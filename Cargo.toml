@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["crates/ftoo_manifest", "crates/ftoo_codegen", "crates/ftoo_audit"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "MIT-0"
+publish = false
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
