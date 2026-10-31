@@ -14,7 +14,7 @@ The decision records in `docs/adr/` carry the full design with its reasons; `doc
 
 ## Status
 
-Pre-release skeleton. The decision records are complete; the crates are empty shells awaiting their first reviewed bites; the engine pin lands with the audit crate's first bite, and the capability requests it needs will be linked here as public issues once filed. The coverage declaration will state at every point how far the audited slice reaches.
+Pre-release skeleton. The decision records are complete; the crates are empty shells awaiting their first reviewed bites; the engine pin lands with the audit crate's first bite, and the capability requests the audit needs are routed as public issues on the engine's repository. The coverage declaration will state at every point how far the audited slice reaches.
 
 ## Reading the paper
 
