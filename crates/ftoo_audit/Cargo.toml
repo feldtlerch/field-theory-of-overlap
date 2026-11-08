@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "6273798201ef00488f87b0c4827487e45cf5bb0e" }
+nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "c5fb73fa244f43a70979a863470f9735ee76cd18" }
 
 [lints]
 workspace = true
