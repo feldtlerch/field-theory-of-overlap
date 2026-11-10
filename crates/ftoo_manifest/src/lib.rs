@@ -4,6 +4,14 @@
 //! not mathematical truth, operation typing or an audit verdict. The coefficient
 //! seed is proposed trial content pending its prose. Bound claims still require an audit run.
 //! There is no serialized boundary or calculation-engine dependency here.
+//!
+//! Addressing admits permanent opaque handles and append-only lifecycle history.
+//! Live handles denote the declared claim slice and its dependency support;
+//! they supply no certification, audit admission or release assessment. Address
+//! books borrow the graph without changing its semantic snapshot. Preserving
+//! descriptors and prior events across source revisions remains a review duty.
+//! Future projection consumers must check the full history and all three stores;
+//! rendering and per-site build refusal remain separate consumers.
 
 mod audit;
 mod budgets;
@@ -12,7 +20,23 @@ mod graph;
 mod identity;
 mod seed;
 mod status;
+mod tag_history;
+mod tag_validation;
+mod tags;
 mod validation;
+
+pub use tag_history::{HistoryChange, HistoryEvent, RetirementCause};
+pub use tag_validation::{
+    AddressingDiagnostic, AddressingErrors, AddressingFault, AddressingLocation, AddressingStage,
+    StoreState,
+};
+pub use tags::{
+    AddressBook, OutOfSliceCause, OutOfSliceEntry, RetiredEntry, TagDescriptor, TagId,
+    TagResolutionFault, addressing,
+};
+
+#[cfg(test)]
+mod tag_tests;
 
 pub use coverage::{ClosedWorld, Coverage, ReleaseGate};
 pub use graph::{

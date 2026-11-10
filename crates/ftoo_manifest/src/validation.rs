@@ -40,6 +40,13 @@ pub enum RuleId {
     M027,
     M028,
     M029,
+    M030,
+    M031,
+    M032,
+    M033,
+    M034,
+    M035,
+    M036,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,7 +68,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 29] = [
+pub const RULES: [RuleSpec; 36] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -264,6 +271,55 @@ pub const RULES: [RuleSpec; 29] = [
         scope: "Registry and execution consumers.",
         state: RuleState::DeferredExclusiveRoutes,
         deferred_reason: Some("Exclusive routes await their first claim and isolation consumer."),
+    },
+    RuleSpec {
+        number: RuleId::M030,
+        statement: "Tag targets and spellings are fixed; no lifecycle operation can rebind or rename a tag or reactivate a retired tag.",
+        scope: "Every public addressing value and operation.",
+        state: RuleState::Structural,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M031,
+        statement: "Tag spellings are nonempty, contain no whitespace or control character, and are unique by exact UTF-8 bytes.",
+        scope: "CatalogAdmission over all descriptors including retired handles.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M032,
+        statement: "History admits every permanent identity and tag exactly once, in a contiguous event order, with identity admission before tag admission.",
+        scope: "HistoryAdmission over the whole ledger, not just present nodes.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M033,
+        statement: "History records carry nonblank reasons, valid authority-record labels and nonblank original identity formulations.",
+        scope: "HistoryAdmission for every event's metadata.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M034,
+        statement: "Retirement is terminal, follows admission, and a retired identity cannot remain in the addressed graph.",
+        scope: "HistoryAdmission and StoreConstruction.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M035,
+        statement: "The live, retired and out-of-slice stores partition every admitted tag according to retirement and declared-slice dependency support.",
+        scope: "StoreConstruction over the full catalog.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M036,
+        statement: "Every permanent identity has a tag, and resolution returns its bound NodeId only for a live exact handle, otherwise its exact named refusal.",
+        scope: "Completed catalog coverage and the resolution consumer.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
 ];
 
