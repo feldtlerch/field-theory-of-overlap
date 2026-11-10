@@ -455,15 +455,13 @@ fn m015_each_closure_assertion_and_complete_gate() -> TestResult {
             _ => draft.coverage.release_gate = ReleaseGate::Complete,
         }
 
-        let diagnostics = refused(draft, &[RuleId::M015])?;
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].location, DraftLocation::Coverage);
+        validate(draft)?; // Editorial assertions are admitted, not inferred.
     }
     Ok(())
 }
 
 #[test]
-fn m015_empty_graph_partial_passes_complete_refused() -> TestResult {
+fn m015_empty_graph_declaration_defers_complete_to_consumer() -> TestResult {
     let mut draft = seed_draft();
     draft.coverage.slice.clear();
     draft.budgets.clear();
@@ -474,7 +472,7 @@ fn m015_empty_graph_partial_passes_complete_refused() -> TestResult {
     assert_eq!(graph.node(One), None);
     assert_eq!(graph.status(One), None);
     draft.coverage.release_gate = ReleaseGate::Complete;
-    refused(draft, &[RuleId::M015])?;
+    validate(draft)?;
     Ok(())
 }
 
@@ -543,7 +541,7 @@ fn diagnostics_are_semantic_and_independent_defects_accumulate() -> TestResult {
 }
 
 #[test]
-fn register_has_exact_m3a_allocation_and_deferral_reasons() -> TestResult {
+fn register_has_exact_m3b_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029,
@@ -560,20 +558,16 @@ fn register_has_exact_m3a_allocation_and_deferral_reasons() -> TestResult {
         let expected = match rule.number {
             M005 | M011 => RuleState::Structural,
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
-            | M024 => RuleState::Enforced,
+            | M024 | M025 | M026 | M027 | M028 => RuleState::Enforced,
             M001 | M002 | M003 | M004 | M012 => RuleState::DeferredM1b,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
-            M025 | M026 | M027 | M028 => RuleState::DeferredM3b,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
         assert_eq!(rule.state, expected);
         assert!(!rule.statement.is_empty() && !rule.scope.is_empty());
         match expected {
             RuleState::Structural | RuleState::Enforced => assert_eq!(rule.deferred_reason, None),
-            RuleState::DeferredM1b
-            | RuleState::DeferredM2
-            | RuleState::DeferredM3b
-            | RuleState::DeferredExclusiveRoutes => {
+            RuleState::DeferredM1b | RuleState::DeferredM2 | RuleState::DeferredExclusiveRoutes => {
                 assert_ne!(rule.deferred_reason.ok_or("missing reason")?, "");
             }
         }
@@ -632,18 +626,18 @@ fn register_pins_admission_statements_and_counts() {
     );
     assert_eq!(
         RULES[13].statement,
-        "Every selected claim is Bound and every transitive claim premise of a selected claim is selected."
+        "GraphAdmission requires each slice claim Bound; RegistryAdmission requires transitive claim premises selected; ReportConsumption requires reached IDs equal the declared slice."
     );
     assert_eq!(
         RULES[14].statement,
-        "Theory closure flags are false, the release gate is ExplicitPartial, and asserted audit closure requires every present claim Bound to its unique implementation."
+        "Audit closure true requires every claim Bound to its implementation; ExplicitPartial and Complete satisfy the stated report predicates, including nonvacuity."
     );
     assert_eq!(
         RULES
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        13
+        17
     );
     assert_eq!(
         RULES
@@ -654,7 +648,7 @@ fn register_pins_admission_statements_and_counts() {
     );
     assert_eq!(
         RULES.iter().filter(|r| r.deferred_reason.is_some()).count(),
-        14
+        10
     );
 }
 
@@ -681,22 +675,6 @@ fn exact_deferral_reasons() {
         ),
         (M019, "M2 must admit indexed spaces and operation typing."),
         (
-            M025,
-            "Outcome and provenance consumption await the M3b report consumer.",
-        ),
-        (
-            M026,
-            "Verdict interpretation awaits the M3b report consumer.",
-        ),
-        (
-            M027,
-            "Gated report reproducibility awaits the M3b report consumer.",
-        ),
-        (
-            M028,
-            "Total blocker semantics await the M3b report consumer.",
-        ),
-        (
             M029,
             "Exclusive routes await their first claim and isolation consumer.",
         ),
@@ -708,4 +686,324 @@ fn exact_deferral_reasons() {
             .collect::<Vec<_>>(),
         expected
     );
+}
+
+// These are explicitly synthetic classifications. Pure acceptance proves no mathematics.
+fn synthetic_rows(graph: &crate::ValidatedManifest) -> Vec<crate::OutcomeDraft> {
+    let mut rows = Vec::new();
+    for id in graph.dependency_order(DependsOn).unwrap() {
+        let node = graph.node(id).unwrap();
+        if node.payload.kind() != NodeKind::Claim {
+            continue;
+        }
+        let deferred = crate::expected_deferral(graph, node, &rows);
+        rows.push(crate::OutcomeDraft::new(
+            node,
+            if deferred.is_some() {
+                crate::VerdictClass::Deferred
+            } else {
+                crate::VerdictClass::Certified
+            },
+            deferred,
+        ));
+    }
+    rows.sort_by_key(|r| r.claim);
+    rows
+}
+fn exact_report_rules(
+    graph: &crate::ValidatedManifest,
+    snapshot: &crate::Snapshot,
+    reached: &[NodeId],
+    rows: &[crate::OutcomeDraft],
+    expected: &[RuleId],
+) {
+    let errors = crate::report_diagnostics(graph, snapshot, reached, rows);
+    assert_eq!(
+        errors.iter().map(|d| d.rule).collect::<BTreeSet<_>>(),
+        expected.iter().copied().collect()
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|d| d.stage == crate::AdmissionStage::ReportConsumption)
+    );
+}
+#[test]
+fn m025_missing_duplicate_and_quantity_rows_are_domain_errors_only() -> TestResult {
+    let graph = seed()?;
+    let snapshot = crate::Snapshot::capture(&graph);
+    let rows = synthetic_rows(&graph);
+    for mutation in 0..3 {
+        let mut changed = rows.clone();
+        match mutation {
+            0 => {
+                changed.pop();
+            }
+            1 => changed.push(changed[0].clone()),
+            _ => changed[0].claim = One,
+        }
+        exact_report_rules(
+            &graph,
+            &snapshot,
+            &graph.coverage().slice,
+            &changed,
+            &[RuleId::M025],
+        );
+    }
+    Ok(())
+}
+#[test]
+fn m025_each_snapshot_component_and_row_identity_is_pinned() -> TestResult {
+    let graph = seed()?;
+    let snapshot = crate::Snapshot::capture(&graph);
+    let rows = synthetic_rows(&graph);
+    for mutation in 0..12 {
+        let mut changed = snapshot.clone();
+        match mutation {
+            0 => {
+                let (NodePayload::Claim { description, .. }
+                | NodePayload::Quantity { description }) = &mut changed.nodes[0].payload;
+                description.push('!');
+            }
+            1 => changed.nodes[0].maturity = Maturity::Retained,
+            2 => changed
+                .edges
+                .retain(|e| *e != edge(CompatibleWith, One, Three)),
+            3 => changed
+                .edges
+                .retain(|e| *e != edge(CompatibleWith, Three, One)),
+            4 => {
+                let n = changed.nodes.iter_mut().find(|n| n.id == OneValue).unwrap();
+                if let NodePayload::Claim { audit, .. } = &mut n.payload {
+                    *audit = ClaimAudit::Awaiting(Awaiting::AuditBinding);
+                }
+            }
+            5 => changed.budgets[0].pin = crate::EnginePin("stale"),
+            6 => changed.capabilities[0].adapter_implemented = true,
+            7 => changed.coverage.slice.pop().map(|_| ()).unwrap(),
+            8 => changed.coverage.closed_world.referents = true,
+            9 => changed.descriptors[0].revision += 1,
+            10 => changed.pin = crate::EnginePin("stale"),
+            _ => changed.descriptors[0].capabilities = &[crate::CapabilityId::SymbolicTrigonometry],
+        }
+        exact_report_rules(
+            &graph,
+            &changed,
+            &graph.coverage().slice,
+            &rows,
+            &[RuleId::M025],
+        );
+    }
+    for mutation in 0..4 {
+        let mut changed = rows.clone();
+        match mutation {
+            0 => changed[0].producer = Some(crate::ProducerId::LangevinCoefficientThreeValue),
+            1 => changed[0].revision = Some(99),
+            2 => changed[0].budget = Some(crate::BudgetId::CoefficientThreeV1),
+            _ => changed[0].pin = crate::EnginePin("stale"),
+        }
+        exact_report_rules(
+            &graph,
+            &snapshot,
+            &graph.coverage().slice,
+            &changed,
+            &[RuleId::M025],
+        );
+    }
+    let mut reordered = seed_draft();
+    reordered.nodes.reverse();
+    reordered.edges.reverse();
+    reordered.budgets.reverse();
+    reordered.coverage.slice.reverse();
+    assert_eq!(snapshot, crate::Snapshot::capture(&validate(reordered)?));
+    Ok(())
+}
+#[test]
+fn m028_wrong_blocker_on_present_valid_row_is_not_m025() -> TestResult {
+    let mut draft = seed_draft();
+    draft.coverage.slice = vec![OneValue];
+    let graph = validate(draft)?;
+    let snapshot = crate::Snapshot::capture(&graph);
+    let mut rows = synthetic_rows(&graph);
+    exact_report_rules(&graph, &snapshot, &graph.coverage().slice, &rows, &[]);
+    let row = rows.iter_mut().find(|r| r.claim == ThreeValue).unwrap();
+    row.deferred = Some(crate::DeferredReason::Premise {
+        claim: OneValue,
+        evidence: crate::VerdictClass::Certified,
+    });
+    exact_report_rules(
+        &graph,
+        &snapshot,
+        &graph.coverage().slice,
+        &rows,
+        &[RuleId::M028],
+    );
+    rows.iter_mut()
+        .find(|r| r.claim == ThreeValue)
+        .unwrap()
+        .deferred = Some(crate::DeferredReason::OutsideSlice);
+    exact_report_rules(&graph, &snapshot, &graph.coverage().slice, &rows, &[]);
+    Ok(())
+}
+#[test]
+fn m014_missing_reached_claim_fails_only_report_consumption() -> TestResult {
+    let graph = seed()?;
+    exact_report_rules(
+        &graph,
+        &crate::Snapshot::capture(&graph),
+        &[OneValue],
+        &synthetic_rows(&graph),
+        &[RuleId::M014],
+    );
+    Ok(())
+}
+fn synthetic_assessment(
+    graph: &crate::ValidatedManifest,
+    rows: &[crate::OutcomeDraft],
+    expected: crate::Disposition,
+) {
+    let result = crate::assess_draft(
+        graph,
+        &crate::Snapshot::capture(graph),
+        &graph.coverage().slice,
+        rows,
+    );
+    assert_eq!(result.disposition, expected);
+    assert_eq!(
+        result
+            .diagnostics
+            .iter()
+            .map(|d| d.rule)
+            .collect::<BTreeSet<_>>(),
+        if expected == crate::Disposition::Pass {
+            BTreeSet::new()
+        } else {
+            [RuleId::M015].into_iter().collect()
+        }
+    );
+}
+#[test]
+fn m015_synthetic_complete_requires_each_closure_nonempty_and_total_certification() -> TestResult {
+    use crate::{DeferredReason as B, Disposition as D, VerdictClass as V};
+    let mut base = seed_draft();
+    base.coverage.release_gate = ReleaseGate::Complete;
+    base.coverage.closed_world = crate::ClosedWorld {
+        referents: true,
+        relations: true,
+        audit: true,
+    };
+    let graph = validate(base.clone())?;
+    synthetic_assessment(&graph, &synthetic_rows(&graph), D::Pass);
+    for flag in 0..3 {
+        let mut draft = base.clone();
+        match flag {
+            0 => draft.coverage.closed_world.referents = false,
+            1 => draft.coverage.closed_world.relations = false,
+            _ => draft.coverage.closed_world.audit = false,
+        }
+        let graph = validate(draft)?;
+        synthetic_assessment(&graph, &synthetic_rows(&graph), D::Incomplete);
+    }
+    let mut draft = base.clone();
+    draft.coverage.slice = vec![OneValue];
+    let graph = validate(draft)?;
+    synthetic_assessment(&graph, &synthetic_rows(&graph), D::Incomplete);
+    for verdict in [V::Refuted, V::Undecided] {
+        let graph = validate(base.clone())?;
+        let mut rows = synthetic_rows(&graph);
+        rows[0].verdict = verdict;
+        rows[1].verdict = V::Deferred;
+        rows[1].deferred = Some(B::Premise {
+            claim: OneValue,
+            evidence: verdict,
+        });
+        synthetic_assessment(
+            &graph,
+            &rows,
+            if verdict == V::Refuted {
+                D::MathematicalFailure
+            } else {
+                D::Incomplete
+            },
+        );
+        let mut draft = base.clone();
+        draft.coverage.release_gate = ReleaseGate::ExplicitPartial;
+        let graph = validate(draft)?;
+        synthetic_assessment(
+            &graph,
+            &rows,
+            if verdict == V::Refuted {
+                D::MathematicalFailure
+            } else {
+                D::Pass
+            },
+        );
+    }
+    let mut draft = base.clone();
+    draft.coverage.slice.clear();
+    let graph = validate(draft)?;
+    synthetic_assessment(&graph, &synthetic_rows(&graph), D::Incomplete);
+    let mut empty = base;
+    empty.nodes.clear();
+    empty.edges.clear();
+    empty.budgets.clear();
+    empty.coverage.slice.clear();
+    let graph = validate(empty.clone())?;
+    synthetic_assessment(&graph, &[], D::Incomplete);
+    empty.coverage.release_gate = ReleaseGate::ExplicitPartial;
+    let graph = validate(empty)?;
+    synthetic_assessment(&graph, &[], D::Pass);
+    Ok(())
+}
+#[test]
+fn m028_awaiting_reasons_survive_empty_selection() -> TestResult {
+    let mut draft = seed_draft();
+    draft.coverage.slice.clear();
+    draft.coverage.closed_world.audit = false;
+    draft.budgets.clear();
+    awaiting(&mut draft, OneValue);
+    awaiting(&mut draft, ThreeValue);
+    if let NodePayload::Claim { audit, .. } = &mut draft
+        .nodes
+        .iter_mut()
+        .find(|n| n.id == ThreeValue)
+        .unwrap()
+        .payload
+    {
+        *audit = ClaimAudit::Awaiting(Awaiting::Capability(
+            crate::CapabilityId::ExactRationalLinearEquivalence,
+        ));
+    }
+    let graph = validate(draft)?;
+    let rows = synthetic_rows(&graph);
+    assert_eq!(rows[0].deferred, Some(crate::DeferredReason::AuditBinding));
+    assert_eq!(
+        rows[1].deferred,
+        Some(crate::DeferredReason::Capability(
+            crate::CapabilityId::ExactRationalLinearEquivalence
+        ))
+    );
+    synthetic_assessment(&graph, &rows, crate::Disposition::Pass);
+    Ok(())
+}
+
+#[test]
+fn m015_awaiting_claim_prevents_complete_even_outside_slice() -> TestResult {
+    let mut draft = seed_draft();
+    draft.coverage.release_gate = ReleaseGate::Complete;
+    draft.coverage.closed_world = crate::ClosedWorld {
+        referents: true,
+        relations: true,
+        audit: false,
+    };
+    draft.coverage.slice = vec![OneValue];
+    awaiting(&mut draft, ThreeValue);
+    draft.budgets.pop();
+    let graph = validate(draft)?;
+    synthetic_assessment(
+        &graph,
+        &synthetic_rows(&graph),
+        crate::Disposition::Incomplete,
+    );
+    Ok(())
 }

@@ -60,6 +60,14 @@ pub(crate) fn checked(
     limits: Limits,
     empty: bool,
 ) -> Result<(Receipt, Measurement), RunError> {
+    checked_claim(d, limits, empty, None)
+}
+pub(crate) fn checked_claim(
+    d: ProducerDescriptor,
+    limits: Limits,
+    empty: bool,
+    claimed: Option<(i64, u64)>,
+) -> Result<(Receipt, Measurement), RunError> {
     if d.target != d.producer.descriptor().target || d.region != d.producer.descriptor().region {
         return Err(RunError::Execution {
             claim: d.claim,
@@ -95,6 +103,22 @@ pub(crate) fn checked(
     frame
         .replay(&evidence, &expected)
         .map_err(error(RunStage::Replay))?;
+    let mut replay_work = frame.budget.usage().work - before;
+    let contrary = if let Some((numerator, denominator)) = claimed {
+        let claimed = nrz_cas::Rational::from_ratio(numerator, denominator, &mut frame.budget)
+            .map_err(error(RunStage::Projection))?;
+        if claimed == jet[d.target] {
+            None
+        } else {
+            let (witness, contrary_replay) = frame
+                .counterstatement(&jet[d.target], &claimed)
+                .map_err(error(RunStage::Projection))?;
+            replay_work += contrary_replay;
+            Some(crate::Counterstatement { claimed, witness })
+        }
+    } else {
+        None
+    };
     let total_work = frame.budget.usage().work;
     let summary = JetSummary {
         subject: "identity composition Compose(J,h)=J",
@@ -110,13 +134,16 @@ pub(crate) fn checked(
         region: d.region,
         analytic_scope: "The regular germ coth(x)-1/x satisfies this ODE. The triangular finite equations have leading coefficients 2,3,4,5 and uniquely fix c0..c3; c4 is free terminal candidate data. No convergence or global equality is certified.",
     };
+    let mut receipt = Receipt::accepted(d, limits, summary, evidence);
+    receipt.contrary = contrary;
     Ok((
-        Receipt::accepted(d, limits, summary, evidence),
+        receipt,
         Measurement {
             claim: d.claim,
+            execution: frame.execution,
             member_work,
             total_work,
-            replay_work: total_work - before,
+            replay_work,
         },
     ))
 }

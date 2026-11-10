@@ -25,6 +25,7 @@ fn scalar() -> Sort {
     Sort::Value(AtomicSort::Scalar(Field::Real))
 }
 pub(crate) struct Frame {
+    pub(crate) execution: u64,
     pub cas: Cas,
     pub budget: Budget,
     nodes: Vec<(Operator, Vec<Handle>, Handle)>,
@@ -138,6 +139,7 @@ impl Frame {
             (Operator::Free("y".into()), Vec::new(), y.clone()),
         ];
         let mut frame = Self {
+            execution: EXECUTIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             cas,
             budget,
             nodes,
@@ -539,3 +541,75 @@ fn polynomial(
 
 #[cfg(test)]
 thread_local! { pub(crate) static COUNTS: std::cell::Cell<(usize,usize)> = const { std::cell::Cell::new((0,0)) }; }
+
+static EXECUTIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+impl Frame {
+    /// Check (actual - claimed) * inverse = 1 in the same ambient frame and budget.
+    pub fn counterstatement(
+        &mut self,
+        actual: &Rational,
+        claimed: &Rational,
+    ) -> Result<(Vec<u8>, u64), Fault> {
+        use nrz_cas::{
+            proof::{ApplicationDraft, Certificate, Primitive},
+            solving::{
+                CertificateCoefficientIdentity, CoefficientMapData, IdentityMode, MapMode,
+                MapTarget, SolveSchema, StatementCoefficientEquality,
+            },
+        };
+        let difference = actual.sub(claimed, &mut self.budget)?;
+        let inverse = Rational::one().div(&difference, &mut self.budget)?;
+        let map = self.admit(Draft::Solve(SolveDraft::CoefficientMap(
+            CoefficientMapData {
+                source: Reference::Existing(self.field.clone()),
+                target: MapTarget::ScalarAmbient {
+                    header: Reference::Existing(self.header.clone()),
+                    field: Field::Real,
+                },
+                mode: MapMode::Embedding,
+                region: Reference::Existing(self.region.clone()),
+                images: Vec::new(),
+                denominators: Vec::new(),
+            },
+        )))?;
+        let actual = self.node(Operator::Rational(actual.clone()), &[])?;
+        let claimed = self.node(Operator::Rational(claimed.clone()), &[])?;
+        let difference = self.node(Operator::Sub, &[actual, claimed])?;
+        let inverse = self.node(Operator::Rational(inverse), &[])?;
+        let left = self.node(Operator::Mul, &[difference, inverse])?;
+        let right = self.node(Operator::Rational(Rational::one()), &[])?;
+        let statement = SolveStatement::CoefficientEquality(StatementCoefficientEquality {
+            left: left.clone(),
+            right: right.clone(),
+            map: map.clone(),
+            region: self.region.clone(),
+        });
+        let expected = self.judgment(Statement::Solve(Box::new(statement.clone())));
+        let application = ApplicationDraft {
+            rule: Primitive::Solve(SolveSchema::CoefficientIdentity),
+            context: self.context.clone(),
+            conclusion: Statement::Solve(Box::new(statement)),
+            premises: Vec::new(),
+            substitutions: Vec::new(),
+            certificate: Certificate::Solve(Box::new(SolveCertificate::CoefficientIdentity(
+                CertificateCoefficientIdentity {
+                    mode: IdentityMode::Normalize,
+                    left,
+                    right,
+                    map,
+                    region: self.region.clone(),
+                    combinations: Vec::new(),
+                    denominators: Vec::new(),
+                },
+            ))),
+        };
+        let witness = self
+            .cas
+            .check_proof(&self.context, &[application], &mut self.budget)?;
+        let bytes = self.export(&witness)?;
+        let before_replay = self.budget.usage().work;
+        self.cas.replay(&bytes, &expected, &mut self.budget)?;
+        Ok((bytes, self.budget.usage().work - before_replay))
+    }
+}

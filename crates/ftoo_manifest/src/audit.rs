@@ -237,3 +237,247 @@ pub fn registry_diagnostics(
     });
     errors
 }
+
+/// Untrusted classifications for consistency checking; never proof tokens.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VerdictClass {
+    Certified,
+    Refuted,
+    Undecided,
+    Deferred,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DeferredReason {
+    AuditBinding,
+    Capability(CapabilityId),
+    OutsideSlice,
+    Premise {
+        claim: NodeId,
+        evidence: VerdictClass,
+    },
+}
+/// Caller-authored report data. Acceptance by a pure checker does not certify it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OutcomeDraft {
+    pub claim: NodeId,
+    pub producer: Option<ProducerId>,
+    pub revision: Option<u32>,
+    pub budget: Option<BudgetId>,
+    pub pin: EnginePin,
+    pub verdict: VerdictClass,
+    pub deferred: Option<DeferredReason>,
+}
+impl OutcomeDraft {
+    #[must_use]
+    pub fn new(
+        node: &crate::NodeDraft,
+        verdict: VerdictClass,
+        deferred: Option<DeferredReason>,
+    ) -> Self {
+        let binding = match node.payload {
+            crate::NodePayload::Claim {
+                audit:
+                    ClaimAudit::Bound {
+                        producer, budget, ..
+                    },
+                ..
+            } => Some((producer, budget)),
+            _ => None,
+        };
+        Self {
+            claim: node.id,
+            producer: binding.map(|b| b.0),
+            revision: binding.map(|b| b.0.descriptor().revision),
+            budget: binding.map(|b| b.1),
+            pin: ENGINE_PIN,
+            verdict,
+            deferred,
+        }
+    }
+}
+/// Canonical owned semantic input, including editorial fields and every edge.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Snapshot {
+    pub nodes: Vec<crate::NodeDraft>,
+    pub edges: Vec<crate::Edge>,
+    pub descriptors: Vec<ProducerDescriptor>,
+    pub capabilities: Vec<CapabilitySpec>,
+    pub coverage: crate::Coverage,
+    pub budgets: Vec<crate::BudgetSpec>,
+    pub pin: EnginePin,
+}
+impl Snapshot {
+    #[must_use]
+    pub fn capture(graph: &crate::ValidatedManifest) -> Self {
+        let mut nodes = graph.nodes().to_vec();
+        nodes.sort_by_key(|n| n.id);
+        let mut edges = graph.edges().to_vec();
+        edges.sort();
+        let mut budgets = graph.budgets().to_vec();
+        budgets.sort_by_key(|b| b.id);
+        let mut coverage = graph.coverage().clone();
+        coverage.slice.sort();
+        let mut descriptors: Vec<_> = nodes
+            .iter()
+            .filter_map(|n| match n.payload {
+                crate::NodePayload::Claim {
+                    audit: ClaimAudit::Bound { producer, .. },
+                    ..
+                } => Some(producer.descriptor()),
+                _ => None,
+            })
+            .collect();
+        descriptors.sort_by_key(|d| d.producer);
+        Self {
+            nodes,
+            edges,
+            descriptors,
+            capabilities: CAPABILITIES.to_vec(),
+            coverage,
+            budgets,
+            pin: ENGINE_PIN,
+        }
+    }
+}
+/// Derive a blocker from authority and existing classifications, never from timing.
+#[must_use]
+pub fn expected_deferral(
+    graph: &crate::ValidatedManifest,
+    node: &crate::NodeDraft,
+    rows: &[OutcomeDraft],
+) -> Option<DeferredReason> {
+    let crate::NodePayload::Claim { audit, .. } = node.payload else {
+        return None;
+    };
+    let producer = match audit {
+        ClaimAudit::Awaiting(crate::Awaiting::AuditBinding) => {
+            return Some(DeferredReason::AuditBinding);
+        }
+        ClaimAudit::Awaiting(crate::Awaiting::Capability(c)) => {
+            return Some(DeferredReason::Capability(c));
+        }
+        ClaimAudit::Bound { producer, .. } => producer,
+    };
+    if !graph.coverage().slice.contains(&node.id) {
+        return Some(DeferredReason::OutsideSlice);
+    }
+    let descriptor = producer.descriptor();
+    if let Some(capability) = descriptor
+        .capabilities
+        .iter()
+        .find(|c| !adapter_implemented(**c, ENGINE_PIN))
+    {
+        return Some(DeferredReason::Capability(*capability));
+    }
+    for premise in descriptor
+        .dependencies
+        .iter()
+        .filter(|id| id.expected_kind() == crate::NodeKind::Claim)
+    {
+        if let Some(row) = rows.iter().find(|r| r.claim == *premise)
+            && row.verdict != VerdictClass::Certified
+        {
+            return Some(DeferredReason::Premise {
+                claim: *premise,
+                evidence: row.verdict,
+            });
+        }
+    }
+    None
+}
+pub(crate) fn consumption_diagnostic(
+    rule: crate::RuleId,
+    ids: Vec<NodeId>,
+    location: crate::DraftLocation,
+    explanation: &str,
+) -> crate::Diagnostic {
+    crate::Diagnostic {
+        stage: crate::AdmissionStage::ReportConsumption,
+        rule,
+        ids,
+        edge: None,
+        location,
+        explanation: explanation.into(),
+    }
+}
+/// Check untrusted report structure only; no engine evidence or status is produced.
+#[must_use]
+pub fn report_diagnostics(
+    graph: &crate::ValidatedManifest,
+    snapshot: &Snapshot,
+    reached: &[NodeId],
+    rows: &[OutcomeDraft],
+) -> Vec<crate::Diagnostic> {
+    use crate::{DraftLocation, NodeKind, RuleId};
+    use std::collections::BTreeSet;
+    let mut errors = Vec::new();
+    if *snapshot != Snapshot::capture(graph) {
+        errors.push(consumption_diagnostic(
+            RuleId::M025,
+            vec![],
+            DraftLocation::Provenance,
+            "semantic snapshot differs from authority",
+        ));
+    }
+    let selected: BTreeSet<_> = graph.coverage().slice.iter().copied().collect();
+    let actual: BTreeSet<_> = reached.iter().copied().collect();
+    if selected != actual || actual.len() != reached.len() {
+        errors.push(consumption_diagnostic(
+            RuleId::M014,
+            vec![],
+            DraftLocation::Coverage,
+            "reached IDs must equal the declared slice exactly",
+        ));
+    }
+    let claims: BTreeSet<_> = graph
+        .nodes()
+        .iter()
+        .filter(|n| n.payload.kind() == NodeKind::Claim)
+        .map(|n| n.id)
+        .collect();
+    let row_ids: BTreeSet<_> = rows.iter().map(|r| r.claim).collect();
+    let domain_valid = claims == row_ids && rows.len() == row_ids.len();
+    if !domain_valid {
+        errors.push(consumption_diagnostic(
+            RuleId::M025,
+            vec![],
+            DraftLocation::Provenance,
+            "exactly one row per present claim and none for quantities is required",
+        ));
+    }
+    for (index, row) in rows.iter().enumerate() {
+        let Some(node) = graph
+            .nodes()
+            .iter()
+            .find(|n| n.id == row.claim && n.payload.kind() == NodeKind::Claim)
+        else {
+            continue;
+        };
+        let expected = OutcomeDraft::new(node, row.verdict, row.deferred);
+        if *row != expected {
+            errors.push(consumption_diagnostic(
+                RuleId::M025,
+                vec![row.claim],
+                DraftLocation::Verdict(index),
+                "claim, producer, revision, budget and pin must match",
+            ));
+            continue;
+        }
+        // Missing or duplicate premises belong solely to M025, not blocker fallback.
+        if domain_valid {
+            let blocker = expected_deferral(graph, node, rows);
+            if row.deferred != blocker
+                || (row.verdict == VerdictClass::Deferred) != blocker.is_some()
+            {
+                errors.push(consumption_diagnostic(
+                    RuleId::M028,
+                    vec![row.claim],
+                    DraftLocation::Verdict(index),
+                    "outcome must carry precisely its derived blocker",
+                ));
+            }
+        }
+    }
+    errors.sort_by(|a, b| (a.rule, &a.ids, &a.location).cmp(&(b.rule, &b.ids, &b.location)));
+    errors
+}

@@ -671,3 +671,395 @@ fn changed_residual_sign_refuses_member() -> TestResult {
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
     Ok(())
 }
+
+fn report_rules(error: crate::AuditError, expected: &[RuleId]) {
+    let crate::AuditError::Report(errors) = error else {
+        panic!("expected report diagnostics")
+    };
+    assert_eq!(
+        errors
+            .iter()
+            .map(|d| d.rule)
+            .collect::<std::collections::BTreeSet<_>>(),
+        expected.iter().copied().collect()
+    );
+    assert!(
+        errors
+            .iter()
+            .all(|d| d.stage == AdmissionStage::ReportConsumption)
+    );
+}
+#[test]
+fn m027_cold_warm_and_reordered_reports_have_identical_gated_evidence() -> TestResult {
+    let graph = seed()?;
+    let before = counts();
+    let cold = crate::audit(&graph)?;
+    assert_eq!(counts(), (before.0 + 2, before.1 + 2));
+    crate::test_support::solving_trial()?;
+    let warm = crate::audit(&graph)?;
+    assert_eq!(cold.gated(), warm.gated());
+    let mut draft = seed_draft();
+    draft.nodes.reverse();
+    draft.edges.reverse();
+    draft.budgets.reverse();
+    draft.coverage.slice.reverse();
+    let reordered = crate::audit(&validate(draft)?)?;
+    assert_eq!(cold.gated(), reordered.gated());
+    let mut measurements = warm.measurements().to_vec();
+    measurements[0].total_work += 999;
+    let observed = crate::AuditReport::from_outcomes(
+        &graph,
+        warm.snapshot().clone(),
+        warm.reached().to_vec(),
+        warm.outcomes().to_vec(),
+        measurements,
+    )?;
+    assert_eq!(cold.gated(), observed.gated());
+    assert_eq!(
+        cold.status(OneValue).unwrap().evidence(),
+        crate::AuditedEvidence::Certified
+    );
+    assert_eq!(
+        cold.status(One).unwrap().evidence(),
+        crate::AuditedEvidence::NotAClaim
+    );
+    assert_eq!(
+        cold.status(OneValue).unwrap().base().maturity(),
+        ftoo_manifest::Maturity::Proposed
+    );
+    assert_eq!(
+        graph.status(OneValue).unwrap().evidence(),
+        ftoo_manifest::Evidence::Deferred
+    );
+    Ok(())
+}
+#[test]
+fn m027_reused_execution_identity_is_refused() -> TestResult {
+    let graph = seed()?;
+    let report = crate::audit(&graph)?;
+    let mut measurements = report.measurements().to_vec();
+    measurements[1].execution = measurements[0].execution;
+    report_rules(
+        crate::AuditReport::from_outcomes(
+            &graph,
+            report.snapshot().clone(),
+            report.reached().to_vec(),
+            report.outcomes().to_vec(),
+            measurements,
+        )
+        .expect_err("reused store"),
+        &[RuleId::M027],
+    );
+    Ok(())
+}
+fn refuted_first() -> Result<(crate::Receipt, crate::Measurement), RunError> {
+    theory::checked_claim(
+        ProducerId::LangevinCoefficientOneValue.descriptor(),
+        profile(),
+        false,
+        Some((0, 1)),
+    )
+}
+fn exhausted_first() -> Result<(crate::Receipt, crate::Measurement), RunError> {
+    theory::checked(
+        ProducerId::LangevinCoefficientOneValue.descriptor(),
+        Limits {
+            work: 1,
+            ..profile()
+        },
+        false,
+    )
+}
+#[test]
+fn m026_checked_counterstatement_refutes_and_partial_release_refuses() -> TestResult {
+    let graph = seed()?;
+    let mut entries = crate::registry::REGISTRY;
+    entries[0].produce = refuted_first;
+    entries[1].produce = must_not_execute;
+    let report = crate::runner::audit_entries(&graph, &entries)?;
+    let crate::Verdict::Refuted(receipt) = report.outcomes()[0].verdict() else {
+        panic!("expected checked refutation: {:?}", report.outcomes())
+    };
+    assert_eq!(
+        receipt.counterstatement().unwrap().claimed(),
+        &Rational::zero()
+    );
+    assert_ne!(receipt.counterstatement().unwrap().witness(), []);
+    assert_eq!(
+        report.outcomes()[1].verdict(),
+        &crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Premise {
+            claim: OneValue,
+            evidence: ftoo_manifest::VerdictClass::Refuted
+        })
+    );
+    assert_eq!(
+        report.assessment().disposition(),
+        ftoo_manifest::Disposition::MathematicalFailure
+    );
+    assert_eq!(report.assessment().exit_code(), 4);
+    assert_eq!(
+        report
+            .assessment()
+            .diagnostics()
+            .iter()
+            .map(|d| d.rule)
+            .collect::<Vec<_>>(),
+        [RuleId::M015]
+    );
+    assert_eq!(
+        report.status(OneValue).unwrap().evidence(),
+        crate::AuditedEvidence::Refuted
+    );
+    println!(
+        "COUNTERSTATEMENT complete work={} total replay={}",
+        report.measurements()[0].total_work,
+        report.measurements()[0].replay_work
+    );
+    assert!(report.measurements()[0].total_work <= 8_000_000);
+    Ok(())
+}
+#[test]
+fn m026_typed_exhaustion_is_undecided_and_partial_release_allows_it() -> TestResult {
+    let graph = seed()?;
+    let mut entries = crate::registry::REGISTRY;
+    entries[0].produce = exhausted_first;
+    entries[1].produce = must_not_execute;
+    let report = crate::runner::audit_entries(&graph, &entries)?;
+    let crate::Verdict::Undecided { stage, exhaustion } = report.outcomes()[0].verdict() else {
+        panic!("Undecided")
+    };
+    assert_eq!(*stage, RunStage::Setup);
+    assert_eq!(
+        exhaustion.kind,
+        FaultKind::Exhausted {
+            reason: nrz_cas::Exhaustion::Limit,
+            budget: BudgetKind::Work,
+            limit: 1,
+            needed: 2
+        }
+    );
+    assert_eq!(
+        report.outcomes()[1].verdict(),
+        &crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Premise {
+            claim: OneValue,
+            evidence: ftoo_manifest::VerdictClass::Undecided
+        })
+    );
+    assert_eq!(report.assessment().exit_code(), 0);
+    assert_eq!(report.reached(), [OneValue, ThreeValue]);
+    assert_eq!(report.measurements(), []);
+    Ok(())
+}
+#[test]
+fn m028_deferred_premise_and_capability_never_execute() -> TestResult {
+    let first = crate::ClaimOutcome {
+        claim: OneValue,
+        verdict: crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Capability(
+            ftoo_manifest::CapabilityId::ExactRationalLinearEquivalence,
+        )),
+    };
+    let mut entry = crate::registry::REGISTRY[1];
+    entry.produce = must_not_execute;
+    let before = counts();
+    let (verdict, measurement) = crate::runner::dispatch(&entry, &[first])?;
+    assert_eq!(
+        verdict,
+        crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Premise {
+            claim: OneValue,
+            evidence: ftoo_manifest::VerdictClass::Deferred
+        })
+    );
+    assert!(measurement.is_none());
+    let mut entry = crate::registry::REGISTRY[0];
+    entry.produce = must_not_execute;
+    entry.descriptor.capabilities = &[ftoo_manifest::CapabilityId::ExactRationalLinearEquivalence];
+    let (verdict, measurement) = crate::runner::dispatch(&entry, &[])?;
+    assert_eq!(
+        verdict,
+        crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Capability(
+            ftoo_manifest::CapabilityId::ExactRationalLinearEquivalence
+        ))
+    );
+    assert!(measurement.is_none());
+    assert_eq!(counts(), before);
+    Ok(())
+}
+#[test]
+fn m025_missing_premise_is_not_a_blocker_fallback() {
+    report_rules(
+        crate::runner::dispatch(&crate::registry::REGISTRY[1], &[]).expect_err("missing row"),
+        &[RuleId::M025],
+    );
+}
+#[test]
+fn m026_invalid_construction_never_becomes_refutation() -> TestResult {
+    let mut f = Frame::new(profile(), false)?;
+    let j = f.rationals(&[(0, 1), (1, 3), (0, 1), (1, 45), (0, 1)])?;
+    let h = f.rationals(&[(0, 1), (1, 1), (0, 1), (0, 1), (0, 1)])?;
+    let compose = f.compose(&j, &h)?;
+    let (ode, rows) = f.term(&theory::ode(), &j, 4)?;
+    let fault = f.residual(&compose, &ode, &rows).expect_err("bad member");
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+    let error = crate::runner::fault(OneValue, RunStage::ResidualMember, fault);
+    assert_eq!(
+        crate::runner::interpret(error.clone()).expect_err("invalid is not refutation"),
+        crate::AuditError::Execution(error)
+    );
+    let graph = seed()?;
+    let report = crate::audit(&graph)?;
+    let mut outcomes = report.outcomes().to_vec();
+    let crate::Verdict::Certified(receipt) = outcomes.remove(0).verdict else {
+        panic!("certified")
+    };
+    outcomes.insert(
+        0,
+        crate::ClaimOutcome {
+            claim: OneValue,
+            verdict: crate::Verdict::Refuted(receipt),
+        },
+    );
+    report_rules(
+        crate::AuditReport::from_outcomes(
+            &graph,
+            report.snapshot().clone(),
+            report.reached().to_vec(),
+            outcomes,
+            report.measurements().to_vec(),
+        )
+        .expect_err("no contrary proof"),
+        &[RuleId::M026],
+    );
+    Ok(())
+}
+#[test]
+fn m015_real_partial_complete_and_incomplete_assessments() -> TestResult {
+    use ftoo_manifest::{Disposition as D, ReleaseGate};
+    for slice in [vec![], vec![OneValue], vec![OneValue, ThreeValue]] {
+        let mut draft = seed_draft();
+        draft.coverage.slice = slice.clone();
+        let graph = validate(draft)?;
+        let report = crate::audit(&graph)?;
+        assert_eq!(report.assessment().disposition(), D::Pass);
+        assert_eq!(report.outcomes().len(), 2);
+        for row in report.outcomes() {
+            if !slice.contains(&row.claim()) {
+                assert_eq!(
+                    row.verdict(),
+                    &crate::Verdict::Deferred(ftoo_manifest::DeferredReason::OutsideSlice)
+                );
+            }
+        }
+    }
+    let mut draft = seed_draft();
+    draft.coverage.release_gate = ReleaseGate::Complete;
+    let report = crate::audit(&validate(draft.clone())?)?;
+    assert_eq!(report.assessment().exit_code(), 5);
+    draft.coverage.closed_world.referents = true;
+    draft.coverage.closed_world.relations = true;
+    let report = crate::audit(&validate(draft)?)?;
+    assert_eq!(report.assessment().exit_code(), 0);
+    for (class, code) in [
+        (D::Pass, 0),
+        (D::InputError, 2),
+        (D::SemanticInvalidity, 3),
+        (D::MathematicalFailure, 4),
+        (D::Incomplete, 5),
+    ] {
+        assert_eq!(class.exit_code(), code);
+    }
+    Ok(())
+}
+
+#[test]
+fn m026_junk_witness_is_semantic_invalidity_not_refutation() -> TestResult {
+    let mut frame = Frame::new(profile(), false)?;
+    let expected = frame.expectations()?;
+    let fault = frame
+        .cas
+        .replay(&[], &expected[0], &mut frame.budget)
+        .expect_err("junk witness");
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedVersion)
+    );
+    let error = crate::runner::fault(OneValue, RunStage::Replay, fault);
+    let classified = crate::runner::interpret(error.clone()).expect_err("invalid must abort");
+    assert_eq!(classified, crate::AuditError::Execution(error));
+    assert_eq!(classified.exit_code(), 3);
+    let mut entries = crate::registry::REGISTRY;
+    entries[0].produce = failed_first;
+    entries[1].produce = must_not_execute;
+    assert_eq!(
+        crate::runner::audit_entries(&seed()?, &entries).expect_err("invalid producer must abort"),
+        crate::AuditError::Execution(RunError::Execution {
+            claim: OneValue,
+            stage: RunStage::Projection,
+            cause: RunCause::ProjectionMismatch
+        })
+    );
+    Ok(())
+}
+#[test]
+fn m025_stale_provenance_cannot_construct_audited_status() -> TestResult {
+    let graph = seed()?;
+    let report = crate::audit(&graph)?;
+    let mut snapshot = report.snapshot().clone();
+    snapshot.pin = EnginePin("stale");
+    report_rules(
+        crate::AuditReport::from_outcomes(
+            &graph,
+            snapshot,
+            report.reached().to_vec(),
+            report.outcomes().to_vec(),
+            report.measurements().to_vec(),
+        )
+        .expect_err("stale report"),
+        &[RuleId::M025],
+    );
+    Ok(())
+}
+#[test]
+fn m026_both_counterstatements_fit_the_fixed_profile() -> TestResult {
+    for producer in ProducerId::ALL {
+        let (receipt, measurement) =
+            theory::checked_claim(producer.descriptor(), profile(), false, Some((0, 1)))?;
+        assert!(receipt.counterstatement().is_some());
+        assert_eq!(receipt.limits(), &profile());
+        println!(
+            "COUNTERSTATEMENT target={} work={} total_replay={}",
+            receipt.target(),
+            measurement.total_work,
+            measurement.replay_work
+        );
+        assert!(measurement.total_work <= 8_000_000);
+        assert!(measurement.replay_work <= 4_500_000);
+    }
+    Ok(())
+}
+
+#[test]
+fn m015_empty_authority_is_partial_but_never_complete() -> TestResult {
+    let mut draft = seed_draft();
+    draft.nodes.clear();
+    draft.edges.clear();
+    draft.budgets.clear();
+    draft.coverage.slice.clear();
+    draft.coverage.closed_world = ftoo_manifest::ClosedWorld {
+        referents: true,
+        relations: true,
+        audit: true,
+    };
+    let before = counts();
+    for (gate, code) in [
+        (ftoo_manifest::ReleaseGate::ExplicitPartial, 0),
+        (ftoo_manifest::ReleaseGate::Complete, 5),
+    ] {
+        draft.coverage.release_gate = gate;
+        let graph = validate(draft.clone())?;
+        let report = crate::runner::audit_entries(&graph, &[])?;
+        assert_eq!(report.outcomes(), []);
+        assert_eq!(report.assessment().exit_code(), code);
+    }
+    assert_eq!(counts(), before);
+    Ok(())
+}

@@ -48,7 +48,6 @@ pub enum RuleState {
     Enforced,
     DeferredM1b,
     DeferredM2,
-    DeferredM3b,
     DeferredExclusiveRoutes,
 }
 
@@ -93,7 +92,7 @@ pub const RULES: [RuleSpec; 29] = [
     },
     RuleSpec {
         number: RuleId::M005,
-        statement: "Identifiers, kinds, relations, guards, status, binding, capabilities, budgets and Unconditional routes are closed; payload determines kind.",
+        statement: "Identifiers, kinds, relations, guards, status, binding, capabilities, budgets, verdict classifications and Unconditional routes are closed; payload determines kind.",
         scope: "Every admitted Rust value.",
         state: RuleState::Structural,
         deferred_reason: None,
@@ -135,14 +134,14 @@ pub const RULES: [RuleSpec; 29] = [
     },
     RuleSpec {
         number: RuleId::M011,
-        statement: "Only maturity is authored; other status axes derive from admitted identity and payload.",
-        scope: "Every validated node.",
+        statement: "Only maturity is authored; base status derives from identity/payload and AuditedStatus only through private checked-report construction.",
+        scope: "Base and audited status APIs.",
         state: RuleState::Structural,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M012,
-        statement: "Loaded status assertions equal derivation and claims name the admitted blocker.",
+        statement: "Assertions equal their surface's derivation: unaudited projection or replay-checked audited report.",
         scope: "Every loaded status assertion.",
         state: RuleState::DeferredM1b,
         deferred_reason: Some("Assertions enter only through the M1b wire boundary."),
@@ -156,14 +155,14 @@ pub const RULES: [RuleSpec; 29] = [
     },
     RuleSpec {
         number: RuleId::M014,
-        statement: "Every selected claim is Bound and every transitive claim premise of a selected claim is selected.",
-        scope: "Members passing presence and shape; AuditBinding is ineligible.",
+        statement: "GraphAdmission requires each slice claim Bound; RegistryAdmission requires transitive claim premises selected; ReportConsumption requires reached IDs equal the declared slice.",
+        scope: "GraphAdmission, RegistryAdmission and ReportConsumption.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M015,
-        statement: "Theory closure flags are false, the release gate is ExplicitPartial, and asserted audit closure requires every present claim Bound to its unique implementation.",
+        statement: "Audit closure true requires every claim Bound to its implementation; ExplicitPartial and Complete satisfy the stated report predicates, including nonvacuity.",
         scope: "Every manifest, including an empty graph.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -212,7 +211,7 @@ pub const RULES: [RuleSpec; 29] = [
     },
     RuleSpec {
         number: RuleId::M022,
-        statement: "Fixed producers have exactly their declared dependencies; accepted premises unlock execution and target witnesses contain full coefficient dependencies.",
+        statement: "Fixed producers have exactly their declared dependencies; Certified premises unlock execution and target witnesses contain full coefficient dependencies.",
         scope: "Registry and execution consumers.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -233,31 +232,31 @@ pub const RULES: [RuleSpec; 29] = [
     },
     RuleSpec {
         number: RuleId::M025,
-        statement: "Outcome domain and provenance match the manifest.",
-        scope: "Registry and execution consumers.",
-        state: RuleState::DeferredM3b,
-        deferred_reason: Some("Outcome and provenance consumption await the M3b report consumer."),
+        statement: "Exactly one outcome exists per claim, none for quantities; claim, producer, revision, pin, budget and semantic snapshot match.",
+        scope: "Report domain and semantic provenance.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M026,
-        statement: "Mathematical verdicts consume matching replay-checked evidence.",
-        scope: "Registry and execution consumers.",
-        state: RuleState::DeferredM3b,
-        deferred_reason: Some("Verdict interpretation awaits the M3b report consumer."),
+        statement: "Certified/Refuted consume matching replay-checked evidence; only typed limits yield exhaustion and invalid construction never refutes.",
+        scope: "Private receipt construction and verdict interpretation.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M027,
-        statement: "Gated report evidence is reproducible independently of measurements.",
-        scope: "Registry and execution consumers.",
-        state: RuleState::DeferredM3b,
-        deferred_reason: Some("Gated report reproducibility awaits the M3b report consumer."),
+        statement: "Each execution has a fresh store and one budget; gated evidence is independent of measurements and previous caches.",
+        scope: "Fresh execution and complete gated report reproducibility.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M028,
-        statement: "Every unselected or blocked claim has its exact derived deferral.",
-        scope: "Registry and execution consumers.",
-        state: RuleState::DeferredM3b,
-        deferred_reason: Some("Total blocker semantics await the M3b report consumer."),
+        statement: "Every unselected or blocked claim has its exact derived deferral; uncertified prerequisites cannot promote dependents.",
+        scope: "Total report blockers and Certified-premise scheduling.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M029,
@@ -278,6 +277,8 @@ pub enum DraftLocation {
     Binding(usize),
     Budget(usize),
     Capability(usize),
+    Verdict(usize),
+    Provenance,
     Cycle {
         relation: RelationKind,
         edges: Vec<usize>,
@@ -557,21 +558,26 @@ fn check_coverage(
             );
         }
     }
-    if !draft.coverage.has_partial_assertions()
-        || (draft.coverage.closed_world.audit
-            && draft.nodes.iter().any(|n| {
-                nodes.get(&n.id) == Some(&Some(NodeKind::Claim))
-                    && matches!(
-                        n.payload,
-                        NodePayload::Claim {
-                            audit: ClaimAudit::Awaiting(_),
-                            ..
-                        }
-                    )
-            }))
+    if draft.coverage.closed_world.audit
+        && draft.nodes.iter().any(|n| {
+            nodes.get(&n.id) == Some(&Some(NodeKind::Claim))
+                && matches!(
+                    n.payload,
+                    NodePayload::Claim {
+                        audit: ClaimAudit::Awaiting(_),
+                        ..
+                    }
+                )
+        })
     {
-        report(diagnostics, RuleId::M015, vec![], None, DraftLocation::Coverage,
-            "theory closures must be false, gate ExplicitPartial, and audit closure requires Bound claims".into());
+        report(
+            diagnostics,
+            RuleId::M015,
+            vec![],
+            None,
+            DraftLocation::Coverage,
+            "audit closure requires every present claim Bound".into(),
+        );
     }
 }
 
@@ -669,4 +675,5 @@ fn cycle_from(
 pub enum AdmissionStage {
     GraphAdmission,
     RegistryAdmission,
+    ReportConsumption,
 }

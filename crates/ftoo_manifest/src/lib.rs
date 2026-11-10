@@ -1,6 +1,6 @@
 //! A closed Rust-data manifest and its structural validator.
 //!
-//! Validation establishes identity, relation contracts and conservative coverage,
+//! Validation establishes identity, relation contracts and coverage declarations,
 //! not mathematical truth, operation typing or an audit verdict. The coefficient
 //! seed is proposed trial content pending its prose. Bound claims still require an audit run.
 //! There is no serialized boundary or calculation-engine dependency here.
@@ -36,3 +36,8 @@ pub use audit::{
     adapter_implemented, registry_diagnostics,
 };
 pub use budgets::{BudgetId, BudgetProfile, BudgetSpec};
+
+pub use audit::{
+    DeferredReason, OutcomeDraft, Snapshot, VerdictClass, expected_deferral, report_diagnostics,
+};
+pub use coverage::{AssessmentDraft, Disposition, assess_draft};
