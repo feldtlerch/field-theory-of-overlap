@@ -1,5 +1,5 @@
 //! Owned locations and faults for the authored unit boundary.
-use crate::RuleId;
+use crate::{RuleId, TagResolutionFault};
 use std::{fmt, ops::Range};
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -78,6 +78,7 @@ pub enum UnitStage {
     Metadata,
     Language,
     Content,
+    Resolution,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ShapeKind {
@@ -187,6 +188,9 @@ pub enum UnitFault {
     UnusedMath {
         name: String,
     },
+    ResolutionFault {
+        cause: TagResolutionFault,
+    },
 }
 impl UnitFault {
     fn rank(&self) -> usize {
@@ -217,12 +221,16 @@ impl UnitFault {
             Self::UnsupportedMathSyntax { .. } => 23,
             Self::UnknownMath { .. } => 24,
             Self::UnusedMath { .. } => 25,
+            Self::ResolutionFault { .. } => 26,
         }
     }
 }
 impl fmt::Display for UnitFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Self::ResolutionFault { cause } => write!(f, "{cause}"),
+            _ => write!(f, "{self:?}"),
+        }
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]

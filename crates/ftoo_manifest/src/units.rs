@@ -4,7 +4,7 @@ mod content;
 mod diagnostics;
 #[cfg(test)]
 mod tests;
-use crate::RuleId;
+use crate::{AddressBook, NodeId, RuleId};
 pub use diagnostics::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -74,11 +74,30 @@ impl MathOccurrence {
         &self.site
     }
 }
-/// Nonblank admitted prose with only math insertions and literal at-sign escapes.
+/// An opaque authored handle, retained without claiming live resolution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TagOccurrence {
+    input: String,
+    site: UnitSite,
+}
+impl TagOccurrence {
+    #[must_use]
+    pub fn input(&self) -> &str {
+        &self.input
+    }
+    #[must_use]
+    pub fn site(&self) -> &UnitSite {
+        &self.site
+    }
+}
+
+/// Nonblank admitted prose with math and tag insertions and literal at-sign escapes.
+/// Tag spellings here have syntax admission only; use `resolve_unit_tags` for liveness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckedText {
     source: LocatedString,
     occurrences: Vec<MathOccurrence>,
+    tags: Vec<TagOccurrence>,
 }
 impl CheckedText {
     #[must_use]
@@ -92,6 +111,10 @@ impl CheckedText {
     #[must_use]
     pub fn occurrences(&self) -> &[MathOccurrence] {
         &self.occurrences
+    }
+    #[must_use]
+    pub fn tag_occurrences(&self) -> &[TagOccurrence] {
+        &self.tags
     }
 }
 /// Unique editorial metadata, complete language slots and used shared mathematics.
@@ -390,7 +413,7 @@ fn unit_metadata(documents: &DocumentDraft, units: &[UnitDraft], errors: &mut Ve
         }
     }
 }
-/// Validate metadata, language contracts and math-only insertion content.
+/// Validate metadata, language contracts and insertion content before tag resolution.
 /// # Errors
 /// Returns the complete ordered failures in the earliest failing semantic phase.
 pub fn admit_unit_drafts(
@@ -512,7 +535,11 @@ fn check_texts(
             ));
         }
         match content::scan(&entry.value) {
-            Ok((prose, occurrences)) => {
+            Ok(content::ScannedText {
+                prose,
+                math: occurrences,
+                tags,
+            }) => {
                 if !prose {
                     errors.push(diagnostic(
                         RuleId::M040,
@@ -545,6 +572,7 @@ fn check_texts(
                     CheckedText {
                         source: entry.value.clone(),
                         occurrences,
+                        tags,
                     },
                 );
             }
@@ -563,4 +591,119 @@ fn check_texts(
         }
     }
     (texts, used, scanner_failed)
+}
+
+/// A live identity at one authored occurrence, accessible through its resolved corpus.
+#[derive(Debug)]
+pub struct ResolvedUnitTag<'u> {
+    unit: &'u UnitLabel,
+    language: &'u str,
+    occurrence: &'u TagOccurrence,
+    target: NodeId,
+}
+impl ResolvedUnitTag<'_> {
+    #[must_use]
+    pub fn unit(&self) -> &UnitLabel {
+        self.unit
+    }
+    #[must_use]
+    pub fn language(&self) -> &str {
+        self.language
+    }
+    #[must_use]
+    pub fn occurrence(&self) -> &TagOccurrence {
+        self.occurrence
+    }
+    #[must_use]
+    pub fn target(&self) -> NodeId {
+        self.target
+    }
+}
+
+/// Every tag occurrence is live in this exact borrowed book and corpus.
+/// This establishes no weld, translation equivalence or rendering readiness.
+/// ```compile_fail,E0451
+/// fn forge<'u,'b,'g>(corpus: &'u ftoo_manifest::LanguageCheckedUnits, book: &'b ftoo_manifest::AddressBook<'g>) {
+///     let _ = ftoo_manifest::ResolvedUnits { corpus, book, tags: vec![] };
+/// }
+/// ```
+/// ```compile_fail,E0616
+/// fn mutate(value: &mut ftoo_manifest::ResolvedUnits<'_, '_, '_>) { value.tags.clear(); }
+/// ```
+/// ```compile_fail,E0599
+/// let _ = ftoo_manifest::ResolvedUnits::default();
+/// ```
+/// ```compile_fail,E0277
+/// fn deserialize<T: serde::de::DeserializeOwned>() {}
+/// deserialize::<ftoo_manifest::ResolvedUnits<'static, 'static, 'static>>();
+/// ```
+/// ```compile_fail,E0515
+/// fn escape<'b,'g>(corpus: &ftoo_manifest::LanguageCheckedUnits, book: &'b ftoo_manifest::AddressBook<'g>)
+///     -> ftoo_manifest::ResolvedUnits<'static,'b,'g> {
+///     let local = corpus.clone();
+///     ftoo_manifest::resolve_unit_tags(&local, book).unwrap()
+/// }
+/// ```
+/// ```compile_fail,E0515
+/// fn escape<'u,'g>(corpus: &'u ftoo_manifest::LanguageCheckedUnits, graph: &'g ftoo_manifest::ValidatedManifest)
+///     -> ftoo_manifest::ResolvedUnits<'u,'static,'g> {
+///     let book = ftoo_manifest::addressing(graph).unwrap();
+///     ftoo_manifest::resolve_unit_tags(corpus, &book).unwrap()
+/// }
+/// ```
+#[derive(Debug)]
+pub struct ResolvedUnits<'u, 'b, 'g> {
+    corpus: &'u LanguageCheckedUnits,
+    book: &'b AddressBook<'g>,
+    tags: Vec<ResolvedUnitTag<'u>>,
+}
+impl<'u, 'b, 'g> ResolvedUnits<'u, 'b, 'g> {
+    #[must_use]
+    pub fn corpus(&self) -> &'u LanguageCheckedUnits {
+        self.corpus
+    }
+    #[must_use]
+    pub fn book(&self) -> &'b AddressBook<'g> {
+        self.book
+    }
+    #[must_use]
+    pub fn tags(&self) -> &[ResolvedUnitTag<'u>] {
+        &self.tags
+    }
+}
+/// Resolve every occurrence through the supplied book's existing live resolver.
+/// # Errors
+/// Returns all located resolution refusals in semantic order, with no partial result.
+pub fn resolve_unit_tags<'u, 'b, 'g>(
+    corpus: &'u LanguageCheckedUnits,
+    book: &'b AddressBook<'g>,
+) -> Result<ResolvedUnits<'u, 'b, 'g>, UnitErrors> {
+    let mut errors = Vec::new();
+    let mut tags = Vec::new();
+    for unit in &corpus.units {
+        for (language, text) in &unit.texts {
+            for occurrence in &text.tags {
+                match book.resolve(&occurrence.input) {
+                    Ok(target) => tags.push(ResolvedUnitTag {
+                        unit: &unit.label,
+                        language,
+                        occurrence,
+                        target,
+                    }),
+                    Err(cause) => errors.push(diagnostic(
+                        RuleId::M042,
+                        UnitStage::Resolution,
+                        Some(unit.label.as_str()),
+                        Some(language),
+                        &occurrence.site,
+                        UnitFault::ResolutionFault { cause },
+                    )),
+                }
+            }
+        }
+    }
+    if let Some(errors) = UnitErrors::semantic(errors) {
+        return Err(errors);
+    }
+    Ok(ResolvedUnits { corpus, book, tags })
 }

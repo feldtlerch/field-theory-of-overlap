@@ -1,7 +1,5 @@
 use super::*;
-use ftoo_manifest::{
-    InsertionReason, PathPart, RuleId, ShapeKind, SourceAnchor, UnitFault, UnitSite, UnitStage,
-};
+use ftoo_manifest::{PathPart, RuleId, ShapeKind, SourceAnchor, UnitFault, UnitSite, UnitStage};
 use std::{
     fs,
     sync::atomic::{AtomicU64, Ordering},
@@ -139,36 +137,35 @@ fn u04_shape_context_four_discriminating_cases() {
     );
 }
 #[test]
-fn u07_byte_known_tag_refusal_and_restoration() {
+fn u07_byte_known_tag_acceptance_and_restoration() {
     let text = STATEMENT.replace("The coefficient.", "See @tag{c:1}.");
+    let corpus = load(DECLARATION, &text).unwrap();
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book).unwrap();
     let mut site = location(
         "units/statements/one.toml",
         &["unit", "texts", "en"],
         span(&text, "'See @tag{c:1}.'"),
     );
-    site.decoded = Some(4..6);
+    site.decoded = Some(4..13);
     site.occurrence = Some(0);
-    let expected = diagnostic(
-        RuleId::M041,
-        UnitStage::Content,
-        Some("sec:coefficients:first-value"),
-        Some("en"),
-        site,
-        UnitFault::MalformedInsertion {
-            reason: InsertionReason::UnknownForm,
-            fragment: "@t".to_owned(),
-        },
-    );
-    assert_fault(DECLARATION, &text, expected.clone());
     assert_eq!(
-        expected.to_string(),
-        "M041 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"units/statements/one.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 100..116 decoded 4..6 occurrence 0: MalformedInsertion { reason: UnknownForm, fragment: \"@t\" }"
+        resolved.tags()[0].target(),
+        ftoo_manifest::NodeId::LangevinCoefficientOne
+    );
+    assert_eq!(resolved.tags()[0].occurrence().input(), "c:1");
+    assert_eq!(resolved.tags()[0].occurrence().site(), &site);
+    assert_eq!(
+        site.to_string(),
+        "\"units/statements/one.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 100..116 decoded 4..13 occurrence 0"
     );
     assert_eq!(
         load(DECLARATION, STATEMENT).unwrap().units()[0].texts()["en"].text(),
         "The coefficient."
     );
 }
+
 #[test]
 fn u01_encoding_both_roles_and_global_precedence() {
     for declaration_role in [false, true] {
@@ -836,22 +833,21 @@ fn u09_empty_literals_implicit_tables_and_decoded_unicode() {
         &["unit", "texts", "en"],
         span(&text, "\"\\u00e9 @tag{c:1}\""),
     );
-    site.decoded = Some(3..5);
+    site.decoded = Some(3..12);
     site.occurrence = Some(0);
-    assert_fault(
-        DECLARATION,
-        &text,
-        diagnostic(
-            RuleId::M041,
-            UnitStage::Content,
-            Some("sec:coefficients:first-value"),
-            Some("en"),
-            site,
-            UnitFault::MalformedInsertion {
-                reason: InsertionReason::UnknownForm,
-                fragment: "@t".to_owned(),
-            },
-        ),
+    let corpus = load(DECLARATION, &text).unwrap();
+    assert_eq!(
+        corpus.units()[0].texts()["en"].tag_occurrences()[0].site(),
+        &site
+    );
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    assert_eq!(
+        ftoo_manifest::resolve_unit_tags(&corpus, &book)
+            .unwrap()
+            .tags()[0]
+            .target(),
+        ftoo_manifest::NodeId::LangevinCoefficientOne
     );
     let text = "schema=1\nunit.texts.en='Text.'";
     assert_fault(
@@ -933,6 +929,7 @@ impl Fixture {
         Self { root }
     }
     fn restore(&self) {
+        assert_eq!(checked_files(&self.root).unwrap().tag_sites, 0);
         assert_eq!(
             load_unit_files(&self.root).unwrap().units()[0].texts()["en"].text(),
             "The coefficient."
@@ -942,9 +939,9 @@ impl Fixture {
         let path = self.root.join("units/statements/one.toml");
         fs::write(&path, text).unwrap();
         let expected = errors(diagnostics);
-        assert_eq!(load_unit_files(&self.root), Err(expected.clone()));
+        assert_eq!(checked_files(&self.root), Err(expected.clone()));
         assert_eq!(
-            load_unit_files(&self.root).unwrap_err().to_string(),
+            checked_files(&self.root).unwrap_err().to_string(),
             expected.to_string()
         );
         assert_eq!(fs::read(&path).unwrap(), text.as_bytes());
@@ -1147,9 +1144,9 @@ fn u15_actual_duplicate_unit_and_two_missing_translations() {
             })
             .collect(),
     );
-    assert_eq!(load_unit_files(&fixture.root), Err(expected.clone()));
+    assert_eq!(checked_files(&fixture.root), Err(expected.clone()));
     assert_eq!(
-        load_unit_files(&fixture.root).unwrap_err().to_string(),
+        checked_files(&fixture.root).unwrap_err().to_string(),
         expected.to_string()
     );
     assert_eq!(fs::read(&second).unwrap(), STATEMENT.as_bytes());
@@ -1194,9 +1191,9 @@ fn u15_actual_duplicate_unit_and_two_missing_translations() {
     })
     .collect();
     let expected = errors(diagnostics);
-    assert_eq!(load_unit_files(&fixture.root), Err(expected.clone()));
+    assert_eq!(checked_files(&fixture.root), Err(expected.clone()));
     assert_eq!(
-        load_unit_files(&fixture.root).unwrap_err().to_string(),
+        checked_files(&fixture.root).unwrap_err().to_string(),
         expected.to_string()
     );
     assert_eq!(fs::read(&second).unwrap(), second_text.as_bytes());
@@ -1285,7 +1282,7 @@ fn u01_actual_removals_entries_and_restoration() {
             file: path.clone(),
             kind: io::ErrorKind::NotFound,
         };
-        assert_eq!(load_unit_files(&fixture.root), Err(expected.clone()));
+        assert_eq!(checked_files(&fixture.root), Err(expected.clone()));
         assert_eq!(
             expected.to_string(),
             format!("Io {{ operation: {operation:?}, file: {path:?}, kind: NotFound }}")
@@ -1296,7 +1293,7 @@ fn u01_actual_removals_entries_and_restoration() {
     let statement = fixture.root.join("units/statements/one.toml");
     fs::remove_file(&statement).unwrap();
     assert_eq!(
-        load_unit_files(&fixture.root),
+        checked_files(&fixture.root),
         Err(UnitLoadError::Input(UnitInputFault::EmptyCorpus {
             directory: "units/statements".to_owned()
         }))
@@ -1315,7 +1312,7 @@ fn u01_actual_removals_entries_and_restoration() {
             _ => fs::write(&path, "ignored").unwrap(),
         }
         assert_eq!(
-            load_unit_files(&fixture.root),
+            checked_files(&fixture.root),
             Err(UnitLoadError::Input(UnitInputFault::UnexpectedEntry {
                 file: path.clone(),
                 kind
@@ -1346,25 +1343,15 @@ fn u15_actual_file_tag_and_shape_tampering_restores_every_time() {
             None,
         ),
         (
-            "'See @tag{c:1}.'",
-            UnitFault::MalformedInsertion {
-                reason: InsertionReason::UnknownForm,
-                fragment: "@t".to_owned(),
-            },
-            UnitStage::Content,
-            RuleId::M041,
-            Some(4..6),
-            Some(0),
-        ),
-        (
             "'See @tag{unknown}.'",
-            UnitFault::MalformedInsertion {
-                reason: InsertionReason::UnknownForm,
-                fragment: "@t".to_owned(),
+            UnitFault::ResolutionFault {
+                cause: ftoo_manifest::TagResolutionFault::UnknownTag {
+                    input: "unknown".to_owned(),
+                },
             },
-            UnitStage::Content,
-            RuleId::M041,
-            Some(4..6),
+            UnitStage::Resolution,
+            RuleId::M042,
+            Some(4..17),
             Some(0),
         ),
         (
@@ -1397,9 +1384,9 @@ fn u15_actual_file_tag_and_shape_tampering_restores_every_time() {
             location,
             fault,
         )]);
-        assert_eq!(load_unit_files(&fixture.root), Err(expected.clone()));
+        assert_eq!(checked_files(&fixture.root), Err(expected.clone()));
         assert_eq!(
-            load_unit_files(&fixture.root).unwrap_err().to_string(),
+            checked_files(&fixture.root).unwrap_err().to_string(),
             expected.to_string()
         );
         assert_eq!(fs::read(&path).unwrap(), text.as_bytes());
@@ -1483,7 +1470,7 @@ fn u01_non_utf8_names_special_entries_and_displays() {
         file: bad.clone(),
         kind: EntryKind::NonTomlFile,
     });
-    assert_eq!(load_unit_files(&fixture.root), Err(expected.clone()));
+    assert_eq!(checked_files(&fixture.root), Err(expected.clone()));
     assert_eq!(
         expected.to_string(),
         format!("Input(UnexpectedEntry {{ file: {bad:?}, kind: NonTomlFile }})")
@@ -1493,7 +1480,7 @@ fn u01_non_utf8_names_special_entries_and_displays() {
     let socket = fixture.root.join("units/statements/socket.toml");
     let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
     assert_eq!(
-        load_unit_files(&fixture.root),
+        checked_files(&fixture.root),
         Err(UnitLoadError::Input(UnitInputFault::UnexpectedEntry {
             file: socket.clone(),
             kind: EntryKind::Other
@@ -1793,4 +1780,243 @@ fn u03_declaration_schema_and_float_looking_strings() {
         corpus.units()[0].texts()["en"].text(),
         "1.0 is prose; see @math{value}."
     );
+}
+
+fn checked_files(root: &Path) -> Result<UnitCheckSummary, UnitLoadError> {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    check_unit_files(root, &book)
+}
+
+#[test]
+fn u15_actual_tag_sites_unknown_and_different_books_restore_bytes() {
+    use ftoo_manifest::{NodeId as N, OutOfSliceCause as O, TagResolutionFault as F};
+    use std::fmt::Write;
+    let fixture = Fixture::new();
+    fixture.restore();
+    let declaration = "schema=1\n[documents.main]\nrequired-languages=['en']\n[documents.explainer]\nrequired-languages=['en','fr']\n";
+    let declaration_path = fixture.root.join("units/documents.toml");
+    let statement_path = fixture.root.join("units/statements/one.toml");
+    let graph = ftoo_manifest::seed().unwrap();
+    let full = ftoo_manifest::addressing(&graph).unwrap();
+    let mut one_draft = ftoo_manifest::seed_draft();
+    one_draft.coverage.slice = vec![N::LangevinCoefficientOneValue];
+    let one = ftoo_manifest::validate(one_draft).unwrap();
+    let one_book = ftoo_manifest::addressing(&one).unwrap();
+    let mut empty_draft = ftoo_manifest::seed_draft();
+    empty_draft.coverage.slice.clear();
+    let empty = ftoo_manifest::validate(empty_draft).unwrap();
+    let empty_book = ftoo_manifest::addressing(&empty).unwrap();
+    for (input, tag, target, label, reason) in file_tag_cases() {
+        for (text, starts) in [
+            (format!("@tag{{{input}}} begins."), vec![0]),
+            (format!("See @tag{{{input}}} here."), vec![4]),
+            (format!("See @tag{{{input}}}"), vec![4]),
+            (
+                format!("See @tag{{{input}}} and @tag{{{input}}}."),
+                vec![4, 18],
+            ),
+        ] {
+            let statement = format!(
+                "schema=1\n[unit]\nid='sec:coefficients:first-value'\ndocument='explainer'\nmath={{}}\n[unit.texts]\nen='{text}'\nfr='{text}'\n"
+            );
+            fs::write(&declaration_path, declaration).unwrap();
+            fs::write(&statement_path, &statement).unwrap();
+            let summary = UnitCheckSummary {
+                documents: 2,
+                units: 1,
+                texts: 2,
+                tag_sites: starts.len() * 2,
+            };
+            assert_eq!(check_unit_files(&fixture.root, &full).unwrap(), summary);
+            mutate_tag_sites(
+                &fixture,
+                declaration,
+                &statement,
+                &text,
+                &starts,
+                &full,
+                summary,
+            );
+            for book in [&one_book, &empty_book] {
+                if std::ptr::eq(book, &raw const one_book) && matches!(input, "c:1" | "v:1") {
+                    assert_eq!(check_unit_files(&fixture.root, book).unwrap(), summary);
+                    continue;
+                }
+                let mut faults = Vec::new();
+                let mut display = String::new();
+                for language in ["en", "fr"] {
+                    let raw_start = statement.find(&format!("{language}=")).unwrap() + 3;
+                    for (index, start) in starts.iter().copied().enumerate() {
+                        let mut site = location(
+                            "units/statements/one.toml",
+                            &["unit", "texts", language],
+                            SourceAnchor::Bytes(raw_start, raw_start + text.len() + 2),
+                        );
+                        site.decoded = Some(start..start + 9);
+                        site.occurrence = Some(index);
+                        faults.push(diagnostic(
+                            RuleId::M042,
+                            UnitStage::Resolution,
+                            Some("sec:coefficients:first-value"),
+                            Some(language),
+                            site,
+                            UnitFault::ResolutionFault {
+                                cause: F::OutOfSliceTag {
+                                    input: input.into(),
+                                    tag,
+                                    target,
+                                    cause: reason,
+                                },
+                            },
+                        ));
+                        let cause = match reason {
+                            O::QuantityOutsideSupport => "quantity-outside-support",
+                            O::ClaimNotSelected => "claim-not-selected",
+                            O::TargetAbsent => unreachable!(),
+                        };
+                        writeln!(display,"M042 Resolution unit=Some(\"sec:coefficients:first-value\") language=Some({language:?}) at \"units/statements/one.toml\" $[\"unit\"][\"texts\"][{language:?}] bytes {raw_start}..{} decoded {start}..{} occurrence {index}: tag {input:?}: out of slice; label {label}; cause {cause}",raw_start+text.len()+2,start+9).unwrap();
+                    }
+                }
+                let actual = check_unit_files(&fixture.root, book).unwrap_err();
+                assert_eq!(actual, errors(faults));
+                assert_eq!(actual.to_string(), display);
+                assert_eq!(fs::read(&statement_path).unwrap(), statement.as_bytes());
+                assert_eq!(fs::read(&declaration_path).unwrap(), declaration.as_bytes());
+                assert_eq!(check_unit_files(&fixture.root, &full).unwrap(), summary);
+            }
+            fs::write(&declaration_path, DECLARATION).unwrap();
+            fs::write(&statement_path, STATEMENT).unwrap();
+            fixture.restore();
+        }
+    }
+}
+#[test]
+fn u09_tag_raw_literals_decoded_unicode_crlf_and_continuation() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    for literal in [
+        "'é See @tag{c:1}.'",
+        "\"\\u00e9 See @tag{c:1}.\"",
+        "'''\né See @tag{c:1}.'''",
+        "\"\"\"\r\né See @tag{c:1}.\"\"\"",
+        "\"\"\"é See \\\n  @tag{c:1}.\"\"\"",
+    ] {
+        let source = INLINE.replace("'Text.'", literal);
+        let corpus = load(DECLARATION, &source).unwrap();
+        let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book).unwrap();
+        let mut site = location(
+            "units/statements/one.toml",
+            &["unit", "texts", "en"],
+            span(&source, literal),
+        );
+        site.decoded = Some(7..16);
+        site.occurrence = Some(0);
+        assert_eq!(resolved.tags()[0].occurrence().site(), &site);
+        assert_eq!(
+            resolved.tags()[0].target(),
+            ftoo_manifest::NodeId::LangevinCoefficientOne
+        );
+        assert_eq!(corpus.units()[0].texts()["en"].text(), "é See @tag{c:1}.");
+    }
+}
+
+fn mutate_tag_sites(
+    fixture: &Fixture,
+    declaration: &str,
+    statement: &str,
+    text: &str,
+    starts: &[usize],
+    full: &ftoo_manifest::AddressBook<'_>,
+    summary: UnitCheckSummary,
+) {
+    use ftoo_manifest::TagResolutionFault as F;
+    let statement_path = fixture.root.join("units/statements/one.toml");
+    let declaration_path = fixture.root.join("units/documents.toml");
+    for language in ["en", "fr"] {
+        for (index, start) in starts.iter().copied().enumerate() {
+            let mut changed = text.to_owned();
+            changed.replace_range(start + 5..start + 8, "bad");
+            let mutated = statement.replace(
+                &format!("{language}='{text}'"),
+                &format!("{language}='{changed}'"),
+            );
+            fs::write(&statement_path, &mutated).unwrap();
+            let raw_start = mutated.find(&format!("{language}=")).unwrap() + 3;
+            let mut site = location(
+                "units/statements/one.toml",
+                &["unit", "texts", language],
+                SourceAnchor::Bytes(raw_start, raw_start + changed.len() + 2),
+            );
+            site.decoded = Some(start..start + 9);
+            site.occurrence = Some(index);
+            let expected = errors(vec![diagnostic(
+                RuleId::M042,
+                UnitStage::Resolution,
+                Some("sec:coefficients:first-value"),
+                Some(language),
+                site,
+                UnitFault::ResolutionFault {
+                    cause: F::UnknownTag {
+                        input: "bad".into(),
+                    },
+                },
+            )]);
+            let actual = check_unit_files(&fixture.root, full).unwrap_err();
+            assert_eq!(actual, expected);
+            assert_eq!(
+                actual.to_string(),
+                format!(
+                    "M042 Resolution unit=Some(\"sec:coefficients:first-value\") language=Some({language:?}) at \"units/statements/one.toml\" $[\"unit\"][\"texts\"][{language:?}] bytes {raw_start}..{} decoded {start}..{} occurrence {index}: tag \"bad\": unknown\n",
+                    raw_start + changed.len() + 2,
+                    start + 9
+                )
+            );
+            assert_eq!(fs::read(&statement_path).unwrap(), mutated.as_bytes());
+            assert_eq!(fs::read(&declaration_path).unwrap(), declaration.as_bytes());
+            fs::write(&statement_path, statement).unwrap();
+            assert_eq!(check_unit_files(&fixture.root, full).unwrap(), summary);
+        }
+    }
+}
+
+type FileTagCase = (
+    &'static str,
+    ftoo_manifest::TagId,
+    ftoo_manifest::NodeId,
+    &'static str,
+    ftoo_manifest::OutOfSliceCause,
+);
+fn file_tag_cases() -> [FileTagCase; 4] {
+    use ftoo_manifest::{NodeId as N, OutOfSliceCause as O, TagId as T};
+    [
+        (
+            "c:1",
+            T::LangevinCoefficientOne,
+            N::LangevinCoefficientOne,
+            "def:langevin:coefficient-one",
+            O::QuantityOutsideSupport,
+        ),
+        (
+            "c:3",
+            T::LangevinCoefficientThree,
+            N::LangevinCoefficientThree,
+            "def:langevin:coefficient-three",
+            O::QuantityOutsideSupport,
+        ),
+        (
+            "v:1",
+            T::LangevinCoefficientOneValue,
+            N::LangevinCoefficientOneValue,
+            "claim:langevin:coefficient-one-value",
+            O::ClaimNotSelected,
+        ),
+        (
+            "v:3",
+            T::LangevinCoefficientThreeValue,
+            N::LangevinCoefficientThreeValue,
+            "claim:langevin:coefficient-three-value",
+            O::ClaimNotSelected,
+        ),
+    ]
 }

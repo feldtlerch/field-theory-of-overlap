@@ -52,6 +52,7 @@ pub enum RuleId {
     M039,
     M040,
     M041,
+    M042,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,7 +73,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 41] = [
+pub const RULES: [RuleSpec; 42] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -357,6 +358,13 @@ pub const RULES: [RuleSpec; 41] = [
         number: RuleId::M041,
         statement: "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar.",
         scope: "Every authored statement text, shared math entry and local math insertion.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M042,
+        statement: "Every tag-facing statement-text occurrence resolves through the supplied AddressBook's live resolver or refuses admission with its unit, language and site.",
+        scope: "All tag insertions in every admitted language text.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

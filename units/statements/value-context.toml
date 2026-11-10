@@ -6,4 +6,4 @@ document = "main"
 math = {}
 
 [unit.texts]
-en = 'The value claim concerns the first coefficient.'
+en = 'The value claim @tag{v:1} concerns the coefficient @tag{c:1}.'

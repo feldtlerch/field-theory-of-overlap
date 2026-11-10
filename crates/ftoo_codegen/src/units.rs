@@ -159,3 +159,30 @@ pub fn load_unit_files(root: &Path) -> Result<LanguageCheckedUnits, UnitLoadErro
     let (declaration, statements) = files::collect(root)?;
     load_unit_sources(declaration, statements)
 }
+
+/// Owned counts from a successful actual-file check; no detached resolved identities.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnitCheckSummary {
+    pub documents: usize,
+    pub units: usize,
+    pub texts: usize,
+    pub tag_sites: usize,
+}
+/// Reread actual sources and resolve every tag through the supplied book.
+/// No file is written and no projection authority is selected implicitly.
+/// # Errors
+/// Preserves loading failures and the complete located resolution fault collection.
+pub fn check_unit_files(
+    root: &Path,
+    book: &ftoo_manifest::AddressBook<'_>,
+) -> Result<UnitCheckSummary, UnitLoadError> {
+    let corpus = load_unit_files(root)?;
+    let resolved =
+        ftoo_manifest::resolve_unit_tags(&corpus, book).map_err(UnitLoadError::Admission)?;
+    Ok(UnitCheckSummary {
+        documents: corpus.documents().len(),
+        units: corpus.units().len(),
+        texts: corpus.units().iter().map(|unit| unit.texts().len()).sum(),
+        tag_sites: resolved.tags().len(),
+    })
+}

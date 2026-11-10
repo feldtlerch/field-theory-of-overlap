@@ -4,8 +4,8 @@ mod artifact;
 mod projection;
 mod units;
 pub use units::{
-    EntryKind, UnitInputFault, UnitIoOperation, UnitLoadError, UnitSource, load_unit_files,
-    load_unit_sources,
+    EntryKind, UnitCheckSummary, UnitInputFault, UnitIoOperation, UnitLoadError, UnitSource,
+    check_unit_files, load_unit_files, load_unit_sources,
 };
 #[cfg(test)]
 mod tests;

@@ -1,4 +1,6 @@
-use super::{InsertionReason, LocatedString, MathOccurrence, UnitFault, UnitSite, local_name};
+use super::{
+    InsertionReason, LocatedString, MathOccurrence, TagOccurrence, UnitFault, UnitSite, local_name,
+};
 
 fn at(source: &LocatedString, start: usize, end: usize, occurrence: Option<usize>) -> UnitSite {
     let mut site = source.site.clone();
@@ -22,11 +24,22 @@ fn malformed(
         },
     ))
 }
-pub(super) fn scan(source: &LocatedString) -> Result<(bool, Vec<MathOccurrence>), ScanFault> {
-    let text = &source.value;
-    let mut chars = text.char_indices().peekable();
-    let mut prose = false;
-    let mut occurrences = Vec::new();
+pub(super) struct ScannedText {
+    pub prose: bool,
+    pub math: Vec<MathOccurrence>,
+    pub tags: Vec<TagOccurrence>,
+}
+enum Insertion {
+    Math(MathOccurrence),
+    Tag(TagOccurrence),
+}
+pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
+    let mut chars = source.value.char_indices().peekable();
+    let mut scanned = ScannedText {
+        prose: false,
+        math: Vec::new(),
+        tags: Vec::new(),
+    };
     while let Some((start, c)) = chars.next() {
         if c != '@' {
             if matches!(c, '`' | '$' | '\\' | '<' | '>')
@@ -39,47 +52,65 @@ pub(super) fn scan(source: &LocatedString) -> Result<(bool, Vec<MathOccurrence>)
                     },
                 )));
             }
-            prose |= !c.is_whitespace();
+            scanned.prose |= !c.is_whitespace();
             continue;
         }
         if chars.peek().is_some_and(|(_, c)| *c == '@') {
             chars.next();
-            prose = true;
+            scanned.prose = true;
             continue;
         }
-        let index = occurrences.len();
-        prefix(source, start, index, &mut chars)?;
-        let name_start = start + 6;
-        let mut closed = false;
-        for (position, c) in chars.by_ref() {
-            if c == '{' {
+        let index = scanned.math.len() + scanned.tags.len();
+        match insertion(source, start, index, &mut chars)? {
+            Insertion::Math(value) => scanned.math.push(value),
+            Insertion::Tag(value) => scanned.tags.push(value),
+        }
+    }
+    Ok(scanned)
+}
+fn insertion(
+    source: &LocatedString,
+    start: usize,
+    index: usize,
+    chars: &mut impl Iterator<Item = (usize, char)>,
+) -> Result<Insertion, ScanFault> {
+    let is_tag = prefix(source, start, index, chars)?;
+    let name_start = start + if is_tag { 5 } else { 6 };
+    for (position, c) in chars.by_ref() {
+        if c == '{' {
+            return Err(malformed(
+                source,
+                start,
+                position + 1,
+                index,
+                InsertionReason::NestedBrace,
+            ));
+        }
+        if c == '}' {
+            let name = &source.value[name_start..position];
+            let site = at(source, start, position + 1, Some(index));
+            if is_tag {
+                return Ok(Insertion::Tag(TagOccurrence {
+                    input: name.to_owned(),
+                    site,
+                }));
+            }
+            if !local_name(name) {
                 return Err(malformed(
                     source,
                     start,
                     position + 1,
                     index,
-                    InsertionReason::NestedBrace,
+                    InsertionReason::BadMathName,
                 ));
             }
-            if c == '}' {
-                let name = &text[name_start..position];
-                if !local_name(name) {
-                    return Err(malformed(
-                        source,
-                        start,
-                        position + 1,
-                        index,
-                        InsertionReason::BadMathName,
-                    ));
-                }
-                occurrences.push(MathOccurrence {
-                    name: name.to_owned(),
-                    site: at(source, start, position + 1, Some(index)),
-                });
-                closed = true;
-                break;
-            }
-            let prefix = &text[name_start..position + c.len_utf8()];
+            return Ok(Insertion::Math(MathOccurrence {
+                name: name.to_owned(),
+                site,
+            }));
+        }
+        if !is_tag {
+            let prefix = &source.value[name_start..position + c.len_utf8()];
             let valid = if position == name_start {
                 c.is_ascii_lowercase()
             } else {
@@ -97,17 +128,14 @@ pub(super) fn scan(source: &LocatedString) -> Result<(bool, Vec<MathOccurrence>)
                 ));
             }
         }
-        if !closed {
-            return Err(malformed(
-                source,
-                start,
-                text.len(),
-                index,
-                InsertionReason::Unclosed,
-            ));
-        }
     }
-    Ok((prose, occurrences))
+    Err(malformed(
+        source,
+        start,
+        source.value.len(),
+        index,
+        InsertionReason::Unclosed,
+    ))
 }
 pub(super) fn math(name: &str, source: &LocatedString) -> Option<(UnitSite, UnitFault)> {
     if source.value.chars().all(char::is_whitespace) {
@@ -147,8 +175,30 @@ fn prefix(
     start: usize,
     index: usize,
     chars: &mut impl Iterator<Item = (usize, char)>,
-) -> Result<(), ScanFault> {
-    for expected in "math{".chars() {
+) -> Result<bool, ScanFault> {
+    let (is_tag, tail) = match chars.next() {
+        Some((_, 'm')) => (false, "ath{"),
+        Some((_, 't')) => (true, "ag{"),
+        Some((position, c)) => {
+            return Err(malformed(
+                source,
+                start,
+                position + c.len_utf8(),
+                index,
+                InsertionReason::UnknownForm,
+            ));
+        }
+        None => {
+            return Err(malformed(
+                source,
+                start,
+                source.value.len(),
+                index,
+                InsertionReason::Unclosed,
+            ));
+        }
+    };
+    for expected in tail.chars() {
         match chars.next() {
             Some((position, actual)) if actual != expected => {
                 return Err(malformed(
@@ -171,5 +221,5 @@ fn prefix(
             _ => (),
         }
     }
-    Ok(())
+    Ok(is_tag)
 }

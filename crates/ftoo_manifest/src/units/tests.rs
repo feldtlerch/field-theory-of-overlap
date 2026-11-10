@@ -85,27 +85,22 @@ fn refusal(documents: DocumentDraft, units: Vec<UnitDraft>, expected: Vec<UnitDi
     assert_eq!(actual, UnitErrors::from_diagnostics(expected).unwrap());
 }
 #[test]
-fn u07_known_tag_refusal_and_literal_escape() {
+fn u07_known_tag_acceptance_and_literal_escape() {
     let (documents, mut units) = fixtures();
     units[0].texts.get_mut("en").unwrap().value.value = "See @tag{c:1}.".to_owned();
+    let corpus = admit_unit_drafts(documents.clone(), units.clone()).unwrap();
+    let graph = crate::seed().unwrap();
+    let book = crate::addressing(&graph).unwrap();
+    let resolved = resolve_unit_tags(&corpus, &book).unwrap();
     let mut location = site("statement.toml", &["unit", "texts", "en"]);
-    location.decoded = Some(4..6);
+    location.decoded = Some(4..13);
     location.occurrence = Some(0);
-    let diagnostic = expected(
-        RuleId::M041,
-        UnitStage::Content,
-        Some("en"),
-        location,
-        UnitFault::MalformedInsertion {
-            reason: InsertionReason::UnknownForm,
-            fragment: "@t".to_owned(),
-        },
-    );
+    assert_eq!(resolved.tags()[0].occurrence().input(), "c:1");
+    assert_eq!(resolved.tags()[0].occurrence().site(), &location);
     assert_eq!(
-        diagnostic.to_string(),
-        "M041 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90 decoded 4..6 occurrence 0: MalformedInsertion { reason: UnknownForm, fragment: \"@t\" }"
+        resolved.tags()[0].target(),
+        crate::NodeId::LangevinCoefficientOne
     );
-    refusal(documents.clone(), units.clone(), vec![diagnostic]);
     for text in [
         "See the coefficient.",
         "See @@tag{c:1}.",
@@ -115,6 +110,7 @@ fn u07_known_tag_refusal_and_literal_escape() {
         units[0].texts.get_mut("en").unwrap().value.value = text.to_owned();
         let checked = admit_unit_drafts(documents.clone(), units.clone()).unwrap();
         assert_eq!(checked.units()[0].texts()["en"].occurrences(), []);
+        assert_eq!(checked.units()[0].texts()["en"].tag_occurrences(), []);
     }
 }
 #[test]
@@ -148,7 +144,7 @@ fn u07_insertion_fault_matrix_and_unicode_ranges() {
             "@math{x-}",
             4..13,
         ),
-        ("é @tag{c:1}", InsertionReason::UnknownForm, "@t", 3..5),
+        ("é @bad{c:1}", InsertionReason::UnknownForm, "@b", 3..5),
     ] {
         let (documents, mut units) = fixtures();
         units[0].texts.get_mut("en").unwrap().value.value = text.to_owned();
@@ -546,7 +542,7 @@ fn u08_math_faults_and_usage_suppression() {
             },
         )],
     );
-    units[0].texts.get_mut("en").unwrap().value.value = "See @tag{c:1}.".to_owned();
+    units[0].texts.get_mut("en").unwrap().value.value = "See @bad{c:1}.".to_owned();
     let mut location = site("statement.toml", &["unit", "texts", "en"]);
     location.decoded = Some(4..6);
     location.occurrence = Some(0);
@@ -560,7 +556,7 @@ fn u08_math_faults_and_usage_suppression() {
             location,
             UnitFault::MalformedInsertion {
                 reason: InsertionReason::UnknownForm,
-                fragment: "@t".to_owned(),
+                fragment: "@b".to_owned(),
             },
         )],
     );
@@ -676,13 +672,13 @@ fn register_final_unit_statements() {
         ),
     ];
     assert_eq!(
-        crate::RULES[38..]
+        crate::RULES[38..41]
             .iter()
             .map(|r| (r.number, r.statement, r.scope))
             .collect::<Vec<_>>(),
         expected
     );
-    for rule in &crate::RULES[38..] {
+    for rule in &crate::RULES[38..41] {
         assert_eq!(
             (rule.state, rule.deferred_reason),
             (crate::RuleState::Enforced, None)
@@ -1042,7 +1038,7 @@ fn u06_empty_explainer_and_u07_later_occurrence_refusal() {
     units[0]
         .math
         .insert("x".to_owned(), entry("x", &["unit", "math", "x"]));
-    units[0].texts.get_mut("en").unwrap().value.value = "See @math{x} @tag{c:1}.".to_owned();
+    units[0].texts.get_mut("en").unwrap().value.value = "See @math{x} @bad{c:1}.".to_owned();
     let mut location = site("statement.toml", &["unit", "texts", "en"]);
     location.decoded = Some(13..15);
     location.occurrence = Some(1);
@@ -1056,8 +1052,588 @@ fn u06_empty_explainer_and_u07_later_occurrence_refusal() {
             location,
             UnitFault::MalformedInsertion {
                 reason: InsertionReason::UnknownForm,
-                fragment: "@t".to_owned(),
+                fragment: "@b".to_owned(),
             },
         )],
     );
+}
+
+fn bilingual(en: &str, fr: &str) -> LanguageCheckedUnits {
+    let (mut documents, mut units) = fixtures();
+    let mut explainer = documents.documents["main"].clone();
+    explainer.required_languages.push(LocatedString {
+        value: "fr".into(),
+        site: site(
+            "documents.toml",
+            &["documents", "explainer", "required-languages"],
+        ),
+    });
+    documents.documents.insert("explainer".into(), explainer);
+    units[0].document.value = "explainer".into();
+    units[0].texts = [("en", en), ("fr", fr)]
+        .into_iter()
+        .map(|(language, text)| (language.into(), entry(text, &["unit", "texts", language])))
+        .collect();
+    admit_unit_drafts(documents, units).unwrap()
+}
+fn positions(input: &str) -> Vec<(String, Vec<std::ops::Range<usize>>)> {
+    let size = input.len() + 6;
+    vec![
+        (
+            format!("@tag{{{input}}} begins."),
+            std::iter::once(0..size).collect(),
+        ),
+        (
+            format!("See @tag{{{input}}} here."),
+            std::iter::once(4..4 + size).collect(),
+        ),
+        (
+            format!("See @tag{{{input}}}"),
+            std::iter::once(4..4 + size).collect(),
+        ),
+        (
+            format!("See @tag{{{input}}} and @tag{{{input}}}."),
+            vec![4..4 + size, 9 + size..9 + size * 2],
+        ),
+    ]
+}
+fn tag_site(language: &str, range: std::ops::Range<usize>, index: usize) -> UnitSite {
+    UnitSite {
+        decoded: Some(range),
+        occurrence: Some(index),
+        ..site("statement.toml", &["unit", "texts", language])
+    }
+}
+fn resolution_fault(
+    language: &str,
+    range: std::ops::Range<usize>,
+    index: usize,
+    cause: crate::TagResolutionFault,
+) -> UnitDiagnostic {
+    expected(
+        RuleId::M042,
+        UnitStage::Resolution,
+        Some(language),
+        tag_site(language, range, index),
+        UnitFault::ResolutionFault { cause },
+    )
+}
+fn resolution_matrix(
+    book: &AddressBook<'_>,
+    input: &str,
+    cause: &crate::TagResolutionFault,
+    message: &str,
+) {
+    use std::fmt::Write;
+    let restored = crate::seed().unwrap();
+    let restored_book = crate::addressing(&restored).unwrap();
+    for (text, ranges) in positions(input) {
+        let corpus = bilingual(&text, &text);
+        let mut faults = Vec::new();
+        let mut display = String::new();
+        for language in ["en", "fr"] {
+            for (index, range) in ranges.iter().enumerate() {
+                faults.push(resolution_fault(
+                    language,
+                    range.clone(),
+                    index,
+                    cause.clone(),
+                ));
+                writeln!(display,"M042 Resolution unit=Some(\"sec:coefficients:first-value\") language=Some({language:?}) at \"statement.toml\" $[\"unit\"][\"texts\"][{language:?}] bytes 10..90 decoded {}..{} occurrence {index}: {message}",range.start,range.end).unwrap();
+            }
+        }
+        let error = resolve_unit_tags(&corpus, book).unwrap_err();
+        assert_eq!(error, UnitErrors::from_diagnostics(faults).unwrap());
+        assert_eq!(error.to_string(), display);
+        assert_eq!(error.diagnostics()[0].fault.to_string(), message);
+        if let UnitFault::ResolutionFault { cause } = &error.diagnostics()[0].fault {
+            assert_eq!(cause.to_string(), message);
+        } else {
+            panic!("resolution fault required");
+        }
+        // Restore the live spelling independently for every positional fixture.
+        let live = text.replace(&format!("@tag{{{input}}}"), "@tag{c:1}");
+        let control = bilingual(&live, &live);
+        assert_eq!(
+            resolve_unit_tags(&control, &restored_book)
+                .unwrap()
+                .tags()
+                .len(),
+            ranges.len() * 2
+        );
+    }
+}
+#[test]
+fn u10_all_live_tags_every_position_language_and_bound_context() {
+    let graph = crate::seed().unwrap();
+    let before = crate::Snapshot::capture(&graph);
+    let statuses = crate::NodeId::ALL.map(|id| graph.status(id));
+    let book = crate::addressing(&graph).unwrap();
+    for (input, target) in [
+        ("c:1", NodeId::LangevinCoefficientOne),
+        ("c:3", NodeId::LangevinCoefficientThree),
+        ("v:1", NodeId::LangevinCoefficientOneValue),
+        ("v:3", NodeId::LangevinCoefficientThreeValue),
+    ] {
+        for (text, ranges) in positions(input) {
+            let corpus = bilingual(&text, &text);
+            let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+            assert!(std::ptr::eq(resolved.book(), &raw const book));
+            assert!(std::ptr::eq(resolved.corpus(), &raw const corpus));
+            let expected: Vec<_> = ["en", "fr"]
+                .into_iter()
+                .flat_map(|language| {
+                    ranges.iter().enumerate().map(move |(index, range)| {
+                        (
+                            "sec:coefficients:first-value",
+                            language,
+                            input,
+                            tag_site(language, range.clone(), index),
+                            target,
+                        )
+                    })
+                })
+                .collect();
+            let actual: Vec<_> = resolved
+                .tags()
+                .iter()
+                .map(|tag| {
+                    (
+                        tag.unit().as_str(),
+                        tag.language(),
+                        tag.occurrence().input(),
+                        tag.occurrence().site().clone(),
+                        tag.target(),
+                    )
+                })
+                .collect();
+            assert_eq!(actual, expected);
+            assert_eq!(graph.node(target).unwrap().id, target);
+            assert_eq!(graph.status(target), statuses[target as usize]);
+        }
+    }
+    assert_eq!(crate::Snapshot::capture(&graph), before);
+    assert_eq!(crate::NodeId::ALL.map(|id| graph.status(id)), statuses);
+}
+#[test]
+fn u11_unknown_payloads_every_position_language_and_literal_display() {
+    let graph = crate::seed().unwrap();
+    let book = crate::addressing(&graph).unwrap();
+    for input in [
+        "c:01",
+        "C:1",
+        " c:1",
+        "c:1 ",
+        "",
+        "def:langevin:coefficient-one",
+        "x\u{0}y",
+        "x\r\ny",
+        "x\\y",
+        "`$<>",
+    ] {
+        resolution_matrix(
+            &book,
+            input,
+            &crate::TagResolutionFault::UnknownTag {
+                input: input.into(),
+            },
+            &format!("tag {input:?}: unknown"),
+        );
+    }
+}
+fn unit_slice(ids: &[NodeId]) -> crate::ValidatedManifest {
+    let mut draft = crate::seed_draft();
+    draft.coverage.slice = ids.to_vec();
+    crate::validate(draft).unwrap()
+}
+fn absent_three() -> crate::ValidatedManifest {
+    let mut draft = crate::seed_draft();
+    draft
+        .nodes
+        .retain(|node| node.id != NodeId::LangevinCoefficientThree);
+    draft.edges.retain(|edge| {
+        edge.source != NodeId::LangevinCoefficientThree
+            && edge.target != NodeId::LangevinCoefficientThree
+    });
+    draft.coverage.slice.clear();
+    crate::validate(draft).unwrap()
+}
+#[test]
+fn u12_out_of_slice_every_position_language_and_cause() {
+    use crate::{OutOfSliceCause as O, TagId as T};
+    let one = unit_slice(&[NodeId::LangevinCoefficientOneValue]);
+    let empty = unit_slice(&[]);
+    let absent = absent_three();
+    let quantity = [
+        (
+            "c:1",
+            T::LangevinCoefficientOne,
+            NodeId::LangevinCoefficientOne,
+            O::QuantityOutsideSupport,
+            "def:langevin:coefficient-one",
+            "quantity-outside-support",
+        ),
+        (
+            "c:3",
+            T::LangevinCoefficientThree,
+            NodeId::LangevinCoefficientThree,
+            O::QuantityOutsideSupport,
+            "def:langevin:coefficient-three",
+            "quantity-outside-support",
+        ),
+    ];
+    let claims = [
+        (
+            "v:1",
+            T::LangevinCoefficientOneValue,
+            NodeId::LangevinCoefficientOneValue,
+            O::ClaimNotSelected,
+            "claim:langevin:coefficient-one-value",
+            "claim-not-selected",
+        ),
+        (
+            "v:3",
+            T::LangevinCoefficientThreeValue,
+            NodeId::LangevinCoefficientThreeValue,
+            O::ClaimNotSelected,
+            "claim:langevin:coefficient-three-value",
+            "claim-not-selected",
+        ),
+    ];
+    for (graph, cases) in [
+        (&one, vec![quantity[1], claims[1]]),
+        (&empty, vec![quantity[0], quantity[1], claims[0], claims[1]]),
+        (
+            &absent,
+            vec![(
+                "c:3",
+                T::LangevinCoefficientThree,
+                NodeId::LangevinCoefficientThree,
+                O::TargetAbsent,
+                "def:langevin:coefficient-three",
+                "target-absent",
+            )],
+        ),
+    ] {
+        let book = crate::addressing(graph).unwrap();
+        let before = crate::Snapshot::capture(graph);
+        for (input, tag, target, cause, label, reason) in cases {
+            resolution_matrix(
+                &book,
+                input,
+                &crate::TagResolutionFault::OutOfSliceTag {
+                    input: input.into(),
+                    tag,
+                    target,
+                    cause,
+                },
+                &format!("tag {input:?}: out of slice; label {label}; cause {reason}"),
+            );
+            let full = crate::seed().unwrap();
+            let restored = crate::addressing(&full).unwrap();
+            let corpus = bilingual(
+                &format!("See @tag{{{input}}}."),
+                &format!("See @tag{{{input}}}."),
+            );
+            assert_eq!(
+                resolve_unit_tags(&corpus, &restored).unwrap().tags()[0].target(),
+                target
+            );
+        }
+        assert_eq!(crate::Snapshot::capture(graph), before);
+    }
+}
+fn retirement_event(ordinal: u32, change: crate::HistoryChange) -> crate::HistoryEvent {
+    crate::HistoryEvent {
+        ordinal,
+        authority_record: "rec:units:retirement".into(),
+        reason: "Withdrawn for correction.".into(),
+        change,
+    }
+}
+#[test]
+fn u13_private_retirement_every_position_language_and_earliest_event() {
+    use crate::{HistoryChange as H, RetirementCause as R, TagId as T};
+    let full = crate::seed().unwrap();
+    let one = unit_slice(&[NodeId::LangevinCoefficientOneValue]);
+    let absent = absent_three();
+    let tag_event = retirement_event(
+        9,
+        H::RetireTag {
+            tag: T::LangevinCoefficientThree,
+        },
+    );
+    let identity_event = retirement_event(
+        9,
+        H::RetireIdentity {
+            identity: NodeId::LangevinCoefficientThree,
+        },
+    );
+    for (graph, events, cause) in [
+        (
+            &full,
+            vec![tag_event.clone()],
+            R::TagRetirement(tag_event.clone()),
+        ),
+        (
+            &one,
+            vec![tag_event.clone()],
+            R::TagRetirement(tag_event.clone()),
+        ),
+        (
+            &absent,
+            vec![tag_event.clone()],
+            R::TagRetirement(tag_event.clone()),
+        ),
+        (
+            &absent,
+            vec![identity_event.clone()],
+            R::IdentityRetirement(identity_event),
+        ),
+        (
+            &absent,
+            vec![
+                tag_event.clone(),
+                retirement_event(
+                    10,
+                    H::RetireIdentity {
+                        identity: NodeId::LangevinCoefficientThree,
+                    },
+                ),
+            ],
+            R::TagRetirement(tag_event),
+        ),
+    ] {
+        let mut history = crate::tag_history::seed_history();
+        history.extend(events.clone());
+        let book = crate::tag_validation::construct(
+            graph,
+            crate::TagId::ALL.map(crate::TagId::descriptor).to_vec(),
+            history,
+        )
+        .unwrap();
+        assert_eq!(book.history().skip(8).cloned().collect::<Vec<_>>(), events);
+        let before = crate::Snapshot::capture(graph);
+        resolution_matrix(
+            &book,
+            "c:3",
+            &crate::TagResolutionFault::RetiredTag {
+                input: "c:3".into(),
+                tag: T::LangevinCoefficientThree,
+                target: NodeId::LangevinCoefficientThree,
+                cause,
+            },
+            "tag \"c:3\": retired; label def:langevin:coefficient-three; event 9; authority rec:units:retirement; reason \"Withdrawn for correction.\"",
+        );
+        assert_eq!(crate::Snapshot::capture(graph), before);
+        let restored = crate::addressing(&full).unwrap();
+        let corpus = bilingual("See @tag{c:3}.", "See @tag{c:3}.");
+        assert_eq!(
+            resolve_unit_tags(&corpus, &restored).unwrap().tags()[0].target(),
+            NodeId::LangevinCoefficientThree
+        );
+    }
+}
+#[test]
+fn u14_different_live_tag_sets_pass_without_weld() {
+    let graph = crate::seed().unwrap();
+    let book = crate::addressing(&graph).unwrap();
+    let corpus = bilingual("See @tag{c:1}.", "Voir @tag{v:3} et @tag{c:3}.");
+    let result = resolve_unit_tags(&corpus, &book).unwrap();
+    assert_eq!(
+        result
+            .tags()
+            .iter()
+            .map(|tag| (tag.language(), tag.target()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("en", NodeId::LangevinCoefficientOne),
+            ("fr", NodeId::LangevinCoefficientThreeValue),
+            ("fr", NodeId::LangevinCoefficientThree)
+        ]
+    );
+}
+
+#[test]
+fn u07_tag_boundaries_empty_payload_and_mixed_occurrence_indices() {
+    for (text, reason, fragment, range) in [
+        ("See @taX{c:1}.", InsertionReason::UnknownForm, "@taX", 4..8),
+        ("See @ta", InsertionReason::Unclosed, "@ta", 4..7),
+        ("See @tag{c:1", InsertionReason::Unclosed, "@tag{c:1", 4..12),
+        (
+            "See @tag{x{y}.",
+            InsertionReason::NestedBrace,
+            "@tag{x{",
+            4..11,
+        ),
+    ] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = text.into();
+        let fault = expected(
+            RuleId::M041,
+            UnitStage::Content,
+            Some("en"),
+            tag_site("en", range.clone(), 0),
+            UnitFault::MalformedInsertion {
+                reason,
+                fragment: fragment.into(),
+            },
+        );
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        assert_eq!(error, UnitErrors::from_diagnostics(vec![fault]).unwrap());
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "M041 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90 decoded {}..{} occurrence 0: MalformedInsertion {{ reason: {reason:?}, fragment: {fragment:?} }}\n",
+                range.start, range.end
+            )
+        );
+    }
+    let corpus = bilingual("See @tag{}.", "See @tag{}.");
+    assert_eq!(
+        corpus.units()[0].texts()["en"].tag_occurrences()[0].input(),
+        ""
+    );
+    assert_eq!(
+        corpus.units()[0].texts()["en"].tag_occurrences()[0].site(),
+        &tag_site("en", 4..10, 0)
+    );
+    let (documents, mut units) = fixtures();
+    units[0].texts.get_mut("en").unwrap().value.value = " @tag{c:1} \n".into();
+    refusal(
+        documents.clone(),
+        units.clone(),
+        vec![expected(
+            RuleId::M040,
+            UnitStage::Language,
+            Some("en"),
+            site("statement.toml", &["unit", "texts", "en"]),
+            UnitFault::BlankText,
+        )],
+    );
+    units[0]
+        .math
+        .insert("x".into(), entry("x", &["unit", "math", "x"]));
+    units[0].texts.get_mut("en").unwrap().value.value = "é @tag{c:1}\n@math{x} @tag{v:1}.".into();
+    let corpus = admit_unit_drafts(documents, units).unwrap();
+    let text = &corpus.units()[0].texts()["en"];
+    assert_eq!(
+        text.tag_occurrences()
+            .iter()
+            .map(|o| (o.input(), o.site().clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("c:1", tag_site("en", 3..12, 0)),
+            ("v:1", tag_site("en", 22..31, 2))
+        ]
+    );
+    assert_eq!(text.occurrences()[0].site(), &tag_site("en", 13..21, 1));
+}
+#[test]
+fn u14_complete_ordered_mixed_refusals_keep_repetitions_and_status() {
+    use crate::{HistoryChange as H, OutOfSliceCause as O, RetirementCause as R, TagId as T};
+    use std::fmt::Write;
+    let graph = unit_slice(&[NodeId::LangevinCoefficientOneValue]);
+    let before = crate::Snapshot::capture(&graph);
+    let statuses = NodeId::ALL.map(|id| graph.status(id));
+    let event = retirement_event(
+        9,
+        H::RetireTag {
+            tag: T::LangevinCoefficientThree,
+        },
+    );
+    let mut history = crate::tag_history::seed_history();
+    history.push(event.clone());
+    let book =
+        crate::tag_validation::construct(&graph, T::ALL.map(T::descriptor).to_vec(), history)
+            .unwrap();
+    let mut corpus = bilingual(
+        "See @tag{c:1} @tag{bad} @tag{c:3} @tag{v:3} @tag{bad}.",
+        "See @tag{c:1} @tag{bad} @tag{c:3} @tag{v:3} @tag{bad}.",
+    );
+    // Deliberately reverse the unit input order: semantic diagnostics sort by ID.
+    let mut second = corpus.units[0].clone();
+    second.label = UnitLabel("sec:coefficients:second".into());
+    corpus.units.insert(0, second);
+    let mut expected_faults = Vec::new();
+    let mut display = String::new();
+    for unit in ["sec:coefficients:first-value", "sec:coefficients:second"] {
+        for language in ["en", "fr"] {
+            for (index, range, cause, message) in [
+                (
+                    1,
+                    14..23,
+                    crate::TagResolutionFault::UnknownTag {
+                        input: "bad".into(),
+                    },
+                    "tag \"bad\": unknown",
+                ),
+                (
+                    2,
+                    24..33,
+                    crate::TagResolutionFault::RetiredTag {
+                        input: "c:3".into(),
+                        tag: T::LangevinCoefficientThree,
+                        target: NodeId::LangevinCoefficientThree,
+                        cause: R::TagRetirement(event.clone()),
+                    },
+                    "tag \"c:3\": retired; label def:langevin:coefficient-three; event 9; authority rec:units:retirement; reason \"Withdrawn for correction.\"",
+                ),
+                (
+                    3,
+                    34..43,
+                    crate::TagResolutionFault::OutOfSliceTag {
+                        input: "v:3".into(),
+                        tag: T::LangevinCoefficientThreeValue,
+                        target: NodeId::LangevinCoefficientThreeValue,
+                        cause: O::ClaimNotSelected,
+                    },
+                    "tag \"v:3\": out of slice; label claim:langevin:coefficient-three-value; cause claim-not-selected",
+                ),
+                (
+                    4,
+                    44..53,
+                    crate::TagResolutionFault::UnknownTag {
+                        input: "bad".into(),
+                    },
+                    "tag \"bad\": unknown",
+                ),
+            ] {
+                let mut fault = resolution_fault(language, range.clone(), index, cause);
+                fault.unit = Some(unit.into());
+                expected_faults.push(fault);
+                writeln!(display,"M042 Resolution unit=Some({unit:?}) language=Some({language:?}) at \"statement.toml\" $[\"unit\"][\"texts\"][{language:?}] bytes 10..90 decoded {}..{} occurrence {index}: {message}",range.start,range.end).unwrap();
+            }
+        }
+    }
+    let errors = resolve_unit_tags(&corpus, &book).unwrap_err();
+    assert_eq!(
+        errors,
+        UnitErrors::from_diagnostics(expected_faults).unwrap()
+    );
+    assert_eq!(errors.to_string(), display);
+    assert_eq!(crate::Snapshot::capture(&graph), before);
+    assert_eq!(NodeId::ALL.map(|id| graph.status(id)), statuses);
+    let full = crate::seed().unwrap();
+    let restored = crate::addressing(&full).unwrap();
+    let control = bilingual("See @tag{c:1} @tag{c:3} @tag{v:3}.", "See @tag{v:1}.");
+    assert_eq!(
+        resolve_unit_tags(&control, &restored).unwrap().tags().len(),
+        4
+    );
+}
+#[test]
+fn register_m042_literal_statement_scope_and_state() {
+    let rule = &crate::RULES[41];
+    assert_eq!(rule.number, RuleId::M042);
+    assert_eq!(
+        rule.statement,
+        "Every tag-facing statement-text occurrence resolves through the supplied AddressBook's live resolver or refuses admission with its unit, language and site."
+    );
+    assert_eq!(
+        rule.scope,
+        "All tag insertions in every admitted language text."
+    );
+    assert_eq!(rule.state, crate::RuleState::Enforced);
+    assert_eq!(rule.deferred_reason, None);
 }

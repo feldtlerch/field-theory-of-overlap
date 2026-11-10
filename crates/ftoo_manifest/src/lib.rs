@@ -30,8 +30,9 @@ mod wire;
 pub use units::{
     CheckedText, CheckedUnit, DocumentDraft, DocumentEntryDraft, InsertionReason,
     LanguageCheckedUnits, LocatedEntryDraft, LocatedString, MathOccurrence, NameDomain, PathPart,
-    ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite,
-    UnitStage, admit_unit_drafts,
+    ResolvedUnitTag, ResolvedUnits, ShapeKind, SourceAnchor, TagOccurrence, UnitDiagnostic,
+    UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite, UnitStage, admit_unit_drafts,
+    resolve_unit_tags,
 };
 
 pub use wire::{
