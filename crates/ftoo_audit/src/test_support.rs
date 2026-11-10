@@ -656,7 +656,7 @@ mod tests {
         );
         for submission in &trial.submissions[..8] {
             if let Ok(witness) = &submission.verdict {
-                assert_ne!(witness.as_slice(), []);
+                assert_ne!(witness.as_slice(), [0u8; 0]);
             }
         }
         let joint_witness = trial.submissions[7]

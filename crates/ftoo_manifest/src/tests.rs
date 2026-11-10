@@ -541,18 +541,18 @@ fn diagnostics_are_semantic_and_independent_defects_accumulate() -> TestResult {
 }
 
 #[test]
-fn register_has_exact_m4_allocation_and_deferral_reasons() -> TestResult {
+fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
-        M031, M032, M033, M034, M035, M036,
+        M031, M032, M033, M034, M035, M036, M037, M038,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
         [
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
-            M029, M030, M031, M032, M033, M034, M035, M036
+            M029, M030, M031, M032, M033, M034, M035, M036, M037, M038
         ]
     );
     for rule in RULES {
@@ -562,7 +562,7 @@ fn register_has_exact_m4_allocation_and_deferral_reasons() -> TestResult {
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 => {
                 RuleState::Enforced
             }
-            M001 | M002 | M003 | M004 | M012 => RuleState::DeferredM1b,
+            M001 | M002 | M003 | M004 | M012 | M037 | M038 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
@@ -570,7 +570,7 @@ fn register_has_exact_m4_allocation_and_deferral_reasons() -> TestResult {
         assert!(!rule.statement.is_empty() && !rule.scope.is_empty());
         match expected {
             RuleState::Structural | RuleState::Enforced => assert_eq!(rule.deferred_reason, None),
-            RuleState::DeferredM1b | RuleState::DeferredM2 | RuleState::DeferredExclusiveRoutes => {
+            RuleState::DeferredM2 | RuleState::DeferredExclusiveRoutes => {
                 assert_ne!(rule.deferred_reason.ok_or("missing reason")?, "");
             }
         }
@@ -640,7 +640,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        23
+        30
     );
     assert_eq!(
         RULES
@@ -651,7 +651,7 @@ fn register_pins_admission_statements_and_counts() {
     );
     assert_eq!(
         RULES.iter().filter(|r| r.deferred_reason.is_some()).count(),
-        10
+        5
     );
 }
 
@@ -659,14 +659,6 @@ fn register_pins_admission_statements_and_counts() {
 fn exact_deferral_reasons() {
     use RuleId::*;
     let expected = [
-        (
-            M001,
-            "The serialized boundary enters with its M1b projection consumer.",
-        ),
-        (M002, "No byte parser is admitted before M1b."),
-        (M003, "The wire schema is deferred to M1b."),
-        (M004, "Typed wire admission is deferred to M1b."),
-        (M012, "Assertions enter only through the M1b wire boundary."),
         (
             M016,
             "M2 must admit typed weighting paths and their consumer.",

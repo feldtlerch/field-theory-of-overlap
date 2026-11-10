@@ -8,3 +8,9 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+ftoo_manifest = { path = "../ftoo_manifest" }
+
+[dev-dependencies]
+ftoo_audit = { path = "../ftoo_audit" }

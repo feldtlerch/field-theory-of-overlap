@@ -1211,13 +1211,13 @@ fn m4_register_statements_scopes_and_consumer_inventory() {
         ),
     ];
     assert_eq!(
-        RULES[29..]
+        RULES[29..36]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state))
             .collect::<Vec<_>>(),
         expected
     );
-    assert!(RULES[29..].iter().all(|r| r.deferred_reason.is_none()));
+    assert!(RULES[29..36].iter().all(|r| r.deferred_reason.is_none()));
     // M036 resolution has no RuleId diagnostic. Only its catalog half does.
     let diagnostic_consumers: [(RuleId, fn() -> TestResult); 6] = [
         (RuleId::M031, m031_spelling_and_duplicate_positions),

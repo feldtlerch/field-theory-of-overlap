@@ -1,4 +1,9 @@
-//! The generator: documents, notation and the runtime projection, with
-//! generate and check on one code path.
-//!
-//! Empty shell awaiting its first reviewed bite (ADR 004, ADR 006, ADR 009).
+//! Generate and check the core manifest artifact against Rust authority.
+//! Semantic comparison precedes registry admission and exact byte comparison.
+mod artifact;
+mod projection;
+#[cfg(test)]
+mod tests;
+pub use artifact::{
+    ByteGateFault, IoOperation, ProjectionCheckError, check_projection, generate_projection,
+};

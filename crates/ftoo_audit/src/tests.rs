@@ -784,7 +784,7 @@ fn m026_checked_counterstatement_refutes_and_partial_release_refuses() -> TestRe
         receipt.counterstatement().unwrap().claimed(),
         &Rational::zero()
     );
-    assert_ne!(receipt.counterstatement().unwrap().witness(), []);
+    assert_ne!(receipt.counterstatement().unwrap().witness(), [0u8; 0]);
     assert_eq!(
         report.outcomes()[1].verdict(),
         &crate::Verdict::Deferred(ftoo_manifest::DeferredReason::Premise {

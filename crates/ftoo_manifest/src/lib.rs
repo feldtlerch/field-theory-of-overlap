@@ -3,7 +3,7 @@
 //! Validation establishes identity, relation contracts and coverage declarations,
 //! not mathematical truth, operation typing or an audit verdict. The coefficient
 //! seed is proposed trial content pending its prose. Bound claims still require an audit run.
-//! There is no serialized boundary or calculation-engine dependency here.
+//! The strict core projection checks base assertions without an engine dependency.
 //!
 //! Addressing admits permanent opaque handles and append-only lifecycle history.
 //! Live handles denote the declared claim slice and its dependency support;
@@ -24,6 +24,13 @@ mod tag_history;
 mod tag_validation;
 mod tags;
 mod validation;
+mod wire;
+
+pub use wire::{
+    BudgetExport, CapabilityExport, LoadedProjection, ProducerExport, ProjectionDiagnostic,
+    ProjectionError, ProjectionFault, ProjectionValue, SourceDifference, WireError, WireFault,
+    WireLocation, load_projection, projection_bytes,
+};
 
 pub use tag_history::{HistoryChange, HistoryEvent, RetirementCause};
 pub use tag_validation::{
@@ -59,7 +66,7 @@ pub use audit::{
     EngineAvailability, EnginePin, ProducerDescriptor, ProducerId, RegionContract,
     adapter_implemented, registry_diagnostics,
 };
-pub use budgets::{BudgetId, BudgetProfile, BudgetSpec};
+pub use budgets::{BudgetId, BudgetProfile, BudgetSpec, ResolvedLimits};
 
 pub use audit::{
     DeferredReason, OutcomeDraft, Snapshot, VerdictClass, expected_deferral, report_diagnostics,
