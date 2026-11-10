@@ -19,6 +19,12 @@ mod budgets;
 mod coverage;
 mod graph;
 mod identity;
+mod labels;
+pub use labels::{
+    CheckedMarkdown, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
+    LabelOccurrence, LabelSite, LabelSourceError, LabelSourceFault, LabelStage, MarkdownSource,
+    MintKind, MintOrigin, ReferenceDomain, check_markdown_sources, integrate_labels,
+};
 mod seed;
 mod status;
 mod tag_history;

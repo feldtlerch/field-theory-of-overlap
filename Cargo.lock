@@ -40,6 +40,7 @@ version = "0.0.0"
 dependencies = [
  "ftoo_audit",
  "ftoo_manifest",
+ "serde_json",
  "toml_edit",
 ]
 

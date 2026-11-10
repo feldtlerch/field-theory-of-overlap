@@ -5,6 +5,7 @@ re-implementation of two invariants; the published lint tooling replaces it
 when available (ADR 008). Run with --self-test to prove the harvest on a
 fixture, which CI does before the real run."""
 import pathlib
+import json
 import re
 import sys
 
@@ -29,27 +30,34 @@ def self_test() -> None:
     mints, cites = harvest(fixture)
     assert mints == ["rec:a:b"], mints
     assert cites == ["rec:a:b", "dec:c:d", "arg:e:f"], cites
+    cases = json.loads((pathlib.Path(__file__).parent / "fixtures/label-harvest.json").read_text(encoding="utf-8"))
+    for case in cases:
+        assert harvest(case["text"]) == (case["mints"], case["cites"]), case["name"]
     print("self-test: ok")
 
 
-if "--self-test" in sys.argv[1:]:
-    self_test()
-    sys.exit(0)
-
-mints: dict[str, pathlib.Path] = {}
-cites: list[tuple[pathlib.Path, str]] = []
-failed = False
-for path in sorted(pathlib.Path(".").rglob("*.md")):
-    file_mints, file_cites = harvest(path.read_text(encoding="utf-8"))
-    for label in file_mints:
-        if label in mints:
-            print(f"duplicate mint: {label} in {path} and {mints[label]}")
+def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        self_test()
+        return 0
+    mints: dict[str, pathlib.Path] = {}
+    cites: list[tuple[pathlib.Path, str]] = []
+    failed = False
+    for path in sorted(pathlib.Path(".").rglob("*.md")):
+        file_mints, file_cites = harvest(path.read_text(encoding="utf-8"))
+        for label in file_mints:
+            if label in mints:
+                print(f"duplicate mint: {label} in {path} and {mints[label]}")
+                failed = True
+            mints[label] = path
+        cites.extend((path, label) for label in file_cites)
+    for path, label in cites:
+        if label not in mints:
+            print(f"unresolved citation: {label} in {path}")
             failed = True
-        mints[label] = path
-    cites.extend((path, label) for label in file_cites)
-for path, label in cites:
-    if label not in mints:
-        print(f"unresolved citation: {label} in {path}")
-        failed = True
-print(f"labels: {len(mints)} mints, {len(cites)} citations")
-sys.exit(1 if failed else 0)
+    print(f"labels: {len(mints)} mints, {len(cites)} citations")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

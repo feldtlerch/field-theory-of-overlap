@@ -53,6 +53,8 @@ pub enum RuleId {
     M040,
     M041,
     M042,
+    M043,
+    M044,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,7 +75,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 42] = [
+pub const RULES: [RuleSpec; 44] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -365,6 +367,20 @@ pub const RULES: [RuleSpec; 42] = [
         number: RuleId::M042,
         statement: "Every tag-facing statement-text occurrence resolves through the supplied AddressBook's live resolver or refuses admission with its unit, language and site.",
         scope: "All tag insertions in every admitted language text.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M043,
+        statement: "Every label has one mint across the permanent Rust identity catalog, Markdown mint occurrences and admitted unit metadata; Markdown citations resolve within the Markdown mint domain.",
+        scope: "The complete supplied Markdown corpus, every permanent NodeId and every admitted unit metadata mint.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M044,
+        statement: "Every Rust-held authority-record citation resolves to exactly one Markdown mint.",
+        scope: "Every history event in the supplied resolved corpus's AddressBook, including admission and retirement records.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

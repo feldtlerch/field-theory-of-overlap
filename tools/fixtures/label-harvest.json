@@ -1,0 +1,12 @@
+[
+  {"name":"marker-spacing", "text":"·`a:b:c` ·  `d:e:f` · `g:h:i`", "mints":["g:h:i"], "cites":[]},
+  {"name":"boundaries", "text":"· `a:b:c` (`a:b:c` `d:e:f`)", "mints":["a:b:c"], "cites":["a:b:c","d:e:f"]},
+  {"name":"malformed", "text":"· `a:b` · `A:b:c` · `a:b:c:d` (`:b:c` `a::c` `a:b:c d`)", "mints":[], "cites":[]},
+  {"name":"parentheses", "text":"(`a:b:c` (`d:e:f`) `g:h:i`) (`j:k:l`", "mints":[], "cites":["d:e:f"]},
+  {"name":"multiline", "text":"(`a:b:c`\n`d:e:f`) `g:h:i`", "mints":[], "cites":["a:b:c","d:e:f"]},
+  {"name":"doubled", "text":"(``a:b:c`` ```d:e:f```)", "mints":[], "cites":["a:b:c","d:e:f"]},
+  {"name":"fence-comment-link", "text":"```\n· `a:b:c`\n```\n<!-- · `d:e:f` (`a:b:c`) --> [x](`d:e:f`)", "mints":["a:b:c","d:e:f"], "cites":["a:b:c","d:e:f"]},
+  {"name":"mint-and-cite", "text":"(· `a:b:c`)", "mints":["a:b:c"], "cites":["a:b:c"]},
+  {"name":"overlap", "text":"(`a:b:c`d:e:f` `a:b:c`) · `a:b:c` · `a:b:c`", "mints":["a:b:c","a:b:c"], "cites":["a:b:c","a:b:c"]},
+  {"name":"unicode-newlines", "text":"é\r\n· `a:b:c`\r(\r`a:b:c`\r\n)", "mints":["a:b:c"], "cites":["a:b:c"]}
+]

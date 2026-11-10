@@ -545,14 +545,15 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
-        M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
+        M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
         [
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
-            M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042
+            M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
+            M043, M044
         ]
     );
     for rule in RULES {
@@ -560,7 +561,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M005 | M011 | M030 => RuleState::Structural,
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
-            | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 => {
+            | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044 => {
                 RuleState::Enforced
             }
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
@@ -623,6 +624,29 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
+    assert_eq!(RULES.len(), 44);
+    assert_eq!(
+        RULES[42..]
+            .iter()
+            .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                RuleId::M043,
+                "Every label has one mint across the permanent Rust identity catalog, Markdown mint occurrences and admitted unit metadata; Markdown citations resolve within the Markdown mint domain.",
+                "The complete supplied Markdown corpus, every permanent NodeId and every admitted unit metadata mint.",
+                RuleState::Enforced,
+                None
+            ),
+            (
+                RuleId::M044,
+                "Every Rust-held authority-record citation resolves to exactly one Markdown mint.",
+                "Every history event in the supplied resolved corpus's AddressBook, including admission and retirement records.",
+                RuleState::Enforced,
+                None
+            ),
+        ]
+    );
     assert_eq!(
         RULES[12].statement,
         "Every declared slice member is unique and is a claim; M007 resolves membership before this shape check."
@@ -640,7 +664,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        34
+        36
     );
     assert_eq!(
         RULES
