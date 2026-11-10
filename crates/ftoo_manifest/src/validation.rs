@@ -57,6 +57,9 @@ pub enum RuleId {
     M044,
     M045,
     M046,
+    M047,
+    M048,
+    M049,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,7 +80,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 46] = [
+pub const RULES: [RuleSpec; 49] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -398,6 +401,27 @@ pub const RULES: [RuleSpec; 46] = [
         statement: "Within each statement unit, every language has equal addressed tag sets and equal cited label sets, compared separately from the shared metadata mint and independently of position or multiplicity.",
         scope: "All language texts of each resolved unit after joint label and citation admission.",
         state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M047,
+        statement: "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits.",
+        scope: "Every primitive descriptor, definition body and submitted notation expression.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M048,
+        statement: "Definitions have their kind's signature shape and any backing equals their object; stems obey the reserved alphabetic grammar and generated names are unique; every permanent object has exactly one canonical symbol; aliases preserve that object and terminate at its canonical symbol; all definition dependencies are acyclic.",
+        scope: "The complete notation definition catalogue, including absent objects and unused definitions.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M049,
+        statement: "Symbol tiers are derived from the supplied graph and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
+        scope: "Checked notation catalogues and all exposed symbol-status values.",
+        state: RuleState::Structural,
         deferred_reason: None,
     },
 ];

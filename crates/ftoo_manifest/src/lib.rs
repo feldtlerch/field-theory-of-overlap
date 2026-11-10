@@ -19,6 +19,16 @@ mod budgets;
 mod coverage;
 mod graph;
 mod identity;
+mod notation;
+pub use notation::{
+    AliasTargetReason, Callee, CheckedDefinition, CheckedExpression, CheckedNotation,
+    DefinitionCategory, DefinitionId, DefinitionKind, DefinitionShapeReason, DefinitionSpec,
+    ExprDraft, LiteralReason, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES,
+    MathSort, NotationDiagnostic, NotationErrors, NotationFault, NotationOrigin, NotationPathPart,
+    NotationResource, NotationSite, NotationStage, PendingReason, PrimitiveId, PrimitiveOperation,
+    PrimitiveSpec, RegistryEntry, Signature, SymbolLookupFault, SymbolStatus, SymbolTier,
+    SymbolUse, check_expression, notation,
+};
 mod labels;
 pub use labels::{
     CheckedMarkdown, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
