@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    Awaiting, Calibration, Diagnostic, DraftLocation, Edge, Evidence, Guard, Identification,
-    ManifestDraft, Maturity, NodeId, NodeKind, NodePayload, RULES, RelationKind, ReleaseGate,
-    RuleId, RuleState, seed, seed_draft, validate,
+    Awaiting, Blocker, Calibration, ClaimAudit, Diagnostic, DraftLocation, Edge, Evidence, Guard,
+    Identification, ManifestDraft, Maturity, NodeId, NodeKind, NodePayload, RULES, RelationKind,
+    ReleaseGate, RuleId, RuleState, seed, seed_draft, validate,
 };
 use NodeId::{
     LangevinCoefficientOne as One, LangevinCoefficientOneValue as OneValue,
@@ -29,6 +29,12 @@ fn refused(draft: ManifestDraft, expected: &[RuleId]) -> TestResult<Vec<Diagnost
         Err(errors) => {
             let actual: BTreeSet<_> = errors.diagnostics().iter().map(|d| d.rule).collect();
             assert_eq!(actual, expected.iter().copied().collect());
+            assert!(
+                errors
+                    .diagnostics()
+                    .iter()
+                    .all(|d| d.stage == crate::AdmissionStage::GraphAdmission)
+            );
             assert!(
                 errors
                     .diagnostics()
@@ -86,18 +92,18 @@ fn seed_admission_identity_kinds_edges_status_and_coverage() -> TestResult {
         assert_eq!(status.calibration(), Calibration::NotApplicable);
         match &node.payload {
             NodePayload::Quantity { .. } => assert_eq!(status.evidence(), Evidence::NotAClaim),
-            NodePayload::Claim { awaits, .. } => {
+            NodePayload::Claim { audit, .. } => {
                 assert_eq!(status.evidence(), Evidence::Deferred);
-                assert_eq!(*awaits, Awaiting::AuditBinding);
+                assert!(matches!(audit, ClaimAudit::Bound { .. }));
+                assert_eq!(status.blocker(), Some(Blocker::AuditRunRequired));
             }
         }
     }
-    assert_eq!(graph.coverage().slice, []);
+    assert_eq!(graph.coverage().slice, [OneValue, ThreeValue]);
     assert!(!graph.coverage().closed_world.referents);
     assert!(!graph.coverage().closed_world.relations);
-    assert!(!graph.coverage().closed_world.audit);
+    assert!(graph.coverage().closed_world.audit);
     assert_eq!(graph.coverage().release_gate, ReleaseGate::ExplicitPartial);
-    assert!(graph.coverage().is_explicit_partial());
     Ok(())
 }
 
@@ -154,7 +160,7 @@ fn m006_payload_identity_mismatch_suppresses_dependent_checks() -> TestResult {
     let mut draft = seed_draft();
     draft.nodes[0].payload = NodePayload::Claim {
         description: "Wrong payload".into(),
-        awaits: Awaiting::AuditBinding,
+        audit: ClaimAudit::Awaiting(Awaiting::AuditBinding),
     };
     let diagnostics = refused(draft, &[RuleId::M006])?;
     assert_eq!(diagnostics[0].ids, [One]);
@@ -309,7 +315,7 @@ fn m009_self_edges_precede_cycles_and_symmetry() -> TestResult {
 #[test]
 fn m010_dependency_cycle_outside_empty_slice() -> TestResult {
     let mut draft = seed_draft();
-    assert_eq!(draft.coverage.slice, []);
+    draft.coverage.slice.clear();
     draft.edges.push(edge(DependsOn, One, Three));
     let diagnostics = refused(draft, &[RuleId::M010])?;
     assert_eq!(diagnostics.len(), 1);
@@ -425,11 +431,13 @@ fn m013_quantity_slice_precedes_eligibility() -> TestResult {
 }
 
 #[test]
-fn m014_registered_claim_is_not_audited() -> TestResult {
+fn m014_awaiting_selected_claim_refused_at_graph_admission() -> TestResult {
     for id in [OneValue, ThreeValue] {
         let mut draft = seed_draft();
         draft.coverage.slice = vec![id];
-        assert!(!draft.coverage.is_explicit_partial());
+        draft.coverage.closed_world.audit = false;
+        awaiting(&mut draft, id);
+
         let diagnostics = refused(draft, &[RuleId::M014])?;
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].ids, [id]);
@@ -439,15 +447,14 @@ fn m014_registered_claim_is_not_audited() -> TestResult {
 
 #[test]
 fn m015_each_closure_assertion_and_complete_gate() -> TestResult {
-    for flag in 0..4 {
+    for flag in 0..3 {
         let mut draft = seed_draft();
         match flag {
             0 => draft.coverage.closed_world.referents = true,
             1 => draft.coverage.closed_world.relations = true,
-            2 => draft.coverage.closed_world.audit = true,
             _ => draft.coverage.release_gate = ReleaseGate::Complete,
         }
-        assert!(!draft.coverage.is_explicit_partial());
+
         let diagnostics = refused(draft, &[RuleId::M015])?;
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].location, DraftLocation::Coverage);
@@ -458,10 +465,11 @@ fn m015_each_closure_assertion_and_complete_gate() -> TestResult {
 #[test]
 fn m015_empty_graph_partial_passes_complete_refused() -> TestResult {
     let mut draft = seed_draft();
+    draft.coverage.slice.clear();
+    draft.budgets.clear();
     draft.nodes.clear();
     draft.edges.clear();
     let graph = validate(draft.clone())?;
-    assert!(graph.coverage().is_explicit_partial());
     assert_eq!(graph.dependency_order(DependsOn)?, []);
     assert_eq!(graph.node(One), None);
     assert_eq!(graph.status(One), None);
@@ -513,6 +521,7 @@ fn diagnostics_are_semantic_and_independent_defects_accumulate() -> TestResult {
         .edges
         .retain(|e| *e != edge(CompatibleWith, One, Three));
     draft.coverage.slice = vec![One, OneValue];
+    awaiting(&mut draft, OneValue);
     draft.coverage.closed_world.audit = true;
     let rules = [
         RuleId::M008,
@@ -534,34 +543,169 @@ fn diagnostics_are_semantic_and_independent_defects_accumulate() -> TestResult {
 }
 
 #[test]
-fn register_has_exact_m1a_allocation_and_deferral_reasons() -> TestResult {
+fn register_has_exact_m3a_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
-        M016, M017, M018, M019, M020, M021,
+        M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
         [
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
-            M015, M016, M017, M018, M019, M020, M021
+            M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
+            M029
         ]
     );
     for rule in RULES {
         let expected = match rule.number {
             M005 | M011 => RuleState::Structural,
-            M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M021 => RuleState::Enforced,
+            M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
+            | M024 => RuleState::Enforced,
             M001 | M002 | M003 | M004 | M012 => RuleState::DeferredM1b,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
-            M020 => RuleState::DeferredM3,
+            M025 | M026 | M027 | M028 => RuleState::DeferredM3b,
+            M029 => RuleState::DeferredExclusiveRoutes,
         };
         assert_eq!(rule.state, expected);
         assert!(!rule.statement.is_empty() && !rule.scope.is_empty());
         match expected {
             RuleState::Structural | RuleState::Enforced => assert_eq!(rule.deferred_reason, None),
-            RuleState::DeferredM1b | RuleState::DeferredM2 | RuleState::DeferredM3 => {
+            RuleState::DeferredM1b
+            | RuleState::DeferredM2
+            | RuleState::DeferredM3b
+            | RuleState::DeferredExclusiveRoutes => {
                 assert_ne!(rule.deferred_reason.ok_or("missing reason")?, "");
             }
         }
     }
     Ok(())
+}
+
+fn awaiting(draft: &mut ManifestDraft, id: NodeId) {
+    for node in &mut draft.nodes {
+        if node.id == id
+            && let NodePayload::Claim { audit, .. } = &mut node.payload
+        {
+            *audit = ClaimAudit::Awaiting(Awaiting::AuditBinding);
+        }
+    }
+}
+#[test]
+fn m015_awaiting_outside_empty_slice_refuses_audit_closure() -> TestResult {
+    let mut draft = seed_draft();
+    draft.coverage.slice.clear();
+    awaiting(&mut draft, OneValue);
+    draft
+        .budgets
+        .retain(|b| b.producer.descriptor().claim != OneValue);
+    let diagnostics = refused(draft, &[RuleId::M015])?;
+    assert_eq!(diagnostics[0].stage, crate::AdmissionStage::GraphAdmission);
+    Ok(())
+}
+#[test]
+fn m024_adapter_support_is_not_engine_availability() -> TestResult {
+    for capability in [
+        crate::CapabilityId::FormalTruncatedPowerSeries,
+        crate::CapabilityId::ExactRationalLinearEquivalence,
+    ] {
+        let mut draft = seed_draft();
+        draft.coverage.slice.clear();
+        draft.coverage.closed_world.audit = false;
+        if let NodePayload::Claim { audit, .. } = &mut draft.nodes[2].payload {
+            *audit = ClaimAudit::Awaiting(Awaiting::Capability(capability));
+        }
+        draft.budgets.remove(0);
+        if capability == crate::CapabilityId::FormalTruncatedPowerSeries {
+            let d = refused(draft, &[RuleId::M024])?;
+            assert_eq!(d[0].stage, crate::AdmissionStage::GraphAdmission);
+        } else {
+            validate(draft)?;
+        }
+    }
+    Ok(())
+}
+#[test]
+fn register_pins_admission_statements_and_counts() {
+    assert_eq!(
+        RULES[12].statement,
+        "Every declared slice member is unique and is a claim; M007 resolves membership before this shape check."
+    );
+    assert_eq!(
+        RULES[13].statement,
+        "Every selected claim is Bound and every transitive claim premise of a selected claim is selected."
+    );
+    assert_eq!(
+        RULES[14].statement,
+        "Theory closure flags are false, the release gate is ExplicitPartial, and asserted audit closure requires every present claim Bound to its unique implementation."
+    );
+    assert_eq!(
+        RULES
+            .iter()
+            .filter(|r| r.state == RuleState::Enforced)
+            .count(),
+        13
+    );
+    assert_eq!(
+        RULES
+            .iter()
+            .filter(|r| r.state == RuleState::Structural)
+            .count(),
+        2
+    );
+    assert_eq!(
+        RULES.iter().filter(|r| r.deferred_reason.is_some()).count(),
+        14
+    );
+}
+
+#[test]
+fn exact_deferral_reasons() {
+    use RuleId::*;
+    let expected = [
+        (
+            M001,
+            "The serialized boundary enters with its M1b projection consumer.",
+        ),
+        (M002, "No byte parser is admitted before M1b."),
+        (M003, "The wire schema is deferred to M1b."),
+        (M004, "Typed wire admission is deferred to M1b."),
+        (M012, "Assertions enter only through the M1b wire boundary."),
+        (
+            M016,
+            "M2 must admit typed weighting paths and their consumer.",
+        ),
+        (M017, "M2 must admit anchored readings and route checking."),
+        (
+            M018,
+            "M2 must admit converters and their checking consumer.",
+        ),
+        (M019, "M2 must admit indexed spaces and operation typing."),
+        (
+            M025,
+            "Outcome and provenance consumption await the M3b report consumer.",
+        ),
+        (
+            M026,
+            "Verdict interpretation awaits the M3b report consumer.",
+        ),
+        (
+            M027,
+            "Gated report reproducibility awaits the M3b report consumer.",
+        ),
+        (
+            M028,
+            "Total blocker semantics await the M3b report consumer.",
+        ),
+        (
+            M029,
+            "Exclusive routes await their first claim and isolation consumer.",
+        ),
+    ];
+    assert_eq!(
+        RULES
+            .iter()
+            .filter_map(|r| r.deferred_reason.map(|reason| (r.number, reason)))
+            .collect::<Vec<_>>(),
+        expected
+    );
 }

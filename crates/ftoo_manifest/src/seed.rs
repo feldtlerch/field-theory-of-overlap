@@ -1,6 +1,7 @@
 use crate::{
-    Awaiting, ClosedWorld, Coverage, Edge, Guard, ManifestDraft, Maturity, NodeDraft, NodeId,
-    NodePayload, RelationKind, ReleaseGate, ValidatedManifest, ValidationErrors, validate,
+    AuditRoutes, BudgetSpec, ClaimAudit, ClosedWorld, Coverage, Edge, Guard, ManifestDraft,
+    Maturity, NodeDraft, NodeId, NodePayload, ProducerId, RelationKind, ReleaseGate,
+    ValidatedManifest, ValidationErrors, validate,
 };
 
 /// Four proposed objects grounded in the dimension-three Langevin audit trial.
@@ -34,7 +35,11 @@ pub fn seed_draft() -> ManifestDraft {
                 maturity: Maturity::Proposed,
                 payload: NodePayload::Claim {
                     description: "The first coefficient is exactly 1/3.".into(),
-                    awaits: Awaiting::AuditBinding,
+                    audit: ClaimAudit::Bound {
+                        producer: ProducerId::LangevinCoefficientOneValue,
+                        budget: ProducerId::LangevinCoefficientOneValue.descriptor().budget,
+                        routes: AuditRoutes::Unconditional,
+                    },
                 },
             },
             NodeDraft {
@@ -42,7 +47,13 @@ pub fn seed_draft() -> ManifestDraft {
                 maturity: Maturity::Proposed,
                 payload: NodePayload::Claim {
                     description: "The third coefficient is exactly -1/45.".into(),
-                    awaits: Awaiting::AuditBinding,
+                    audit: ClaimAudit::Bound {
+                        producer: ProducerId::LangevinCoefficientThreeValue,
+                        budget: ProducerId::LangevinCoefficientThreeValue
+                            .descriptor()
+                            .budget,
+                        routes: AuditRoutes::Unconditional,
+                    },
                 },
             },
         ],
@@ -62,12 +73,16 @@ pub fn seed_draft() -> ManifestDraft {
             guard: Guard::Always,
         })
         .collect(),
+        budgets: ProducerId::ALL
+            .into_iter()
+            .map(BudgetSpec::reviewed)
+            .collect(),
         coverage: Coverage {
-            slice: vec![],
+            slice: vec![OneValue, ThreeValue],
             closed_world: ClosedWorld {
                 referents: false,
                 relations: false,
-                audit: false,
+                audit: true,
             },
             release_gate: ReleaseGate::ExplicitPartial,
         },

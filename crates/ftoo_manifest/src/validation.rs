@@ -1,4 +1,7 @@
-use crate::{Edge, ManifestDraft, NodeId, NodeKind, RelationKind, ValidatedManifest};
+use crate::{
+    Awaiting, ClaimAudit, ENGINE_PIN, Edge, ManifestDraft, NodeId, NodeKind, NodePayload,
+    RelationKind, ValidatedManifest, adapter_implemented,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
@@ -29,6 +32,14 @@ pub enum RuleId {
     M019,
     M020,
     M021,
+    M022,
+    M023,
+    M024,
+    M025,
+    M026,
+    M027,
+    M028,
+    M029,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,7 +48,8 @@ pub enum RuleState {
     Enforced,
     DeferredM1b,
     DeferredM2,
-    DeferredM3,
+    DeferredM3b,
+    DeferredExclusiveRoutes,
 }
 
 /// Scope and deferral are part of the rule, not inferred from an empty domain.
@@ -50,7 +62,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 21] = [
+pub const RULES: [RuleSpec; 29] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -81,7 +93,7 @@ pub const RULES: [RuleSpec; 21] = [
     },
     RuleSpec {
         number: RuleId::M005,
-        statement: "Identifiers, kinds, relations, guards and status values are closed; payload determines kind.",
+        statement: "Identifiers, kinds, relations, guards, status, binding, capabilities, budgets and Unconditional routes are closed; payload determines kind.",
         scope: "Every admitted Rust value.",
         state: RuleState::Structural,
         deferred_reason: None,
@@ -137,21 +149,21 @@ pub const RULES: [RuleSpec; 21] = [
     },
     RuleSpec {
         number: RuleId::M013,
-        statement: "Slice members are unique claims.",
+        statement: "Every declared slice member is unique and is a claim; M007 resolves membership before this shape check.",
         scope: "Resolved members; shape precedes eligibility.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M014,
-        statement: "Every slice claim is reached by implemented manifest audit binding.",
+        statement: "Every selected claim is Bound and every transitive claim premise of a selected claim is selected.",
         scope: "Members passing presence and shape; AuditBinding is ineligible.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M015,
-        statement: "All completeness assertions are false and release is explicit partial.",
+        statement: "Theory closure flags are false, the release gate is ExplicitPartial, and asserted audit closure requires every present claim Bound to its unique implementation.",
         scope: "Every manifest, including an empty graph.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -186,10 +198,10 @@ pub const RULES: [RuleSpec; 21] = [
     },
     RuleSpec {
         number: RuleId::M020,
-        statement: "Claims and producers bind exclusively in both directions; routes, budgets, readiness and evidence are checked.",
-        scope: "Bound claims, producers and consumed verdicts.",
-        state: RuleState::DeferredM3,
-        deferred_reason: Some("M3 must admit audit binding and the complete-release consumer."),
+        statement: "Every Bound claim has exactly its designated implementation and every implementation exactly one present Bound claim; admitted contracts pass their numbered consumers.",
+        scope: "Bound claims and the executing registry.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M021,
@@ -197,6 +209,62 @@ pub const RULES: [RuleSpec; 21] = [
         scope: "Edges passing M007, M008 and self-edge policy; compatibility only.",
         state: RuleState::Enforced,
         deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M022,
+        statement: "Fixed producers have exactly their declared dependencies; accepted premises unlock execution and target witnesses contain full coefficient dependencies.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M023,
+        statement: "Every Bound claim has its designated reviewed budget; all records are used, pin/profile agree and claim work shares one budget.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M024,
+        statement: "Supported means adapter-implemented at this pin solely from the table; unsupported requirements never execute and Awaiting supported contracts is refused.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M025,
+        statement: "Outcome domain and provenance match the manifest.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::DeferredM3b,
+        deferred_reason: Some("Outcome and provenance consumption await the M3b report consumer."),
+    },
+    RuleSpec {
+        number: RuleId::M026,
+        statement: "Mathematical verdicts consume matching replay-checked evidence.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::DeferredM3b,
+        deferred_reason: Some("Verdict interpretation awaits the M3b report consumer."),
+    },
+    RuleSpec {
+        number: RuleId::M027,
+        statement: "Gated report evidence is reproducible independently of measurements.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::DeferredM3b,
+        deferred_reason: Some("Gated report reproducibility awaits the M3b report consumer."),
+    },
+    RuleSpec {
+        number: RuleId::M028,
+        statement: "Every unselected or blocked claim has its exact derived deferral.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::DeferredM3b,
+        deferred_reason: Some("Total blocker semantics await the M3b report consumer."),
+    },
+    RuleSpec {
+        number: RuleId::M029,
+        statement: "Alternative routes execute alone and combine by a reviewed rule.",
+        scope: "Registry and execution consumers.",
+        state: RuleState::DeferredExclusiveRoutes,
+        deferred_reason: Some("Exclusive routes await their first claim and isolation consumer."),
     },
 ];
 
@@ -207,6 +275,9 @@ pub enum DraftLocation {
     Edge(usize),
     Slice(usize),
     Coverage,
+    Binding(usize),
+    Budget(usize),
+    Capability(usize),
     Cycle {
         relation: RelationKind,
         edges: Vec<usize>,
@@ -215,6 +286,7 @@ pub enum DraftLocation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Diagnostic {
+    pub stage: AdmissionStage,
     pub rule: RuleId,
     /// Edge-scoped IDs retain source/target order; other IDs use semantic order,
     /// except cycles which retain their concrete traversal path order.
@@ -257,6 +329,7 @@ fn report(
     explanation: String,
 ) {
     diagnostics.push(Diagnostic {
+        stage: AdmissionStage::GraphAdmission,
         rule,
         ids,
         edge,
@@ -279,6 +352,24 @@ pub fn validate(draft: ManifestDraft) -> Result<ValidatedManifest, ValidationErr
     let edges = check_edges(&draft, &nodes, &mut diagnostics);
     check_coverage(&draft, &nodes, &mut diagnostics);
     check_relations(&edges, &mut diagnostics);
+    for (index, node) in draft.nodes.iter().enumerate() {
+        if nodes.get(&node.id) == Some(&Some(NodeKind::Claim))
+            && let NodePayload::Claim {
+                audit: ClaimAudit::Awaiting(Awaiting::Capability(id)),
+                ..
+            } = node.payload
+            && adapter_implemented(id, ENGINE_PIN)
+        {
+            report(
+                &mut diagnostics,
+                RuleId::M024,
+                vec![node.id],
+                None,
+                DraftLocation::Capability(index),
+                "cannot await an implemented adapter".into(),
+            );
+        }
+    }
     diagnostics.sort_by(|a, b| {
         (a.rule, a.edge, &a.ids, &a.location, &a.explanation).cmp(&(
             b.rule,
@@ -443,7 +534,16 @@ fn check_coverage(
                 location,
                 format!("{} must occur once and be a claim", id.semantic_name()),
             );
-        } else {
+        } else if draft.nodes.iter().any(|n| {
+            n.id == *id
+                && matches!(
+                    n.payload,
+                    NodePayload::Claim {
+                        audit: ClaimAudit::Awaiting(_),
+                        ..
+                    }
+                )
+        }) {
             report(
                 diagnostics,
                 RuleId::M014,
@@ -457,9 +557,21 @@ fn check_coverage(
             );
         }
     }
-    if !draft.coverage.has_partial_assertions() {
+    if !draft.coverage.has_partial_assertions()
+        || (draft.coverage.closed_world.audit
+            && draft.nodes.iter().any(|n| {
+                nodes.get(&n.id) == Some(&Some(NodeKind::Claim))
+                    && matches!(
+                        n.payload,
+                        NodePayload::Claim {
+                            audit: ClaimAudit::Awaiting(_),
+                            ..
+                        }
+                    )
+            }))
+    {
         report(diagnostics, RuleId::M015, vec![], None, DraftLocation::Coverage,
-            "referents, relations and audit closure must all be false; release gate must be ExplicitPartial".into());
+            "theory closures must be false, gate ExplicitPartial, and audit closure requires Bound claims".into());
     }
 }
 
@@ -551,4 +663,10 @@ fn cycle_from(
         }
     }
     false
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AdmissionStage {
+    GraphAdmission,
+    RegistryAdmission,
 }

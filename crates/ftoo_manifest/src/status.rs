@@ -1,4 +1,4 @@
-use crate::{NodeDraft, NodeKind};
+use crate::{Awaiting, ClaimAudit, NodeDraft, NodeKind, NodePayload};
 
 /// Editorial formulation only, never mathematical certification.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -31,6 +31,7 @@ pub enum Evidence {
 /// ```compile_fail,E0451
 /// use ftoo_manifest::{Status, Maturity, Identification, Calibration, Evidence};
 /// let status = Status {
+///     blocker: None,
 ///     maturity: Maturity::Proposed,
 ///     identification: Identification::Identified,
 ///     calibration: Calibration::NotApplicable,
@@ -44,6 +45,7 @@ pub enum Evidence {
 /// ```
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Status {
+    blocker: Option<Blocker>,
     maturity: Maturity,
     identification: Identification,
     calibration: Calibration,
@@ -52,6 +54,17 @@ pub struct Status {
 impl Status {
     pub(crate) fn derive(node: &NodeDraft) -> Self {
         Self {
+            blocker: match node.payload {
+                NodePayload::Quantity { .. } => None,
+                NodePayload::Claim {
+                    audit: ClaimAudit::Awaiting(awaits),
+                    ..
+                } => Some(Blocker::Awaiting(awaits)),
+                NodePayload::Claim {
+                    audit: ClaimAudit::Bound { .. },
+                    ..
+                } => Some(Blocker::AuditRunRequired),
+            },
             maturity: node.maturity,
             identification: Identification::Identified,
             calibration: Calibration::NotApplicable,
@@ -60,6 +73,10 @@ impl Status {
                 NodeKind::Claim => Evidence::Deferred,
             },
         }
+    }
+    #[must_use]
+    pub const fn blocker(self) -> Option<Blocker> {
+        self.blocker
     }
     #[must_use]
     pub const fn maturity(self) -> Maturity {
@@ -77,4 +94,10 @@ impl Status {
     pub const fn evidence(self) -> Evidence {
         self.evidence
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Blocker {
+    Awaiting(Awaiting),
+    AuditRunRequired,
 }

@@ -1,11 +1,12 @@
 use std::{cmp::Ordering, error::Error, fmt};
 
-use crate::{Coverage, Maturity, NodeId, NodeKind, Status};
+use crate::{BudgetSpec, CapabilityId, ClaimAudit, Coverage, Maturity, NodeId, NodeKind, Status};
 
 /// The blocker remains explicit until manifest-bound audit is implemented.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Awaiting {
     AuditBinding,
+    Capability(CapabilityId),
 }
 
 /// Descriptions register referents; they are not executable mathematics.
@@ -16,7 +17,7 @@ pub enum NodePayload {
     },
     Claim {
         description: String,
-        awaits: Awaiting,
+        audit: ClaimAudit,
     },
 }
 impl NodePayload {
@@ -144,6 +145,7 @@ pub struct ManifestDraft {
     pub nodes: Vec<NodeDraft>,
     pub edges: Vec<Edge>,
     pub coverage: Coverage,
+    pub budgets: Vec<BudgetSpec>,
 }
 
 /// Immutable structural admission, obtainable only through validation.
@@ -156,6 +158,7 @@ pub struct ValidatedManifest {
     nodes: Vec<NodeDraft>,
     edges: Vec<Edge>,
     coverage: Coverage,
+    budgets: Vec<BudgetSpec>,
 }
 impl ValidatedManifest {
     pub(crate) fn from_checked(draft: ManifestDraft) -> Self {
@@ -163,7 +166,12 @@ impl ValidatedManifest {
             nodes: draft.nodes,
             edges: draft.edges,
             coverage: draft.coverage,
+            budgets: draft.budgets,
         }
+    }
+    #[must_use]
+    pub fn budgets(&self) -> &[BudgetSpec] {
+        &self.budgets
     }
     #[must_use]
     pub fn nodes(&self) -> &[NodeDraft] {
