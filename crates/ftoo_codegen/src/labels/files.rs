@@ -51,11 +51,16 @@ fn visit(
             .map_err(|e| io_error(LabelIoOperation::InspectEntry, &path, &e))?;
         let metadata = fs::symlink_metadata(&path)
             .map_err(|e| io_error(LabelIoOperation::InspectEntry, &path, &e))?;
+        let matching = path
+            .file_name()
+            .is_some_and(|n| n.as_encoded_bytes().ends_with(b".md"));
+        if !matching && !metadata.is_dir() {
+            continue;
+        }
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| entry_error(&path, MarkdownEntryKind::NonUtf8Name))?;
-        let matching = name.as_bytes().ends_with(b".md");
         if matching {
             let kind = if metadata.file_type().is_symlink() {
                 Some(MarkdownEntryKind::Symlink)

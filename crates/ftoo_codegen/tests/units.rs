@@ -65,7 +65,7 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
     );
     assert_eq!(
         second.texts()["en"].text(),
-        "The value claim @tag{v:1} concerns the coefficient @tag{c:1}."
+        "The value claim @tag{v:1} concerns the coefficient @tag{c:1}. See `dec:weld:equal-address-sets`."
     );
     assert_eq!(second.math().len(), 0);
     assert_eq!(second.texts()["en"].occurrences(), []);

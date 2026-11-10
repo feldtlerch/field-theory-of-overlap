@@ -4,6 +4,7 @@ mod artifact;
 mod labels;
 mod projection;
 mod units;
+mod weld;
 pub use labels::{
     LabelCheckSummary, LabelEntryFault, LabelFileError, LabelIoOperation, MarkdownEntryKind,
     check_label_files, load_markdown_files,
@@ -12,6 +13,7 @@ pub use units::{
     EntryKind, UnitCheckSummary, UnitInputFault, UnitIoOperation, UnitLoadError, UnitSource,
     check_unit_files, load_unit_files, load_unit_sources,
 };
+pub use weld::{WeldCheckSummary, WeldFileError, check_weld_files};
 #[cfg(test)]
 mod tests;
 pub use artifact::{

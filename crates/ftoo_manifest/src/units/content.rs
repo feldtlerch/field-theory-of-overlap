@@ -35,15 +35,23 @@ enum Insertion {
 }
 pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
     let mut chars = source.value.char_indices().peekable();
+    let mut span_index = 0;
     let mut scanned = ScannedText {
         prose: false,
         math: Vec::new(),
         tags: Vec::new(),
     };
     while let Some((start, c)) = chars.next() {
+        if c == '`' {
+            let span = super::spans::parse(&source.value, &source.site, start, span_index)?;
+            span_index += 1;
+            while chars.peek().is_some_and(|(at, _)| *at < span.bytes.end) {
+                chars.next();
+            }
+            continue;
+        }
         if c != '@' {
-            if matches!(c, '`' | '$' | '\\' | '<' | '>')
-                || (c.is_control() && !matches!(c, '\t' | '\n'))
+            if matches!(c, '$' | '\\' | '<' | '>') || (c.is_control() && !matches!(c, '\t' | '\n'))
             {
                 return Err(Box::new((
                     at(source, start, start + c.len_utf8(), None),

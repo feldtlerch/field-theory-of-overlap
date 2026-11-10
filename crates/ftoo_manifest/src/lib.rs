@@ -31,6 +31,12 @@ mod tag_history;
 mod tag_validation;
 mod tags;
 mod units;
+mod weld;
+pub use units::LabelSpanReason;
+pub use weld::{
+    LabelMember, LabelSide, LabelUseSite, ResolvedUnitCitation, TagMember, TagSide, WeldDiagnostic,
+    WeldErrors, WeldFault, WeldStage, WeldedLanguage, WeldedUnit, WeldedUnits, weld_units,
+};
 mod validation;
 mod wire;
 pub use units::{

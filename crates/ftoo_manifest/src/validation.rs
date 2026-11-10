@@ -55,6 +55,8 @@ pub enum RuleId {
     M042,
     M043,
     M044,
+    M045,
+    M046,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,7 +77,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 44] = [
+pub const RULES: [RuleSpec; 46] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -381,6 +383,20 @@ pub const RULES: [RuleSpec; 44] = [
         number: RuleId::M044,
         statement: "Every Rust-held authority-record citation resolves to exactly one Markdown mint.",
         scope: "Every history event in the supplied resolved corpus's AddressBook, including admission and retirement records.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M045,
+        statement: "Unit texts never mint labels; bare label spans cite uniquely minted labels and doubled spans mention without harvesting or resolution.",
+        scope: "Every admitted statement text in every required language, with citations resolved in the joint label domain.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M046,
+        statement: "Within each statement unit, every language has equal addressed tag sets and equal cited label sets, compared separately from the shared metadata mint and independently of position or multiplicity.",
+        scope: "All language texts of each resolved unit after joint label and citation admission.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

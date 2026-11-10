@@ -191,6 +191,15 @@ pub enum UnitFault {
     ResolutionFault {
         cause: TagResolutionFault,
     },
+    MalformedLabelSpan {
+        span_index: usize,
+        reason: LabelSpanReason,
+        fragment: String,
+    },
+    TextMintForbidden {
+        span_index: usize,
+        label: String,
+    },
 }
 impl UnitFault {
     fn rank(&self) -> usize {
@@ -222,8 +231,19 @@ impl UnitFault {
             Self::UnknownMath { .. } => 24,
             Self::UnusedMath { .. } => 25,
             Self::ResolutionFault { .. } => 26,
+            Self::MalformedLabelSpan { .. } => 27,
+            Self::TextMintForbidden { .. } => 28,
         }
     }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LabelSpanReason {
+    DelimiterWidth,
+    MismatchedDelimiter,
+    Unclosed,
+    EmptyBody,
+    InvalidLabel,
+    ForbiddenCharacter,
 }
 impl fmt::Display for UnitFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

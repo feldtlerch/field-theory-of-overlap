@@ -2,6 +2,7 @@
 //! Draft admission proves no byte provenance, theory identity, weld or rendering.
 mod content;
 mod diagnostics;
+pub(crate) mod spans;
 #[cfg(test)]
 mod tests;
 use crate::{AddressBook, NodeId, RuleId};
@@ -580,7 +581,11 @@ fn check_texts(
                 let (site, fault) = *failure;
                 scanner_failed = true;
                 errors.push(diagnostic(
-                    RuleId::M041,
+                    if matches!(fault, UnitFault::TextMintForbidden { .. }) {
+                        RuleId::M045
+                    } else {
+                        RuleId::M041
+                    },
                     UnitStage::Content,
                     Some(&unit.id.value),
                     Some(language),

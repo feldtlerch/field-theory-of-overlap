@@ -1,5 +1,168 @@
 use super::*;
 
+#[test]
+fn w07_span_grammar_exact_faults_and_first_decisive_ranges() {
+    use LabelSpanReason::*;
+    for (token, reason, fragment) in [
+        ("`", Unclosed, "`"),
+        ("``", Unclosed, "``"),
+        ("````", DelimiterWidth, "````"),
+        ("```a:b:c```", DelimiterWidth, "```"),
+        ("`a:b:c``", MismatchedDelimiter, "`a:b:c``"),
+        ("``a`later``", MismatchedDelimiter, "``a`"),
+        ("`a:b:c```", MismatchedDelimiter, "`a:b:c```"),
+        ("`a:b:c``d:e:f`", MismatchedDelimiter, "`a:b:c``"),
+        ("``outer `a:b:c` inner``", MismatchedDelimiter, "``outer `"),
+        ("`` ``", EmptyBody, "`` ``"),
+        ("``\u{a0}``", EmptyBody, "``\u{a0}``"),
+        ("`A:b:c`", InvalidLabel, "`A:b:c`"),
+        ("`a:b`", InvalidLabel, "`a:b`"),
+        ("`a:b:c:d`", InvalidLabel, "`a:b:c:d`"),
+        ("` a:b:c`", InvalidLabel, "` a:b:c`"),
+        ("` `", InvalidLabel, "` `"),
+        ("`a:b:c` `unterminated", Unclosed, "`unterminated"),
+    ] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = format!("See {token}");
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        let (start, index) = if token.starts_with("`a:b:c` ") {
+            (12, 1)
+        } else {
+            (4, 0)
+        };
+        let mut location = site("statement.toml", &["unit", "texts", "en"]);
+        location.decoded = Some(start..start + fragment.len());
+        let fault = UnitFault::MalformedLabelSpan {
+            span_index: index,
+            reason,
+            fragment: fragment.into(),
+        };
+        assert_eq!(
+            error.diagnostics(),
+            [expected(
+                RuleId::M041,
+                UnitStage::Content,
+                Some("en"),
+                location,
+                fault
+            )]
+        );
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "M041 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90 decoded {start}..{}: MalformedLabelSpan {{ span_index: {index}, reason: {reason:?}, fragment: {fragment:?} }}\n",
+                start + fragment.len()
+            )
+        );
+    }
+}
+
+#[test]
+fn w07_every_forbidden_span_character_and_opaque_mention_payload() {
+    for c in [
+        '$', '\\', '<', '>', '\n', '\r', '\t', '\0', '\u{7f}', '\u{85}', '\u{2028}', '\u{2029}',
+    ] {
+        for delimiter in ["`", "``"] {
+            let (documents, mut units) = fixtures();
+            units[0].texts.get_mut("en").unwrap().value.value =
+                format!("See {delimiter}x{c}later{delimiter}.");
+            let fragment = format!("{delimiter}x{c}");
+            let end = 4 + fragment.len();
+            let mut location = site("statement.toml", &["unit", "texts", "en"]);
+            location.decoded = Some(4..end);
+            let error = admit_unit_drafts(documents, units).unwrap_err();
+            assert_eq!(
+                error.diagnostics(),
+                [expected(
+                    RuleId::M041,
+                    UnitStage::Content,
+                    Some("en"),
+                    location,
+                    UnitFault::MalformedLabelSpan {
+                        span_index: 0,
+                        reason: LabelSpanReason::ForbiddenCharacter,
+                        fragment: fragment.clone()
+                    }
+                )]
+            );
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "M041 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90 decoded 4..{end}: MalformedLabelSpan {{ span_index: 0, reason: ForbiddenCharacter, fragment: {fragment:?} }}\n"
+                )
+            );
+        }
+    }
+    for text in [
+        "See ``@tag{unknown} @math{unknown} é``.",
+        "See `a:b:c`.",
+        "See (`a:b:c`).",
+        "See ·`a:b:c`, ·  `a:b:c`, and ordinary a:b:c.",
+        "See @@tag{c:1} and ``unknown:label:name``.",
+    ] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = text.into();
+        let checked = admit_unit_drafts(documents, units).unwrap();
+        assert_eq!(checked.units()[0].texts()["en"].text(), text);
+        assert_eq!(checked.units()[0].texts()["en"].tag_occurrences(), []);
+        assert_eq!(checked.units()[0].texts()["en"].occurrences(), []);
+    }
+}
+
+#[test]
+fn w08_text_mints_are_forbidden_and_spans_do_not_supply_prose() {
+    for label in [
+        "sec:coefficients:first-value",
+        "def:langevin:coefficient-one",
+    ] {
+        let (documents, mut units) = fixtures();
+        let text = format!("· `{label}`");
+        units[0].texts.get_mut("en").unwrap().value.value = text.clone();
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        let mut location = site("statement.toml", &["unit", "texts", "en"]);
+        location.decoded = Some(0..text.len());
+        assert_eq!(
+            error.diagnostics(),
+            [expected(
+                RuleId::M045,
+                UnitStage::Content,
+                Some("en"),
+                location,
+                UnitFault::TextMintForbidden {
+                    span_index: 0,
+                    label: label.into()
+                }
+            )]
+        );
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "M045 Content unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90 decoded 0..{}: TextMintForbidden {{ span_index: 0, label: {label:?} }}\n",
+                text.len()
+            )
+        );
+    }
+    for text in ["`a:b:c`", "``mention``", "@tag{c:1} `a:b:c` ``mention``"] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = text.into();
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        assert_eq!(
+            error.diagnostics(),
+            [expected(
+                RuleId::M040,
+                UnitStage::Language,
+                Some("en"),
+                site("statement.toml", &["unit", "texts", "en"]),
+                UnitFault::BlankText
+            )]
+        );
+        assert_eq!(
+            error.to_string(),
+            "M040 Language unit=Some(\"sec:coefficients:first-value\") language=Some(\"en\") at \"statement.toml\" $[\"unit\"][\"texts\"][\"en\"] bytes 10..90: BlankText\n"
+        );
+    }
+}
+
 fn site(file: &str, path: &[&str]) -> UnitSite {
     UnitSite {
         file: file.to_owned(),
@@ -166,7 +329,7 @@ fn u07_insertion_fault_matrix_and_unicode_ranges() {
             )],
         );
     }
-    for c in ['`', '$', '\\', '<', '>'].into_iter().chain(
+    for c in ['$', '\\', '<', '>'].into_iter().chain(
         (0..=0x9f)
             .filter_map(char::from_u32)
             .filter(|c| c.is_control() && !matches!(c, '\t' | '\n')),

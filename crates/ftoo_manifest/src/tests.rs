@@ -545,7 +545,8 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
-        M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044,
+        M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
+        M046,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -553,7 +554,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
-            M043, M044
+            M043, M044, M045, M046
         ]
     );
     for rule in RULES {
@@ -561,9 +562,8 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M005 | M011 | M030 => RuleState::Structural,
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
-            | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044 => {
-                RuleState::Enforced
-            }
+            | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
+            | M045 | M046 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
@@ -624,9 +624,49 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 44);
+    assert_eq!(RULES.len(), 46);
     assert_eq!(
-        RULES[42..]
+        (
+            RULES[..44].len(),
+            RULES[..44]
+                .iter()
+                .filter(|r| r.state == RuleState::Enforced)
+                .count(),
+            RULES[..44]
+                .iter()
+                .filter(|r| r.state == RuleState::Structural)
+                .count(),
+            RULES[..44]
+                .iter()
+                .filter(|r| r.deferred_reason.is_some())
+                .count(),
+        ),
+        (44, 36, 3, 5)
+    );
+    assert_eq!(
+        RULES[44..]
+            .iter()
+            .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                RuleId::M045,
+                "Unit texts never mint labels; bare label spans cite uniquely minted labels and doubled spans mention without harvesting or resolution.",
+                "Every admitted statement text in every required language, with citations resolved in the joint label domain.",
+                RuleState::Enforced,
+                None
+            ),
+            (
+                RuleId::M046,
+                "Within each statement unit, every language has equal addressed tag sets and equal cited label sets, compared separately from the shared metadata mint and independently of position or multiplicity.",
+                "All language texts of each resolved unit after joint label and citation admission.",
+                RuleState::Enforced,
+                None
+            ),
+        ]
+    );
+    assert_eq!(
+        RULES[42..44]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),
@@ -664,7 +704,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        36
+        38
     );
     assert_eq!(
         RULES

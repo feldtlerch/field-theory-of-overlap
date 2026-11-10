@@ -135,6 +135,13 @@ fn w02_symlinks_nonutf8_and_nonregular_entries_are_refused() {
     fs::remove_file(link).unwrap();
     assert_eq!(files::collect(&root).unwrap(), baseline);
     let bad = root.join(std::ffi::OsString::from_vec(vec![255, b'.', b'm', b'd']));
+    let ignored = root.join(std::ffi::OsString::from_vec(vec![
+        255, b'.', b't', b'x', b't',
+    ]));
+    fs::write(&ignored, b"not Markdown").unwrap();
+    assert_eq!(files::collect(&root).unwrap(), baseline);
+    fs::remove_file(&ignored).unwrap();
+    assert_eq!(files::collect(&root).unwrap(), baseline);
     fs::write(&bad, b"").unwrap();
     let error = load_markdown_files(&root).unwrap_err();
     assert_eq!(
@@ -250,11 +257,25 @@ fn w02_actual_encoding_and_w03_local_citation_faults_restore_all_sources() {
 #[test]
 fn w06_python_differential_compares_discovery_snapshots_and_all_occurrences() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let sources = files::collect(&root).unwrap();
+    let python_script = root.join("tools/check_labels.py").canonicalize().unwrap();
+    differential(&root, &python_script);
+    let fixture = directory();
+    fs::write(
+        fixture.join("spans.md"),
+        "See `a:b:c`; ``d:e:f``; (`a:b:c`, ``d:e:f``).\n",
+    )
+    .unwrap();
+    differential(&fixture, &python_script);
+    fs::remove_file(fixture.join("spans.md")).unwrap();
+    differential(&fixture, &python_script);
+    fs::remove_dir_all(fixture).unwrap();
+}
+fn differential(root: &Path, python_script: &Path) {
+    let sources = files::collect(root).unwrap();
     let checked = check_markdown_sources(sources.clone()).unwrap();
     let script = r"
-import importlib.util, json, pathlib
-spec = importlib.util.spec_from_file_location('labels', 'tools/check_labels.py')
+import importlib.util, json, pathlib, sys
+spec = importlib.util.spec_from_file_location('labels', sys.argv[1])
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 result = []
@@ -267,7 +288,8 @@ print(json.dumps(result))
 ";
     let output = Command::new("python3")
         .args(["-I", "-B", "-c", script])
-        .current_dir(&root)
+        .arg(python_script)
+        .current_dir(root)
         .output()
         .unwrap();
     assert_eq!(
@@ -283,7 +305,7 @@ print(json.dumps(result))
         serde_json::json!([source.file, source.bytes, checked.mints().iter().filter(in_file).map(|o| &o.label).collect::<Vec<_>>(), checked.citations().iter().filter(in_file).map(|o| &o.label).collect::<Vec<_>>()])
     }).collect();
     assert_eq!(python, serde_json::json!(expected));
-    assert_eq!(files::collect(&root).unwrap(), sources);
+    assert_eq!(files::collect(root).unwrap(), sources);
     for source in &sources {
         assert_eq!(fs::read(root.join(&source.file)).unwrap(), source.bytes);
     }

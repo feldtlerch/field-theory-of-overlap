@@ -347,7 +347,7 @@ fn w05_full_record_removal_fails_markdown_before_rust_citations() {
     };
     let locations = [
         ("docs/design/manifest-addressing.md", 1257..1288),
-        ("docs/design/manifest-audit-binding.md", 914..945),
+        ("docs/design/manifest-audit-binding.md", 915..946),
     ];
     let expected: Vec<_> = locations
         .iter()
@@ -373,7 +373,7 @@ fn w05_full_record_removal_fails_markdown_before_rust_citations() {
         error.to_string(),
         concat!(
             "M043 Markdown unit=None language=None at markdown \"docs/design/manifest-addressing.md\" bytes 1257..1288: UnresolvedMarkdownCitation { label: \"proposal:manifest:kernel-bite\", expected: 1, actual: 0, domain: MarkdownOnly }\n",
-            "M043 Markdown unit=None language=None at markdown \"docs/design/manifest-audit-binding.md\" bytes 914..945: UnresolvedMarkdownCitation { label: \"proposal:manifest:kernel-bite\", expected: 1, actual: 0, domain: MarkdownOnly }\n"
+            "M043 Markdown unit=None language=None at markdown \"docs/design/manifest-audit-binding.md\" bytes 915..946: UnresolvedMarkdownCitation { label: \"proposal:manifest:kernel-bite\", expected: 1, actual: 0, domain: MarkdownOnly }\n"
         )
     );
     assert_eq!(fs::read_to_string(&path).unwrap(), changed);
