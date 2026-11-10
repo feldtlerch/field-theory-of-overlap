@@ -69,7 +69,7 @@ dependencies = [
 [[package]]
 name = "nrz-cas"
 version = "0.1.0"
-source = "git+https://github.com/naturrhythmuszentrum/naturrhythmuszentrum?rev=455ea78a1a015f59b4abfb4a359feaacdf90bc86#455ea78a1a015f59b4abfb4a359feaacdf90bc86"
+source = "git+https://github.com/naturrhythmuszentrum/naturrhythmuszentrum?rev=a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad#a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad"
 dependencies = [
  "num-bigint",
  "num-complex",
