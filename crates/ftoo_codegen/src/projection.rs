@@ -1,5 +1,6 @@
 //! Independent semantic inventory; comparison never serializes its operands.
 use crate::ProjectionCheckError;
+use ftoo_manifest::{AddressBook, HistoryChange, ProjectionValue as V, StoreState, TagId};
 use ftoo_manifest::{
     CAPABILITIES, ClaimAudit, ENGINE_PIN, LoadedProjection, NodePayload, ProducerId,
     ProjectionDiagnostic, ProjectionError, ProjectionFault, ProjectionValue, ResolvedLimits,
@@ -119,6 +120,7 @@ pub(crate) fn compare(
     compare_budgets(&mut rows, expected, loaded);
     compare_producers(&mut rows, loaded);
     compare_capabilities(&mut rows, loaded);
+    compare_addressing(&mut rows, expected, loaded)?;
     for difference in &mut rows {
         difference.position = source_position(difference, loaded);
     }
@@ -438,14 +440,219 @@ fn component(path: &str) -> usize {
         "$.budgets",
         "$.producers",
         "$.capabilities",
+        "$.tags",
+        "$.history",
+        "$.stores",
     ]
     .iter()
     .position(|prefix| path.starts_with(prefix))
-    .unwrap_or(7)
+    .unwrap_or(10)
+}
+
+fn compare_addressing(
+    rows: &mut Vec<SourceDifference>,
+    graph: &ValidatedManifest,
+    loaded: &LoadedProjection,
+) -> Result<(), ProjectionCheckError> {
+    let expected = ftoo_manifest::addressing(graph).map_err(|e| {
+        ProjectionCheckError::Projection(ProjectionError::Addressing(e.diagnostics().to_vec()))
+    })?;
+    compare_tags(rows, loaded);
+    compare_history_records(rows, &expected, loaded);
+    compare_stores(rows, &expected, loaded);
+    Ok(())
+}
+
+fn compare_tags(rows: &mut Vec<SourceDifference>, loaded: &LoadedProjection) {
+    changed(
+        rows,
+        "$.tags.length".into(),
+        V::Integer(4),
+        V::Integer(loaded.tags().len() as u64),
+    );
+    for tag in TagId::ALL {
+        let e = tag.descriptor();
+        let path = format!("$.tags[{}]", e.spelling());
+        match loaded.tags().iter().find(|a| a.tag() == tag) {
+            Some(a) => {
+                changed(
+                    rows,
+                    format!("{path}.tag"),
+                    string(e.spelling()),
+                    string(a.spelling()),
+                );
+                changed(
+                    rows,
+                    format!("{path}.target"),
+                    V::Identity(e.target()),
+                    V::Identity(a.target()),
+                );
+            }
+            None => rows.push(SourceDifference {
+                path,
+                position: None,
+                expected: Some(V::Tag(tag)),
+                actual: None,
+            }),
+        }
+    }
+}
+fn compare_history_records(
+    rows: &mut Vec<SourceDifference>,
+    expected: &AddressBook<'_>,
+    loaded: &LoadedProjection,
+) {
+    let expected_history: Vec<_> = expected.history().collect();
+    for e in &expected_history {
+        let path = format!("$.history[{}]", e.ordinal());
+        let Some(a) = loaded.history().iter().find(|a| a.ordinal() == e.ordinal()) else {
+            rows.push(SourceDifference {
+                path,
+                position: None,
+                expected: Some(V::History((*e).clone())),
+                actual: None,
+            });
+            continue;
+        };
+        changed(
+            rows,
+            format!("{path}.ordinal"),
+            V::Integer(u64::from(e.ordinal())),
+            V::Integer(u64::from(a.ordinal())),
+        );
+        changed(
+            rows,
+            format!("{path}.authority-record"),
+            string(e.authority_record()),
+            string(a.authority_record()),
+        );
+        changed(
+            rows,
+            format!("{path}.reason"),
+            string(e.reason()),
+            string(a.reason()),
+        );
+        match (e.change(), a.change()) {
+            (
+                HistoryChange::AdmitIdentity {
+                    identity: ei,
+                    original_formulation: ef,
+                },
+                HistoryChange::AdmitIdentity {
+                    identity: ai,
+                    original_formulation: af,
+                },
+            ) => {
+                changed(
+                    rows,
+                    format!("{path}.change.identity"),
+                    V::Identity(*ei),
+                    V::Identity(*ai),
+                );
+                changed(
+                    rows,
+                    format!("{path}.change.original-formulation"),
+                    string(ef),
+                    string(af),
+                );
+            }
+            (
+                HistoryChange::RetireIdentity { identity: e },
+                HistoryChange::RetireIdentity { identity: a },
+            ) => changed(
+                rows,
+                format!("{path}.change.identity"),
+                V::Identity(*e),
+                V::Identity(*a),
+            ),
+            (HistoryChange::AdmitTag { tag: e }, HistoryChange::AdmitTag { tag: a })
+            | (HistoryChange::RetireTag { tag: e }, HistoryChange::RetireTag { tag: a }) => {
+                changed(rows, format!("{path}.change.tag"), V::Tag(*e), V::Tag(*a));
+            }
+            (e, a) => changed(rows, format!("{path}.change"), text(e), text(a)),
+        }
+    }
+    for a in loaded
+        .history()
+        .iter()
+        .filter(|a| !expected_history.iter().any(|e| e.ordinal() == a.ordinal()))
+    {
+        rows.push(SourceDifference {
+            path: format!("$.history[{}]", a.ordinal()),
+            position: None,
+            expected: None,
+            actual: Some(V::History(a.clone())),
+        });
+    }
+}
+fn compare_stores(
+    rows: &mut Vec<SourceDifference>,
+    expected: &AddressBook<'_>,
+    loaded: &LoadedProjection,
+) {
+    let e: Vec<_> = expected
+        .live()
+        .map(|t| (t, StoreState::Live))
+        .chain(
+            expected
+                .retired()
+                .map(|e| (e.tag(), StoreState::Retired(e.cause().clone()))),
+        )
+        .chain(
+            expected
+                .out_of_slice()
+                .map(|e| (e.tag(), StoreState::OutOfSlice(e.cause()))),
+        )
+        .collect();
+    let a: Vec<_> = loaded
+        .live()
+        .iter()
+        .map(|t| (*t, StoreState::Live))
+        .chain(
+            loaded
+                .retired()
+                .iter()
+                .map(|e| (e.tag(), StoreState::Retired(e.cause().clone()))),
+        )
+        .chain(
+            loaded
+                .out_of_slice()
+                .iter()
+                .map(|e| (e.tag(), StoreState::OutOfSlice(e.cause()))),
+        )
+        .collect();
+    for (tag, state) in &e {
+        let path = format!("$.stores[{}]", tag.descriptor().spelling());
+        match a.iter().find(|(t, _)| t == tag) {
+            Some((_, actual)) => changed(
+                rows,
+                path,
+                V::Store(state.clone()),
+                V::Store(actual.clone()),
+            ),
+            None => rows.push(SourceDifference {
+                path,
+                position: None,
+                expected: Some(V::Store(state.clone())),
+                actual: None,
+            }),
+        }
+    }
+    for (tag, state) in a.iter().filter(|(tag, _)| !e.iter().any(|(t, _)| t == tag)) {
+        rows.push(SourceDifference {
+            path: format!("$.stores[{}]", tag.descriptor().spelling()),
+            position: None,
+            expected: None,
+            actual: Some(V::Store(state.clone())),
+        });
+    }
 }
 
 fn source_position(difference: &SourceDifference, loaded: &LoadedProjection) -> Option<usize> {
     let path = &difference.path;
+    if let Some(position) = addressing_position(path, loaded) {
+        return Some(position);
+    }
     if path.starts_with("$.nodes[") {
         return loaded
             .manifest()
@@ -489,6 +696,40 @@ fn source_position(difference: &SourceDifference, loaded: &LoadedProjection) -> 
             .capabilities()
             .iter()
             .position(|c| path.starts_with(&format!("$.capabilities[{:?}]", c.id())));
+    }
+    None
+}
+
+fn addressing_position(path: &str, loaded: &LoadedProjection) -> Option<usize> {
+    if path.starts_with("$.tags[") {
+        return loaded
+            .tags()
+            .iter()
+            .position(|t| path.starts_with(&format!("$.tags[{}]", t.spelling())));
+    }
+    if path.starts_with("$.history[") {
+        return loaded
+            .history()
+            .iter()
+            .position(|e| path.starts_with(&format!("$.history[{}]", e.ordinal())));
+    }
+    if path.starts_with("$.stores[") {
+        return loaded
+            .live()
+            .iter()
+            .position(|t| path == format!("$.stores[{}]", t.descriptor().spelling()))
+            .or_else(|| {
+                loaded
+                    .retired()
+                    .iter()
+                    .position(|e| path == format!("$.stores[{}]", e.tag().descriptor().spelling()))
+            })
+            .or_else(|| {
+                loaded
+                    .out_of_slice()
+                    .iter()
+                    .position(|e| path == format!("$.stores[{}]", e.tag().descriptor().spelling()))
+            });
     }
     None
 }

@@ -1,8 +1,13 @@
-//! Core projection admission and its sole canonical writer.
+//! Complete projection admission and its sole canonical writer.
 mod syntax;
 #[cfg(test)]
 mod tests;
 
+use crate::{
+    AddressBook, AddressingDiagnostic, AddressingErrors, HistoryChange, HistoryEvent,
+    OutOfSliceCause, OutOfSliceEntry, RetiredEntry, RetirementCause, StoreState, TagDescriptor,
+    TagId,
+};
 use crate::{
     AuditRoutes, Awaiting, Blocker, BudgetId, BudgetProfile, BudgetSpec, CAPABILITIES,
     CapabilityId, ClaimAudit, ClosedWorld, Coverage, ENGINE_PIN, Edge, EngineAvailability,
@@ -12,6 +17,530 @@ use crate::{
 };
 use std::{error::Error, fmt};
 use syntax::Value;
+
+const TAG_FIELDS: &[&str] = &["tag", "target"];
+const HISTORY_FIELDS: &[&str] = &["ordinal", "authority-record", "reason", "change"];
+const ADMIT_IDENTITY_FIELDS: &[&str] = &["kind", "identity", "original-formulation"];
+const IDENTITY_CHANGE_FIELDS: &[&str] = &["kind", "identity"];
+const TAG_CHANGE_FIELDS: &[&str] = &["kind", "tag"];
+const STORE_FIELDS: &[&str] = &["live", "retired", "out-of-slice"];
+const LIVE_FIELDS: &[&str] = &["tag"];
+const UNAVAILABLE_FIELDS: &[&str] = &["tag", "cause"];
+const RETIREMENT_FIELDS: &[&str] = &["kind", "event"];
+const TAGS: &[(TagId, &str)] = &[
+    (TagId::LangevinCoefficientOne, "c:1"),
+    (TagId::LangevinCoefficientThree, "c:3"),
+    (TagId::LangevinCoefficientOneValue, "v:1"),
+    (TagId::LangevinCoefficientThreeValue, "v:3"),
+];
+const CHANGES: &[(u8, &str)] = &[
+    (0, "admit-identity"),
+    (1, "admit-tag"),
+    (2, "retire-tag"),
+    (3, "retire-identity"),
+];
+const RETIREMENTS: &[(bool, &str)] = &[(true, "tag-retirement"), (false, "identity-retirement")];
+const EXCLUSIONS: &[(OutOfSliceCause, &str)] = &[
+    (OutOfSliceCause::TargetAbsent, "target-absent"),
+    (OutOfSliceCause::ClaimNotSelected, "claim-not-selected"),
+    (
+        OutOfSliceCause::QuantityOutsideSupport,
+        "quantity-outside-support",
+    ),
+];
+
+fn tag_record(value: &Value, path: &str) -> Result<(TagId, NodeId), WireError> {
+    let fields = object(value, path, TAG_FIELDS)?;
+    Ok((
+        token(get(fields, "tag"), &format!("{path}.tag"), TAGS)?,
+        identity(get(fields, "target"), &format!("{path}.target"))?,
+    ))
+}
+fn history_record(value: &Value, path: &str) -> Result<HistoryEvent, WireError> {
+    let fields = object(value, path, HISTORY_FIELDS)?;
+    let ordinal = u32::try_from(number(
+        get(fields, "ordinal"),
+        &format!("{path}.ordinal"),
+        32,
+    )?)
+    .expect("checked u32");
+    let authority_record = string(
+        get(fields, "authority-record"),
+        &format!("{path}.authority-record"),
+    )?
+    .into();
+    let reason = string(get(fields, "reason"), &format!("{path}.reason"))?.into();
+    let value = get(fields, "change");
+    let path = format!("{path}.change");
+    let kind = token(
+        &s(discriminator(value, &path)?),
+        &format!("{path}.kind"),
+        CHANGES,
+    )?;
+    let fields = object(
+        value,
+        &path,
+        match kind {
+            0 => ADMIT_IDENTITY_FIELDS,
+            1 | 2 => TAG_CHANGE_FIELDS,
+            _ => IDENTITY_CHANGE_FIELDS,
+        },
+    )?;
+    let change = match kind {
+        0 => HistoryChange::AdmitIdentity {
+            identity: identity(get(fields, "identity"), &format!("{path}.identity"))?,
+            original_formulation: string(
+                get(fields, "original-formulation"),
+                &format!("{path}.original-formulation"),
+            )?
+            .into(),
+        },
+        1 => HistoryChange::AdmitTag {
+            tag: token(get(fields, "tag"), &format!("{path}.tag"), TAGS)?,
+        },
+        2 => HistoryChange::RetireTag {
+            tag: token(get(fields, "tag"), &format!("{path}.tag"), TAGS)?,
+        },
+        _ => HistoryChange::RetireIdentity {
+            identity: identity(get(fields, "identity"), &format!("{path}.identity"))?,
+        },
+    };
+    Ok(HistoryEvent {
+        ordinal,
+        authority_record,
+        reason,
+        change,
+    })
+}
+enum StoreAssertion {
+    Live,
+    Retired { tag_retirement: bool, event: u32 },
+    OutOfSlice(OutOfSliceCause),
+}
+struct StoreRecord {
+    tag: TagId,
+    state: StoreAssertion,
+    path: String,
+    position: usize,
+}
+fn stores_record(value: &Value) -> Result<Vec<StoreRecord>, WireError> {
+    let fields = object(value, "$.stores", STORE_FIELDS)?;
+    let mut records = Vec::new();
+    for name in STORE_FIELDS {
+        let path = format!("$.stores.{name}");
+        for (position, value) in array(get(fields, name), &path)?.iter().enumerate() {
+            let path = format!("{path}[{position}]");
+            let fields = object(
+                value,
+                &path,
+                if *name == "live" {
+                    LIVE_FIELDS
+                } else {
+                    UNAVAILABLE_FIELDS
+                },
+            )?;
+            let tag = token(get(fields, "tag"), &format!("{path}.tag"), TAGS)?;
+            let cause_path = format!("{path}.cause");
+            let state = match *name {
+                "live" => StoreAssertion::Live,
+                "retired" => {
+                    let cause = object(get(fields, "cause"), &cause_path, RETIREMENT_FIELDS)?;
+                    StoreAssertion::Retired {
+                        tag_retirement: token(
+                            get(cause, "kind"),
+                            &format!("{cause_path}.kind"),
+                            RETIREMENTS,
+                        )?,
+                        event: u32::try_from(number(
+                            get(cause, "event"),
+                            &format!("{cause_path}.event"),
+                            32,
+                        )?)
+                        .expect("checked u32"),
+                    }
+                }
+                _ => StoreAssertion::OutOfSlice(token(
+                    get(fields, "cause"),
+                    &cause_path,
+                    EXCLUSIONS,
+                )?),
+            };
+            records.push(StoreRecord {
+                tag,
+                state,
+                path,
+                position,
+            });
+        }
+    }
+    Ok(records)
+}
+fn addressing_error(errors: &AddressingErrors) -> ProjectionError {
+    ProjectionError::Addressing(errors.diagnostics().to_vec())
+}
+fn check_tags(tags: &[(TagId, NodeId)]) -> Result<(), ProjectionError> {
+    let mut errors = Vec::new();
+    for tag in TagId::ALL {
+        let positions: Vec<_> = tags
+            .iter()
+            .enumerate()
+            .filter(|(_, (id, _))| *id == tag)
+            .map(|(i, _)| i)
+            .collect();
+        if positions.len() != 1 {
+            errors.push(assertion(
+                "$.tags",
+                positions.first().copied(),
+                ProjectionFault::CatalogMultiplicity {
+                    tag,
+                    expected: 1,
+                    actual: positions.len(),
+                    positions: positions.clone(),
+                },
+            ));
+        }
+        for position in positions {
+            if tags[position].1 != tag.descriptor().target() {
+                errors.push(assertion(
+                    &format!("$.tags[{position}].target"),
+                    Some(position),
+                    ProjectionFault::TagBindingMismatch {
+                        tag,
+                        expected: tag.descriptor().target(),
+                        actual: tags[position].1,
+                    },
+                ));
+            }
+        }
+    }
+    if !errors.is_empty() {
+        return Err(ProjectionError::Assertion(errors));
+    }
+    Ok(())
+}
+fn store_candidate(
+    stores: &[StoreRecord],
+    history: &[HistoryEvent],
+) -> Result<crate::tag_validation::Candidate, Vec<ProjectionDiagnostic>> {
+    let mut errors = Vec::new();
+    let mut candidate = Vec::new();
+    for record in stores {
+        let state = match record.state {
+            StoreAssertion::Live => StoreState::Live,
+            StoreAssertion::OutOfSlice(cause) => StoreState::OutOfSlice(cause),
+            StoreAssertion::Retired {
+                tag_retirement,
+                event,
+            } => {
+                let found = history.iter().find(|e| e.ordinal() == event);
+                let valid = found.is_some_and(|e| match e.change() {
+                    HistoryChange::RetireTag { tag } => tag_retirement && *tag == record.tag,
+                    HistoryChange::RetireIdentity { identity } => {
+                        !tag_retirement && *identity == record.tag.descriptor().target()
+                    }
+                    _ => false,
+                });
+                if !valid {
+                    errors.push(assertion(
+                        &format!("{}.cause.event", record.path),
+                        Some(record.position),
+                        ProjectionFault::StoreEventMismatch {
+                            tag: record.tag,
+                            kind: spelling(tag_retirement, RETIREMENTS).into(),
+                            ordinal: event,
+                            actual: found.cloned().map(Box::new),
+                        },
+                    ));
+                    continue;
+                }
+                let event = found.expect("validated event reference").clone();
+                StoreState::Retired(if tag_retirement {
+                    RetirementCause::TagRetirement(event)
+                } else {
+                    RetirementCause::IdentityRetirement(event)
+                })
+            }
+        };
+        candidate.push((record.tag, state));
+    }
+    if !errors.is_empty() {
+        errors.sort_by_key(|e| {
+            let ProjectionFault::StoreEventMismatch { tag, .. } = &e.fault else {
+                unreachable!()
+            };
+            (spelling(*tag, TAGS), e.path.clone())
+        });
+        return Err(errors);
+    }
+    Ok(candidate)
+}
+fn admit_addressing<'a>(
+    graph: &'a ValidatedManifest,
+    tags: &[(TagId, NodeId)],
+    history: &[HistoryEvent],
+    stores: &[StoreRecord],
+    authority: &[HistoryEvent],
+) -> Result<AddressBook<'a>, ProjectionError> {
+    check_tags(tags)?;
+    let descriptors = TagId::ALL.map(TagId::descriptor).to_vec();
+    // Derivation validates lifecycle prerequisites before event references. The
+    // resulting stores alone may escape; asserted assignments never fill a book.
+    let mut diagnostics =
+        match crate::tag_validation::construct(graph, descriptors.clone(), history.to_vec()) {
+            Ok(_) => Vec::new(),
+            Err(errors) => {
+                // History admission suppresses dependent partition checks. A present
+                // retired identity is instead a store-construction diagnostic and
+                // must accumulate with independently false partition assertions.
+                if errors
+                    .diagnostics()
+                    .iter()
+                    .any(|d| d.stage != crate::AddressingStage::StoreConstruction)
+                {
+                    return Err(addressing_error(&errors));
+                }
+                errors.diagnostics().to_vec()
+            }
+        };
+    let candidate = match store_candidate(stores, history) {
+        Ok(candidate) => candidate,
+        Err(errors) => {
+            return Err(if diagnostics.is_empty() {
+                ProjectionError::Assertion(errors)
+            } else {
+                // Construction diagnostics take precedence; the event-reference
+                // fault is withheld because conversion did not complete.
+                ProjectionError::Addressing(diagnostics)
+            });
+        }
+    };
+    let lifecycle = crate::tag_history::replay(&descriptors, history, &mut diagnostics);
+    crate::tag_validation::check_partition(
+        graph,
+        &descriptors,
+        &lifecycle,
+        &candidate,
+        &mut diagnostics,
+    );
+    if !diagnostics.is_empty() {
+        return Err(ProjectionError::Addressing(diagnostics));
+    }
+    let book = crate::tag_validation::construct(graph, descriptors, history.to_vec())
+        .map_err(|e| addressing_error(&e))?;
+    compare_history(history, authority)?;
+    Ok(book)
+}
+fn compare_history(
+    history: &[HistoryEvent],
+    authority: &[HistoryEvent],
+) -> Result<(), ProjectionError> {
+    let mut ordinals: Vec<_> = history
+        .iter()
+        .chain(authority)
+        .map(HistoryEvent::ordinal)
+        .collect();
+    ordinals.sort_unstable();
+    ordinals.dedup();
+    let mut errors = Vec::new();
+    for ordinal in ordinals {
+        let actual = history
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.ordinal() == ordinal);
+        let expected = authority.iter().find(|e| e.ordinal() == ordinal);
+        let position = actual.map(|(i, _)| i);
+        let path = position.map_or_else(|| "$.history".into(), |i| format!("$.history[{i}]"));
+        let mut mismatch =
+            |field: &str, expected: Option<ProjectionValue>, actual: Option<ProjectionValue>| {
+                if expected != actual {
+                    errors.push(assertion(
+                        &format!("{path}{field}"),
+                        position,
+                        ProjectionFault::HistoryMismatch {
+                            expected: expected.map(Box::new),
+                            actual: actual.map(Box::new),
+                        },
+                    ));
+                }
+            };
+        match (expected, actual) {
+            (Some(e), Some((_, a))) => {
+                mismatch(
+                    ".authority-record",
+                    Some(ProjectionValue::Text(e.authority_record().into())),
+                    Some(ProjectionValue::Text(a.authority_record().into())),
+                );
+                compare_history_change(e, a, &mut mismatch);
+                mismatch(
+                    ".reason",
+                    Some(ProjectionValue::Text(e.reason().into())),
+                    Some(ProjectionValue::Text(a.reason().into())),
+                );
+            }
+            (e, a) => mismatch(
+                "",
+                e.cloned().map(ProjectionValue::History),
+                a.map(|(_, e)| ProjectionValue::History(e.clone())),
+            ),
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(ProjectionError::Assertion(errors))
+    }
+}
+fn compare_history_change(
+    e: &HistoryEvent,
+    a: &HistoryEvent,
+    mismatch: &mut impl FnMut(&str, Option<ProjectionValue>, Option<ProjectionValue>),
+) {
+    match (e.change(), a.change()) {
+        (
+            HistoryChange::AdmitIdentity {
+                identity: ei,
+                original_formulation: ef,
+            },
+            HistoryChange::AdmitIdentity {
+                identity: ai,
+                original_formulation: af,
+            },
+        ) => {
+            mismatch(
+                ".change.identity",
+                Some(ProjectionValue::Identity(*ei)),
+                Some(ProjectionValue::Identity(*ai)),
+            );
+            mismatch(
+                ".change.original-formulation",
+                Some(ProjectionValue::Text(ef.clone())),
+                Some(ProjectionValue::Text(af.clone())),
+            );
+        }
+        (
+            HistoryChange::RetireIdentity { identity: e },
+            HistoryChange::RetireIdentity { identity: a },
+        ) => mismatch(
+            ".change.identity",
+            Some(ProjectionValue::Identity(*e)),
+            Some(ProjectionValue::Identity(*a)),
+        ),
+        (HistoryChange::AdmitTag { tag: e }, HistoryChange::AdmitTag { tag: a })
+        | (HistoryChange::RetireTag { tag: e }, HistoryChange::RetireTag { tag: a }) => mismatch(
+            ".change.tag",
+            Some(ProjectionValue::Tag(*e)),
+            Some(ProjectionValue::Tag(*a)),
+        ),
+        _ => mismatch(
+            ".change",
+            Some(ProjectionValue::History(e.clone())),
+            Some(ProjectionValue::History(a.clone())),
+        ),
+    }
+}
+fn history_value(event: &HistoryEvent) -> Value {
+    let change = match event.change() {
+        HistoryChange::AdmitIdentity {
+            identity,
+            original_formulation,
+        } => ordered(
+            ADMIT_IDENTITY_FIELDS,
+            [
+                ("kind", s(spelling(0, CHANGES))),
+                ("identity", s(identity.semantic_name())),
+                ("original-formulation", s(original_formulation)),
+            ],
+        ),
+        HistoryChange::AdmitTag { tag } | HistoryChange::RetireTag { tag } => ordered(
+            TAG_CHANGE_FIELDS,
+            [
+                (
+                    "kind",
+                    s(spelling(
+                        if matches!(event.change(), HistoryChange::AdmitTag { .. }) {
+                            1
+                        } else {
+                            2
+                        },
+                        CHANGES,
+                    )),
+                ),
+                ("tag", s(spelling(*tag, TAGS))),
+            ],
+        ),
+        HistoryChange::RetireIdentity { identity } => ordered(
+            IDENTITY_CHANGE_FIELDS,
+            [
+                ("kind", s(spelling(3, CHANGES))),
+                ("identity", s(identity.semantic_name())),
+            ],
+        ),
+    };
+    ordered(
+        HISTORY_FIELDS,
+        [
+            ("ordinal", n(u64::from(event.ordinal()))),
+            ("authority-record", s(event.authority_record())),
+            ("reason", s(event.reason())),
+            ("change", change),
+        ],
+    )
+}
+fn stores_value(book: &AddressBook<'_>) -> Value {
+    ordered(
+        STORE_FIELDS,
+        [
+            (
+                "live",
+                arr(book.live(), |tag| {
+                    ordered(LIVE_FIELDS, [("tag", s(spelling(tag, TAGS)))])
+                }),
+            ),
+            (
+                "retired",
+                arr(book.retired(), |entry| {
+                    ordered(
+                        UNAVAILABLE_FIELDS,
+                        [
+                            ("tag", s(spelling(entry.tag(), TAGS))),
+                            (
+                                "cause",
+                                ordered(
+                                    RETIREMENT_FIELDS,
+                                    [
+                                        (
+                                            "kind",
+                                            s(spelling(
+                                                matches!(
+                                                    entry.cause(),
+                                                    RetirementCause::TagRetirement(_)
+                                                ),
+                                                RETIREMENTS,
+                                            )),
+                                        ),
+                                        ("event", n(u64::from(entry.cause().event().ordinal()))),
+                                    ],
+                                ),
+                            ),
+                        ],
+                    )
+                }),
+            ),
+            (
+                "out-of-slice",
+                arr(book.out_of_slice(), |entry| {
+                    ordered(
+                        UNAVAILABLE_FIELDS,
+                        [
+                            ("tag", s(spelling(entry.tag(), TAGS))),
+                            ("cause", s(spelling(entry.cause(), EXCLUSIONS))),
+                        ],
+                    )
+                }),
+            ),
+        ],
+    )
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WireLocation {
@@ -99,6 +628,9 @@ pub enum ProjectionValue {
     Identities(Vec<NodeId>),
     Capabilities(Vec<CapabilityId>),
     Budget(BudgetSpec),
+    Tag(TagId),
+    History(HistoryEvent),
+    Store(StoreState),
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceDifference {
@@ -109,6 +641,27 @@ pub struct SourceDifference {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProjectionFault {
+    CatalogMultiplicity {
+        tag: TagId,
+        expected: usize,
+        actual: usize,
+        positions: Vec<usize>,
+    },
+    TagBindingMismatch {
+        tag: TagId,
+        expected: NodeId,
+        actual: NodeId,
+    },
+    HistoryMismatch {
+        expected: Option<Box<ProjectionValue>>,
+        actual: Option<Box<ProjectionValue>>,
+    },
+    StoreEventMismatch {
+        tag: TagId,
+        kind: String,
+        ordinal: u32,
+        actual: Option<Box<HistoryEvent>>,
+    },
     ContractMultiplicity {
         record: String,
         expected: usize,
@@ -149,6 +702,7 @@ impl Error for ProjectionDiagnostic {}
 pub enum ProjectionError {
     Wire(WireError),
     Graph(ValidationErrors),
+    Addressing(Vec<AddressingDiagnostic>),
     Assertion(Vec<ProjectionDiagnostic>),
 }
 impl fmt::Display for ProjectionError {
@@ -156,6 +710,12 @@ impl fmt::Display for ProjectionError {
         match self {
             Self::Wire(e) => e.fmt(f),
             Self::Graph(e) => e.fmt(f),
+            Self::Addressing(errors) => {
+                for error in errors {
+                    writeln!(f, "{error}")?;
+                }
+                Ok(())
+            }
             Self::Assertion(errors) => {
                 for error in errors {
                     writeln!(f, "{error}")?;
@@ -263,11 +823,12 @@ impl BudgetExport {
     }
 }
 
-/// Checked core bytes. M012 establishes base status only, never audited evidence.
+/// Checked projection bytes. M012 establishes base status only, never audited evidence.
 /// ```compile_fail,E0451
 /// let checked = ftoo_manifest::LoadedProjection {
 ///     manifest: ftoo_manifest::seed().unwrap(), pin: String::new(),
 ///     budgets: vec![], producers: vec![], capabilities: vec![],
+///     tags: vec![], history: vec![], live: vec![], retired: vec![], out_of_slice: vec![],
 /// };
 /// ```
 /// ```compile_fail,E0616
@@ -276,6 +837,16 @@ impl BudgetExport {
 /// let mut checked = ftoo_manifest::load_projection(&bytes).unwrap();
 /// checked.producers.clear();
 /// ```
+/// ```compile_fail,E0616
+/// let bytes = ftoo_manifest::projection_bytes(&ftoo_manifest::seed().unwrap()).unwrap();
+/// let mut checked = ftoo_manifest::load_projection(&bytes).unwrap();
+/// checked.history.clear();
+/// ```
+/// ```compile_fail,E0616
+/// let bytes = ftoo_manifest::projection_bytes(&ftoo_manifest::seed().unwrap()).unwrap();
+/// let mut checked = ftoo_manifest::load_projection(&bytes).unwrap();
+/// checked.live.clear();
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoadedProjection {
     manifest: ValidatedManifest,
@@ -283,8 +854,39 @@ pub struct LoadedProjection {
     budgets: Vec<BudgetExport>,
     producers: Vec<ProducerExport>,
     capabilities: Vec<CapabilityExport>,
+    tags: Vec<TagDescriptor>,
+    history: Vec<HistoryEvent>,
+    live: Vec<TagId>,
+    retired: Vec<RetiredEntry>,
+    out_of_slice: Vec<OutOfSliceEntry>,
 }
 impl LoadedProjection {
+    #[must_use]
+    pub fn tags(&self) -> &[TagDescriptor] {
+        &self.tags
+    }
+    #[must_use]
+    pub fn history(&self) -> &[HistoryEvent] {
+        &self.history
+    }
+    #[must_use]
+    pub fn live(&self) -> &[TagId] {
+        &self.live
+    }
+    #[must_use]
+    pub fn retired(&self) -> &[RetiredEntry] {
+        &self.retired
+    }
+    #[must_use]
+    pub fn out_of_slice(&self) -> &[OutOfSliceEntry] {
+        &self.out_of_slice
+    }
+    /// Derive a checked address book borrowing this exact graph.
+    /// # Errors
+    /// Returns lifecycle or partition diagnostics if the retained authority is invalid.
+    pub fn addressing(&self) -> Result<AddressBook<'_>, AddressingErrors> {
+        crate::tag_validation::construct(&self.manifest, self.tags.clone(), self.history.clone())
+    }
     #[must_use]
     pub const fn manifest(&self) -> &ValidatedManifest {
         &self.manifest
@@ -316,6 +918,9 @@ const ROOT: &[&str] = &[
     "budgets",
     "producers",
     "capabilities",
+    "tags",
+    "history",
+    "stores",
 ];
 const QUANTITY_FIELDS: &[&str] = &["id", "kind", "description", "status"];
 const CLAIM_FIELDS: &[&str] = &["id", "kind", "description", "status", "audit"];
@@ -1050,16 +1655,23 @@ fn check_budget(
     })
 }
 
-/// Load one strict core document, checking syntax, shapes, contracts and base status.
+/// Load a strict projection, checking contracts, base status, history and stores.
 ///
 /// # Errors
-/// Returns the first earlier-phase fault or the complete graph diagnostic collection.
+/// Returns the first earlier-phase fault or the complete graph/addressing diagnostics.
 /// Fixed-assertion faults accumulate in component, semantic-record and field order.
 ///
 /// # Panics
 /// Panics only if an internal exact-shape or closed-table invariant is violated,
 /// which input bytes cannot arrange.
 pub fn load_projection(bytes: &[u8]) -> Result<LoadedProjection, ProjectionError> {
+    load_with_authority(bytes, &crate::tag_history::seed_history())
+}
+
+fn load_with_authority(
+    bytes: &[u8],
+    authority: &[HistoryEvent],
+) -> Result<LoadedProjection, ProjectionError> {
     let value = syntax::parse(bytes)?;
     let root = object(&value, "$", ROOT)?;
     let schema = get(root, "schema");
@@ -1086,6 +1698,9 @@ pub fn load_projection(bytes: &[u8]) -> Result<LoadedProjection, ProjectionError
     let budget_assertions = list(get(root, "budgets"), "$.budgets", budget)?;
     let mut producers = list(get(root, "producers"), "$.producers", producer)?;
     let capabilities = list(get(root, "capabilities"), "$.capabilities", capability)?;
+    let tags = list(get(root, "tags"), "$.tags", tag_record)?;
+    let history = list(get(root, "history"), "$.history", history_record)?;
+    let stores = stores_record(get(root, "stores"))?;
     let mut errors = Vec::new();
     collect_assertion(&mut errors, pin(&engine_pin, "$.engine-pin", None));
     let budgets = match check_contracts(&mut producers, &capabilities, &budget_assertions) {
@@ -1133,7 +1748,22 @@ pub fn load_projection(bytes: &[u8]) -> Result<LoadedProjection, ProjectionError
             }
         }
     }
+    let book = admit_addressing(&manifest, &tags, &history, &stores, authority)?;
+    let mut live: Vec<_> = book.live().collect();
+    let mut retired: Vec<_> = book.retired().cloned().collect();
+    let mut out_of_slice: Vec<_> = book.out_of_slice().copied().collect();
+    // Retain input positions for the independent source comparator, while
+    // taking every assignment and cause exclusively from the checked derivation.
+    let position = |tag| stores.iter().find(|r| r.tag == tag).map(|r| r.position);
+    live.sort_by_key(|tag| position(*tag));
+    retired.sort_by_key(|entry| position(entry.tag()));
+    out_of_slice.sort_by_key(|entry| position(entry.tag()));
     Ok(LoadedProjection {
+        tags: tags.iter().map(|(tag, _)| tag.descriptor()).collect(),
+        history,
+        live,
+        retired,
+        out_of_slice,
         manifest,
         pin: engine_pin,
         budgets,
@@ -1314,15 +1944,35 @@ fn render(value: &Value, out: &mut String) {
         Value::Null => out.push_str("null"),
     }
 }
-/// The sole canonical core writer. Fixed assertions are checked before bytes escape.
+/// The sole canonical projection writer. Fixed assertions are checked before bytes escape.
 ///
 /// # Errors
-/// Returns a fixed-contract fault for an unreviewed budget or pin.
+/// Returns fixed-contract or addressing faults before emitting a projection.
 ///
 /// # Panics
 /// Panics only if an internal exact-shape or string-serialization invariant is
 /// violated, which an admitted graph cannot arrange.
 pub fn projection_bytes(graph: &ValidatedManifest) -> Result<Vec<u8>, ProjectionError> {
+    let book = crate::addressing(graph).map_err(|e| addressing_error(&e))?;
+    write_projection(&book)
+}
+
+#[cfg(test)]
+fn projection_with_authority(
+    graph: &ValidatedManifest,
+    authority: &[HistoryEvent],
+) -> Result<Vec<u8>, ProjectionError> {
+    let book = crate::tag_validation::construct(
+        graph,
+        TagId::ALL.map(TagId::descriptor).to_vec(),
+        authority.to_vec(),
+    )
+    .map_err(|e| addressing_error(&e))?;
+    write_projection(&book)
+}
+
+fn write_projection(book: &AddressBook<'_>) -> Result<Vec<u8>, ProjectionError> {
+    let graph = book.graph();
     let mut nodes: Vec<_> = graph.nodes().iter().collect();
     nodes.sort_by_key(|n| n.id);
     let mut edges = graph.edges().to_vec();
@@ -1385,29 +2035,41 @@ pub fn projection_bytes(graph: &ValidatedManifest) -> Result<Vec<u8>, Projection
             ),
             ("budgets", arr(budgets, budget_value)),
             ("producers", arr(producers, producer_value)),
+            ("capabilities", arr(capabilities, capability_value)),
             (
-                "capabilities",
-                arr(capabilities, |c| {
+                "tags",
+                arr(book.descriptors.iter(), |d| {
                     ordered(
-                        CAPABILITY_FIELDS,
+                        TAG_FIELDS,
                         [
-                            ("id", s(spelling(c.id, CAPS))),
-                            ("availability", s(spelling(c.availability, AVAILABILITY))),
-                            ("adapter-implemented", Value::Bool(c.adapter_implemented)),
-                            ("evidence", s(c.evidence)),
+                            ("tag", s(d.spelling())),
+                            ("target", s(d.target().semantic_name())),
                         ],
                     )
                 }),
             ),
+            ("history", arr(book.history(), history_value)),
+            ("stores", stores_value(book)),
         ],
     );
     let mut output = String::new();
     render(&value, &mut output);
     output.push('\n');
-    load_projection(output.as_bytes())?;
+    load_with_authority(output.as_bytes(), &book.history)?;
     Ok(output.into_bytes())
 }
 
+fn capability_value(c: crate::CapabilitySpec) -> Value {
+    ordered(
+        CAPABILITY_FIELDS,
+        [
+            ("id", s(spelling(c.id, CAPS))),
+            ("availability", s(spelling(c.availability, AVAILABILITY))),
+            ("adapter-implemented", Value::Bool(c.adapter_implemented)),
+            ("evidence", s(c.evidence)),
+        ],
+    )
+}
 fn budget_value(budget: BudgetSpec) -> Value {
     ordered(
         BUDGET_FIELDS,

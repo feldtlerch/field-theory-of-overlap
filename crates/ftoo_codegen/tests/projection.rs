@@ -3,8 +3,106 @@ use std::path::Path;
 
 #[test]
 fn committed_artifact_is_checked_by_the_ordinary_workspace_gate() {
+    use ftoo_manifest::{HistoryChange as H, NodeId as N, TagId as T};
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    ftoo_codegen::check_projection(root).unwrap();
+    ftoo_codegen::check_projection(&root).unwrap();
+    let bytes = std::fs::read(root.join("generated/manifest.json")).unwrap();
+    let loaded = load_projection(&bytes).unwrap();
+    let book = loaded.addressing().unwrap();
+    assert!(std::ptr::eq(book.graph(), loaded.manifest()));
+    let tags = [
+        (T::LangevinCoefficientOne, "c:1", N::LangevinCoefficientOne),
+        (
+            T::LangevinCoefficientThree,
+            "c:3",
+            N::LangevinCoefficientThree,
+        ),
+        (
+            T::LangevinCoefficientOneValue,
+            "v:1",
+            N::LangevinCoefficientOneValue,
+        ),
+        (
+            T::LangevinCoefficientThreeValue,
+            "v:3",
+            N::LangevinCoefficientThreeValue,
+        ),
+    ];
+    assert_eq!(
+        loaded
+            .tags()
+            .iter()
+            .map(|d| (d.tag(), d.spelling(), d.target()))
+            .collect::<Vec<_>>(),
+        tags
+    );
+    assert_eq!(loaded.live(), tags.map(|(t, _, _)| t));
+    assert_eq!(loaded.retired().len(), 0);
+    assert_eq!(loaded.out_of_slice().len(), 0);
+    assert_eq!(book.retired().count(), 0);
+    assert_eq!(book.out_of_slice().count(), 0);
+    let mut events = Vec::new();
+    for (ordinal, identity, formulation) in [
+        (
+            1,
+            N::LangevinCoefficientOne,
+            "The coefficient of k in the three-dimensional Langevin expansion.",
+        ),
+        (
+            2,
+            N::LangevinCoefficientThree,
+            "The coefficient of k cubed in the same expansion.",
+        ),
+        (
+            3,
+            N::LangevinCoefficientOneValue,
+            "The first coefficient is exactly 1/3.",
+        ),
+        (
+            4,
+            N::LangevinCoefficientThreeValue,
+            "The third coefficient is exactly -1/45.",
+        ),
+    ] {
+        events.push((
+            ordinal,
+            "proposal:manifest:kernel-bite",
+            "Retrospective registration of the M1 seed identity.".into(),
+            H::AdmitIdentity {
+                identity,
+                original_formulation: formulation.into(),
+            },
+        ));
+    }
+    for (ordinal, (tag, handle, target)) in (5..=8).zip(tags) {
+        assert_eq!(book.resolve(handle), Ok(target));
+        events.push((
+            ordinal,
+            "proposal:manifest:addressing-lifecycle-bite",
+            format!(
+                "The handle addresses the existing seed referent {}.",
+                target.semantic_name()
+            ),
+            H::AdmitTag { tag },
+        ));
+    }
+    assert_eq!(
+        loaded
+            .history()
+            .iter()
+            .map(|e| (
+                e.ordinal(),
+                e.authority_record(),
+                e.reason().to_owned(),
+                e.change().clone()
+            ))
+            .collect::<Vec<_>>(),
+        events
+    );
+    assert_eq!(
+        book.history().cloned().collect::<Vec<_>>(),
+        loaded.history()
+    );
 }
 
 fn lossless<T: TryInto<u64>>(value: T) -> u64

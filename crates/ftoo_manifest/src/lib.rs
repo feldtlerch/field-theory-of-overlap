@@ -3,15 +3,16 @@
 //! Validation establishes identity, relation contracts and coverage declarations,
 //! not mathematical truth, operation typing or an audit verdict. The coefficient
 //! seed is proposed trial content pending its prose. Bound claims still require an audit run.
-//! The strict core projection checks base assertions without an engine dependency.
+//! The strict complete projection checks base assertions without an engine dependency.
 //!
 //! Addressing admits permanent opaque handles and append-only lifecycle history.
 //! Live handles denote the declared claim slice and its dependency support;
 //! they supply no certification, audit admission or release assessment. Address
 //! books borrow the graph without changing its semantic snapshot. Preserving
 //! descriptors and prior events across source revisions remains a review duty.
-//! Future projection consumers must check the full history and all three stores;
-//! rendering and per-site build refusal remain separate consumers.
+//! Projection loading checks the full history and all three store assertions,
+//! retaining derived addressing beside the graph. Rendering and per-site build
+//! refusal remain separate consumers.
 
 mod audit;
 mod budgets;

@@ -3,9 +3,10 @@ use NodeId::{
     LangevinCoefficientOne as Q1, LangevinCoefficientOneValue as C1, LangevinCoefficientThree as Q3,
 };
 use ftoo_manifest::{
-    AdmissionStage, Diagnostic, DraftLocation, Edge, Guard, NodeId, ProjectionDiagnostic,
+    AddressingDiagnostic, AddressingFault, AddressingLocation, AddressingStage, AdmissionStage,
+    Diagnostic, DraftLocation, Edge, Guard, NodeId, OutOfSliceCause, ProjectionDiagnostic,
     ProjectionError, ProjectionFault, ProjectionValue, RelationKind, RuleId, SourceDifference,
-    WireError, WireFault, WireLocation,
+    StoreState, TagId, WireError, WireFault, WireLocation,
 };
 use std::{
     fs,
@@ -14,6 +15,164 @@ use std::{
 };
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
+
+fn addressing_fault(
+    rule: RuleId,
+    stage: AddressingStage,
+    location: AddressingLocation,
+    tag: Option<TagId>,
+    identity: NodeId,
+    fault: AddressingFault,
+) -> ProjectionCheckError {
+    ProjectionCheckError::Projection(ProjectionError::Addressing(vec![AddressingDiagnostic {
+        rule,
+        stage,
+        location,
+        tag,
+        identity: Some(identity),
+        fault,
+    }]))
+}
+#[test]
+fn t08_history_ordinal_retains_original_index() {
+    let f = Fixture::new();
+    f.check(
+        &f.clean.replacen("\"ordinal\":8", "\"ordinal\":9", 1),
+        addressing_fault(
+            RuleId::M032,
+            AddressingStage::HistoryAdmission,
+            AddressingLocation::History(7),
+            Some(TagId::LangevinCoefficientThreeValue),
+            NodeId::LangevinCoefficientThreeValue,
+            AddressingFault::InvalidHistoryOrder {
+                expected: 8,
+                actual: 9,
+            },
+        ),
+    );
+}
+#[test]
+fn t09_unknown_descriptor_handle_is_not_runtime_unknown_tag() {
+    let f = Fixture::new();
+    f.check(
+        &f.clean.replacen("\"tag\":\"c:1\"", "\"tag\":\"c:01\"", 1),
+        shape(
+            "$.tags[0].tag",
+            WireFault::UnknownToken {
+                expected: vec!["c:1".into(), "c:3".into(), "v:1".into(), "v:3".into()],
+                actual: "c:01".into(),
+            },
+        ),
+    );
+}
+#[test]
+fn t10_known_handle_cannot_rebind_target() {
+    let f = Fixture::new();
+    f.check(
+        &f.clean.replacen(
+            "\"tag\":\"c:1\",\"target\":\"def:langevin:coefficient-one\"",
+            "\"tag\":\"c:1\",\"target\":\"def:langevin:coefficient-three\"",
+            1,
+        ),
+        assertion(
+            "$.tags[0].target",
+            Some(0),
+            ProjectionFault::TagBindingMismatch {
+                tag: TagId::LangevinCoefficientOne,
+                expected: Q1,
+                actual: Q3,
+            },
+        ),
+    );
+}
+#[test]
+fn t11_false_out_of_slice_store_cannot_replace_live() {
+    let f = Fixture::new();
+    let bytes = f
+        .clean
+        .replacen(
+            "\"live\":[{\"tag\":\"c:1\"},{\"tag\":\"c:3\"}",
+            "\"live\":[{\"tag\":\"c:1\"}",
+            1,
+        )
+        .replacen(
+            "\"out-of-slice\":[]",
+            "\"out-of-slice\":[{\"tag\":\"c:3\",\"cause\":\"quantity-outside-support\"}]",
+            1,
+        );
+    f.check(
+        &bytes,
+        addressing_fault(
+            RuleId::M035,
+            AddressingStage::StoreConstruction,
+            AddressingLocation::Store(TagId::LangevinCoefficientThree),
+            Some(TagId::LangevinCoefficientThree),
+            Q3,
+            AddressingFault::StoreStateMismatch {
+                expected: StoreState::Live,
+                actual: StoreState::OutOfSlice(OutOfSliceCause::QuantityOutsideSupport),
+            },
+        ),
+    );
+}
+#[test]
+fn t12_repeated_live_entry_retains_multiplicity() {
+    let f = Fixture::new();
+    f.check(
+        &f.clean
+            .replacen("\"live\":[", "\"live\":[{\"tag\":\"c:1\"},", 1),
+        addressing_fault(
+            RuleId::M035,
+            AddressingStage::StoreConstruction,
+            AddressingLocation::Store(TagId::LangevinCoefficientOne),
+            Some(TagId::LangevinCoefficientOne),
+            Q1,
+            AddressingFault::StorePartitionMismatch {
+                expected: 1,
+                actual: 2,
+            },
+        ),
+    );
+}
+#[test]
+fn t13_history_reason_is_fixed_authority() {
+    let f = Fixture::new();
+    let old = "Retrospective registration of the M1 seed identity.";
+    let new = "A different nonblank reason.";
+    f.check(
+        &f.clean.replacen(old, new, 1),
+        assertion(
+            "$.history[0].reason",
+            Some(0),
+            ProjectionFault::HistoryMismatch {
+                expected: Some(Box::new(ProjectionValue::Text(old.into()))),
+                actual: Some(Box::new(ProjectionValue::Text(new.into()))),
+            },
+        ),
+    );
+}
+#[test]
+fn t14_original_formulation_is_not_current_description() {
+    let f = Fixture::new();
+    let old = "The coefficient of k in the three-dimensional Langevin expansion.";
+    let new = "A different nonblank historical formulation.";
+    let bytes = f.clean.replacen(
+        &format!("\"original-formulation\":\"{old}\""),
+        &format!("\"original-formulation\":\"{new}\""),
+        1,
+    );
+    f.check(
+        &bytes,
+        assertion(
+            "$.history[0].change.original-formulation",
+            Some(0),
+            ProjectionFault::HistoryMismatch {
+                expected: Some(Box::new(ProjectionValue::Text(old.into()))),
+                actual: Some(Box::new(ProjectionValue::Text(new.into()))),
+            },
+        ),
+    );
+}
 
 #[test]
 fn io_faults_preserve_old_bytes_before_replacement_and_report_afterward() {
@@ -224,7 +383,13 @@ fn semantic_comparison_covers_coverage_maturity_and_binding_budget() {
             }]),
         );
     }
-    let bytes=f.clean.replacen("\"slice\":[\"claim:langevin:coefficient-one-value\",\"claim:langevin:coefficient-three-value\"]","\"slice\":[]",1);
+}
+#[test]
+fn semantic_comparison_covers_slice_and_derived_stores() {
+    let f = Fixture::new();
+    let bytes=f.clean.replacen("\"slice\":[\"claim:langevin:coefficient-one-value\",\"claim:langevin:coefficient-three-value\"]","\"slice\":[]",1)
+        .replacen("\"live\":[{\"tag\":\"c:1\"},{\"tag\":\"c:3\"},{\"tag\":\"v:1\"},{\"tag\":\"v:3\"}]", "\"live\":[]", 1)
+        .replacen("\"out-of-slice\":[]", "\"out-of-slice\":[{\"tag\":\"c:1\",\"cause\":\"quantity-outside-support\"},{\"tag\":\"c:3\",\"cause\":\"quantity-outside-support\"},{\"tag\":\"v:1\",\"cause\":\"claim-not-selected\"},{\"tag\":\"v:3\",\"cause\":\"claim-not-selected\"}]", 1);
     f.check(
         &bytes,
         source(vec![
@@ -241,6 +406,38 @@ fn semantic_comparison_covers_coverage_maturity_and_binding_budget() {
                     NodeId::LangevinCoefficientThreeValue,
                 )),
                 actual: None,
+            },
+            SourceDifference {
+                path: "$.stores[c:1]".into(),
+                position: Some(0),
+                expected: Some(ProjectionValue::Store(StoreState::Live)),
+                actual: Some(ProjectionValue::Store(StoreState::OutOfSlice(
+                    OutOfSliceCause::QuantityOutsideSupport,
+                ))),
+            },
+            SourceDifference {
+                path: "$.stores[c:3]".into(),
+                position: Some(1),
+                expected: Some(ProjectionValue::Store(StoreState::Live)),
+                actual: Some(ProjectionValue::Store(StoreState::OutOfSlice(
+                    OutOfSliceCause::QuantityOutsideSupport,
+                ))),
+            },
+            SourceDifference {
+                path: "$.stores[v:1]".into(),
+                position: Some(2),
+                expected: Some(ProjectionValue::Store(StoreState::Live)),
+                actual: Some(ProjectionValue::Store(StoreState::OutOfSlice(
+                    OutOfSliceCause::ClaimNotSelected,
+                ))),
+            },
+            SourceDifference {
+                path: "$.stores[v:3]".into(),
+                position: Some(3),
+                expected: Some(ProjectionValue::Store(StoreState::Live)),
+                actual: Some(ProjectionValue::Store(StoreState::OutOfSlice(
+                    OutOfSliceCause::ClaimNotSelected,
+                ))),
             },
         ]),
     );
