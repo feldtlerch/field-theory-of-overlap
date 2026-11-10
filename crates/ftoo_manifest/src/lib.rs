@@ -24,8 +24,15 @@ mod status;
 mod tag_history;
 mod tag_validation;
 mod tags;
+mod units;
 mod validation;
 mod wire;
+pub use units::{
+    CheckedText, CheckedUnit, DocumentDraft, DocumentEntryDraft, InsertionReason,
+    LanguageCheckedUnits, LocatedEntryDraft, LocatedString, MathOccurrence, NameDomain, PathPart,
+    ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite,
+    UnitStage, admit_unit_drafts,
+};
 
 pub use wire::{
     BudgetExport, CapabilityExport, LoadedProjection, ProducerExport, ProjectionDiagnostic,

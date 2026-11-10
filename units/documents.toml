@@ -1,0 +1,4 @@
+schema = 1
+
+[documents.main]
+required-languages = ["en"]

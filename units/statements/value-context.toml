@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:coefficients:value-context"
+document = "main"
+math = {}
+
+[unit.texts]
+en = 'The value claim concerns the first coefficient.'

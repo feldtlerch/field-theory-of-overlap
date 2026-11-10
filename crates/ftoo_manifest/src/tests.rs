@@ -545,24 +545,22 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
     use RuleId::{
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
-        M031, M032, M033, M034, M035, M036, M037, M038,
+        M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
         [
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
-            M029, M030, M031, M032, M033, M034, M035, M036, M037, M038
+            M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041
         ]
     );
     for rule in RULES {
         let expected = match rule.number {
             M005 | M011 | M030 => RuleState::Structural,
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
-            | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 => {
-                RuleState::Enforced
-            }
-            M001 | M002 | M003 | M004 | M012 | M037 | M038 => RuleState::Enforced,
+            | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
+            | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
@@ -640,7 +638,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        30
+        33
     );
     assert_eq!(
         RULES

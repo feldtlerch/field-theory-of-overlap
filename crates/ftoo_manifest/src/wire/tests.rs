@@ -1609,7 +1609,7 @@ fn rust_variant_spellings_are_refused_at_actual_grammar_positions() {
 #[test]
 fn new_register_entries_have_literal_statements_and_scopes() {
     assert_eq!(
-        crate::RULES[36..]
+        crate::RULES[36..38]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),

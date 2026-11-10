@@ -11,6 +11,7 @@ workspace = true
 
 [dependencies]
 ftoo_manifest = { path = "../ftoo_manifest" }
+toml_edit = { version = "=0.22.27", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
 ftoo_audit = { path = "../ftoo_audit" }
