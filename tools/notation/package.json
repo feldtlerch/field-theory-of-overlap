@@ -1,0 +1,11 @@
+{
+  "name": "ftoo-notation",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "katex": "0.16.22"
+  },
+  "overrides": {
+    "commander": "8.3.0"
+  }
+}

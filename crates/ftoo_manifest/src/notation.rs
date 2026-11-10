@@ -19,6 +19,7 @@ pub use diagnostics::{
     NotationFault, NotationOrigin, NotationPathPart, NotationResource, NotationSite, NotationStage,
     RegistryEntry, SymbolLookupFault,
 };
+pub use diagnostics::{RenderOwner, RenderTarget};
 pub use primitives::{PrimitiveId, PrimitiveOperation, PrimitiveSpec};
 pub use tiers::{PendingReason, SymbolStatus, SymbolTier};
 

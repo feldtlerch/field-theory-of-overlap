@@ -1,0 +1,891 @@
+{
+  "schema": 1,
+  "algorithm": "sha256",
+  "node-version": "22.16.0",
+  "packages": [
+    {
+      "path": "node_modules/commander/LICENSE",
+      "sha256": "04512a63dce4d2d506ad612dc0bd7681ccf6e3655f7b6eaef7dfac8323d1ec0b"
+    },
+    {
+      "path": "node_modules/commander/Readme.md",
+      "sha256": "9ee7c537cb5e335e2e9c383b3b08ee7361fd227fb83c86ffa35eedc9c7f92877"
+    },
+    {
+      "path": "node_modules/commander/esm.mjs",
+      "sha256": "d590f9c55c9f8bfec81fdc4170b3e7653226a39956055aec657b52ae45495d88"
+    },
+    {
+      "path": "node_modules/commander/index.js",
+      "sha256": "d4f8af488a7a08cd71df8503fcc3e5f2fd61e9b26eb368ecd5cc8159862cde3f"
+    },
+    {
+      "path": "node_modules/commander/lib/argument.js",
+      "sha256": "7859398cfac1869df6cbba646e7e437875185866b79ac70a5a3cd802fd4df96b"
+    },
+    {
+      "path": "node_modules/commander/lib/command.js",
+      "sha256": "69047076c77593471bbf1aa2ba5f01f0565bffa187d415a600d8ec5998d2056b"
+    },
+    {
+      "path": "node_modules/commander/lib/error.js",
+      "sha256": "c69bbc276b3c7fec052f930b9de091db2206646761f765a2077d5731f763dc55"
+    },
+    {
+      "path": "node_modules/commander/lib/help.js",
+      "sha256": "f07a902508e463968826dd36b567640a563f0192989355c6559723415951bcf2"
+    },
+    {
+      "path": "node_modules/commander/lib/option.js",
+      "sha256": "9dfc7ae4b048435196cbdd888819bb84253d2693460adfa262cffcbb31d6cf98"
+    },
+    {
+      "path": "node_modules/commander/lib/suggestSimilar.js",
+      "sha256": "2f96448988ab89b4acd941d298e51bb103544bf65b60eb0a4260a26a8b39bb57"
+    },
+    {
+      "path": "node_modules/commander/package-support.json",
+      "sha256": "b07a441d1dbc88588a2e7f219d43a5ea9b7c429a44f119caa49229da86bb0063"
+    },
+    {
+      "path": "node_modules/commander/package.json",
+      "sha256": "5f5944b2fa479bf68003ca239940f8ad9cae893ddfc3662272a1855dfb9ce4db"
+    },
+    {
+      "path": "node_modules/commander/typings/index.d.ts",
+      "sha256": "051ae0b0bda811703875e6f2e466b9344cfe320b39087676327dc0c109f26d32"
+    },
+    {
+      "path": "node_modules/katex/LICENSE",
+      "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+    },
+    {
+      "path": "node_modules/katex/README.md",
+      "sha256": "f5a45fbe02ce38e1548193dd1d34135ed4ede89ebd1617d1dba2ae3e5e300df9"
+    },
+    {
+      "path": "node_modules/katex/cli.js",
+      "sha256": "accab3cdd9135fc54fd8da7bc9756ca9d7d43b37614d3fa7f9f55efdda70ab45"
+    },
+    {
+      "path": "node_modules/katex/contrib/auto-render/README.md",
+      "sha256": "cd18b887f3c09b393745231345b3552fb2b1ad2a18377cff8cb3d2ab749cbd60"
+    },
+    {
+      "path": "node_modules/katex/contrib/auto-render/auto-render.js",
+      "sha256": "740bd2ce628642b3504054077729c8d3deb29d25bcec00175a3601570ab78944"
+    },
+    {
+      "path": "node_modules/katex/contrib/auto-render/index.html",
+      "sha256": "fb5316f664876ba4d28d5f89f66cab0b8d75174fdb8f5991a23137f6227bd96d"
+    },
+    {
+      "path": "node_modules/katex/contrib/auto-render/splitAtDelimiters.js",
+      "sha256": "ac109fbe626c843091d4632593d122e7b1adb304ef80e2eea95efe737d9321e3"
+    },
+    {
+      "path": "node_modules/katex/contrib/auto-render/test/auto-render-spec.js",
+      "sha256": "0f03894372ddcf687ac4c43b41c8f220f177fa3f2e3401677729a674890efff5"
+    },
+    {
+      "path": "node_modules/katex/contrib/copy-tex/README.md",
+      "sha256": "5c3cbb408cbc2cab7f763082f5cbde8c6e84595b8c82ef4e7b79092c6bf5b1db"
+    },
+    {
+      "path": "node_modules/katex/contrib/copy-tex/copy-tex.js",
+      "sha256": "4c339fbd316eb36ae36ac226fc3550af341bfc1ff2276da6288ba5767d616d0b"
+    },
+    {
+      "path": "node_modules/katex/contrib/copy-tex/index.html",
+      "sha256": "4ec3393dede4eace57bf9707fc96a0e376853ff6fcfd4c4fe8735d39ccdde2b9"
+    },
+    {
+      "path": "node_modules/katex/contrib/copy-tex/katex2tex.js",
+      "sha256": "777ced473efbe444b0be365f8d6283a31952c8350e51d0c7d2deed15ab2e558c"
+    },
+    {
+      "path": "node_modules/katex/contrib/mathtex-script-type/README.md",
+      "sha256": "f4e904ef61d013f127c30fe1b5632a64492aee23bcf23ee1ba68899d60ca1c42"
+    },
+    {
+      "path": "node_modules/katex/contrib/mathtex-script-type/mathtex-script-type.js",
+      "sha256": "ffe9ba5c864c432a8b46042457c4cead048f03011aac2be7fb57f43b556a12e3"
+    },
+    {
+      "path": "node_modules/katex/contrib/mhchem/README.md",
+      "sha256": "0f8bbf8dabb2a539b6c3af7d5dea49f06d8c0d0a8c6844808047ae1f4ead1d38"
+    },
+    {
+      "path": "node_modules/katex/contrib/mhchem/mhchem.js",
+      "sha256": "2e59e02033d60c110e5ba70a42f9259c8597bb19dbd03c542e2e5860394376fd"
+    },
+    {
+      "path": "node_modules/katex/contrib/render-a11y-string/render-a11y-string.js",
+      "sha256": "3f36cc483aaff348216fb5d51aa11ce328fcd6e0b954e088e1226691aa65954e"
+    },
+    {
+      "path": "node_modules/katex/contrib/render-a11y-string/test/render-a11y-string-spec.js",
+      "sha256": "cbbd9946f29061fd54b0766491bdf88666d21fdedb27e26b975e74d7103569cf"
+    },
+    {
+      "path": "node_modules/katex/dist/README.md",
+      "sha256": "f5a45fbe02ce38e1548193dd1d34135ed4ede89ebd1617d1dba2ae3e5e300df9"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/auto-render.js",
+      "sha256": "1f5492e68752a1b1fbcd500840ca1d0191c26131fdc36381b493a02c6b8d4bcf"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/auto-render.min.js",
+      "sha256": "bb53eb953394531aae36fdd537065c4244eb8542901a3ce914601d932675b8ac"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/auto-render.mjs",
+      "sha256": "42d3240990d45436d6dd4dfb36e7792448cdc2b602c47ac424fd09b1e93dbdfe"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/copy-tex.js",
+      "sha256": "2a0cbb0816ea3fa4558b2c810f833fd9c2e293708898c4a1e590617c9ab204eb"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/copy-tex.min.js",
+      "sha256": "07770af90943a1de1a1010794bc78c6a7346d46d48fb63e35cc76ba76b827604"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/copy-tex.mjs",
+      "sha256": "d037b7c4cdc73420285a580e5b8f9cb441ad67e661fd1ad31dd45aadcf047bf5"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mathtex-script-type.js",
+      "sha256": "642910d0c2189220f4d83f579d8c611ef0c2d74c430c5c5f5d0aca861c5c6b12"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mathtex-script-type.min.js",
+      "sha256": "0799b28b8bc80621fc86d9cee45cfd1ca499f77d3d6d71b0ee307158fc3b50b9"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mathtex-script-type.mjs",
+      "sha256": "57f519b2230307c74d08020f52c859c969f5527eb40d24bb8ab3e2167808d5c6"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mhchem.js",
+      "sha256": "adae02881ece750ce430aa5b250c54e23e0e3d1854c7ff348dfb5eb34daf687a"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mhchem.min.js",
+      "sha256": "9f87e5e9c384a160472d0045035a8641f6013358eddb3ece708634a50f946a40"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/mhchem.mjs",
+      "sha256": "c5d4b68a7921c218ffdcf4d7c17900d783af7b48430513810cb14e791a54abb4"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/render-a11y-string.js",
+      "sha256": "a5fa0dd91b33d24ce6b6ab2d4132825842aa286c14b040f668dcd92717497387"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/render-a11y-string.min.js",
+      "sha256": "79020f6ca629c07bddf2271c6d057e8e55e8e251428a493de839c894f713160d"
+    },
+    {
+      "path": "node_modules/katex/dist/contrib/render-a11y-string.mjs",
+      "sha256": "5df820dd9376bd23ef424e5cfc45505d57ae646fb0c5533758e7ad51e048893b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_AMS-Regular.ttf",
+      "sha256": "68534840bcfdd2bffb6f0e8deb48684dd01e7f04ea2813267577afb906de1d13"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_AMS-Regular.woff",
+      "sha256": "30da91e84c893f875e252689faebdc590b2871145e8adc7f9a9d4dbd8ce0b251"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_AMS-Regular.woff2",
+      "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Bold.ttf",
+      "sha256": "07d8e303ce4fc12b4bb54f1004170dd190a1f3db45d400fe68060df3e0897268"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Bold.woff",
+      "sha256": "1ae6bd7475590e97e7f145a89e09ccde322f7a6bc0b91607b1c8b8ee28290fed"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Bold.woff2",
+      "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Regular.ttf",
+      "sha256": "ed0b74372feefcbb9c0666b2e210da37b7e49fa7fbbf3eeb11db5f693dacfbb7"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Regular.woff",
+      "sha256": "3398dd02302557a793f2863f88e02d96ce10df2abffa07c8e9fa90775116e65c"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Caligraphic-Regular.woff2",
+      "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Bold.ttf",
+      "sha256": "9163df9c7122432e6495b4229fa9071cf9ae86a758ae5efc4924ec2e1a6dbce1"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Bold.woff",
+      "sha256": "9be7ceb88004ab8ad124082246fbfcca4091e36385d4ec6ed1df67375dad50fb"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Bold.woff2",
+      "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Regular.ttf",
+      "sha256": "1e6f9579e90e2cac37f8f60a597c436e075c114385652b7cbeb0dec0421291b3"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Regular.woff",
+      "sha256": "5e28753be717dac97f559f49bc10be9cf3c124ddcabda6659d11cb68febc6463"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Fraktur-Regular.woff2",
+      "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Bold.ttf",
+      "sha256": "138ac28d1663b3037e9c5f52371fa5c63d8324f4a38d22cd573e6ea3a3fd0cf8"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Bold.woff",
+      "sha256": "c76c5d696297d51b9cb1639c7da4334f0e7dec81b42b11213b5e25ef671bb822"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Bold.woff2",
+      "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-BoldItalic.ttf",
+      "sha256": "70ee1f64a20f2048c21940ef46d0144fd215baa953ca69afd1e31e98544f708f"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-BoldItalic.woff",
+      "sha256": "a6f7ec0d846ac7ad975adb8959c37ed49b94acbc4ae436db9ce9e20287e4a64c"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-BoldItalic.woff2",
+      "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Italic.ttf",
+      "sha256": "0d85ae7cc30f23790a7f1a58c4a112fdca8aae769b6ba11429af1d98b1b6cb3a"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Italic.woff",
+      "sha256": "f1d6ef86f3b11a528bd5185199bd2443ecb2b0dead96d88674b5a2c12be24bdf"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Italic.woff2",
+      "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Regular.ttf",
+      "sha256": "d0332f52868370fd83ae7fa46470f90c8f2eab2fcf12bc4f88080b340c95a830"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff",
+      "sha256": "c6368d87e8a1a3a5d337623d83d8dc4b868f242a9ad476237d6f8d1e0f168cdc"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2",
+      "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-BoldItalic.ttf",
+      "sha256": "f9377ab0271cda59af24bcffbd46a4d0c8a3572ffafdbb38de2ad5ea7b0d5ee5"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-BoldItalic.woff",
+      "sha256": "850c0af5c2238497febaf5e461d880bf458c341f42f4f330f1b1ab5698b1998e"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-BoldItalic.woff2",
+      "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-Italic.ttf",
+      "sha256": "08ce98e51b04d58945a301e639e02b6998af29fdfd61a7b8afdd07bbfc479d4a"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-Italic.woff",
+      "sha256": "8a8d244581371912b8f3f5a23e2437cb2a59cd9bcaebb0346e722c05737a2571"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Math-Italic.woff2",
+      "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Bold.ttf",
+      "sha256": "1ece03f79f95277d57dc7f6b435a74e1379b0d46104a8530286b60ff49369ea0"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Bold.woff",
+      "sha256": "ece03cfd83e22c212cdef66feb8442d25a083beb988db3f1883f3f9738d750ba"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Bold.woff2",
+      "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Italic.ttf",
+      "sha256": "3931dd81faed86ba021bb2bbdc36f5bed9a38d6b4f4077aca59b265aa1b02083"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Italic.woff",
+      "sha256": "91ee67500cc0129aa0ace3ac5c61ff1692102f0f31d02b69347fba35dcb75bf2"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Italic.woff2",
+      "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Regular.ttf",
+      "sha256": "f36ea897e19f4a2e571d1e900e4e3710e438deb05a842486045ba0a3e616a4ad"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Regular.woff",
+      "sha256": "11e4dc8a6471ff6d6ee561d53d10fde8f7489e798257ff449c5d37c197435605"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_SansSerif-Regular.woff2",
+      "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Script-Regular.ttf",
+      "sha256": "1c67f068fea8bb09bf099c088b1cf64bd27516a6e07f4684344873564bb66a67"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Script-Regular.woff",
+      "sha256": "d96cdf2b3bdd4d64a8fd5f74a4c467f123a8a73931cd435889f08ffaf9bf947a"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Script-Regular.woff2",
+      "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size1-Regular.ttf",
+      "sha256": "95b6d2f1a50173bfedb8c63e1d1c99b10427d0a4df4201cb44513b226951a22b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size1-Regular.woff",
+      "sha256": "c943cc986384f59e86bea5fd7dc50a9c4dfe567a7c05eb40d6790720dead97c9"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size1-Regular.woff2",
+      "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size2-Regular.ttf",
+      "sha256": "a6b2099fb555c60e3a0db3a08842ebf1d732c6eb4e4bf44913613bed4fc4e39b"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size2-Regular.woff",
+      "sha256": "2014c523c3210bcc166648c4d4cc57f05b747df07a24277bf71c51e67dc79e3d"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size2-Regular.woff2",
+      "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size3-Regular.ttf",
+      "sha256": "500e04d54f0d51666332c9d2089aa803be22aa878eca539e59fa53c6e522b082"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size3-Regular.woff",
+      "sha256": "6ab6b62e9b62dae2c00dd90f791bd10950be0ecc3490d7d6045f51c2e8fe0949"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size3-Regular.woff2",
+      "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size4-Regular.ttf",
+      "sha256": "c647367d1dd4e162468717d020e1fc0f1dc5c26ebfdffbe55261713bf88c5877"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size4-Regular.woff",
+      "sha256": "99f9c6750b489c9462bf04900bd3f939df9b829339daaaaa99ef5495cdddea58"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Size4-Regular.woff2",
+      "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.ttf",
+      "sha256": "f01f3e87d9c6a61c0c081ceb577abd864eb00a612f7ac1620dd6915fad2ef5aa"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff",
+      "sha256": "e14fed02b1aba7ce9f5afd5844b5d0321b22351febc720e0de8b8723527609f7"
+    },
+    {
+      "path": "node_modules/katex/dist/fonts/KaTeX_Typewriter-Regular.woff2",
+      "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+    },
+    {
+      "path": "node_modules/katex/dist/katex.css",
+      "sha256": "009f1e58806819e90d02e90ffecafa988a3ee4b54418f8cab70f4f2cbf8ce2d8"
+    },
+    {
+      "path": "node_modules/katex/dist/katex.js",
+      "sha256": "8f1f4fb1080439c012bb8fddf424fa253e9144ab4cdd7dc0eae0e92cd04a5e33"
+    },
+    {
+      "path": "node_modules/katex/dist/katex.min.css",
+      "sha256": "19095127357ed6d29fe0a63a6b000c913a89f7f1963b765dd3715e97c9852e75"
+    },
+    {
+      "path": "node_modules/katex/dist/katex.min.js",
+      "sha256": "e8d885505949f3a5f4abdd5dd0d53696bd1371ad26ffbf4f310dcd77c8cdae89"
+    },
+    {
+      "path": "node_modules/katex/dist/katex.mjs",
+      "sha256": "7af1aa5e484a4ae881e181ff97ddffdce2deabef42596d2679658b9fe4cd4615"
+    },
+    {
+      "path": "node_modules/katex/katex.js",
+      "sha256": "31c849032c4484815aa7eb7f946fead4075748c9b79ddec9770a3393b9a70743"
+    },
+    {
+      "path": "node_modules/katex/package.json",
+      "sha256": "bd6430ca96592a055393a1ce980925162da3d40cd0231813d41ef0c56daacd91"
+    },
+    {
+      "path": "node_modules/katex/src/Lexer.js",
+      "sha256": "9f918bf8f5809aefac9c7b320e1dba91efb0087bef8e3a3ebd01a8af0e2a76cf"
+    },
+    {
+      "path": "node_modules/katex/src/MacroExpander.js",
+      "sha256": "1e40733f1f3447f968438b5757d3fab75939978ec5efd73efda816725c6f23e1"
+    },
+    {
+      "path": "node_modules/katex/src/Namespace.js",
+      "sha256": "8e32edf234920c0a84e6fe816e849768b106d469b18d7594a97d7d9da18f15f7"
+    },
+    {
+      "path": "node_modules/katex/src/Options.js",
+      "sha256": "32210c2d7275bd6865566441533dd531c4ab73adc61a963a8c439375f479a126"
+    },
+    {
+      "path": "node_modules/katex/src/ParseError.js",
+      "sha256": "6fbfdba27c9403051b425732f649b15f67746e2f2c8b8af9409a1d2d20cb8ab1"
+    },
+    {
+      "path": "node_modules/katex/src/Parser.js",
+      "sha256": "e9cc85ffca3463f094f2c2b7f62890ad810d8a91fd347e8cf17d635bb57af5f1"
+    },
+    {
+      "path": "node_modules/katex/src/Settings.js",
+      "sha256": "951fe60b60af2073450e729d549a2c9eb1dd3818b900ab427eaff4a980ac6715"
+    },
+    {
+      "path": "node_modules/katex/src/SourceLocation.js",
+      "sha256": "f853a8238c289b93731367354913baa87835c032cab6507948c277fcfd46f079"
+    },
+    {
+      "path": "node_modules/katex/src/Style.js",
+      "sha256": "95603d92438819e0787bfe448149c37c032505ffeb3737a94eaecbf167ae4833"
+    },
+    {
+      "path": "node_modules/katex/src/Token.js",
+      "sha256": "7825456a002871810ea50b890d4232c75ee3eefb7e4cb5efd8d525b20f5eabd9"
+    },
+    {
+      "path": "node_modules/katex/src/buildCommon.js",
+      "sha256": "3814e699845563ec85eddfae5b9deb3f6eaa2e86f3331568d864073b28bda455"
+    },
+    {
+      "path": "node_modules/katex/src/buildHTML.js",
+      "sha256": "4a1f872f166884368ac1ae80e16f779178f3301c70383bcbc72584e5513eb7ca"
+    },
+    {
+      "path": "node_modules/katex/src/buildMathML.js",
+      "sha256": "21bafae858bfd32e246f9f514f62585442886ff172e8581157c6d1ae3271ff26"
+    },
+    {
+      "path": "node_modules/katex/src/buildTree.js",
+      "sha256": "301974504f52b553c4b4915f3cd58e3656cf269aebbab4eb09d97abbbfe0cc90"
+    },
+    {
+      "path": "node_modules/katex/src/defineEnvironment.js",
+      "sha256": "802a9b8f4633f438232bb899dc5a564e633a1583afd643c2721479f60196d0bb"
+    },
+    {
+      "path": "node_modules/katex/src/defineFunction.js",
+      "sha256": "1f2779cf141d9de9350e23d281ad8273c789ab0913d567b40f0fda290e4964ea"
+    },
+    {
+      "path": "node_modules/katex/src/defineMacro.js",
+      "sha256": "94abe8d66e14d6f074cdf0b35e02c9cae2f09a6973afa7b7ae2fbf8a5b11d218"
+    },
+    {
+      "path": "node_modules/katex/src/delimiter.js",
+      "sha256": "78b651b35d992d61d8a51562b4625817f2ec3bc0eb745d9ffa9a28e69799862b"
+    },
+    {
+      "path": "node_modules/katex/src/domTree.js",
+      "sha256": "55495ea38c6676e61a99d111da006f6d915ac0eb887b657ae0b27d32ecbc7045"
+    },
+    {
+      "path": "node_modules/katex/src/environments.js",
+      "sha256": "58cbad6fc07a09c4d56c26610c019a00019f15a76065c47bf2c1283e8b7bbd47"
+    },
+    {
+      "path": "node_modules/katex/src/environments/array.js",
+      "sha256": "24199fe02b9d6b7b1c78ba1c4653d5658412660312fbec501ad0adfd7184d12c"
+    },
+    {
+      "path": "node_modules/katex/src/environments/cd.js",
+      "sha256": "e968c7785b105d1a181e3d839d247d426eefdd596198a455f17dd525e8d3b417"
+    },
+    {
+      "path": "node_modules/katex/src/fontMetrics.js",
+      "sha256": "bfa0952ac3feadf855b745b96594327e2097b9c3e60847c966c275dcd373abaf"
+    },
+    {
+      "path": "node_modules/katex/src/fontMetricsData.js",
+      "sha256": "1e72fc6b451a565e60b1eb7e89f4738eb74f35edfcf3c9c273015700b42ae04d"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/Makefile",
+      "sha256": "493804c19071e9424b297c9951e5738af5dde798c967cc0304517c3c7c6457ee"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/default.cfg",
+      "sha256": "af2a0b6858a5c2489c350e31b6f26ddae6c04d2035a1c9bfcd28e4fd4294b624"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/generate_fonts.py",
+      "sha256": "06a673594fa7db62f2a51bd0eac57b52f92ff39dd025adebcf9e3775ed15f612"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/lib/Extra.otf",
+      "sha256": "6988f536e73250abbf858ca4ecc8a42a125c7d725d1460c2832a4d3bbca63779"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/lib/Space.ttx",
+      "sha256": "31c0949994e017db007263b87b7f9a013d66de421934eea7b84d60d555ca3dc7"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/makeBlacker",
+      "sha256": "e1d2ecc3cfdcac6e9dd85762eec9792b17e10a3e934c7f2de5f67118c2e57ae8"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/makeFF",
+      "sha256": "ca217873a52190e0edbe775c1c39c8c716e5ad66e23603cf3eb978a3b2b825bb"
+    },
+    {
+      "path": "node_modules/katex/src/fonts/xbbold.mf",
+      "sha256": "5da01e5bd02a3ee3da6707f84d378e6295e6af7936e48957ad8f93d3d7229d05"
+    },
+    {
+      "path": "node_modules/katex/src/functions.js",
+      "sha256": "92cbbb44e3c8bfc2d18d811a0def3e247ea8c5428162112df0f5a769f2a630f5"
+    },
+    {
+      "path": "node_modules/katex/src/functions/accent.js",
+      "sha256": "87a5cb4b16516442bf6950d9be50d8c60317d66efa8f1433adb463d7307c4f09"
+    },
+    {
+      "path": "node_modules/katex/src/functions/accentunder.js",
+      "sha256": "aec03072e8cfb6fb5f5ce72861a5250e49cd5718b24fc24669fb09ba875faa54"
+    },
+    {
+      "path": "node_modules/katex/src/functions/arrow.js",
+      "sha256": "5feee9676d47dfa13fc33719b91707d756bed29bf5dd58580d7d3b7b1d893e27"
+    },
+    {
+      "path": "node_modules/katex/src/functions/char.js",
+      "sha256": "0c86a22ff61880626f6e04d67fca4bb8075b81560af68aee117fc642ee81772e"
+    },
+    {
+      "path": "node_modules/katex/src/functions/color.js",
+      "sha256": "d12bc8184f7662d71c3dfc0498f396077290c8ac40c37108dbb9fbd3f5c9bf06"
+    },
+    {
+      "path": "node_modules/katex/src/functions/cr.js",
+      "sha256": "5a06df59ab7cfe249acdd12862cc34fef9429ef27cd378933a0716faf545f013"
+    },
+    {
+      "path": "node_modules/katex/src/functions/def.js",
+      "sha256": "9a3dd1e3804b462d9442d8031d934ec5794dcec4653ff41be93dd046d3266266"
+    },
+    {
+      "path": "node_modules/katex/src/functions/delimsizing.js",
+      "sha256": "1594085127352d6881d94f0d41ad5d83863cba47c570abdd90d6db1d48a46c1e"
+    },
+    {
+      "path": "node_modules/katex/src/functions/enclose.js",
+      "sha256": "b7b9013593abd19f09bb0a9dfb4208037fc7f166f1b0acc5f9e1839acb47c374"
+    },
+    {
+      "path": "node_modules/katex/src/functions/environment.js",
+      "sha256": "ceb7d7506fcca9e3bb36e1cffb13b426896d8a53cdd78c43087cb53ce8287a65"
+    },
+    {
+      "path": "node_modules/katex/src/functions/font.js",
+      "sha256": "068e25ea82eb6e8a9c7109235ca4ba8622cf8ad4763c85711de588d3481663e3"
+    },
+    {
+      "path": "node_modules/katex/src/functions/genfrac.js",
+      "sha256": "148f9f1cf597ecaa32623acc02d1ccab558758b9c959af22a1cf8e8e975a7146"
+    },
+    {
+      "path": "node_modules/katex/src/functions/hbox.js",
+      "sha256": "dfc22054c814ca113e661b122a8baf76d6497ded3c0ae7f3b3d679d223670dcc"
+    },
+    {
+      "path": "node_modules/katex/src/functions/horizBrace.js",
+      "sha256": "ff4aac86fe211abb2b5fb2c41ecf5edc1e263f3463c293fe6796179496bb493f"
+    },
+    {
+      "path": "node_modules/katex/src/functions/href.js",
+      "sha256": "43056167a26ea3283c2951e3b4f8c4ad302fc1ac476b7d00629172d40c05089d"
+    },
+    {
+      "path": "node_modules/katex/src/functions/html.js",
+      "sha256": "22b8872b146170301cd5fdf4cfc65f6706e6b4d71e936d42d81636d4f2a75971"
+    },
+    {
+      "path": "node_modules/katex/src/functions/htmlmathml.js",
+      "sha256": "e4280b2a63a3a72c9cd47b5c01aad240f74db8ad889923749cb3f33e3509f0cf"
+    },
+    {
+      "path": "node_modules/katex/src/functions/includegraphics.js",
+      "sha256": "75299140e7c347c81620856e7ac7faae709796ea0d4f55a1db0995dd0b16980e"
+    },
+    {
+      "path": "node_modules/katex/src/functions/kern.js",
+      "sha256": "5a566dab3f3d3caeb8ebb4ed0c8114de3ad8e0a0f29f2b808003f635c8d9f70f"
+    },
+    {
+      "path": "node_modules/katex/src/functions/lap.js",
+      "sha256": "0bd5fade795a40735c4a33ebdd361b8745df1f306d59186d215b7f0ff472d951"
+    },
+    {
+      "path": "node_modules/katex/src/functions/math.js",
+      "sha256": "c68b33293e2aa4d7ce3561a063a549ade9998096050251b244503bb414d22e74"
+    },
+    {
+      "path": "node_modules/katex/src/functions/mathchoice.js",
+      "sha256": "517cf8fcee3fd4acefc83f62e114b82642a24849fad87f7d9d74a13eb018f3ff"
+    },
+    {
+      "path": "node_modules/katex/src/functions/mclass.js",
+      "sha256": "f657845a00a6c3aa6c6c0172d219176876b87d1733031fd7fd9b98dea802362f"
+    },
+    {
+      "path": "node_modules/katex/src/functions/op.js",
+      "sha256": "51dff1916c6302133d486f9bc474188531896390982b5eda5eb2776ac6cd9b58"
+    },
+    {
+      "path": "node_modules/katex/src/functions/operatorname.js",
+      "sha256": "407609cd55ffdcf9e27a7edb5c5dd015361b45e3991649844cb281774adeb801"
+    },
+    {
+      "path": "node_modules/katex/src/functions/ordgroup.js",
+      "sha256": "4dba0b6b7926e68df0156f41c3780b3105577923c5b5e5681927223b4acd6209"
+    },
+    {
+      "path": "node_modules/katex/src/functions/overline.js",
+      "sha256": "d504b72d9d2654561a7227fbbf44241a5ac36b117d42a53e30fb26e4ccf6d1cc"
+    },
+    {
+      "path": "node_modules/katex/src/functions/phantom.js",
+      "sha256": "7433d266c738d05ce425ee20dfe87a976d3efb8d9091324aeb2c9dab91b0453b"
+    },
+    {
+      "path": "node_modules/katex/src/functions/pmb.js",
+      "sha256": "7be0e64f6583d5577d1b17c61a10ae02d091c91c347ed1fad6cb19735d9aa11f"
+    },
+    {
+      "path": "node_modules/katex/src/functions/raisebox.js",
+      "sha256": "a821d7077c902827250e33e0c89bf0a73dbd0ef1109810937a72517102edfef3"
+    },
+    {
+      "path": "node_modules/katex/src/functions/relax.js",
+      "sha256": "e14313b9328ce1fe7e2761653f355ccfaf601cdc670260de99d3d48f4b7913a2"
+    },
+    {
+      "path": "node_modules/katex/src/functions/rule.js",
+      "sha256": "8e32a236e57df9a85bda78ea7221807c3205ac235740fb85b3bb8f440b7b164a"
+    },
+    {
+      "path": "node_modules/katex/src/functions/sizing.js",
+      "sha256": "7efd9a5c2e07fc65499d5142182ea3812e5bd3dc13b298f5ef26c3a7c65736f1"
+    },
+    {
+      "path": "node_modules/katex/src/functions/smash.js",
+      "sha256": "1fa0b9b726970f568a12976569cbaf7f31d3802b6551473843d6958c05c3d7eb"
+    },
+    {
+      "path": "node_modules/katex/src/functions/sqrt.js",
+      "sha256": "845ff9192358fe95cb97725e377b5e2e85ea7aab61316c895fd7a196b577b1ea"
+    },
+    {
+      "path": "node_modules/katex/src/functions/styling.js",
+      "sha256": "03fd316537dc41ef3aa58718d02692a0371db199b69e591be1b1e6fc2b23db81"
+    },
+    {
+      "path": "node_modules/katex/src/functions/supsub.js",
+      "sha256": "00ccd5d1c8ca20531cfe3b71688591a36652fd045bc3b25089de7c7d2cd24dd6"
+    },
+    {
+      "path": "node_modules/katex/src/functions/symbolsOp.js",
+      "sha256": "8646ff377c9b54b018b3f4ac9ed4969d17c8fdbb0a28fcadecb0fab631ba9512"
+    },
+    {
+      "path": "node_modules/katex/src/functions/symbolsOrd.js",
+      "sha256": "78cbe1ac2da9e0d9de30953c8450aeb4d0dcb32338e8b8fd64ffdc66bb2e72a7"
+    },
+    {
+      "path": "node_modules/katex/src/functions/symbolsSpacing.js",
+      "sha256": "b4ea1bab491af0be39443e5a0a30046b26aa27b9cbb0b1fcfbacba704f2220bf"
+    },
+    {
+      "path": "node_modules/katex/src/functions/tag.js",
+      "sha256": "4d0f725c47284ff5bc19bec6f853ee06848d446b785176b5b678204091f91aec"
+    },
+    {
+      "path": "node_modules/katex/src/functions/text.js",
+      "sha256": "778e141222f9da3dfd0952cb9c892ab77d9a90eed1e87b1acc855fe778e7d60b"
+    },
+    {
+      "path": "node_modules/katex/src/functions/underline.js",
+      "sha256": "301649baccd93fd6fa73c6b410e6a96ade2731eca429c999f0f92759114a1ee5"
+    },
+    {
+      "path": "node_modules/katex/src/functions/utils/assembleSupSub.js",
+      "sha256": "2b13af1ab22ed0ba0cc5f971a6ce1a2958ad66bb65804c14587689d4f96c0cdc"
+    },
+    {
+      "path": "node_modules/katex/src/functions/vcenter.js",
+      "sha256": "929c48a690559f3dc09a25558ef439d1e47b2fe01559a82650f503b4574a5e59"
+    },
+    {
+      "path": "node_modules/katex/src/functions/verb.js",
+      "sha256": "0734707684e19b57d5d4aa621a2fca27702de606b83e4589bac8858c33e2f5bb"
+    },
+    {
+      "path": "node_modules/katex/src/macros.js",
+      "sha256": "edec1b1ca725bf7d74f3dc910a582a112f15def63437160b15fb3c1cf21fcbd6"
+    },
+    {
+      "path": "node_modules/katex/src/mathMLTree.js",
+      "sha256": "c062d571200ea0254c81ba8ea98fa1960cd75025ff95bcb92deae6f0cb954e1b"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/README.md",
+      "sha256": "3ec39a83b6421a13264b960531cecd624ecb3167097588e5e990c160e961ef3f"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/extract_tfms.py",
+      "sha256": "92e0b20a2aefe0965e66004e04881efce3e2eb6efaefa0d2e83278be8e7f622e"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/extract_ttfs.py",
+      "sha256": "89ac56c19c6be1f814c907cedaa101246193bd11011e32877e79bc45623214b0"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/format_json.py",
+      "sha256": "ae6f6661043aaece4a833168e3e78faa2bd4931f1a307e5b1bc4a487260f84d8"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/mapping.pl",
+      "sha256": "064d5725db05baf0c663cde540deb4fb4aea1b5bfb4ebc17ed849b6260d27317"
+    },
+    {
+      "path": "node_modules/katex/src/metrics/parse_tfm.py",
+      "sha256": "76486ee9ab1d5e762dff74eae61f9549554a05ec5f949a9a469ec7dd2ba0fd82"
+    },
+    {
+      "path": "node_modules/katex/src/parseNode.js",
+      "sha256": "028063173959cf2226542199bae5cf4f02e578c85a659280bb80b4d22009e959"
+    },
+    {
+      "path": "node_modules/katex/src/parseTree.js",
+      "sha256": "ee03077e2f4e92543ad3e2fa11242b610770f24d517ca19c5ca2a2b1eb31640f"
+    },
+    {
+      "path": "node_modules/katex/src/spacingData.js",
+      "sha256": "e59b3550ca2652610f8d17fa5e9856674e7ff4de4ab20c2304ba3c7916896067"
+    },
+    {
+      "path": "node_modules/katex/src/stretchy.js",
+      "sha256": "5bcda72e30f9768cf65f29e73bd9b8905aabe42e0022cd8de9cbaa60aec69abd"
+    },
+    {
+      "path": "node_modules/katex/src/styles/fonts.scss",
+      "sha256": "2ebe148405677c46ac63e387a0a4582db27002119386eedfa4df9ef11e52f885"
+    },
+    {
+      "path": "node_modules/katex/src/styles/katex.scss",
+      "sha256": "3ba3ded2491d4d6c2d87950a0d8a8fc8c3f9f95ffb78521c8831c14165ee9a6f"
+    },
+    {
+      "path": "node_modules/katex/src/svgGeometry.js",
+      "sha256": "e7bb196633f23cab95da9d010ffbbdad37d2c942c2f96a33f8094f260ecfd892"
+    },
+    {
+      "path": "node_modules/katex/src/symbols.js",
+      "sha256": "1f5f370c734fadf938e8165045d4d1bca7c1894a5a3f6b9d5cbd1a141d7c9fbd"
+    },
+    {
+      "path": "node_modules/katex/src/tree.js",
+      "sha256": "d707d66aca570994683ec513e549c967efd66bc5a3167146eea6650318340386"
+    },
+    {
+      "path": "node_modules/katex/src/types.js",
+      "sha256": "627850458b91f88e7d9033cc6833a7d731bb25c7020a5db953278929259a2f19"
+    },
+    {
+      "path": "node_modules/katex/src/unicodeAccents.js",
+      "sha256": "9b42c5e1d3362698a753e4f8a309d8dc90f49fd5f995f2f2dd99afbe01f3d377"
+    },
+    {
+      "path": "node_modules/katex/src/unicodeScripts.js",
+      "sha256": "01e4586c3ccf19ac13fd3d8322e5b4b52bc51a3bacdb971890ef27faafe87617"
+    },
+    {
+      "path": "node_modules/katex/src/unicodeSupOrSub.js",
+      "sha256": "ed8a121fc2fcfe35c1324939b2883da5607c80c62b24ce9f707dcc682bc2acb3"
+    },
+    {
+      "path": "node_modules/katex/src/unicodeSymbols.js",
+      "sha256": "c20c4e7cb811aa4e799f424e95fc43cd7afb1fbbd9d9ffbc6cd5328622062b34"
+    },
+    {
+      "path": "node_modules/katex/src/units.js",
+      "sha256": "1cc75825d7861672fe4287a65f01f1cc927364f05977b3b05f3f2224f29adcd8"
+    },
+    {
+      "path": "node_modules/katex/src/utils.js",
+      "sha256": "a03345fcf08b46c90f486e73d461c02a978f02ae855cc7978d2776a42c09cdba"
+    },
+    {
+      "path": "node_modules/katex/src/wide-character.js",
+      "sha256": "5062146fa8580f2b23990e760b74f25862a3cfb1f08520c6de0a21e56ceec311"
+    },
+    {
+      "path": "node_modules/katex/types/katex.d.ts",
+      "sha256": "5bb37c8ed3d343ae525902e64be52edbc1ce0a5ad86ca2201118c0d8168078e5"
+    }
+  ],
+  "runtimes": [
+    {
+      "platform": "linux-x64",
+      "release-artifact": "node-v22.16.0-linux-x64.tar.xz",
+      "release-sha256": "f4cb75bb036f0d0eddf6b79d9596df1aaab9ddccd6a20bf489be5abe9467e84e",
+      "executable-sha256": "8142d37c6f2f372ef040419e7a111a6baf17df89f8078d02447d6c639ae20c1d"
+    }
+  ]
+}

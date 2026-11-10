@@ -60,6 +60,9 @@ pub enum RuleId {
     M047,
     M048,
     M049,
+    M050,
+    M051,
+    M052,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,7 +83,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 49] = [
+pub const RULES: [RuleSpec; 52] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -422,6 +425,27 @@ pub const RULES: [RuleSpec; 49] = [
         statement: "Symbol tiers are derived from the supplied graph and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
         scope: "Checked notation catalogues and all exposed symbol-status values.",
         state: RuleState::Structural,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M050,
+        statement: "Generated notation declarations refuse collisions in the consuming typesetting context.",
+        scope: "Every emitted notation declaration and its checked KaTeX context.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M051,
+        statement: "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar.",
+        scope: "Generated declaration bodies, macro invocations and fully expanded notation expressions.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M052,
+        statement: "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart.",
+        scope: "The complete emitted command inventory, including aliases, constructors and pending symbols.",
+        state: RuleState::Enforced,
         deferred_reason: None,
     },
 ];

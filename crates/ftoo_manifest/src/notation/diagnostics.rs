@@ -8,6 +8,29 @@ pub enum NotationStage {
     References,
     Ast,
     Dependencies,
+    Names,
+    Typesetting,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RenderOwner {
+    Definition(DefinitionId),
+    Primitive(PrimitiveId),
+    Expression,
+}
+impl RenderOwner {
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Definition(id) => id.token(),
+            Self::Primitive(id) => id.token(),
+            Self::Expression => "",
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RenderTarget {
+    Macro,
+    Unicode,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegistryEntry {
@@ -41,13 +64,19 @@ pub enum NotationSite {
     Expression {
         path: Vec<NotationPathPart>,
     },
+    Rendered {
+        owner: RenderOwner,
+        case: String,
+        bytes: std::ops::Range<usize>,
+        origins: Vec<NotationOrigin>,
+    },
 }
 impl NotationSite {
     pub(super) fn child(&self, part: NotationPathPart) -> Self {
         let mut site = self.clone();
         match &mut site {
             Self::Registry { path, .. } | Self::Expression { path } => path.push(part),
-            Self::Catalogue { .. } => unreachable!("AST sites have paths"),
+            Self::Catalogue { .. } | Self::Rendered { .. } => unreachable!("AST sites have paths"),
         }
         site
     }
@@ -61,6 +90,16 @@ impl NotationSite {
             } => (entry.token(), path, *index),
             Self::Expression { path } => ("", path, 0),
             Self::Catalogue { .. } => ("", &[], 0),
+            Self::Rendered {
+                owner,
+                origins,
+                bytes,
+                ..
+            } => (
+                owner.token(),
+                origins.first().map_or(&[], |o| o.path.as_slice()),
+                bytes.start,
+            ),
         }
     }
 }
@@ -93,6 +132,7 @@ pub enum NotationResource {
     AstNodes,
     LiteralBytes,
     ExpansionNodes,
+    OutputBytes,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NotationFault {
@@ -163,6 +203,33 @@ pub enum NotationFault {
         command: String,
         definitions: Vec<DefinitionId>,
     },
+    HostCollision {
+        command: String,
+        message: String,
+    },
+    IncompleteExpansion {
+        remaining: String,
+        origin: NotationOrigin,
+    },
+    KaTeXRejected {
+        target: RenderTarget,
+        source: String,
+        message: String,
+    },
+    SweepInventory {
+        missing: Vec<DefinitionId>,
+        repeated: Vec<(DefinitionId, usize)>,
+    },
+    SweepCommand {
+        definition: DefinitionId,
+        expected: String,
+        actual: String,
+    },
+    SweepSignature {
+        definition: DefinitionId,
+        expected: u8,
+        actual: u8,
+    },
 }
 impl NotationFault {
     fn rank(&self) -> u8 {
@@ -181,6 +248,12 @@ impl NotationFault {
             Self::DefinitionCycle { .. } => 11,
             Self::InvalidStem { .. } => 12,
             Self::CommandCollision { .. } => 13,
+            Self::HostCollision { .. } => 14,
+            Self::IncompleteExpansion { .. } => 15,
+            Self::KaTeXRejected { .. } => 16,
+            Self::SweepInventory { .. } => 17,
+            Self::SweepCommand { .. } => 18,
+            Self::SweepSignature { .. } => 19,
         }
     }
 }

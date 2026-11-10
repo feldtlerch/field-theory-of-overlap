@@ -17,6 +17,43 @@ pub enum PrimitiveOperation {
     Dimension,
 }
 impl PrimitiveOperation {
+    /// Closed host control tokens used by the renderer and the future shared
+    /// mathematics lexer. Grouping punctuation is supplied by the typed writer.
+    #[must_use]
+    pub const fn host_tokens(self) -> &'static [&'static str] {
+        match self {
+            Self::Alpha => &["\\alpha"],
+            Self::Beta => &["\\beta"],
+            Self::Fraction => &["\\frac"],
+            Self::Multiply => &["\\cdot"],
+            Self::Juxtapose => &["\\,"],
+            Self::Subscript
+            | Self::Superscript
+            | Self::Add
+            | Self::Equal
+            | Self::Negate
+            | Self::Parentheses
+            | Self::Dimension => &[],
+        }
+    }
+    /// Preferred Unicode spelling where the operation has a single scalar.
+    #[must_use]
+    pub const fn unicode_scalar(self) -> Option<&'static str> {
+        match self {
+            Self::Alpha => Some("α"),
+            Self::Beta => Some("β"),
+            Self::Negate => Some("−"),
+            Self::Multiply => Some("⋅"),
+            Self::Fraction
+            | Self::Subscript
+            | Self::Superscript
+            | Self::Add
+            | Self::Equal
+            | Self::Juxtapose
+            | Self::Parentheses
+            | Self::Dimension => None,
+        }
+    }
     #[must_use]
     pub const fn arity(self) -> u8 {
         match self {

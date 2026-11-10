@@ -1168,8 +1168,9 @@ fn n02_substitution_counts_repeated_occurrences_at_exact_limit() -> TestResult {
 #[test]
 fn n16_exact_appended_register() {
     use crate::{RULES, RuleState};
+    let rules = &RULES[..49];
     assert_eq!(
-        RULES[46..]
+        rules[46..]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),
@@ -1199,16 +1200,16 @@ fn n16_exact_appended_register() {
     );
     assert_eq!(
         (
-            RULES.len(),
-            RULES
+            rules.len(),
+            rules
                 .iter()
                 .filter(|r| r.state == RuleState::Enforced)
                 .count(),
-            RULES
+            rules
                 .iter()
                 .filter(|r| r.state == RuleState::Structural)
                 .count(),
-            RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
+            rules.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
         (49, 40, 4, 5)
     );
@@ -1229,6 +1230,55 @@ fn n16_exact_appended_register() {
                 .count()
         ),
         (46, 38, 3, 5)
+    );
+}
+
+#[test]
+fn n16_renderer_register_has_no_existing_transitions() {
+    use crate::{RULES, RuleState};
+    assert_eq!(
+        RULES[49..]
+            .iter()
+            .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
+            .collect::<Vec<_>>(),
+        [
+            (
+                RuleId::M050,
+                "Generated notation declarations refuse collisions in the consuming typesetting context.",
+                "Every emitted notation declaration and its checked KaTeX context.",
+                RuleState::Enforced,
+                None
+            ),
+            (
+                RuleId::M051,
+                "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar.",
+                "Generated declaration bodies, macro invocations and fully expanded notation expressions.",
+                RuleState::Enforced,
+                None
+            ),
+            (
+                RuleId::M052,
+                "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart.",
+                "The complete emitted command inventory, including aliases, constructors and pending symbols.",
+                RuleState::Enforced,
+                None
+            ),
+        ]
+    );
+    assert_eq!(
+        (
+            RULES.len(),
+            RULES
+                .iter()
+                .filter(|r| r.state == RuleState::Enforced)
+                .count(),
+            RULES
+                .iter()
+                .filter(|r| r.state == RuleState::Structural)
+                .count(),
+            RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
+        ),
+        (52, 43, 4, 5)
     );
 }
 

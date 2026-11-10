@@ -29,6 +29,7 @@ pub use notation::{
     PrimitiveSpec, RegistryEntry, Signature, SymbolLookupFault, SymbolStatus, SymbolTier,
     SymbolUse, check_expression, notation,
 };
+pub use notation::{RenderOwner, RenderTarget};
 mod labels;
 pub use labels::{
     CheckedMarkdown, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,

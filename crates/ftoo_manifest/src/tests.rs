@@ -546,7 +546,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014, M015,
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
-        M046, M047, M048, M049,
+        M046, M047, M048, M049, M050, M051, M052,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -554,7 +554,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M001, M002, M003, M004, M005, M006, M007, M008, M009, M010, M011, M012, M013, M014,
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
-            M043, M044, M045, M046, M047, M048, M049
+            M043, M044, M045, M046, M047, M048, M049, M050, M051, M052
         ]
     );
     for rule in RULES {
@@ -563,7 +563,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
-            | M045 | M046 | M047 | M048 => RuleState::Enforced,
+            | M045 | M046 | M047 | M048 | M050 | M051 | M052 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
@@ -624,7 +624,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 49);
+    assert_eq!(RULES.len(), 52);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -704,7 +704,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        40
+        43
     );
     assert_eq!(
         RULES

@@ -11,11 +11,38 @@ jobs:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: toolchain
         run: rustup toolchain install
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: tools/notation/.node-version
+          check-latest: false
+      - name: notation prerequisites
+        id: notation
+        run: |
+          set -eu
+          support="$HOME/.cache/ftoo-notation-support"
+          mkdir -p "$support/runtime" "$support/packages" "$support/npm-cache" "$support/tmp"
+          root="$(realpath .)"
+          support="$(realpath "$support")"
+          echo "support=$support" >> "$GITHUB_OUTPUT"
+          case "$support/" in "$root/"*) exit 1;; esac
+          case "$root/" in "$support/"*) exit 1;; esac
+          runtime="$(dirname "$(dirname "$(command -v node)")")"
+          cp -a "$runtime/." "$support/runtime/"
+          cp tools/notation/package.json tools/notation/package-lock.json "$support/packages/"
+          (cd "$support/packages" && TMPDIR="$support/tmp" npm_config_cache="$support/npm-cache" npm ci --ignore-scripts)
+          cargo fetch --locked
       - name: fmt
+        env:
+          CARGO_NET_OFFLINE: 'true'
         run: time cargo fmt --all -- --check
       - name: clippy
+        env:
+          CARGO_NET_OFFLINE: 'true'
         run: time cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: test
+        env:
+          CARGO_NET_OFFLINE: 'true'
+          FTOO_NOTATION_SUPPORT: ${{ steps.notation.outputs.support }}
         run: time cargo test --workspace --locked
       - name: labels
         run: time python3 -I tools/check_labels.py --self-test && time python3 -I tools/check_labels.py
