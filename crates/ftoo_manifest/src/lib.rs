@@ -14,7 +14,9 @@
 //! retaining derived addressing beside the graph. Rendering and per-site build
 //! refusal remain separate consumers.
 
+mod assembly;
 mod audit;
+pub use assembly::*;
 mod budgets;
 mod coverage;
 mod graph;

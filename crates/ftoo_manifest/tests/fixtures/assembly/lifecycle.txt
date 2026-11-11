@@ -1,0 +1,20 @@
+tag-retirement	live	c:1	def:langevin:coefficient-one
+tag-retirement	live	v:1	claim:langevin:coefficient-one-value
+tag-retirement	live	v:3	claim:langevin:coefficient-three-value
+tag-retirement	retired	c:3	tag "c:3": retired; label def:langevin:coefficient-three; event 9; authority rec:test:retirement; reason "Withdrawn for correction."
+identity-retirement	retired	c:3	tag "c:3": retired; label def:langevin:coefficient-three; event 9; authority rec:test:retirement; reason "Withdrawn for correction."
+identity-retirement	outside	c:1	tag "c:1": out of slice; label def:langevin:coefficient-one; cause quantity-outside-support
+identity-retirement	outside	v:1	tag "v:1": out of slice; label claim:langevin:coefficient-one-value; cause claim-not-selected
+identity-retirement	outside	v:3	tag "v:3": out of slice; label claim:langevin:coefficient-three-value; cause claim-not-selected
+target-absent	outside	c:1	tag "c:1": out of slice; label def:langevin:coefficient-one; cause quantity-outside-support
+target-absent	outside	c:3	tag "c:3": out of slice; label def:langevin:coefficient-three; cause target-absent
+target-absent	outside	v:1	tag "v:1": out of slice; label claim:langevin:coefficient-one-value; cause claim-not-selected
+target-absent	outside	v:3	tag "v:3": out of slice; label claim:langevin:coefficient-three-value; cause claim-not-selected
+selected-one	live	c:1	def:langevin:coefficient-one
+selected-one	live	v:1	claim:langevin:coefficient-one-value
+selected-one	outside	c:3	tag "c:3": out of slice; label def:langevin:coefficient-three; cause quantity-outside-support
+selected-one	outside	v:3	tag "v:3": out of slice; label claim:langevin:coefficient-three-value; cause claim-not-selected
+empty	outside	c:1	tag "c:1": out of slice; label def:langevin:coefficient-one; cause quantity-outside-support
+empty	outside	c:3	tag "c:3": out of slice; label def:langevin:coefficient-three; cause quantity-outside-support
+empty	outside	v:1	tag "v:1": out of slice; label claim:langevin:coefficient-one-value; cause claim-not-selected
+empty	outside	v:3	tag "v:3": out of slice; label claim:langevin:coefficient-three-value; cause claim-not-selected

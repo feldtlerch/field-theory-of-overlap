@@ -17,12 +17,12 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let before = ftoo_manifest::Snapshot::capture(&graph);
     let statuses = ftoo_manifest::NodeId::ALL.map(|id| graph.status(id));
     let expected = WeldCheckSummary {
-        units: 2,
-        texts: 2,
+        units: 3,
+        texts: 3,
         tag_sites: 3,
         rust_mints: 4,
         markdown_mints: 117,
-        unit_mints: 2,
+        unit_mints: 3,
         markdown_citations: 100,
         rust_citations: 8,
         unit_citation_sites: 1,
@@ -45,6 +45,7 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             .collect::<Vec<_>>(),
         [
             "sec:coefficients:first-value",
+            "sec:coefficients:overview",
             "sec:coefficients:value-context"
         ]
     );
@@ -56,7 +57,13 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     assert_eq!(first.labels().members, []);
     assert_eq!(first.mentions(), []);
     assert!(first.citations().is_empty());
-    let second = &welded.units()[1].languages()[0];
+    let heading = &welded.units()[1].languages()[0];
+    assert_eq!(heading.language(), "en");
+    assert_eq!(heading.tags().members, []);
+    assert_eq!(heading.labels().members, []);
+    assert_eq!(heading.mentions(), []);
+    assert!(heading.citations().is_empty());
+    let second = &welded.units()[2].languages()[0];
     assert_eq!(second.language(), "en");
     assert_eq!(second.mentions(), []);
     assert_context(second);
@@ -77,7 +84,7 @@ fn assert_first(first: &ftoo_manifest::WeldedLanguage) {
         path: ["unit", "texts", "en"]
             .map(|s| PathPart::Key(s.into()))
             .to_vec(),
-        anchor: SourceAnchor::Bytes(133, 194),
+        anchor: SourceAnchor::Bytes(152, 213),
         decoded: None,
         occurrence: None,
     };

@@ -7,8 +7,8 @@ use ftoo_manifest::{
 };
 
 #[test]
-fn complete_typesetter_consumer_requires_prepared_support() -> Result<(), Box<dyn std::error::Error>>
-{
+fn support_required_complete_typesetter_consumer_requires_prepared_support()
+-> Result<(), Box<dyn std::error::Error>> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     check_projection(&root)?;
     let bytes = std::fs::read(root.join("generated/manifest.json"))?;
@@ -43,8 +43,8 @@ fn complete_typesetter_consumer_requires_prepared_support() -> Result<(), Box<dy
     assert_eq!(expanded.source(), "[{x}]");
     assert!(std::ptr::eq(expanded.notation(), &raw const prepared));
     assert_eq!(macro_form.uses(), expanded.uses());
-    assert_eq!(check_unit_files(&root, &book)?.units, 2);
-    assert_eq!(check_weld_files(&root, &book)?.units, 2);
+    assert_eq!(check_unit_files(&root, &book)?.units, 3);
+    assert_eq!(check_weld_files(&root, &book)?.units, 3);
     assert_eq!(ftoo_manifest::Snapshot::capture(book.graph()), snapshot);
     assert_eq!(std::fs::read(root.join("generated/manifest.json"))?, bytes);
     Ok(())

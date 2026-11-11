@@ -494,7 +494,7 @@ fn digest_path_byte_order_refuses_first_pair_and_restores() {
 }
 
 #[test]
-fn every_invocation_rechecks_copies_hashes_and_postprocess_bytes() {
+fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_bytes() {
     let fixture = Fixture::new();
     let support = fixture.support();
     assert_eq!(
@@ -677,7 +677,7 @@ fn every_invocation_rechecks_copies_hashes_and_postprocess_bytes() {
 }
 
 #[test]
-fn installed_record_and_file_inventory_are_complete() {
+fn support_required_installed_record_and_file_inventory_are_complete() {
     let fixture = Fixture::new();
     let support = fixture.support();
     let packages = fixture.root.join("packages");
@@ -1585,7 +1585,7 @@ fn substitution_repeats_formals_without_capturing_nested_arguments() {
 }
 
 #[test]
-fn retained_quantity_examples_and_adversarial_atom_concatenation() {
+fn support_required_retained_quantity_examples_and_adversarial_atom_concatenation() {
     let mut draft = ftoo_manifest::seed_draft();
     for node in &mut draft.nodes {
         node.maturity = ftoo_manifest::Maturity::Retained;
@@ -1820,7 +1820,7 @@ fn pending_annotations_use_the_exported_reason_text_in_both_targets() {
 }
 
 #[test]
-fn external_markdown_and_links_do_not_change_either_source_inventory() {
+fn support_required_external_markdown_and_links_do_not_change_either_source_inventory() {
     use sha2::{Digest, Sha256};
     use std::process::Command;
     let fixture = Fixture::new();
@@ -1865,9 +1865,14 @@ fn external_markdown_and_links_do_not_change_either_source_inventory() {
 fn committed_adapter_and_ci_pins_are_fixed() {
     assert_eq!(support::NODE_PIN.as_bytes(), b"22.16.0\n");
     let ci = include_str!("../../../../.github/workflows/ci.yml");
-    assert!(ci.contains("actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"));
-    assert!(ci.contains("node-version-file: tools/notation/.node-version"));
-    assert!(ci.contains("npm ci --ignore-scripts"));
+    assert!(ci.contains("actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11"));
+    assert!(ci.contains("name: bounded smoke — support-dependent suites require the full battery"));
+    assert!(ci.contains("test --workspace --locked -- --skip support_required"));
+    assert!(ci.contains("unshare --user --map-root-user --net"));
+    assert!(!ci.contains("FTOO_NOTATION_SUPPORT"));
+    assert!(!ci.contains("FTOO_ASSEMBLY_SUPPORT"));
+    assert!(!ci.contains("prepare-native.py"));
+    assert!(!ci.contains("npm ci"));
     let script = include_str!("../../../../tools/notation/check.cjs");
     assert!(script.contains("require(entry)"));
     assert!(script.contains("throwOnError: true, strict: 'error', trust: false"));
@@ -1877,7 +1882,7 @@ fn committed_adapter_and_ci_pins_are_fixed() {
 }
 
 #[test]
-fn actual_grammar_refusals_and_host_collision_restore() {
+fn support_required_actual_grammar_refusals_and_host_collision_restore() {
     let support = prepared();
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();

@@ -1,0 +1,11 @@
+schema = 1
+
+[skeleton]
+document = "main"
+
+[[skeleton.sections]]
+heading = "sec:coefficients:overview"
+children = [
+  { kind = "unit", unit = "sec:coefficients:value-context" },
+  { kind = "unit", unit = "sec:coefficients:first-value" }
+]

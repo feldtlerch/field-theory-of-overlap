@@ -1,0 +1,85 @@
+\ExplSyntaxOn
+\prop_new:N \g_ftdoc_live_prop
+\prop_new:N \g_ftdoc_retired_prop
+\prop_new:N \g_ftdoc_outside_prop
+\prop_new:N \g_ftdoc_sites_prop
+\tl_new:N \l_ftdoc_input_tl
+\tl_new:N \l_ftdoc_key_tl
+\tl_new:N \l_ftdoc_value_tl
+\tl_new:N \l_ftdoc_site_tl
+\tl_new:N \l_ftdoc_site_key_tl
+\tl_new:N \l_ftdoc_unit_tl
+\tl_new:N \g_ftdoc_document_tl
+\tl_new:N \g_ftdoc_language_tl
+\str_new:N \l_ftdoc_hex_str
+\str_new:N \l_ftdoc_message_str
+\int_new:N \l_ftdoc_chunks_int
+\cs_generate_variant:Nn \prop_get:NnNTF { NVNTF }
+\cs_generate_variant:Nn \prop_gput:Nnn { Nxx }
+\cs_generate_variant:Nn \str_set_convert:Nnnn { Nxnn }
+\msg_new:nnn { ftdoc } { tag } { Addressing~runtime~refusal.~Document~\g_ftdoc_document_tl,~unit~\l_ftdoc_unit_tl,~language~\g_ftdoc_language_tl,~site~\l_ftdoc_site_tl. }
+\cs_new_protected:Npn \FtdocContext #1#2
+ { \tl_gset:Nn \g_ftdoc_document_tl {#1} \tl_gset:Nn \g_ftdoc_language_tl {#2} }
+\cs_new_protected:Npn \ftdoc_record:nn #1#2
+ {
+  \str_set_convert:Nxnn \l_ftdoc_hex_str {#2} {} {utf8/hex}
+  \str_set:Nx \l_ftdoc_hex_str { \str_lowercase:f { \l_ftdoc_hex_str } }
+  \int_set:Nn \l_ftdoc_chunks_int { \int_max:nn {1} { \int_div_truncate:nn { \str_count:N \l_ftdoc_hex_str + 31 } {32} } }
+  \int_step_inline:nn { \l_ftdoc_chunks_int }
+   { \iow_term:x { FTDOC-R:#1:\int_eval:n {##1-1}:\int_use:N \l_ftdoc_chunks_int :\str_range:Nnn \l_ftdoc_hex_str {32*(##1-1)+1} {32*##1} } }
+ }
+\cs_new_protected:Npn \ftdoc_reject:
+ {
+  \ftdoc_record:nn {i} {\l_ftdoc_key_tl}
+  \ftdoc_record:nn {s} {\l_ftdoc_site_tl}
+  \ftdoc_record:nn {m} {\l_ftdoc_value_tl}
+  \iow_term:n {FTDOC-END}
+  \msg_fatal:nn {ftdoc} {tag}
+ }
+\cs_new_protected:Npn \ftdoc_unknown:
+ {
+  \str_clear:N \l_ftdoc_message_str
+  \str_map_inline:Nn \l_ftdoc_key_tl
+   {
+    \int_case:nnF {`##1}
+     {
+      {34}{\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}\char_generate:nn {34}{12}}}
+      {92}{\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}\char_generate:nn {92}{12}}}
+      {10}{\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}n}}
+      {13}{\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}r}}
+      {9}{\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}t}}
+     }
+     {
+      \bool_lazy_or:nnTF
+       {\int_compare_p:n {`##1 < 32}}
+       {\bool_lazy_and_p:nn {\int_compare_p:n {`##1 > 126}} {\int_compare_p:n {`##1 < 160}}}
+       {\str_put_right:Nx \l_ftdoc_message_str {\char_generate:nn {92}{12}u\char_generate:nn {123}{12}\int_to_hex:n {`##1}\char_generate:nn {125}{12}}}
+       {\str_put_right:Nn \l_ftdoc_message_str {##1}}
+     }
+   }
+  \tl_set:Nx \l_ftdoc_value_tl {tag~\char_generate:nn {34}{12}\l_ftdoc_message_str\char_generate:nn {34}{12}:~unknown}
+  \ftdoc_reject:
+ }
+\cs_new_protected:Npn \FtdocTag #1#2
+ {
+  \tl_set:Nx \l_ftdoc_input_tl {#1}
+  \tl_set:Nx \l_ftdoc_key_tl {\tl_to_str:V \l_ftdoc_input_tl}
+  \tl_set:Nn \l_ftdoc_site_tl {#2}
+  \tl_set:Nx \l_ftdoc_site_key_tl {\tl_to_str:V \g_ftdoc_document_tl/\tl_to_str:V \g_ftdoc_language_tl/\tl_to_str:V \l_ftdoc_site_tl}
+  \prop_get:NVNTF \g_ftdoc_sites_prop \l_ftdoc_site_key_tl \l_ftdoc_unit_tl
+   {} {\tl_clear:N \l_ftdoc_unit_tl}
+  \prop_get:NVNTF \g_ftdoc_live_prop \l_ftdoc_key_tl \l_ftdoc_value_tl
+   {\exp_after:wN \use_i:nn \l_ftdoc_value_tl}
+   {\prop_get:NVNTF \g_ftdoc_retired_prop \l_ftdoc_key_tl \l_ftdoc_value_tl
+     {\ftdoc_reject:}
+     {\prop_get:NVNTF \g_ftdoc_outside_prop \l_ftdoc_key_tl \l_ftdoc_value_tl
+       {\ftdoc_reject:}{\ftdoc_unknown:}}}
+ }
+\prop_gput:Nxx \g_ftdoc_live_prop {\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {49}{12}} {{\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {49}{12}}{\char_generate:nn {100}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {58}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {110}{12}\char_generate:nn {103}{12}\char_generate:nn {101}{12}\char_generate:nn {118}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {45}{12}\char_generate:nn {111}{12}\char_generate:nn {110}{12}\char_generate:nn {101}{12}}}
+\prop_gput:Nxx \g_ftdoc_live_prop {\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {51}{12}} {{\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {51}{12}}{\char_generate:nn {100}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {58}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {110}{12}\char_generate:nn {103}{12}\char_generate:nn {101}{12}\char_generate:nn {118}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {45}{12}\char_generate:nn {116}{12}\char_generate:nn {104}{12}\char_generate:nn {114}{12}\char_generate:nn {101}{12}\char_generate:nn {101}{12}}}
+\prop_gput:Nxx \g_ftdoc_live_prop {\char_generate:nn {118}{12}\char_generate:nn {58}{12}\char_generate:nn {49}{12}} {{\char_generate:nn {118}{12}\char_generate:nn {58}{12}\char_generate:nn {49}{12}}{\char_generate:nn {99}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {105}{12}\char_generate:nn {109}{12}\char_generate:nn {58}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {110}{12}\char_generate:nn {103}{12}\char_generate:nn {101}{12}\char_generate:nn {118}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {45}{12}\char_generate:nn {111}{12}\char_generate:nn {110}{12}\char_generate:nn {101}{12}\char_generate:nn {45}{12}\char_generate:nn {118}{12}\char_generate:nn {97}{12}\char_generate:nn {108}{12}\char_generate:nn {117}{12}\char_generate:nn {101}{12}}}
+\prop_gput:Nxx \g_ftdoc_live_prop {\char_generate:nn {118}{12}\char_generate:nn {58}{12}\char_generate:nn {51}{12}} {{\char_generate:nn {118}{12}\char_generate:nn {58}{12}\char_generate:nn {51}{12}}{\char_generate:nn {99}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {105}{12}\char_generate:nn {109}{12}\char_generate:nn {58}{12}\char_generate:nn {108}{12}\char_generate:nn {97}{12}\char_generate:nn {110}{12}\char_generate:nn {103}{12}\char_generate:nn {101}{12}\char_generate:nn {118}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {45}{12}\char_generate:nn {116}{12}\char_generate:nn {104}{12}\char_generate:nn {114}{12}\char_generate:nn {101}{12}\char_generate:nn {101}{12}\char_generate:nn {45}{12}\char_generate:nn {118}{12}\char_generate:nn {97}{12}\char_generate:nn {108}{12}\char_generate:nn {117}{12}\char_generate:nn {101}{12}}}
+\prop_gput:Nxx \g_ftdoc_sites_prop {\char_generate:nn {109}{12}\char_generate:nn {97}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {117}{12}\char_generate:nn {48}{12}\char_generate:nn {45}{12}\char_generate:nn {116}{12}\char_generate:nn {48}{12}} {\char_generate:nn {115}{12}\char_generate:nn {101}{12}\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {115}{12}\char_generate:nn {58}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {114}{12}\char_generate:nn {115}{12}\char_generate:nn {116}{12}\char_generate:nn {45}{12}\char_generate:nn {118}{12}\char_generate:nn {97}{12}\char_generate:nn {108}{12}\char_generate:nn {117}{12}\char_generate:nn {101}{12}}
+\prop_gput:Nxx \g_ftdoc_sites_prop {\char_generate:nn {109}{12}\char_generate:nn {97}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {117}{12}\char_generate:nn {50}{12}\char_generate:nn {45}{12}\char_generate:nn {116}{12}\char_generate:nn {48}{12}} {\char_generate:nn {115}{12}\char_generate:nn {101}{12}\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {115}{12}\char_generate:nn {58}{12}\char_generate:nn {118}{12}\char_generate:nn {97}{12}\char_generate:nn {108}{12}\char_generate:nn {117}{12}\char_generate:nn {101}{12}\char_generate:nn {45}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {101}{12}\char_generate:nn {120}{12}\char_generate:nn {116}{12}}
+\prop_gput:Nxx \g_ftdoc_sites_prop {\char_generate:nn {109}{12}\char_generate:nn {97}{12}\char_generate:nn {105}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {47}{12}\char_generate:nn {117}{12}\char_generate:nn {50}{12}\char_generate:nn {45}{12}\char_generate:nn {116}{12}\char_generate:nn {49}{12}} {\char_generate:nn {115}{12}\char_generate:nn {101}{12}\char_generate:nn {99}{12}\char_generate:nn {58}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {101}{12}\char_generate:nn {102}{12}\char_generate:nn {102}{12}\char_generate:nn {105}{12}\char_generate:nn {99}{12}\char_generate:nn {105}{12}\char_generate:nn {101}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {115}{12}\char_generate:nn {58}{12}\char_generate:nn {118}{12}\char_generate:nn {97}{12}\char_generate:nn {108}{12}\char_generate:nn {117}{12}\char_generate:nn {101}{12}\char_generate:nn {45}{12}\char_generate:nn {99}{12}\char_generate:nn {111}{12}\char_generate:nn {110}{12}\char_generate:nn {116}{12}\char_generate:nn {101}{12}\char_generate:nn {120}{12}\char_generate:nn {116}{12}}
+\ExplSyntaxOff

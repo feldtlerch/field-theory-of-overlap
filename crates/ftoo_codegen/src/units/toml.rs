@@ -6,12 +6,12 @@ use ftoo_manifest::{
 use std::{collections::BTreeMap, ops::Range};
 use toml_edit::{ImDocument, Item, TableLike, Value};
 
-pub(super) struct Node {
+pub(crate) struct Node {
     pub site: UnitSite,
-    kind: ShapeKind,
-    string: Option<String>,
-    fields: Vec<(String, UnitSite, Node)>,
-    elements: Vec<Node>,
+    pub(crate) kind: ShapeKind,
+    pub(crate) string: Option<String>,
+    pub(crate) fields: Vec<(String, UnitSite, Node)>,
+    pub(crate) elements: Vec<Node>,
 }
 fn anchor(span: Option<Range<usize>>) -> SourceAnchor {
     span.map_or(SourceAnchor::WholeFile, |r| {
@@ -37,7 +37,7 @@ fn error(rule: RuleId, stage: UnitStage, site: UnitSite, fault: UnitFault) -> Bo
         fault,
     })
 }
-pub(super) fn encoding(source: &UnitSource) -> Result<&str, Box<UnitDiagnostic>> {
+pub(crate) fn encoding(source: &UnitSource) -> Result<&str, Box<UnitDiagnostic>> {
     let mut location = site(&source.file);
     let text = std::str::from_utf8(&source.bytes).map_err(|e| {
         let start = e.valid_up_to();
@@ -63,7 +63,7 @@ pub(super) fn encoding(source: &UnitSource) -> Result<&str, Box<UnitDiagnostic>>
     }
     Ok(text)
 }
-pub(super) fn parse(file: &str, text: &str) -> Result<Node, Box<UnitDiagnostic>> {
+pub(crate) fn parse(file: &str, text: &str) -> Result<Node, Box<UnitDiagnostic>> {
     let document = ImDocument::parse(text).map_err(|e| {
         let mut location = site(file);
         location.anchor = e.span().map_or(SourceAnchor::Unavailable, |r| {
@@ -167,13 +167,13 @@ fn first_float(node: &Node) -> Option<&Node> {
             _ => usize::MAX,
         })
 }
-fn raw<'a>(node: &Node, text: &'a str) -> &'a str {
+pub(crate) fn raw<'a>(node: &Node, text: &'a str) -> &'a str {
     match node.site.anchor {
         SourceAnchor::Bytes(a, b) => &text[a..b],
         _ => "",
     }
 }
-pub(super) fn numeric(tree: &Node, text: &str) -> Result<(), Box<UnitDiagnostic>> {
+pub(crate) fn numeric(tree: &Node, text: &str) -> Result<(), Box<UnitDiagnostic>> {
     if let Some(node) = first_float(tree) {
         Err(error(
             RuleId::M003,
@@ -187,7 +187,7 @@ pub(super) fn numeric(tree: &Node, text: &str) -> Result<(), Box<UnitDiagnostic>
         Ok(())
     }
 }
-fn typed(node: &Node, expected: ShapeKind) -> Result<&Node, Box<UnitDiagnostic>> {
+pub(crate) fn typed(node: &Node, expected: ShapeKind) -> Result<&Node, Box<UnitDiagnostic>> {
     if node.kind == expected {
         Ok(node)
     } else {
@@ -202,7 +202,10 @@ fn typed(node: &Node, expected: ShapeKind) -> Result<&Node, Box<UnitDiagnostic>>
         ))
     }
 }
-fn fixed<'a>(node: &'a Node, keys: &[&str]) -> Result<Vec<&'a Node>, Box<UnitDiagnostic>> {
+pub(crate) fn fixed<'a>(
+    node: &'a Node,
+    keys: &[&str],
+) -> Result<Vec<&'a Node>, Box<UnitDiagnostic>> {
     typed(node, ShapeKind::Table)?;
     let mut unknown: Vec<_> = node
         .fields
@@ -243,7 +246,7 @@ fn fixed<'a>(node: &'a Node, keys: &[&str]) -> Result<Vec<&'a Node>, Box<UnitDia
         })
         .collect()
 }
-fn string(node: &Node) -> Result<LocatedString, Box<UnitDiagnostic>> {
+pub(crate) fn string(node: &Node) -> Result<LocatedString, Box<UnitDiagnostic>> {
     typed(node, ShapeKind::String)?;
     Ok(LocatedString {
         value: node.string.clone().unwrap_or_default(),

@@ -1,6 +1,8 @@
 //! Generate and check the complete manifest artifact against Rust authority.
 //! Semantic comparison precedes registry admission and exact byte comparison.
 mod artifact;
+mod documents;
+pub use documents::*;
 mod notation;
 pub use notation::{
     AdapterComponent, AdapterOperation, InstalledPackageChange, MAX_NOTATION_OUTPUT_BYTES,

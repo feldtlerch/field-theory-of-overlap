@@ -1,0 +1,119 @@
+use super::plan::{DocumentPlan, Inline};
+use std::fmt::Write;
+pub(super) fn size(plan: &DocumentPlan) -> usize {
+    let mut size = format!(
+        "<!-- generated document {} language {} -->\n{}\n{}\n\n",
+        plan.document, plan.language, plan.coverage[0], plan.coverage[1]
+    )
+    .len();
+    for block in &plan.blocks {
+        size = size.saturating_add(
+            format!(
+                "<!-- unit {} document {} language {} -->\n",
+                block.unit, plan.document, plan.language
+            )
+            .len(),
+        );
+        size = size.saturating_add(block.depth.map_or(0, |d| d + 1));
+        for run in &block.runs {
+            let count = match run {
+                Inline::Text(value) => text_size(value),
+                Inline::Tag { handle, label, .. } => {
+                    text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
+                }
+                Inline::Math { markdown, .. } => markdown.len().saturating_add(2),
+                Inline::Citation { text, .. } => {
+                    code_size(text).saturating_add(format!("<!-- cite {text} -->").len())
+                }
+                Inline::Mention { text, .. } => code_size(text),
+            };
+            size = size.saturating_add(count);
+        }
+        size = size.saturating_add(2);
+    }
+    size.saturating_sub(1)
+}
+fn text_size(source: &str) -> usize {
+    source
+        .chars()
+        .map(|c| {
+            if c.is_ascii_punctuation() && !matches!(c, ',' | '.' | ':' | ';' | '?' | '!') {
+                if u32::from(c) < 100 { 5 } else { 6 }
+            } else {
+                c.len_utf8()
+            }
+        })
+        .fold(0, usize::saturating_add)
+}
+fn code_size(source: &str) -> usize {
+    source
+        .chars()
+        .map(|c| match c {
+            '&' | '`' => 5,
+            '<' | '>' => 4,
+            '|' => 6,
+            _ => c.len_utf8(),
+        })
+        .fold(13, usize::saturating_add)
+}
+pub(super) fn text(source: &str) -> String {
+    let mut output = String::new();
+    for c in source.chars() {
+        if c.is_ascii_punctuation() && !matches!(c, ',' | '.' | ':' | ';' | '?' | '!') {
+            write!(output, "&#{};", u32::from(c)).expect("string write");
+        } else {
+            output.push(c);
+        }
+    }
+    output
+}
+fn code(source: &str) -> String {
+    let mut output = String::from("<code>");
+    for c in source.chars() {
+        match c {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '|' => output.push_str("&#124;"),
+            '`' => output.push_str("&#96;"),
+            _ => output.push(c),
+        }
+    }
+    output.push_str("</code>");
+    output
+}
+pub(super) fn render(plan: &DocumentPlan) -> String {
+    let mut output = format!(
+        "<!-- generated document {} language {} -->\n{}\n{}\n\n",
+        plan.document, plan.language, plan.coverage[0], plan.coverage[1]
+    );
+    for block in &plan.blocks {
+        writeln!(
+            output,
+            "<!-- unit {} document {} language {} -->",
+            block.unit, plan.document, plan.language
+        )
+        .expect("string write");
+        if let Some(depth) = block.depth {
+            write!(output, "{} ", "#".repeat(depth)).expect("string write");
+        }
+        for run in &block.runs {
+            match run {
+                Inline::Text(value) => output.push_str(&text(value)),
+                Inline::Tag { handle, label, .. } => {
+                    write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
+                }
+                Inline::Math { markdown, .. } => {
+                    write!(output, "${markdown}$").expect("string write");
+                }
+                Inline::Citation { text, .. } => {
+                    write!(output, "{}<!-- cite {text} -->", code(text)).expect("string write");
+                }
+                Inline::Mention { text, .. } => output.push_str(&code(text)),
+            }
+        }
+        output.push_str("\n\n");
+    }
+    output.pop();
+    output
+}

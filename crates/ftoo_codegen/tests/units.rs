@@ -11,8 +11,8 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         check_unit_files(&root, &book).unwrap(),
         UnitCheckSummary {
             documents: 1,
-            units: 2,
-            texts: 2,
+            units: 3,
+            texts: 3,
             tag_sites: 3
         }
     );
@@ -29,6 +29,7 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             .collect::<Vec<_>>(),
         vec![
             ("sec:coefficients:first-value", "main"),
+            ("sec:coefficients:overview", "main"),
             ("sec:coefficients:value-context", "main")
         ]
     );
@@ -45,7 +46,10 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         first.math().keys().map(String::as_str).collect::<Vec<_>>(),
         ["value"]
     );
-    assert_eq!(first.math()["value"].value, "c_1 = \\frac{1}{3}");
+    assert_eq!(
+        first.math()["value"].value,
+        "\\FtooQCoefficientOne{} = \\frac{1}{3}"
+    );
     assert_eq!(
         first.texts()["en"]
             .occurrences()
@@ -54,7 +58,7 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             .collect::<Vec<_>>(),
         vec![("value", Some(46..58), Some(1))]
     );
-    let second = &corpus.units()[1];
+    let second = &corpus.units()[2];
     assert_eq!(
         second
             .texts()

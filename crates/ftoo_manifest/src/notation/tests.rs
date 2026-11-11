@@ -1237,7 +1237,7 @@ fn n16_exact_appended_register() {
 fn n16_renderer_register_has_no_existing_transitions() {
     use crate::{RULES, RuleState};
     assert_eq!(
-        RULES[49..]
+        RULES[49..52]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),
@@ -1278,7 +1278,7 @@ fn n16_renderer_register_has_no_existing_transitions() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (52, 43, 4, 5)
+        (57, 48, 4, 5)
     );
 }
 

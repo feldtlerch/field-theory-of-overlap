@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:coefficients:overview"
+document = "main"
+math = {}
+
+[unit.texts]
+en = "Coefficient values"

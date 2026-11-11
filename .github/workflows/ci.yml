@@ -6,43 +6,46 @@ on:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    name: bounded smoke — support-dependent suites require the full battery
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: toolchain
         run: rustup toolchain install
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version-file: tools/notation/.node-version
-          check-latest: false
-      - name: notation prerequisites
-        id: notation
+      - name: locked Cargo prerequisites
+        run: cargo fetch --locked
+      - name: smoke namespace policy
         run: |
           set -eu
-          support="$HOME/.cache/ftoo-notation-support"
-          mkdir -p "$support/runtime" "$support/packages" "$support/npm-cache" "$support/tmp"
-          root="$(realpath .)"
-          support="$(realpath "$support")"
-          echo "support=$support" >> "$GITHUB_OUTPUT"
-          case "$support/" in "$root/"*) exit 1;; esac
-          case "$root/" in "$support/"*) exit 1;; esac
-          runtime="$(dirname "$(dirname "$(command -v node)")")"
-          cp -a "$runtime/." "$support/runtime/"
-          cp tools/notation/package.json tools/notation/package-lock.json "$support/packages/"
-          (cd "$support/packages" && TMPDIR="$support/tmp" npm_config_cache="$support/npm-cache" npm ci --ignore-scripts)
-          cargo fetch --locked
+          # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor.
+          # Permit namespace creation only through unshare; tests remain the
+          # runner user outside their private user and network namespaces.
+          cat > "$RUNNER_TEMP/ftoo-smoke-unshare" <<'POLICY'
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile ftoo-smoke-unshare /usr/bin/unshare flags=(unconfined) {
+            userns,
+          }
+          POLICY
+          sudo apparmor_parser --replace "$RUNNER_TEMP/ftoo-smoke-unshare"
+          original="$(readlink /proc/self/ns/net)"
+          unshare --user --map-root-user --net sh -c 'test "$(readlink /proc/self/ns/net)" != "$1"' sh "$original"
       - name: fmt
         env:
           CARGO_NET_OFFLINE: 'true'
-        run: time cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
       - name: clippy
         env:
           CARGO_NET_OFFLINE: 'true'
-        run: time cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: test
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: support-independent tests
         env:
           CARGO_NET_OFFLINE: 'true'
-          FTOO_NOTATION_SUPPORT: ${{ steps.notation.outputs.support }}
-        run: time cargo test --workspace --locked
+        run: time unshare --user --map-root-user --net "$HOME/.cargo/bin/cargo" test --workspace --locked -- --skip support_required
       - name: labels
-        run: time python3 -I tools/check_labels.py --self-test && time python3 -I tools/check_labels.py
+        env:
+          CARGO_NET_OFFLINE: 'true'
+        run: |
+          set -eu
+          time unshare --user --map-root-user --net python3 -I tools/check_labels.py --self-test
+          time unshare --user --map-root-user --net python3 -I tools/check_labels.py

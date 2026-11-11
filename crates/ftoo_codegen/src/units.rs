@@ -2,7 +2,7 @@
 mod files;
 #[cfg(test)]
 mod tests;
-mod toml;
+pub(crate) mod toml;
 use ftoo_manifest::{LanguageCheckedUnits, UnitDiagnostic, UnitErrors, admit_unit_drafts};
 use std::{
     collections::BTreeMap,
