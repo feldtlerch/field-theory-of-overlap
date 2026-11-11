@@ -457,3 +457,157 @@ pub(super) fn reread(
     }
     Ok(())
 }
+
+fn display_shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagnostic>> {
+    let fields = toml::fixed(tree, &["schema", "display"])?;
+    toml::typed(fields[0], ShapeKind::Integer)?;
+    if toml::raw(fields[0], text) != "1" {
+        return Err(Box::new(UnitDiagnostic {
+            rule: RuleId::M003,
+            stage: UnitStage::Shape,
+            unit: None,
+            language: None,
+            site: fields[0].site.clone(),
+            fault: UnitFault::SchemaValue {
+                expected: "1".into(),
+                actual: toml::raw(fields[0], text).into(),
+            },
+        }));
+    }
+    let fields = toml::fixed(fields[1], &["unit", "kind", "bodies"])?;
+    toml::string(fields[0])?;
+    let kind = toml::string(fields[1])?;
+    let targets = toml::fixed(fields[2], &["markdown", "latex"])?;
+    for target in targets {
+        toml::typed(target, ShapeKind::Table)?;
+        for (_, _, value) in &target.fields {
+            toml::string(value)?;
+        }
+    }
+    Ok(if matches!(kind.value.as_str(), "table" | "figure") {
+        None
+    } else {
+        Some(kind)
+    })
+}
+pub(super) fn assembly_sources(
+    skeleton_sources: &[UnitSource],
+    display_sources: &[UnitSource],
+) -> Result<(Vec<SkeletonDraft>, Vec<ftoo_manifest::DisplayDraft>), DocumentError> {
+    let mut sources: Vec<_> = skeleton_sources
+        .iter()
+        .map(|s| (s, false))
+        .chain(display_sources.iter().map(|s| (s, true)))
+        .collect();
+    let mut names = BTreeMap::<&str, Vec<usize>>::new();
+    for (position, (source, display)) in sources.iter().enumerate() {
+        if source.file.is_empty()
+            || source.file.contains('\\')
+            || source.file.chars().any(char::is_control)
+            || source.file.split('/').any(|p| matches!(p, "" | "." | ".."))
+        {
+            return Err(DocumentError::Input(
+                DocumentInputFault::InvalidSourceName {
+                    value: source.file.clone(),
+                },
+            ));
+        }
+        names.entry(&source.file).or_default().push(position);
+        if source.bytes.len() > 1_048_576 {
+            return Err(failure(
+                if *display { RuleId::M058 } else { RuleId::M054 },
+                AssemblyStage::Source,
+                AssemblySite::Source(site(&source.file)),
+                AssemblyFault::Limit {
+                    resource: AssemblyResource::SourceBytes,
+                    limit: 1_048_576,
+                    actual: 1_048_577,
+                },
+            ));
+        }
+    }
+    if let Some((file, positions)) = names.into_iter().find(|(_, p)| p.len() > 1) {
+        return Err(DocumentError::Input(DocumentInputFault::DuplicateSource {
+            file: file.into(),
+            positions,
+        }));
+    }
+    sources.sort_by(|a, b| a.0.file.cmp(&b.0.file));
+    let texts = phase(sources.iter().map(|(s, _)| toml::encoding(s)))?;
+    let trees = phase(
+        sources
+            .iter()
+            .zip(&texts)
+            .map(|((s, _), t)| toml::parse(&s.file, t)),
+    )?;
+    phase(trees.iter().zip(&texts).map(|(n, t)| toml::numeric(n, t)))?;
+    let unknown = phase(trees.iter().zip(&texts).zip(&sources).map(
+        |((tree, text), (_, display))| {
+            if *display {
+                display_shape(tree, text)
+            } else {
+                shape(tree, text)
+            }
+        },
+    ))?;
+    let variants = unknown
+        .into_iter()
+        .zip(&sources)
+        .filter_map(|(kind, (_, display))| {
+            kind.map(|kind| {
+                let mut error = unknown_kind(kind);
+                if *display && let AssemblyFault::UnknownToken { expected, .. } = &mut error.fault {
+                    *expected = vec!["table".into(), "figure".into()];
+                }
+                error
+            })
+        })
+        .collect();
+    if let Some(errors) = super::AssemblyErrors::from_diagnostics(variants) {
+        return Err(DocumentError::Assembly(errors));
+    }
+    let mut displays = Vec::new();
+    for (tree, (_, display)) in trees.iter().zip(&sources) {
+        if !display {
+            continue;
+        }
+        displays.push(display_draft(tree)?);
+    }
+    Ok((skeletons(skeleton_sources)?, displays))
+}
+
+fn display_draft(tree: &Node) -> Result<ftoo_manifest::DisplayDraft, DocumentError> {
+    let fields = toml::fixed(tree, &["schema", "display"]).map_err(boundary)?;
+    let fields = toml::fixed(fields[1], &["unit", "kind", "bodies"]).map_err(boundary)?;
+    let unit = toml::string(fields[0]).map_err(boundary)?;
+    let kind = if toml::string(fields[1]).map_err(boundary)?.value == "table" {
+        ftoo_manifest::DisplayKind::Table
+    } else {
+        ftoo_manifest::DisplayKind::Figure
+    };
+    let targets = toml::fixed(fields[2], &["markdown", "latex"]).map_err(boundary)?;
+    let mut bodies = BTreeMap::new();
+    for (target, node) in [
+        ftoo_manifest::DocumentTarget::Markdown,
+        ftoo_manifest::DocumentTarget::Latex,
+    ]
+    .into_iter()
+    .zip(targets)
+    {
+        let languages = node
+            .fields
+            .iter()
+            .map(|(language, _, value)| {
+                Ok((language.clone(), toml::string(value).map_err(boundary)?))
+            })
+            .collect::<Result<_, DocumentError>>()?;
+        bodies.insert(
+            target,
+            ftoo_manifest::DisplayTargetDraft {
+                site: node.site.clone(),
+                languages,
+            },
+        );
+    }
+    Ok(ftoo_manifest::DisplayDraft { unit, kind, bodies })
+}

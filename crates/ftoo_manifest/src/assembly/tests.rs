@@ -316,7 +316,7 @@ fn assembly_register_is_exactly_five_appended_enforced_rules() {
     let previous: [RuleSpec; 52] = include!("../../tests/fixtures/assembly/rules_before.rs");
     assert_eq!(RULES[..52], previous);
     assert_eq!(
-        RULES[52..]
+        RULES[52..57]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),
@@ -371,7 +371,7 @@ fn assembly_register_is_exactly_five_appended_enforced_rules() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (57, 48, 4, 5)
+        (59, 50, 4, 5)
     );
 }
 fn literal(value: &str) -> ExprDraft {

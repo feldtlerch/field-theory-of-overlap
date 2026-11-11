@@ -10,3 +10,11 @@ The value claim v:1<!-- label claim:langevin:coefficient-one-value --> concerns 
 
 <!-- unit sec:coefficients:first-value document main language en -->
 The first coefficient c:1<!-- label def:langevin:coefficient-one --> has the value $({\underbrace{{c}_{1}}_{\text{pending: retained formulation def:langevin:coefficient-one}}}={\frac{1}{3}})$.
+
+<!-- unit sec:coefficients:value-table document main language en -->
+Registered coefficient value claims.
+
+| Coefficient | Claim |
+| --- | --- |
+| c:1<!-- label def:langevin:coefficient-one --> | v:1<!-- label claim:langevin:coefficient-one-value --> |
+| c:3<!-- label def:langevin:coefficient-three --> | v:3<!-- label claim:langevin:coefficient-three-value --> |

@@ -50,24 +50,16 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
                 .len(),
             );
         }
-        for run in &block.runs {
-            let count = match run {
-                Inline::Text(value) => text_size(value),
-                Inline::Tag {
-                    handle,
-                    label,
-                    token,
-                    ..
-                } => format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len(),
-                Inline::Math { latex, .. } => latex.len().saturating_add(4),
-                Inline::Citation { text, .. } => {
-                    text_size(text).saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
-                }
-                Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
-            };
-            size = size.saturating_add(count);
-        }
+        size = size.saturating_add(inline_size(&block.runs));
         size = size.saturating_add(2);
+        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Latex) {
+            size = size
+                .saturating_add(super::display::size(
+                    body,
+                    ftoo_manifest::DocumentTarget::Latex,
+                ))
+                .saturating_add(1);
+        }
     }
     size.saturating_add("\\end{document}\n".len())
 }
@@ -131,33 +123,66 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
                 _ => r"{\noindent\textbf{",
             });
         }
-        for run in &block.runs {
-            match run {
-                Inline::Text(value) => output.push_str(&text(value)),
-                Inline::Tag {
-                    handle,
-                    label,
-                    token,
-                    ..
-                } => writeln!(output, "\\FtdocTag{{{handle}}}{{{token}}}% label {label}")
-                    .expect("string write"),
-                Inline::Math { latex, .. } => {
-                    write!(output, "\\({latex}\\)").expect("string write");
-                }
-                Inline::Citation { text: value, .. } => {
-                    writeln!(output, "\\texttt{{{}}}% cite {value}", text(value))
-                        .expect("string write");
-                }
-                Inline::Mention { text: value, .. } => {
-                    write!(output, "\\texttt{{{}}}", text(value)).expect("string write");
-                }
-            }
-        }
+        inline(&mut output, &block.runs);
         if let Some(depth) = block.depth {
             output.push_str(if depth == 6 { "}\\par}" } else { "}" });
         }
         output.push_str("\n\n");
+        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Latex) {
+            output.push_str(&super::display::render(
+                body,
+                ftoo_manifest::DocumentTarget::Latex,
+            ));
+            output.push('\n');
+        }
     }
     output.push_str("\\end{document}\n");
     output
+}
+
+pub(super) fn inline(output: &mut String, runs: &[Inline]) {
+    for run in runs {
+        match run {
+            Inline::Text(value) => output.push_str(&text(value)),
+            Inline::Tag {
+                handle,
+                label,
+                token,
+                ..
+            } => writeln!(output, "\\FtdocTag{{{handle}}}{{{token}}}% label {label}")
+                .expect("string write"),
+            Inline::Math { latex, .. } => {
+                write!(output, "\\({latex}\\)").expect("string write");
+            }
+            Inline::Citation { text: value, .. } => {
+                writeln!(output, "\\texttt{{{}}}% cite {value}", text(value))
+                    .expect("string write");
+            }
+            Inline::Mention { text: value, .. } => {
+                write!(output, "\\texttt{{{}}}", text(value)).expect("string write");
+            }
+        }
+    }
+}
+
+pub(super) fn inline_size(runs: &[Inline]) -> usize {
+    let mut size: usize = 0;
+    for run in runs {
+        let count = match run {
+            Inline::Text(value) => text_size(value),
+            Inline::Tag {
+                handle,
+                label,
+                token,
+                ..
+            } => format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len(),
+            Inline::Math { latex, .. } => latex.len().saturating_add(4),
+            Inline::Citation { text, .. } => {
+                text_size(text).saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
+            }
+            Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
+        };
+        size = size.saturating_add(count);
+    }
+    size
 }

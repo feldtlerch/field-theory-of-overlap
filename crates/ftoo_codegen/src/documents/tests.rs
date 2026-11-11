@@ -2,6 +2,7 @@
 #![allow(clippy::too_many_lines)]
 use super::*;
 mod acceptance;
+mod displays;
 mod native_evidence;
 mod sweep;
 #[test]
@@ -656,7 +657,20 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
         SkeletonChild, SkeletonDraft, SkeletonSection,
     };
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let corpus = crate::load_unit_files(&root)?;
+    let corpus = crate::load_unit_sources(
+        crate::UnitSource {
+            file: "units/documents.toml".into(),
+            bytes: input::read(&root, "units/documents.toml")?,
+        },
+        input::sources(
+            &root,
+            &[
+                "units/statements/overview.toml".into(),
+                "units/statements/first-value.toml".into(),
+                "units/statements/value-context.toml".into(),
+            ],
+        )?,
+    )?;
     let site = |file: &str, path: Vec<ftoo_manifest::PathPart>| UnitSite {
         file: file.into(),
         path,
@@ -1678,6 +1692,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
         language: "en".into(),
         coverage: ["Coverage.".into(), "Slice.".into()],
         blocks: vec![Block {
+            displays: BTreeMap::new(),
             unit: "sec:coefficients:overview".into(),
             depth: Some(1),
             site: site.clone(),

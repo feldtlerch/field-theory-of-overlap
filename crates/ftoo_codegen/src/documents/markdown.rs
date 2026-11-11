@@ -15,21 +15,16 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
             .len(),
         );
         size = size.saturating_add(block.depth.map_or(0, |d| d + 1));
-        for run in &block.runs {
-            let count = match run {
-                Inline::Text(value) => text_size(value),
-                Inline::Tag { handle, label, .. } => {
-                    text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
-                }
-                Inline::Math { markdown, .. } => markdown.len().saturating_add(2),
-                Inline::Citation { text, .. } => {
-                    code_size(text).saturating_add(format!("<!-- cite {text} -->").len())
-                }
-                Inline::Mention { text, .. } => code_size(text),
-            };
-            size = size.saturating_add(count);
-        }
+        size = size.saturating_add(inline_size(&block.runs));
         size = size.saturating_add(2);
+        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Markdown) {
+            size = size
+                .saturating_add(super::display::size(
+                    body,
+                    ftoo_manifest::DocumentTarget::Markdown,
+                ))
+                .saturating_add(1);
+        }
     }
     size.saturating_sub(1)
 }
@@ -97,23 +92,53 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
         if let Some(depth) = block.depth {
             write!(output, "{} ", "#".repeat(depth)).expect("string write");
         }
-        for run in &block.runs {
-            match run {
-                Inline::Text(value) => output.push_str(&text(value)),
-                Inline::Tag { handle, label, .. } => {
-                    write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
-                }
-                Inline::Math { markdown, .. } => {
-                    write!(output, "${markdown}$").expect("string write");
-                }
-                Inline::Citation { text, .. } => {
-                    write!(output, "{}<!-- cite {text} -->", code(text)).expect("string write");
-                }
-                Inline::Mention { text, .. } => output.push_str(&code(text)),
-            }
-        }
+        inline(&mut output, &block.runs);
         output.push_str("\n\n");
+        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Markdown) {
+            output.push_str(&super::display::render(
+                body,
+                ftoo_manifest::DocumentTarget::Markdown,
+            ));
+            output.push('\n');
+        }
     }
     output.pop();
     output
+}
+
+pub(super) fn inline(output: &mut String, runs: &[Inline]) {
+    for run in runs {
+        match run {
+            Inline::Text(value) => output.push_str(&text(value)),
+            Inline::Tag { handle, label, .. } => {
+                write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
+            }
+            Inline::Math { markdown, .. } => {
+                write!(output, "${markdown}$").expect("string write");
+            }
+            Inline::Citation { text, .. } => {
+                write!(output, "{}<!-- cite {text} -->", code(text)).expect("string write");
+            }
+            Inline::Mention { text, .. } => output.push_str(&code(text)),
+        }
+    }
+}
+
+pub(super) fn inline_size(runs: &[Inline]) -> usize {
+    let mut size: usize = 0;
+    for run in runs {
+        let count = match run {
+            Inline::Text(value) => text_size(value),
+            Inline::Tag { handle, label, .. } => {
+                text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
+            }
+            Inline::Math { markdown, .. } => markdown.len().saturating_add(2),
+            Inline::Citation { text, .. } => {
+                code_size(text).saturating_add(format!("<!-- cite {text} -->").len())
+            }
+            Inline::Mention { text, .. } => code_size(text),
+        };
+        size = size.saturating_add(count);
+    }
+    size
 }

@@ -1,3 +1,4 @@
+use crate::{NodeId, TagResolutionFault, UnitFault};
 use crate::{NotationErrors, RuleId, UnitSite};
 use std::{fmt, ops::Range};
 
@@ -11,6 +12,9 @@ pub enum AssemblyStage {
     Source,
     Shape,
     Ownership,
+    DisplaySyntax,
+    DisplayResolution,
+    DisplayEquality,
     Math,
     Emission,
     Native,
@@ -26,6 +30,10 @@ pub enum AssemblyResource {
     MathDepth,
     MathNodes,
     DocumentBytes,
+    BodyBytes,
+    BodyRows,
+    BodyColumns,
+    BodyOccurrences,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MathSyntaxReason {
@@ -75,6 +83,7 @@ impl fmt::Display for AssemblySite {
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)] // Keep the specified complete typed payloads.
 pub enum AssemblyInputFault {
     Limit {
         resource: AssemblyResource,
@@ -128,12 +137,71 @@ pub enum AssemblyInputFault {
         token: String,
         expected: Vec<String>,
     },
+    DisplayMultiplicity {
+        unit: String,
+        expected: usize,
+        actual: usize,
+        sites: Vec<UnitSite>,
+    },
+    DisplayHeading {
+        unit: String,
+        display_at: UnitSite,
+    },
+    BodyLanguages {
+        target: DocumentTarget,
+        required: Vec<String>,
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
+    DisplaySyntax {
+        kind: DisplayKind,
+        reason: DisplaySyntaxReason,
+        token: String,
+        expected: Vec<String>,
+    },
+    TableColumns {
+        row: usize,
+        expected: usize,
+        actual: usize,
+    },
+    Coordinate {
+        field: String,
+        value: String,
+        minimum: i32,
+        maximum: i32,
+    },
+    DisplayInline {
+        cause: UnitFault,
+    },
+    DisplayMathReference {
+        name: String,
+        available: Vec<String>,
+    },
+    DisplayTag {
+        cause: TagResolutionFault,
+    },
+    DisplayCitation {
+        label: String,
+        span_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    DisplaySetMismatch {
+        family: AddressFamily,
+        reference: BodyAddressSide,
+        actual: BodyAddressSide,
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
     Notation {
         cause: NotationErrors,
     },
 }
 impl fmt::Display for AssemblyInputFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Self::DisplayTag { cause } = self {
+            return cause.fmt(f);
+        }
         write!(f, "{self:?}")
     }
 }
@@ -197,6 +265,17 @@ pub(super) fn sort(diagnostics: &mut [AssemblyInputDiagnostic]) {
             AssemblyInputFault::MathArguments { .. } => 9,
             AssemblyInputFault::MathSyntax { .. } => 10,
             AssemblyInputFault::Notation { .. } => 11,
+            AssemblyInputFault::DisplayMultiplicity { .. } => 20,
+            AssemblyInputFault::DisplayHeading { .. } => 21,
+            AssemblyInputFault::BodyLanguages { .. } => 22,
+            AssemblyInputFault::DisplaySyntax { .. } => 23,
+            AssemblyInputFault::TableColumns { .. } => 24,
+            AssemblyInputFault::Coordinate { .. } => 25,
+            AssemblyInputFault::DisplayInline { .. } => 26,
+            AssemblyInputFault::DisplayMathReference { .. } => 27,
+            AssemblyInputFault::DisplayTag { .. } => 28,
+            AssemblyInputFault::DisplayCitation { .. } => 29,
+            AssemblyInputFault::DisplaySetMismatch { .. } => 30,
         }
     }
     diagnostics.sort_by(|a, b| {
@@ -221,4 +300,42 @@ pub(super) fn sort(diagnostics: &mut [AssemblyInputDiagnostic]) {
                 rank(&b.fault),
             ))
     });
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisplayKind {
+    Table,
+    Figure,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisplaySyntaxReason {
+    EmptyBody,
+    BadDelimiter,
+    MissingHeader,
+    MissingAlignment,
+    MissingRow,
+    UnknownLayout,
+    UnclosedLayout,
+    TrailingContent,
+    InvalidInteger,
+    ZeroDirection,
+    ForbiddenContent,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AddressFamily {
+    Tags,
+    Citations,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BodyAddressSide {
+    pub target: DocumentTarget,
+    pub language: String,
+    pub site: UnitSite,
+    pub members: Vec<BodyAddressMember>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BodyAddressMember {
+    pub value: String,
+    pub target: Option<NodeId>,
+    pub sites: Vec<UnitSite>,
 }

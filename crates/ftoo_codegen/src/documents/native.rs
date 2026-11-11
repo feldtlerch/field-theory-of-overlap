@@ -144,7 +144,7 @@ pub(super) fn runtime_origin(
         .map(|mut diagnostic| {
             if let AssemblyFault::RuntimeTagRejected { site_token, .. } = &diagnostic.fault {
                 for block in &plan.blocks {
-                    for run in &block.runs {
+                    for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                         if let super::plan::Inline::Tag { token, site, .. } = run
                             && token == site_token
                         {

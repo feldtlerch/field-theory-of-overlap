@@ -259,6 +259,7 @@ fn expected_runs(block: &Block, target: DocumentTarget) -> Vec<Recovered> {
         })
         .collect()
 }
+#[allow(clippy::too_many_lines)] // Compare one complete candidate inventory, including captions and bodies.
 pub(super) fn check_emission(
     plan: &DocumentPlan,
     source: &str,
@@ -311,6 +312,41 @@ pub(super) fn check_emission(
             "\n\n"
         };
         let framed = body.strip_suffix(separator);
+        if let Some(display) = block.displays.get(&target) {
+            let actual = framed
+                .and_then(|body| recover_display_block(body, block, display, &records, target));
+            if let Some(actual) = actual {
+                if actual != records {
+                    first_range.get_or_insert(start..end);
+                }
+                actual_records.extend(actual);
+            } else {
+                let text = framed.unwrap_or(body);
+                if let Some((caption, display)) = text.split_once("\n\n")
+                    && let Some(recovered) = recover_block(caption, block, target)
+                {
+                    let count = records
+                        .iter()
+                        .position(|r| r.kind == EmissionKind::Body)
+                        .expect("display record");
+                    actual_records.extend(recovered_records(
+                        block,
+                        &recovered,
+                        &records[..count],
+                        target,
+                    ));
+                    let mut record = records[count].clone();
+                    record.value = display.into();
+                    actual_records.push(record);
+                } else {
+                    let mut actual = records[0].clone();
+                    actual.value = text.into();
+                    actual_records.push(actual);
+                }
+                first_range.get_or_insert(start..end);
+            }
+            continue;
+        }
         let recovered = framed.and_then(|body| recover_block(body, block, target));
         if let Some(recovered) = recovered {
             let mut actual = recovered_records(block, &recovered, &records, target);
@@ -448,11 +484,29 @@ fn envelope(plan: &DocumentPlan, source: &str, target: DocumentTarget) -> bool {
             source.ends_with("\\end{document}\n")
         }
 }
+pub(super) struct DisplayBody {
+    pub source: String,
+    pub layout: ftoo_manifest::DisplayLayout,
+    pub regions: Vec<Block>,
+    pub site: UnitSite,
+}
 pub(super) struct Block {
+    pub displays: BTreeMap<DocumentTarget, DisplayBody>,
     pub unit: String,
     pub depth: Option<usize>,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
+}
+impl Block {
+    pub fn target_runs(&self, target: DocumentTarget) -> impl Iterator<Item = &Inline> {
+        self.runs.iter().chain(
+            self.displays
+                .get(&target)
+                .into_iter()
+                .flat_map(|body| body.regions.iter())
+                .flat_map(|region| region.runs.iter()),
+        )
+    }
 }
 pub(super) struct DocumentPlan {
     pub document: String,
@@ -467,6 +521,8 @@ impl DocumentPlan {
             records.push(EmissionRecord {
                 kind: if block.depth.is_some() {
                     EmissionKind::Heading
+                } else if !block.displays.is_empty() {
+                    EmissionKind::Caption
                 } else {
                     EmissionKind::Paragraph
                 },
@@ -495,27 +551,37 @@ impl DocumentPlan {
                     site: site.clone(),
                 });
             }
+            if let Some(body) = block.displays.get(&target) {
+                records.push(EmissionRecord {
+                    kind: EmissionKind::Body,
+                    unit: block.unit.clone(),
+                    language: self.language.clone(),
+                    target,
+                    occurrence: None,
+                    value: body.source.clone(),
+                    site: body.site.clone(),
+                });
+                for region in &body.regions {
+                    let plan = DocumentPlan {
+                        document: self.document.clone(),
+                        language: self.language.clone(),
+                        coverage: self.coverage.clone(),
+                        blocks: Vec::new(),
+                    };
+                    records.extend(region_records(region, &plan, target));
+                }
+            }
         }
         records
     }
     pub fn origins(&self, target: DocumentTarget) -> Vec<SourceOrigin> {
-        self.blocks
-            .iter()
-            .flat_map(|b| {
-                std::iter::once(&b.site)
-                    .chain(b.runs.iter().filter_map(|run| match run {
-                        Inline::Text(_) => None,
-                        Inline::Tag { site, .. }
-                        | Inline::Math { site, .. }
-                        | Inline::Citation { site, .. }
-                        | Inline::Mention { site, .. } => Some(site),
-                    }))
-                    .map(|site| SourceOrigin {
-                        unit: Some(b.unit.clone()),
-                        language: Some(self.language.clone()),
-                        target: Some(target),
-                        site: site.clone(),
-                    })
+        self.records(target)
+            .into_iter()
+            .map(|record| SourceOrigin {
+                unit: Some(record.unit),
+                language: Some(record.language),
+                target: Some(target),
+                site: record.site,
             })
             .collect()
     }
@@ -525,10 +591,11 @@ pub(super) fn build(
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     notation: &RenderableNotation<'_, '_, '_>,
     metadata: &BTreeMap<String, UnitSite>,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
     let corpus = skeletons.corpus();
     let book = welded.integrated().resolved().book();
-    let equations = equations(corpus, notation)?;
+    let equations = equations(corpus, notation, displays)?;
     let coverage = book.graph().coverage();
     let gate = match coverage.release_gate {
         ftoo_manifest::ReleaseGate::ExplicitPartial => "explicit-partial",
@@ -561,7 +628,9 @@ pub(super) fn build(
                     .find(|(_, u)| u.label().as_str() == position.unit())
                     .expect("checked skeleton unit");
                 let runs = runs(index, unit, language, welded, &equations);
+                let bodies = display_plans(index, unit, language, welded, &equations, displays);
                 blocks.push(Block {
+                    displays: bodies,
                     unit: position.unit().into(),
                     depth: position.depth(),
                     site: metadata[position.unit()].clone(),
@@ -582,12 +651,13 @@ type Equations = BTreeMap<(String, String), (String, String)>;
 fn equations(
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     notation: &RenderableNotation<'_, '_, '_>,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
 ) -> Result<Equations, DocumentError> {
     let mut equations = BTreeMap::new();
     let mut errors = Vec::new();
     for unit in corpus.units() {
         for (key, source) in unit.math() {
-            let uses: Vec<_> = unit
+            let mut uses: Vec<_> = unit
                 .texts()
                 .iter()
                 .flat_map(|(language, text)| {
@@ -601,6 +671,19 @@ fn equations(
                         })
                 })
                 .collect();
+            if let Some(bodies) = displays.bodies().get(unit.label().as_str()) {
+                for ((target, language), body) in bodies {
+                    for region in body.regions() {
+                        uses.extend(region.math().iter().filter(|o| o.name() == key).map(|o| {
+                            MathUseSite {
+                                language: language.clone(),
+                                target: Some(*target),
+                                site: region.site(o.site()),
+                            }
+                        }));
+                    }
+                }
+            }
             let parsed = ftoo_manifest::parse_assembly_math(notation.catalogue(), &source.value);
             let outcome = match parsed {
                 Ok(parsed) => {
@@ -857,6 +940,37 @@ fn canonical_run(run: &Inline) -> String {
         Inline::Mention { text, .. } => format!("``{text}``"),
     }
 }
+fn recovered_tag_site(
+    block: &Block,
+    run: &Recovered,
+    records: &[EmissionRecord],
+) -> Option<UnitSite> {
+    let tag_sites: Vec<_> = if let Recovered::Tag { handle, .. } = run {
+        block
+            .runs
+            .iter()
+            .filter_map(|run| match run {
+                Inline::Tag {
+                    handle: expected,
+                    site,
+                    ..
+                } if expected == handle => Some(site),
+                _ => None,
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let used_tag_sites = records
+        .iter()
+        .filter(|record| tag_sites.contains(&&record.site))
+        .count();
+    tag_sites
+        .get(used_tag_sites)
+        .or_else(|| tag_sites.last())
+        .copied()
+        .cloned()
+}
 fn recovered_records(
     block: &Block,
     recovered: &[Recovered],
@@ -930,12 +1044,14 @@ fn recovered_records(
             .iter()
             .filter(|r| r.kind == kind && r.value == value)
             .count();
-        let site = matching
-            .get(repeated)
-            .or_else(|| matching.last())
-            .copied()
-            .or_else(|| expected.iter().filter(|r| r.kind == kind).nth(index))
-            .map_or_else(|| block.site.clone(), |r| r.site.clone());
+        let site = recovered_tag_site(block, run, &records).unwrap_or_else(|| {
+            matching
+                .get(repeated)
+                .or_else(|| matching.last())
+                .copied()
+                .or_else(|| expected.iter().filter(|r| r.kind == kind).nth(index))
+                .map_or_else(|| block.site.clone(), |r| r.site.clone())
+        });
         records.push(EmissionRecord {
             kind,
             unit: block.unit.clone(),
@@ -988,4 +1104,302 @@ pub(super) fn difference(
     }
     missing.extend_from_slice(&expected[left..]);
     unexpected.extend_from_slice(&actual[right..]);
+}
+
+fn region_records(
+    block: &Block,
+    plan: &DocumentPlan,
+    target: DocumentTarget,
+) -> Vec<EmissionRecord> {
+    block
+        .runs
+        .iter()
+        .filter_map(|run| {
+            let (kind, value, site) = match run {
+                Inline::Text(_) => return None,
+                Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
+                Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
+                Inline::Citation { text, site } => (EmissionKind::Citation, text, site),
+                Inline::Mention { text, site } => (EmissionKind::Mention, text, site),
+            };
+            Some(EmissionRecord {
+                kind,
+                unit: block.unit.clone(),
+                language: plan.language.clone(),
+                target,
+                occurrence: site.occurrence,
+                value: value.clone(),
+                site: site.clone(),
+            })
+        })
+        .collect()
+}
+pub(super) fn display_plans(
+    index: usize,
+    unit: &ftoo_manifest::CheckedUnit,
+    language: &str,
+    welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
+    equations: &Equations,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
+) -> BTreeMap<DocumentTarget, DisplayBody> {
+    let mut result = BTreeMap::new();
+    let Some(bodies) = displays.bodies().get(unit.label().as_str()) else {
+        return result;
+    };
+    for ((target, body_language), body) in bodies {
+        if language != body_language {
+            continue;
+        }
+        let mut regions = Vec::new();
+        for region in body.regions() {
+            let text = &region.source().value;
+            let mut replacements = Vec::new();
+            for occurrence in region.tags() {
+                let target_id = welded
+                    .integrated()
+                    .resolved()
+                    .book()
+                    .resolve(occurrence.input())
+                    .expect("checked display tag");
+                let site = region.site(occurrence.site());
+                let insertion = site.occurrence.expect("checked insertion index");
+                let target_name = if *target == DocumentTarget::Markdown {
+                    "markdown"
+                } else {
+                    "latex"
+                };
+                replacements.push((
+                    occurrence.site().decoded.clone().expect("insertion"),
+                    Inline::Tag {
+                        handle: occurrence.input().into(),
+                        label: target_id.semantic_name().into(),
+                        token: format!("u{index}-d{target_name}-{language}-o{insertion}"),
+                        site,
+                    },
+                ));
+            }
+            for occurrence in region.math() {
+                let (markdown, latex) =
+                    &equations[&(unit.label().as_str().into(), occurrence.name().into())];
+                replacements.push((
+                    occurrence.site().decoded.clone().expect("insertion"),
+                    Inline::Math {
+                        key: occurrence.name().into(),
+                        markdown: markdown.clone(),
+                        latex: latex.clone(),
+                        site: region.site(occurrence.site()),
+                    },
+                ));
+            }
+            for (value, local, citation) in region.spans() {
+                let site = region.site(&local);
+                replacements.push((
+                    local.decoded.expect("span"),
+                    if citation {
+                        Inline::Citation { text: value, site }
+                    } else {
+                        Inline::Mention { text: value, site }
+                    },
+                ));
+            }
+            replacements.sort_by_key(|(r, _)| r.start);
+            let mut runs = Vec::new();
+            let mut at = 0;
+            for (range, run) in replacements {
+                if at < range.start {
+                    runs.push(Inline::Text(text[at..range.start].replace("@@", "@")));
+                }
+                runs.push(run);
+                at = range.end;
+            }
+            if at < text.len() {
+                runs.push(Inline::Text(text[at..].replace("@@", "@")));
+            }
+            normalize(&mut runs);
+            regions.push(Block {
+                unit: unit.label().as_str().into(),
+                depth: None,
+                site: region.site(&region.source().site),
+                runs,
+                displays: BTreeMap::new(),
+            });
+        }
+        result.insert(
+            *target,
+            DisplayBody {
+                source: body.source().value.clone(),
+                layout: body.layout().clone(),
+                regions,
+                site: body.source().site.clone(),
+            },
+        );
+    }
+    result
+}
+
+// Consume actual target delimiters independently of the writer's Part sequence.
+#[allow(clippy::too_many_lines)] // Keep the independent layout reader and its record reconstruction together.
+fn recover_display_block(
+    source: &str,
+    block: &Block,
+    body: &DisplayBody,
+    records: &[EmissionRecord],
+    target: DocumentTarget,
+) -> Option<Vec<EmissionRecord>> {
+    fn take(rest: &mut &str, token: &str) -> Option<()> {
+        *rest = rest.strip_prefix(token)?;
+        Some(())
+    }
+    fn region<'a>(rest: &mut &'a str, end: &str) -> Option<&'a str> {
+        let at = rest.find(end)?;
+        let text = &rest[..at];
+        *rest = &rest[at..];
+        Some(text)
+    }
+    use ftoo_manifest::{DisplayLayout, PictureCommand};
+    let (caption, display) = source.split_once("\n\n").unwrap_or((source, ""));
+    let caption_count = records.iter().position(|r| r.kind == EmissionKind::Body)?;
+    let recovered = recover_block(caption, block, target)?;
+    let mut result = recovered_records(block, &recovered, &records[..caption_count], target);
+    if recovered != expected_runs(block, target) && result == records[..caption_count] {
+        result[0].value = caption.into();
+    }
+    if display.is_empty() {
+        return Some(result);
+    }
+    let full = format!("{display}\n");
+    let mut rest = full.as_str();
+    let mut values = Vec::new();
+
+    match &body.layout {
+        DisplayLayout::Table {
+            columns,
+            rows,
+            rules,
+        } => {
+            if target == DocumentTarget::Latex {
+                take(
+                    &mut rest,
+                    &format!(
+                        "\\begin{{center}}\n\\begin{{tabular}}{{{}}}\n",
+                        columns.concat()
+                    ),
+                )?;
+            }
+            for (row, cells) in rows.iter().enumerate() {
+                if target == DocumentTarget::Markdown {
+                    take(&mut rest, "| ")?;
+                } else if rules.contains(&row) {
+                    take(&mut rest, "\\hline\n")?;
+                }
+                for (column, index) in cells.iter().enumerate() {
+                    let delimiter = match (target, column + 1 == cells.len()) {
+                        (DocumentTarget::Markdown, false) => " | ",
+                        (DocumentTarget::Markdown, true) => " |\n",
+                        (DocumentTarget::Latex, false) => " & ",
+                        (DocumentTarget::Latex, true) => concat!(" ", r"\\", "\n"),
+                    };
+                    values.push((*index, region(&mut rest, delimiter)?));
+                    take(&mut rest, delimiter)?;
+                }
+                if target == DocumentTarget::Markdown && row == 0 {
+                    take(&mut rest, &format!("| {} |\n", columns.join(" | ")))?;
+                }
+            }
+            if target == DocumentTarget::Latex {
+                take(&mut rest, "\\end{tabular}\n\\end{center}\n")?;
+            }
+        }
+        DisplayLayout::Quote { rows } => {
+            for row in rows {
+                if let Some(index) = row {
+                    take(&mut rest, "> ")?;
+                    values.push((*index, region(&mut rest, "\n")?));
+                } else {
+                    take(&mut rest, ">")?;
+                }
+                take(&mut rest, "\n")?;
+            }
+        }
+        DisplayLayout::Picture {
+            width,
+            height,
+            commands,
+        } => {
+            take(
+                &mut rest,
+                &format!(
+                    "\\begingroup\\setlength{{\\unitlength}}{{1pt}}\n\\begin{{picture}}({width},{height})\n"
+                ),
+            )?;
+            for command in commands {
+                match command {
+                    PictureCommand::Label {
+                        x,
+                        y,
+                        region: index,
+                    } => {
+                        take(&mut rest, &format!("\\put({x},{y}){{"))?;
+                        values.push((*index, region(&mut rest, "}\n")?));
+                        take(&mut rest, "}\n")?;
+                    }
+                    PictureCommand::Line {
+                        x,
+                        y,
+                        dx,
+                        dy,
+                        length,
+                        vector,
+                    } => {
+                        let name = if *vector { "vector" } else { "line" };
+                        take(
+                            &mut rest,
+                            &format!("\\put({x},{y}){{\\{name}({dx},{dy}){{{length}}}}}\n"),
+                        )?;
+                    }
+                }
+            }
+            take(&mut rest, "\\end{picture}\n\\endgroup\n")?;
+        }
+    }
+    let consumed = full.len() - rest.len();
+    let mut repetitions = 1;
+    while !rest.is_empty() {
+        rest = rest.strip_prefix('\n').unwrap_or(rest);
+        rest = rest.strip_prefix(&full[..consumed])?;
+        repetitions += 1;
+    }
+    let mut body_record = records[caption_count].clone();
+    let mut changed = false;
+    let mut uses = Vec::new();
+    for (index, source) in values {
+        let region = &body.regions[index];
+        let recovered = recover_block(source, region, target)?;
+        let expected: Vec<_> = records[caption_count + 1..]
+            .iter()
+            .filter(|r| r.site.path == region.site.path)
+            .cloned()
+            .collect();
+        let mut region_records = vec![EmissionRecord {
+            kind: EmissionKind::Body,
+            unit: block.unit.clone(),
+            language: records[0].language.clone(),
+            target,
+            occurrence: None,
+            value: region.runs.iter().map(canonical_run).collect(),
+            site: region.site.clone(),
+        }];
+        region_records.extend(expected);
+        let actual = recovered_records(region, &recovered, &region_records, target);
+        changed |= recovered != expected_runs(region, target);
+        uses.extend(actual.into_iter().skip(1));
+    }
+    if changed {
+        body_record.value = display.into();
+    }
+    for _ in 0..repetitions {
+        result.push(body_record.clone());
+        result.extend(uses.clone());
+    }
+    Some(result)
 }

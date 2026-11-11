@@ -7,5 +7,6 @@ document = "main"
 heading = "sec:coefficients:overview"
 children = [
   { kind = "unit", unit = "sec:coefficients:value-context" },
-  { kind = "unit", unit = "sec:coefficients:first-value" }
+  { kind = "unit", unit = "sec:coefficients:first-value" },
+  { kind = "unit", unit = "sec:coefficients:value-table" }
 ]

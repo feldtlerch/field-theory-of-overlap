@@ -2,6 +2,7 @@
 #![allow(clippy::result_large_err)]
 mod artifacts;
 mod diagnostics;
+mod display;
 mod input;
 mod latex;
 mod lock_scan;
@@ -228,15 +229,9 @@ pub fn prepare_documents(
     let welded = ftoo_manifest::weld_units(&integrated).map_err(DocumentError::Weld)?;
     let skeleton_files = input::discover(root, "units/skeletons", false)?;
     let display_files = input::discover(root, "units/displays", true)?;
-    if !display_files.is_empty() {
-        return Err(DocumentError::Input(
-            DocumentInputFault::DisplaysUnsupported {
-                files: display_files,
-            },
-        ));
-    }
     let sources = input::sources(root, &skeleton_files)?;
-    let drafts = input::skeletons(&sources)?;
+    let display_sources = input::sources(root, &display_files)?;
+    let (drafts, display_drafts) = input::assembly_sources(&sources, &display_sources)?;
     let (metadata, owner_sites) = metadata(&statements);
     let document_sites = document_sites(&corpus);
     let skeletons =
@@ -247,10 +242,17 @@ pub fn prepare_documents(
                         .expect("nonempty errors"),
                 )
             })?;
+    let displays =
+        ftoo_manifest::check_displays(&display_drafts, &skeletons, &welded).map_err(|e| {
+            DocumentError::Assembly(
+                AssemblyErrors::from_diagnostics(e.into_iter().map(Into::into).collect())
+                    .expect("nonempty errors"),
+            )
+        })?;
     let catalogue = ftoo_manifest::notation(&book)
         .map_err(|e| DocumentError::Notation(crate::NotationRenderError::Admission(e)))?;
     let notation = crate::prepare_notation(&catalogue)?;
-    let plans = plan::build(&skeletons, &welded, &notation, &metadata)?;
+    let plans = plan::build(&skeletons, &welded, &notation, &metadata, &displays)?;
     let artifacts = render_artifacts(root, &support, &book, &plans, &notation)?;
     finish_snapshot(
         root,
@@ -258,11 +260,12 @@ pub fn prepare_documents(
         &markdown,
         std::iter::once(declaration)
             .chain(statements)
-            .chain(sources),
+            .chain(sources)
+            .chain(display_sources),
         [
             ("units/statements", statement_files, false),
             ("units/skeletons", skeleton_files, false),
-            ("units/displays", Vec::new(), true),
+            ("units/displays", display_files, true),
         ],
         artifacts,
     )

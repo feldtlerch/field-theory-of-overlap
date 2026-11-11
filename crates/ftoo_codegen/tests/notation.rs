@@ -43,8 +43,8 @@ fn support_required_complete_typesetter_consumer_requires_prepared_support()
     assert_eq!(expanded.source(), "[{x}]");
     assert!(std::ptr::eq(expanded.notation(), &raw const prepared));
     assert_eq!(macro_form.uses(), expanded.uses());
-    assert_eq!(check_unit_files(&root, &book)?.units, 3);
-    assert_eq!(check_weld_files(&root, &book)?.units, 3);
+    assert_eq!(check_unit_files(&root, &book)?.units, 4);
+    assert_eq!(check_weld_files(&root, &book)?.units, 4);
     assert_eq!(ftoo_manifest::Snapshot::capture(book.graph()), snapshot);
     assert_eq!(std::fs::read(root.join("generated/manifest.json"))?, bytes);
     Ok(())

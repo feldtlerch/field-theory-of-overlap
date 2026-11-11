@@ -131,7 +131,7 @@ pub(super) fn render(
     let mut sites = Vec::new();
     for plan in plans {
         for block in &plan.blocks {
-            for run in &block.runs {
+            for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                 if let Inline::Tag { token, .. } = run {
                     sites.push((
                         plan.document.as_str(),
@@ -258,7 +258,7 @@ pub(super) fn check(
     let mut sites = Vec::new();
     for plan in plans {
         for block in &plan.blocks {
-            for run in &block.runs {
+            for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                 if let Inline::Tag { token, .. } = run {
                     sites.push((&plan.document, &plan.language, &block.unit, token));
                 }

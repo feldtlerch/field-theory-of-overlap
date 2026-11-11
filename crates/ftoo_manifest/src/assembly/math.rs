@@ -41,7 +41,9 @@ impl ParsedAssemblyMath {
         &self.ranges
     }
 }
-type Failure = (Range<usize>, Fault);
+// Keep the larger assembly fault family off recursive parser stack frames.
+// The public result still returns the original range/fault pair.
+type Failure = Box<(Range<usize>, Fault)>;
 type Result<T> = std::result::Result<T, Failure>;
 #[derive(Clone)]
 struct Token {
@@ -64,14 +66,14 @@ struct Parser<'a, 'b, 'g> {
     arena: Vec<(Range<usize>, Vec<usize>)>,
 }
 fn limit(bytes: Range<usize>, resource: Resource, maximum: usize) -> Failure {
-    (
+    Box::new((
         bytes,
         Fault::Limit {
             resource,
             limit: maximum,
             actual: maximum + 1,
         },
-    )
+    ))
 }
 fn lex(source: &str) -> Result<Vec<Token>> {
     if source.len() > 262_144 {
@@ -135,14 +137,14 @@ impl Parser<'_, '_, '_> {
     }
     fn syntax(&self, reason: Reason, expected: &[&str]) -> Failure {
         let token = self.token();
-        (
+        Box::new((
             token.bytes,
             Fault::MathSyntax {
                 reason,
                 token: token.text,
                 expected: expected.iter().map(|s| (*s).into()).collect(),
             },
-        )
+        ))
     }
     fn call(&mut self, callee: Callee, arguments: Vec<Node>, bytes: Range<usize>) -> Result<Node> {
         if self.nodes == 4096 {
@@ -366,7 +368,7 @@ impl Parser<'_, '_, '_> {
         let mut ranges = Vec::new();
         for argument in 0..arity {
             if !self.is("{") {
-                return Err((
+                return Err(Box::new((
                     self.token().bytes,
                     Fault::MathArguments {
                         command: token.text,
@@ -374,7 +376,7 @@ impl Parser<'_, '_, '_> {
                         actual: arguments.len(),
                         argument: usize::from(argument),
                     },
-                ));
+                )));
             }
             let node = self.group("}")?;
             ranges.push(node.bytes.clone());
@@ -411,12 +413,12 @@ impl Parser<'_, '_, '_> {
             && token.text[1..].bytes().all(|b| b.is_ascii_alphabetic())
             && token.text.len() > 1
         {
-            return Err((
+            return Err(Box::new((
                 token.bytes,
                 Fault::UnknownMathCommand {
                     command: token.text,
                 },
-            ));
+            )));
         }
         if (token.text.len() == 1 && token.text.as_bytes()[0].is_ascii_alphabetic())
             || (!token.text.is_empty() && token.text.bytes().all(|b| b.is_ascii_digit()))
@@ -446,7 +448,13 @@ impl Parser<'_, '_, '_> {
 pub fn parse_assembly_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
-) -> Result<ParsedAssemblyMath> {
+) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
+    parse_inner(catalogue, source).map_err(|failure| *failure)
+}
+/// Parse the complete authored entry without evaluating any TeX.
+/// # Errors
+/// Returns the first decisive decoded range and complete parser fault.
+fn parse_inner(catalogue: &CheckedNotation<'_, '_>, source: &str) -> Result<ParsedAssemblyMath> {
     let mut parser = Parser {
         catalogue,
         tokens: lex(source)?,

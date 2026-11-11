@@ -712,3 +712,13 @@ pub fn resolve_unit_tags<'u, 'b, 'g>(
     }
     Ok(ResolvedUnits { corpus, book, tags })
 }
+
+pub(crate) use content::AssemblyScanFault;
+// Assembly reuses lexical admission without constructing a statement CheckedText.
+pub(crate) fn assembly_inline(
+    source: &LocatedString,
+    maximum: usize,
+) -> Result<(Vec<MathOccurrence>, Vec<TagOccurrence>), AssemblyScanFault> {
+    let scanned = content::scan_limited(source, Some(maximum))?;
+    Ok((scanned.math, scanned.tags))
+}

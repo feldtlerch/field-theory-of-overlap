@@ -17,12 +17,12 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let before = ftoo_manifest::Snapshot::capture(&graph);
     let statuses = ftoo_manifest::NodeId::ALL.map(|id| graph.status(id));
     let expected = WeldCheckSummary {
-        units: 3,
-        texts: 3,
+        units: 4,
+        texts: 4,
         tag_sites: 3,
         rust_mints: 4,
         markdown_mints: 117,
-        unit_mints: 3,
+        unit_mints: 4,
         markdown_citations: 100,
         rust_citations: 8,
         unit_citation_sites: 1,
@@ -46,7 +46,8 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
         [
             "sec:coefficients:first-value",
             "sec:coefficients:overview",
-            "sec:coefficients:value-context"
+            "sec:coefficients:value-context",
+            "sec:coefficients:value-table"
         ]
     );
     let first = &welded.units()[0].languages()[0];

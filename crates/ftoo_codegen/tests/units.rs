@@ -11,8 +11,8 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         check_unit_files(&root, &book).unwrap(),
         UnitCheckSummary {
             documents: 1,
-            units: 3,
-            texts: 3,
+            units: 4,
+            texts: 4,
             tag_sites: 3
         }
     );
@@ -30,7 +30,8 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         vec![
             ("sec:coefficients:first-value", "main"),
             ("sec:coefficients:overview", "main"),
-            ("sec:coefficients:value-context", "main")
+            ("sec:coefficients:value-context", "main"),
+            ("sec:coefficients:value-table", "main")
         ]
     );
     let first = &corpus.units()[0];

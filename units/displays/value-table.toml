@@ -1,0 +1,19 @@
+schema = 1
+
+[display]
+unit = "sec:coefficients:value-table"
+kind = "table"
+
+[display.bodies.markdown]
+en = '''| Coefficient | Claim |
+| --- | --- |
+| @tag{c:1} | @tag{v:1} |
+| @tag{c:3} | @tag{v:3} |'''
+
+[display.bodies.latex]
+en = '''\begin{tabular}{ll}
+Coefficient & Claim \\
+\hline
+@tag{c:1} & @tag{v:1} \\
+@tag{c:3} & @tag{v:3} \\
+\end{tabular}'''

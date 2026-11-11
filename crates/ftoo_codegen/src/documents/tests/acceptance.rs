@@ -895,7 +895,14 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             (original[..original.len() - 1].to_vec(), original.len() - 1),
             (crlf, newline),
         ];
-        for needle in ["pending", "label def:", "\\providecommand", "\\FtdocTag"] {
+        for needle in [
+            "pending",
+            "label def:",
+            "\\providecommand",
+            "\\FtdocTag",
+            "| Coefficient | Claim |",
+            "\\begin{tabular}",
+        ] {
             if let Some(offset) = std::str::from_utf8(original)?.find(needle) {
                 let mut changed = original.to_vec();
                 changed[offset] = b'X';
@@ -1092,6 +1099,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
         language: "en".into(),
         coverage: ["a".into(), "b".into()],
         blocks: vec![plan::Block {
+            displays: BTreeMap::new(),
             unit: "sec:fixture:heading".into(),
             depth: Some(1),
             site: input::site("units/statements/fixture.toml"),
@@ -1173,6 +1181,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
         coverage: ["Coverage.".into(), "Slice.".into()],
         blocks: ["a", "b", "c"]
             .map(|name| plan::Block {
+                displays: BTreeMap::new(),
                 unit: format!("sec:fixture:{name}"),
                 depth: (name == "a").then_some(1),
                 site: input::site(&format!("units/statements/{name}.toml")),
@@ -1291,6 +1300,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
         language: "en".into(),
         coverage: ["Coverage.".into(), "Slice.".into()],
         blocks: vec![plan::Block {
+            displays: BTreeMap::new(),
             unit: "sec:fixture:unit".into(),
             depth: None,
             site: input::site("units/statements/fixture.toml"),
@@ -1331,6 +1341,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         language: "en".into(),
         coverage: ["Coverage.".into(), "Slice.".into()],
         blocks: vec![plan::Block {
+            displays: BTreeMap::new(),
             unit: "sec:fixture:paragraph".into(),
             depth: None,
             site: site.clone(),
@@ -1579,7 +1590,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
 }
 
 #[test]
-fn support_required_native_lifecycle_tables_reject_at_heading_and_paragraph_sites_and_restore()
+fn support_required_native_lifecycle_tables_reject_at_prose_and_display_sites_and_restore()
 -> Result<(), Box<dyn std::error::Error>> {
     use std::fmt::Write;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -1610,19 +1621,35 @@ fn support_required_native_lifecycle_tables_reject_at_heading_and_paragraph_site
             })
             .collect::<Vec<_>>();
         let message = rows.iter().find(|(_, key, _)| *key == handle).unwrap().2;
-        for depth in [Some(1), None] {
-            let origin = UnitSite {
+        for position in 0..5 {
+            let depth = (position == 0).then_some(1);
+            let mut origin = UnitSite {
                 file: "units/statements/fixture.toml".into(),
                 path: vec![PathPart::Key("text".into()), PathPart::Key("en".into())],
                 anchor: SourceAnchor::Bytes(100, 120),
                 decoded: Some(0..10),
                 occurrence: Some(0),
             };
-            let plan = plan::DocumentPlan {
+            if position >= 2 {
+                origin.file = "units/displays/fixture.toml".into();
+                origin.path = vec![
+                    PathPart::Key("display".into()),
+                    PathPart::Key("bodies".into()),
+                    PathPart::Key("latex".into()),
+                    PathPart::Key("en".into()),
+                    PathPart::Key("regions".into()),
+                    PathPart::Index(usize::from(position == 3)),
+                ];
+                if position < 4 {
+                    origin.path.push(PathPart::Index(0));
+                }
+            }
+            let mut plan = plan::DocumentPlan {
                 document: "fixture".into(),
                 language: "en".into(),
                 coverage: ["Coverage.".into(), "Slice.".into()],
                 blocks: vec![plan::Block {
+                    displays: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth,
                     site: input::site("units/statements/fixture.toml"),
@@ -1634,6 +1661,59 @@ fn support_required_native_lifecycle_tables_reject_at_heading_and_paragraph_site
                     }],
                 }],
             };
+            if position >= 2 {
+                let tag_region = plan::Block {
+                    unit: "sec:fixture:unit".into(),
+                    depth: None,
+                    site: origin.clone(),
+                    runs: std::mem::take(&mut plan.blocks[0].runs),
+                    displays: BTreeMap::new(),
+                };
+                plan.blocks[0].runs = vec![plan::Inline::Text("Caption.".into())];
+                let other_cell = plan::Block {
+                    unit: "sec:fixture:unit".into(),
+                    depth: None,
+                    site: input::site("units/displays/fixture.toml"),
+                    runs: vec![plan::Inline::Text("Cell.".into())],
+                    displays: BTreeMap::new(),
+                };
+                let (layout, regions) = if position == 4 {
+                    (
+                        ftoo_manifest::DisplayLayout::Picture {
+                            width: 100,
+                            height: 20,
+                            commands: vec![ftoo_manifest::PictureCommand::Label {
+                                x: 0,
+                                y: 10,
+                                region: 0,
+                            }],
+                        },
+                        vec![tag_region],
+                    )
+                } else {
+                    (
+                        ftoo_manifest::DisplayLayout::Table {
+                            columns: vec!["l".into()],
+                            rows: vec![vec![0], vec![1]],
+                            rules: vec![],
+                        },
+                        if position == 2 {
+                            vec![tag_region, other_cell]
+                        } else {
+                            vec![other_cell, tag_region]
+                        },
+                    )
+                };
+                plan.blocks[0].displays.insert(
+                    DocumentTarget::Latex,
+                    plan::DisplayBody {
+                        source: "private lifecycle body".into(),
+                        layout,
+                        regions,
+                        site: input::site("units/displays/fixture.toml"),
+                    },
+                );
+            }
             let original = runtime::render(&book, std::slice::from_ref(&plan))?;
             let start = original
                 .find("\\prop_gput:Nxx \\g_ftdoc_live_prop ")
@@ -1815,35 +1895,42 @@ fn support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_
             u32::from(scalar)
         )?;
     }
-    let source = format!(
-        "{}\\ExplSyntaxOn\n\\cs_new:Npn \\fixtureInput {{{definition}}}\n\\ExplSyntaxOff\n\\section*{{\\FtdocTag{{\\fixtureInput}}{{u0-t0}}}}\n\\end{{document}}\n",
-        latex::start("fixture", "en")
-    );
-    let case = NativeCase::Document {
-        document: "fixture".into(),
-        language: "en".into(),
-    };
-    let expected = expected_runtime_refusal(
-        &source,
-        input,
-        "tag \"é\\\"\\\\\\t\\n\\r\\u{1}\\u{7f}\\u{80}\": unknown",
-    );
-    let actual = native::consume(
-        &support,
-        &lock,
-        &source,
-        "",
-        &addressing,
-        case.clone(),
-        vec![],
-    )
-    .unwrap_err();
-    assert_eq!(actual, expected);
-    let restored = source.replace(&definition, "c:1");
-    assert_eq!(
-        native::consume(&support, &lock, &restored, "", &addressing, case, vec![]),
-        Ok(())
-    );
-    assert_eq!(runtime::render(&book, &[])?, addressing);
+    for position in [
+        r"\section*{\FtdocTag{\fixtureInput}{u0-t0}}",
+        r"\begin{tabular}{l}\FtdocTag{\fixtureInput}{u0-t0} \\ Cell \\ \end{tabular}",
+        r"\begin{tabular}{l}Cell \\ \FtdocTag{\fixtureInput}{u0-t0} \\ \end{tabular}",
+        r"\begin{picture}(100,20)\put(0,10){\FtdocTag{\fixtureInput}{u0-t0}}\end{picture}",
+    ] {
+        let source = format!(
+            "{}\\ExplSyntaxOn\n\\cs_new:Npn \\fixtureInput {{{definition}}}\n\\ExplSyntaxOff\n{position}\n\\end{{document}}\n",
+            latex::start("fixture", "en")
+        );
+        let case = NativeCase::Document {
+            document: "fixture".into(),
+            language: "en".into(),
+        };
+        let expected = expected_runtime_refusal(
+            &source,
+            input,
+            "tag \"é\\\"\\\\\\t\\n\\r\\u{1}\\u{7f}\\u{80}\": unknown",
+        );
+        let actual = native::consume(
+            &support,
+            &lock,
+            &source,
+            "",
+            &addressing,
+            case.clone(),
+            vec![],
+        )
+        .unwrap_err();
+        assert_eq!(actual, expected);
+        let restored = source.replace(&definition, "c:1");
+        assert_eq!(
+            native::consume(&support, &lock, &restored, "", &addressing, case, vec![]),
+            Ok(())
+        );
+        assert_eq!(runtime::render(&book, &[])?, addressing);
+    }
     Ok(())
 }

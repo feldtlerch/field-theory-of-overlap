@@ -1,4 +1,7 @@
 use crate::{LabelFileError, NotationRenderError, ProjectionCheckError, UnitLoadError};
+use ftoo_manifest::{
+    AddressFamily, BodyAddressSide, DisplayKind, DisplaySyntaxReason, TagResolutionFault,
+};
 use ftoo_manifest::{AssemblyResource, MathSyntaxReason};
 use ftoo_manifest::{
     AssemblySite, AssemblyStage, DocumentTarget, ProjectionError, RenderOwner, RuleId, UnitErrors,
@@ -7,6 +10,7 @@ use ftoo_manifest::{
 use std::{fmt, io, ops::Range, path::PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
     Limit {
         resource: AssemblyResource,
@@ -60,6 +64,62 @@ pub enum AssemblyFault {
         token: String,
         expected: Vec<String>,
     },
+    DisplayMultiplicity {
+        unit: String,
+        expected: usize,
+        actual: usize,
+        sites: Vec<UnitSite>,
+    },
+    DisplayHeading {
+        unit: String,
+        display_at: UnitSite,
+    },
+    BodyLanguages {
+        target: DocumentTarget,
+        required: Vec<String>,
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
+    DisplaySyntax {
+        kind: DisplayKind,
+        reason: DisplaySyntaxReason,
+        token: String,
+        expected: Vec<String>,
+    },
+    TableColumns {
+        row: usize,
+        expected: usize,
+        actual: usize,
+    },
+    Coordinate {
+        field: String,
+        value: String,
+        minimum: i32,
+        maximum: i32,
+    },
+    DisplayInline {
+        cause: UnitFault,
+    },
+    DisplayMathReference {
+        name: String,
+        available: Vec<String>,
+    },
+    DisplayTag {
+        cause: TagResolutionFault,
+    },
+    DisplayCitation {
+        label: String,
+        span_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    DisplaySetMismatch {
+        family: AddressFamily,
+        reference: BodyAddressSide,
+        actual: BodyAddressSide,
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
     MathNotation {
         cause: NotationRenderError,
     },
@@ -102,6 +162,9 @@ pub enum AssemblyFault {
 }
 impl fmt::Display for AssemblyFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Self::DisplayTag { cause } = self {
+            return cause.fmt(f);
+        }
         write!(f, "{self:?}")
     }
 }
@@ -127,6 +190,17 @@ impl AssemblyFault {
             Self::NativeRejected { .. } => 16,
             Self::ArtifactInventory { .. } => 17,
             Self::NonCanonicalDocument { .. } => 18,
+            Self::DisplayMultiplicity { .. } => 20,
+            Self::DisplayHeading { .. } => 21,
+            Self::BodyLanguages { .. } => 22,
+            Self::DisplaySyntax { .. } => 23,
+            Self::TableColumns { .. } => 24,
+            Self::Coordinate { .. } => 25,
+            Self::DisplayInline { .. } => 26,
+            Self::DisplayMathReference { .. } => 27,
+            Self::DisplayTag { .. } => 28,
+            Self::DisplayCitation { .. } => 29,
+            Self::DisplaySetMismatch { .. } => 30,
         }
     }
 }
@@ -149,9 +223,94 @@ fn location(site: &AssemblySite) -> (&str, &[ftoo_manifest::PathPart], Option<us
     }
 }
 impl From<ftoo_manifest::AssemblyInputFault> for AssemblyFault {
+    #[allow(clippy::too_many_lines)] // Exhaustive lossless conversion of the specified fault family.
     fn from(value: ftoo_manifest::AssemblyInputFault) -> Self {
         use ftoo_manifest::AssemblyInputFault as F;
         match value {
+            F::DisplayMultiplicity {
+                unit,
+                expected,
+                actual,
+                sites,
+            } => Self::DisplayMultiplicity {
+                unit,
+                expected,
+                actual,
+                sites,
+            },
+            F::DisplayHeading { unit, display_at } => Self::DisplayHeading { unit, display_at },
+            F::BodyLanguages {
+                target,
+                required,
+                missing,
+                unexpected,
+            } => Self::BodyLanguages {
+                target,
+                required,
+                missing,
+                unexpected,
+            },
+            F::DisplaySyntax {
+                kind,
+                reason,
+                token,
+                expected,
+            } => Self::DisplaySyntax {
+                kind,
+                reason,
+                token,
+                expected,
+            },
+            F::TableColumns {
+                row,
+                expected,
+                actual,
+            } => Self::TableColumns {
+                row,
+                expected,
+                actual,
+            },
+            F::Coordinate {
+                field,
+                value,
+                minimum,
+                maximum,
+            } => Self::Coordinate {
+                field,
+                value,
+                minimum,
+                maximum,
+            },
+            F::DisplayInline { cause } => Self::DisplayInline { cause },
+            F::DisplayMathReference { name, available } => {
+                Self::DisplayMathReference { name, available }
+            }
+            F::DisplayTag { cause } => Self::DisplayTag { cause },
+            F::DisplayCitation {
+                label,
+                span_index,
+                expected,
+                actual,
+            } => Self::DisplayCitation {
+                label,
+                span_index,
+                expected,
+                actual,
+            },
+            F::DisplaySetMismatch {
+                family,
+                reference,
+                actual,
+                missing,
+                unexpected,
+            } => Self::DisplaySetMismatch {
+                family,
+                reference,
+                actual,
+                missing,
+                unexpected,
+            },
+
             F::Limit {
                 resource,
                 limit,
@@ -314,6 +473,8 @@ impl std::error::Error for AssemblyErrors {}
 pub enum EmissionKind {
     Heading,
     Paragraph,
+    Caption,
+    Body,
     Tag,
     Citation,
     Mention,

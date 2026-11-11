@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:coefficients:value-table"
+document = "main"
+math = {}
+
+[unit.texts]
+en = "Registered coefficient value claims."

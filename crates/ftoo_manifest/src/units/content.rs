@@ -33,7 +33,25 @@ enum Insertion {
     Math(MathOccurrence),
     Tag(TagOccurrence),
 }
+pub(crate) enum AssemblyScanFault {
+    Content(ScanFault),
+    Limit(UnitSite),
+}
+impl From<ScanFault> for AssemblyScanFault {
+    fn from(value: ScanFault) -> Self {
+        Self::Content(value)
+    }
+}
 pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
+    scan_limited(source, None).map_err(|fault| match fault {
+        AssemblyScanFault::Content(error) => error,
+        AssemblyScanFault::Limit(_) => unreachable!("no limit supplied to statement admission"),
+    })
+}
+pub(super) fn scan_limited(
+    source: &LocatedString,
+    maximum: Option<usize>,
+) -> Result<ScannedText, AssemblyScanFault> {
     let mut chars = source.value.char_indices().peekable();
     let mut span_index = 0;
     let mut scanned = ScannedText {
@@ -44,6 +62,16 @@ pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
     while let Some((start, c)) = chars.next() {
         if c == '`' {
             let span = super::spans::parse(&source.value, &source.site, start, span_index)?;
+            if maximum
+                .is_some_and(|limit| span_index + scanned.math.len() + scanned.tags.len() == limit)
+            {
+                return Err(AssemblyScanFault::Limit(at(
+                    source,
+                    span.bytes.start,
+                    span.bytes.end,
+                    None,
+                )));
+            }
             span_index += 1;
             while chars.peek().is_some_and(|(at, _)| *at < span.bytes.end) {
                 chars.next();
@@ -53,12 +81,12 @@ pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
         if c != '@' {
             if matches!(c, '$' | '\\' | '<' | '>') || (c.is_control() && !matches!(c, '\t' | '\n'))
             {
-                return Err(Box::new((
+                return Err(AssemblyScanFault::Content(Box::new((
                     at(source, start, start + c.len_utf8(), None),
                     UnitFault::UnsupportedTextCharacter {
                         value: c.to_string(),
                     },
-                )));
+                ))));
             }
             scanned.prose |= !c.is_whitespace();
             continue;
@@ -69,7 +97,17 @@ pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
             continue;
         }
         let index = scanned.math.len() + scanned.tags.len();
-        match insertion(source, start, index, &mut chars)? {
+        let insertion = insertion(source, start, index, &mut chars)?;
+        if maximum
+            .is_some_and(|limit| span_index + scanned.math.len() + scanned.tags.len() == limit)
+        {
+            let site = match &insertion {
+                Insertion::Math(value) => value.site.clone(),
+                Insertion::Tag(value) => value.site.clone(),
+            };
+            return Err(AssemblyScanFault::Limit(site));
+        }
+        match insertion {
             Insertion::Math(value) => scanned.math.push(value),
             Insertion::Tag(value) => scanned.tags.push(value),
         }
