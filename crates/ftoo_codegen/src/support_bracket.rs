@@ -147,6 +147,46 @@ pub(crate) fn file_beneath(directory: &File, relative: &Path) -> io::Result<File
 }
 
 struct Directory(*mut libc::DIR);
+impl Directory {
+    fn open(file: &File) -> io::Result<Self> {
+        // A new open description gives this enumeration its own offset.
+        let descriptor = child(file, std::ffi::OsStr::new("."), true)?.into_raw_fd();
+        // SAFETY: descriptor is an owned directory descriptor.
+        let pointer = unsafe { libc::fdopendir(descriptor) };
+        if pointer.is_null() {
+            let error = io::Error::last_os_error();
+            // SAFETY: failed fdopendir did not take ownership.
+            unsafe {
+                libc::close(descriptor);
+            }
+            return Err(error);
+        }
+        Ok(Self(pointer))
+    }
+    fn next(&mut self) -> io::Result<Option<&CStr>> {
+        loop {
+            // SAFETY: the stream is exclusively borrowed; errno is thread-local.
+            let entry = unsafe {
+                *libc::__errno_location() = 0;
+                libc::readdir(self.0)
+            };
+            if entry.is_null() {
+                let error = io::Error::last_os_error();
+                return if error.raw_os_error() == Some(0) {
+                    Ok(None)
+                } else {
+                    Err(error)
+                };
+            }
+            // SAFETY: the name is terminated and remains valid until next(),
+            // which requires another exclusive borrow of this stream.
+            let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) };
+            if name.to_bytes() != b"." && name.to_bytes() != b".." {
+                return Ok(Some(name));
+            }
+        }
+    }
+}
 impl Drop for Directory {
     fn drop(&mut self) {
         // SAFETY: fdopendir transferred ownership to this live directory stream.
@@ -193,15 +233,12 @@ fn names(file: &File) -> io::Result<Vec<OsString>> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Snapshot {
+struct Baseline {
     roots: Vec<PathBuf>,
     members: BTreeMap<PathBuf, SupportIdentity>,
 }
-impl Snapshot {
-    pub(crate) fn member_count(&self) -> usize {
-        self.members.len()
-    }
-    pub(crate) fn capture(roots: &[PathBuf]) -> Result<Self, Fault> {
+impl Baseline {
+    fn capture(roots: &[PathBuf]) -> Result<Self, Fault> {
         let mut members = BTreeMap::new();
         for path in roots {
             let mut changed = None;
@@ -315,6 +352,229 @@ impl Snapshot {
             }
         }
         Ok(self.members.len())
+    }
+}
+
+#[derive(Debug)]
+struct Entry {
+    name: CString,
+    identity: SupportIdentity,
+}
+#[derive(Debug)]
+struct HeldDirectory {
+    path: PathBuf,
+    file: File,
+    identity: SupportIdentity,
+    entries: Vec<Entry>,
+    complete: bool,
+}
+enum Mismatch {
+    Observation(Fault),
+    Order,
+}
+impl From<Fault> for Mismatch {
+    fn from(fault: Fault) -> Self {
+        Self::Observation(fault)
+    }
+}
+
+fn entry_identity(file: &File, name: &CStr) -> io::Result<SupportIdentity> {
+    let mut value = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: file and terminated name remain live; value is writable storage.
+    let status = unsafe {
+        libc::fstatat(
+            file.as_raw_fd(),
+            name.as_ptr(),
+            value.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: successful fstatat initialized the stat structure.
+    let value = unsafe { value.assume_init() };
+    Ok(SupportIdentity {
+        device: value.st_dev,
+        inode: value.st_ino,
+        size: u64::try_from(value.st_size).map_err(|_| io::ErrorKind::InvalidData)?,
+        mode: value.st_mode,
+        mtime_seconds: value.st_mtime,
+        mtime_nanoseconds: value.st_mtime_nsec,
+        ctime_seconds: value.st_ctime,
+        ctime_nanoseconds: value.st_ctime_nsec,
+    })
+}
+
+#[derive(Debug)]
+pub(crate) struct Snapshot {
+    roots: Vec<PathBuf>,
+    directories: Vec<HeldDirectory>,
+    members: usize,
+}
+impl Snapshot {
+    pub(crate) fn member_count(&self) -> usize {
+        self.members
+    }
+
+    pub(crate) fn capture(roots: &[PathBuf]) -> Result<Self, Fault> {
+        let baseline = Baseline::capture(roots)?;
+        let mut directories = Vec::new();
+        let is_directory =
+            |identity: &SupportIdentity| identity.mode & libc::S_IFMT == libc::S_IFDIR;
+        for (path, identity) in baseline.members.iter().filter(|(_, id)| is_directory(id)) {
+            let file = open_directory(path).map_err(|e| io_fault(path, &e))?;
+            let actual = SupportIdentity::from(&file.metadata().map_err(|e| io_fault(path, &e))?);
+            if actual != *identity {
+                return Err(Fault::Changed {
+                    path: path.clone(),
+                    expected: *identity,
+                    actual: Some(actual),
+                });
+            }
+            let complete = roots.iter().any(|root| path.starts_with(root));
+            let mut children: BTreeMap<_, _> = baseline
+                .members
+                .iter()
+                .filter(|(member, _)| member.parent() == Some(path.as_path()))
+                .map(|(member, id)| (member.file_name().expect("child name").to_owned(), *id))
+                .collect();
+            let mut entries = Vec::new();
+            let mut unexpected = Vec::new();
+            if complete {
+                let mut stream = Directory::open(&file).map_err(|e| io_fault(path, &e))?;
+                while let Some(name) = stream.next().map_err(|e| io_fault(path, &e))? {
+                    let spelling = std::ffi::OsStr::from_bytes(name.to_bytes());
+                    if let Some(identity) = children.remove(spelling) {
+                        entries.push(Entry {
+                            name: name.to_owned(),
+                            identity,
+                        });
+                    } else {
+                        unexpected.push(path.join(spelling));
+                    }
+                }
+                if !children.is_empty() || !unexpected.is_empty() {
+                    unexpected.sort();
+                    return Err(Fault::Inventory {
+                        missing: children.keys().map(|name| path.join(name)).collect(),
+                        unexpected,
+                    });
+                }
+            } else {
+                for (name, identity) in children {
+                    entries.push(Entry {
+                        name: CString::new(name.as_bytes())
+                            .map_err(|e| io_fault(path, &e.into()))?,
+                        identity,
+                    });
+                }
+            }
+            directories.push(HeldDirectory {
+                path: path.clone(),
+                file,
+                identity: *identity,
+                entries,
+                complete,
+            });
+        }
+        Ok(Self {
+            roots: roots.to_vec(),
+            directories,
+            members: baseline.members.len(),
+        })
+    }
+
+    fn compare_entry(directory: &HeldDirectory, entry: &Entry, name: &CStr) -> Result<(), Fault> {
+        let actual = entry_identity(&directory.file, name).map_err(|e| {
+            io_fault(
+                &directory
+                    .path
+                    .join(std::ffi::OsStr::from_bytes(name.to_bytes())),
+                &e,
+            )
+        })?;
+        if actual == entry.identity {
+            return Ok(());
+        }
+        Err(Fault::Changed {
+            path: directory
+                .path
+                .join(std::ffi::OsStr::from_bytes(name.to_bytes())),
+            expected: entry.identity,
+            actual: Some(actual),
+        })
+    }
+
+    fn streamed_check(&self) -> Result<(), Mismatch> {
+        for directory in &self.directories {
+            let actual = SupportIdentity::from(
+                &directory
+                    .file
+                    .metadata()
+                    .map_err(|e| io_fault(&directory.path, &e))?,
+            );
+            if actual != directory.identity {
+                return Err(Fault::Changed {
+                    path: directory.path.clone(),
+                    expected: directory.identity,
+                    actual: Some(actual),
+                }
+                .into());
+            }
+            if directory.complete {
+                let mut stream =
+                    Directory::open(&directory.file).map_err(|e| io_fault(&directory.path, &e))?;
+                let mut expected = directory.entries.iter();
+                while let Some(name) = stream.next().map_err(|e| io_fault(&directory.path, &e))? {
+                    let Some(entry) = expected.next() else {
+                        return Err(Mismatch::Order);
+                    };
+                    if entry.name.as_c_str() != name {
+                        return Err(Mismatch::Order);
+                    }
+                    Self::compare_entry(directory, entry, name)?;
+                }
+                if expected.next().is_some() {
+                    return Err(Mismatch::Order);
+                }
+            } else {
+                for entry in &directory.entries {
+                    Self::compare_entry(directory, entry, &entry.name)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn check(&self) -> Result<usize, Fault> {
+        let Err(mismatch) = self.streamed_check() else {
+            return Ok(self.members);
+        };
+        // Reconstruct only on refusal, preserving the established complete
+        // inventory and member-before-ancestor diagnostic ordering. Directory
+        // enumeration order itself is not an integrity property.
+        let mut members = BTreeMap::new();
+        for directory in &self.directories {
+            members.insert(directory.path.clone(), directory.identity);
+            for entry in &directory.entries {
+                members.insert(
+                    directory
+                        .path
+                        .join(std::ffi::OsStr::from_bytes(entry.name.to_bytes())),
+                    entry.identity,
+                );
+            }
+        }
+        Baseline {
+            roots: self.roots.clone(),
+            members,
+        }
+        .check()?;
+        match mismatch {
+            Mismatch::Observation(fault) => Err(fault),
+            Mismatch::Order => Ok(self.members),
+        }
     }
 }
 

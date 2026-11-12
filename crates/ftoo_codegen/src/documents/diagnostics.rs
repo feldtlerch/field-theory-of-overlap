@@ -665,7 +665,25 @@ pub enum NativeMetadataReason {
     },
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FormatPhase {
+    Seed,
+    BeforeCase,
+    AfterCase,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FormatChange {
+    pub member: String,
+    pub expected: Vec<u8>,
+    pub actual: Vec<u8>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeAdapterFault {
+    FormatState {
+        phase: FormatPhase,
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+        changed: Vec<FormatChange>,
+    },
     SupportChanged {
         member: String,
         expected: crate::SupportIdentity,

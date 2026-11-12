@@ -1,9 +1,11 @@
 use super::{
+    FormatPhase,
     diagnostics::{
         AssemblyFault, DocumentError, NativeAdapterFault, NativeCase, NativeOperation,
         NativeProtocolReason,
     },
     failure,
+    native_format::{self, Seed},
     native_support::{self, Lock, NativeSupport},
 };
 use ftoo_manifest::{AssemblySite, AssemblyStage, RuleId, SourceOrigin};
@@ -14,6 +16,31 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub(super) struct Evidence {
+    pub scratch: std::path::PathBuf,
+    pub status: Option<i32>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub log: Vec<u8>,
+    pub pdf_bytes: Option<u64>,
+}
+#[cfg(test)]
+impl Evidence {
+    fn new(scratch: &Path, output: &std::process::Output, log: &[u8]) -> Self {
+        Self {
+            scratch: scratch.into(),
+            status: output.status.code(),
+            stdout: output.stdout.clone(),
+            stderr: output.stderr.clone(),
+            log: log.into(),
+            pdf_bytes: fs::metadata(scratch.join("output/document.pdf"))
+                .ok()
+                .map(|value| value.len()),
+        }
+    }
+}
 struct Scratch(std::path::PathBuf);
 impl Drop for Scratch {
     fn drop(&mut self) {
@@ -313,7 +340,7 @@ pub(super) fn consume(
     case: NativeCase,
     origins: Vec<SourceOrigin>,
 ) -> Result<(), DocumentError> {
-    consume_with(
+    consume_observed(
         support,
         lock,
         source,
@@ -321,11 +348,13 @@ pub(super) fn consume(
         addressing,
         case,
         origins,
+        false,
         |_| {},
         |_, _| {},
     )
 }
 #[allow(clippy::too_many_arguments)] // Private injection point observes the same invocation.
+#[cfg(test)]
 pub(super) fn consume_with(
     support: &NativeSupport,
     lock: &Lock,
@@ -337,8 +366,28 @@ pub(super) fn consume_with(
     before: impl FnOnce(&Path),
     completed: impl FnOnce(&Path, &Result<(), DocumentError>),
 ) -> Result<(), DocumentError> {
+    consume_observed(
+        support, lock, source, notation, addressing, case, origins, true, before, completed,
+    )
+}
+#[allow(clippy::too_many_arguments)] // The explicit seam invalidates a shared boundary observation.
+fn consume_observed(
+    support: &NativeSupport,
+    lock: &Lock,
+    source: &str,
+    notation: &str,
+    addressing: &str,
+    case: NativeCase,
+    origins: Vec<SourceOrigin>,
+    injected: bool,
+    before: impl FnOnce(&Path),
+    completed: impl FnOnce(&Path, &Result<(), DocumentError>),
+) -> Result<(), DocumentError> {
     support.scope(lock, || {
         support.ensure_open(lock)?;
+        if injected {
+            support.invalidate_observation();
+        }
         let scratch = support.root.join("tmp").join(format!(
             "document-{}-{}",
             std::process::id(),
@@ -348,17 +397,23 @@ pub(super) fn consume_with(
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e))?;
         let guard = Scratch(scratch.clone());
         before(&scratch);
+        let mut seed = None;
         let result = invoke(
-            support, lock, &scratch, source, notation, addressing, case, origins,
+            support, lock, &scratch, source, notation, addressing, case, origins, &mut seed,
         );
         completed(&scratch, &result);
-        let checked = support.observe(lock);
+        let checked = support.after_consumer(lock);
+        let format = seed.map_or(Ok(()), |seed: std::sync::Arc<Seed>| {
+            seed.check(&scratch.join("cache"), FormatPhase::AfterCase)
+                .map_err(|fault| support.poison(fault))
+        });
         let cleanup_phase = crate::telemetry::Phase::new("native.cleanup");
         let cleanup = fs::remove_dir_all(&scratch)
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e));
         drop(guard);
         drop(cleanup_phase);
         checked?;
+        format?;
         cleanup?;
         result
     })
@@ -373,6 +428,7 @@ fn invoke(
     addressing: &str,
     case: NativeCase,
     origins: Vec<SourceOrigin>,
+    seed: &mut Option<std::sync::Arc<Seed>>,
 ) -> Result<(), DocumentError> {
     for name in ["output", "cache", "config", "bundle-cache"] {
         let path = scratch.join(name);
@@ -389,7 +445,19 @@ fn invoke(
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
     }
     let executable = support.root.join("runtime/bin/tectonic");
-    support.observe(lock)?;
+    #[cfg(test)]
+    let reuse = !support.cold_format.get();
+    #[cfg(not(test))]
+    let reuse = true;
+    if reuse {
+        let format = support.format_seed(lock, native_format::BOOTSTRAP)?;
+        format
+            .copy(&scratch.join("cache"))
+            .map_err(|fault| support.poison(fault))?;
+        crate::telemetry::counter("native.format_copies", 1);
+        *seed = Some(format);
+    }
+    support.before_consumer(lock)?;
     let invocation = crate::telemetry::Phase::new(match &case {
         NativeCase::Document { .. } => "native.document",
         NativeCase::Sweep { .. } => "native.sweep",
@@ -422,6 +490,10 @@ fn invoke(
         bytes,
         origins,
     };
+    #[cfg(test)]
+    if let Some(evidence) = support.evidence.borrow_mut().as_mut() {
+        evidence.push(Evidence::new(scratch, &output, &log));
+    }
     classify(
         output,
         log,
@@ -429,6 +501,79 @@ fn invoke(
         case,
         scratch.join("output/document.pdf").is_file(),
     )
+}
+
+pub(super) fn bootstrap(
+    support: &NativeSupport,
+    lock: &Lock,
+    source: &str,
+) -> Result<Seed, DocumentError> {
+    let phase = crate::telemetry::Phase::new("native.format_bootstrap");
+    let scratch = support.root.join("tmp").join(format!(
+        "format-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    fs::create_dir(&scratch)
+        .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e))?;
+    let guard = Scratch(scratch.clone());
+    let result = (|| {
+        for name in ["output", "cache", "config", "bundle-cache"] {
+            let path = scratch.join(name);
+            fs::create_dir(&path)
+                .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
+        }
+        let input = scratch.join("document.tex");
+        fs::write(&input, source)
+            .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &input, &e))?;
+        support.before_consumer(lock)?;
+        let output = measured_output(&mut command(support, &scratch)).map_err(|e| {
+            native_support::io_error(
+                NativeOperation::Spawn,
+                &support.root.join("runtime/bin/tectonic"),
+                &e,
+            )
+        });
+        support.after_consumer(lock)?;
+        let output = output?;
+        let path = scratch.join("output/document.log");
+        let log = match fs::read(&path) {
+            Ok(log) => log,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => vec![],
+            Err(error) => {
+                return Err(
+                    native_support::io_error(NativeOperation::ReadOutput, &path, &error).into(),
+                );
+            }
+        };
+        #[cfg(test)]
+        {
+            *support.bootstrap_evidence.borrow_mut() = Some(Evidence::new(&scratch, &output, &log));
+        }
+        let reason =
+            if !output.status.success() || log.split(|byte| *byte == b'\n').any(lost_character) {
+                Some(NativeProtocolReason::UnexpectedStatus)
+            } else if !scratch.join("output/document.pdf").is_file() {
+                Some(NativeProtocolReason::MissingOutput)
+            } else {
+                None
+            };
+        if let Some(reason) = reason {
+            return Err(NativeAdapterFault::Protocol {
+                reason,
+                status: output.status.code(),
+                stdout: output.stdout,
+                stderr: output.stderr,
+                log,
+            }
+            .into());
+        }
+        Seed::capture(&scratch.join("cache"), &lock.bundle_digest)
+            .map_err(|fault| support.poison(fault).into())
+    })();
+    drop(guard);
+    phase.finish(result.is_ok());
+    result
 }
 
 fn measured_output(command: &mut Command) -> std::io::Result<std::process::Output> {

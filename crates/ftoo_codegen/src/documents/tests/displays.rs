@@ -48,6 +48,44 @@ fn location(path: &[&str], anchor: SourceAnchor) -> UnitSite {
     }
 }
 #[test]
+fn picture_integer_faults_retain_raw_literal_and_decoded_body_locations() {
+    let original = sources(DISPLAY).unwrap().1;
+    for token in ["00", "01", "-0", "-01", "+1", "", "-", "١"] {
+        let text = DISPLAY.replace("picture}(1,1)", &format!("picture}}({token},1)"));
+        let drafts = sources(&text).unwrap().1;
+        let body = &drafts[0].bodies[&DocumentTarget::Latex].languages["en"];
+        let begin = text.find("en='\\begin{picture}").unwrap() + 3;
+        let end = begin + body.value.len() + 2;
+        let mut expected_site = location(
+            &["display", "bodies", "latex", "en"],
+            SourceAnchor::Bytes(begin, end),
+        );
+        expected_site.decoded = Some(16..16 + token.len());
+        let fault = ftoo_manifest::AssemblyInputFault::DisplaySyntax {
+            kind: DisplayKind::Figure,
+            reason: ftoo_manifest::DisplaySyntaxReason::InvalidInteger,
+            token: token.into(),
+            expected: vec!["minimal decimal integer".into()],
+        };
+        let actual =
+            ftoo_manifest::parse_display_body(DisplayKind::Figure, DocumentTarget::Latex, body)
+                .unwrap_err();
+        assert_eq!(*actual, (expected_site, fault.clone()));
+        assert_eq!(actual.1.to_string(), format!("{fault:?}"));
+        let restored = sources(DISPLAY).unwrap().1;
+        assert_eq!(restored, original);
+        assert!(
+            ftoo_manifest::parse_display_body(
+                DisplayKind::Figure,
+                DocumentTarget::Latex,
+                &restored[0].bodies[&DocumentTarget::Latex].languages["en"]
+            )
+            .is_ok()
+        );
+    }
+}
+
+#[test]
 fn companion_schema_tokens_and_quoted_key_spelling_are_exact() {
     let original = sources(DISPLAY).unwrap();
     for token in ["0", "2", "+1", "0x1", "0o1", "0b1", "1_0"] {

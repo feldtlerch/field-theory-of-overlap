@@ -141,6 +141,7 @@ fn recover_markdown(body: &str, block: &Block) -> Option<Vec<Recovered>> {
 }
 fn tex_literal(tail: &str) -> Option<(char, usize)> {
     for (spelling, c) in [
+        (r"\space{}", ' '),
         (r"\textbackslash{}", '\\'),
         (r"\{", '{'),
         (r"\}", '}'),
@@ -158,10 +159,20 @@ fn tex_literal(tail: &str) -> Option<(char, usize)> {
     }
     None
 }
+#[derive(Clone, Copy, PartialEq)]
+enum TexLine {
+    NewLine,
+    MidLine,
+    SkipBlanks,
+}
+// TeX's input processor precedes the closed-grammar recognizer. Opaque inline
+// commands emit a nonblank token; comments discard their endline. Explicit
+// control spaces expand independently of the input processor's blank state.
 fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
+    let mut line = TexLine::NewLine;
     while at < body.len() {
         let tail = &body[at..];
         if let Some(tail) = tail.strip_prefix(r"\FtdocTag{") {
@@ -178,11 +189,13 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
                 token: Some(rest[..token_end].into()),
             });
             at += 10 + end + 1 + 1 + token_end + 1 + 8 + comment_end + 1;
+            line = TexLine::NewLine;
         } else if let Some(tail) = tail.strip_prefix(r"\(") {
             flush_text(&mut output, &mut text);
             let end = tail.find(r"\)")?;
             output.push(Recovered::Math(tail[..end].into()));
             at += 2 + end + 2;
+            line = TexLine::MidLine;
         } else if let Some(tail) = tail.strip_prefix(r"\texttt{") {
             flush_text(&mut output, &mut text);
             let mut value = String::new();
@@ -206,19 +219,37 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
                 }
                 at += 7 + end + 1;
                 output.push(Recovered::Citation(value));
+                line = TexLine::NewLine;
             } else {
                 output.push(Recovered::Mention(value));
+                line = TexLine::MidLine;
             }
         } else if tail.starts_with('\\') {
             let (c, n) = tex_literal(tail)?;
             text.push(c);
             at += n;
+            line = TexLine::MidLine;
         } else {
             let c = tail.chars().next()?;
-            if matches!(c, '{' | '}' | '%' | '\r' | '\n') {
+            if matches!(c, '{' | '}' | '%' | '\r') {
                 return None;
             }
-            text.push(c);
+            if matches!(c, ' ' | '\t' | '\n') {
+                if c == '\n' && line == TexLine::NewLine {
+                    // A blank line is a paragraph token, outside an inline region.
+                    return None;
+                }
+                if line == TexLine::MidLine {
+                    text.push(' ');
+                    line = TexLine::SkipBlanks;
+                }
+                if c == '\n' {
+                    line = TexLine::NewLine;
+                }
+            } else {
+                text.push(c);
+                line = TexLine::MidLine;
+            }
             at += c.len_utf8();
         }
     }
@@ -1402,4 +1433,60 @@ fn recover_display_block(
         result.extend(uses.clone());
     }
     Some(result)
+}
+
+#[cfg(test)]
+mod spacing_tests {
+    use super::*;
+
+    #[test]
+    fn token_spaces_normalize_source_lines_and_observe_tex_line_states() {
+        let site = UnitSite {
+            file: "fixture.toml".into(),
+            path: vec![],
+            anchor: ftoo_manifest::SourceAnchor::WholeFile,
+            decoded: None,
+            occurrence: None,
+        };
+        let mut runs = vec![
+            Inline::Text(" \n  before\t ".into()),
+            Inline::Tag {
+                handle: "c:1".into(),
+                label: "def:fixture:one".into(),
+                token: "u0-t0".into(),
+                site,
+            },
+            Inline::Text("\n\t after  \n".into()),
+        ];
+        normalize(&mut runs);
+        let mut emitted = String::new();
+        super::super::latex::inline(&mut emitted, &runs);
+        assert_eq!(
+            emitted,
+            "before \\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n\\space{}after"
+        );
+        assert_eq!(
+            recover_latex(&emitted),
+            Some(vec![
+                Recovered::Text("before ".into()),
+                Recovered::Tag {
+                    handle: "c:1".into(),
+                    label: "def:fixture:one".into(),
+                    token: Some("u0-t0".into())
+                },
+                Recovered::Text(" after".into())
+            ])
+        );
+        for source in ["word next", "word\n  next", "  word\t \n  next"] {
+            assert_eq!(
+                recover_latex(source),
+                Some(vec![Recovered::Text("word next".into())])
+            );
+        }
+        assert_eq!(recover_latex("word\n\nnext"), None);
+        assert_eq!(
+            recover_latex(r"\space{}\space{}word"),
+            Some(vec![Recovered::Text("  word".into())])
+        );
+    }
 }

@@ -143,7 +143,11 @@ pub(super) fn support_required_native_negative_contexts_pin_complete_evidence_an
             |path| scratch = path.into(),
             |_, _| {},
         );
-        let (stdout, stderr, log) = native_evidence::evidence(name);
+        let (stdout, stderr, log) = if support.cold_format.get() {
+            native_evidence::evidence(name)
+        } else {
+            native_evidence::seeded_evidence(name)
+        };
         let document = (name != "collision").then(|| "fixture".to_owned());
         let language = (name != "collision").then(|| "en".to_owned());
         let target = (name != "collision").then_some(DocumentTarget::Latex);
@@ -1444,9 +1448,14 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                 ));
             }
         }
+        let prose_space = if target == DocumentTarget::Latex {
+            r"\space{}"
+        } else {
+            " "
+        };
         let swapped = rendered.replacen(
-            &format!("{tag_source} {math_source}"),
-            &format!("{math_source} {tag_source}"),
+            &format!("{tag_source}{prose_space}{math_source} {cite_source}"),
+            &format!("{math_source} {tag_source}{prose_space}{cite_source}"),
             1,
         );
         let mut actual_body = body.clone();
@@ -1479,7 +1488,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         };
         let malformed = rendered.replacen(math_source, malformed_math, 1);
         let mut actual_body = body.clone();
-        actual_body.value = format!("{tag_source} {malformed_math} {cite_source}");
+        actual_body.value = format!("{tag_source}{prose_space}{malformed_math} {cite_source}");
         cases.push((
             malformed,
             vec![tag.clone(), math.clone(), cite.clone()],

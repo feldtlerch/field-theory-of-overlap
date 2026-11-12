@@ -945,10 +945,121 @@ fn display_coordinate_fields_and_every_alignment_have_exact_bounds() {
                 DisplayKind::Figure,
                 DisplaySyntaxReason::InvalidInteger,
                 token,
-                &["decimal integer"],
+                &["minimal decimal integer"],
             ),
         );
     }
+}
+
+#[test]
+fn picture_integer_spellings_are_minimal_in_every_field_and_restore() {
+    with_context(|skeletons, welded| {
+        let template = r"\begin{picture}(W,H)\put(X,Y){\line(DX,DY){L}}\put(0,0){A}\end{picture}";
+        let fields = [
+            ("W", "4096", 1, 4096),
+            ("H", "4096", 1, 4096),
+            ("X", "0", 0, 4096),
+            ("Y", "0", 0, 4096),
+            ("DX", "-1", -1, 1),
+            ("DY", "1", -1, 1),
+            ("L", "4096", 1, 4096),
+        ];
+        let render = |field: &str, value: &str| {
+            // Longest placeholders first, so X never consumes the end of DX.
+            ["DX", "DY", "W", "H", "X", "Y", "L"].into_iter().fold(
+                template.to_owned(),
+                |text, name| {
+                    let original = fields.iter().find(|(f, _, _, _)| *f == name).unwrap().1;
+                    text.replace(name, if name == field { value } else { original })
+                },
+            )
+        };
+        let positive = render("", "");
+        let original = companion("> A", &positive);
+        let baseline = check_displays(std::slice::from_ref(&original), skeletons, welded).unwrap();
+        for (field, valid, minimum, maximum) in fields {
+            for token in [
+                "00",
+                "01",
+                "-0",
+                "-01",
+                "+1",
+                "",
+                "-",
+                "١",
+                "１",
+                "1.0",
+                "99999999999999999999",
+            ] {
+                let marked = render(field, "TOKEN");
+                let at = marked.find("TOKEN").unwrap();
+                let text = marked.replace("TOKEN", token);
+                let mut changed = companion("> A", &text);
+                let body = changed
+                    .bodies
+                    .get_mut(&DocumentTarget::Latex)
+                    .unwrap()
+                    .languages
+                    .get_mut("en")
+                    .unwrap();
+                body.site.path[2] = PathPart::Key("latex".into());
+                body.site.anchor = SourceAnchor::Bytes(100, 102 + text.len());
+                let mut expected_site = body.site.clone();
+                expected_site.decoded = Some(at..at + token.len());
+                let fault = if token == "99999999999999999999" {
+                    AssemblyInputFault::Coordinate {
+                        field: field.into(),
+                        value: token.into(),
+                        minimum,
+                        maximum,
+                    }
+                } else {
+                    syntax(
+                        DisplayKind::Figure,
+                        DisplaySyntaxReason::InvalidInteger,
+                        token,
+                        &["minimal decimal integer"],
+                    )
+                };
+                let expected = AssemblyInputDiagnostic {
+                    rule: RuleId::M058,
+                    stage: AssemblyStage::DisplaySyntax,
+                    document: Some("main".into()),
+                    unit: Some("sec:fixture:caption".into()),
+                    language: Some("en".into()),
+                    target: Some(DocumentTarget::Latex),
+                    site: AssemblySite::Source(expected_site),
+                    fault,
+                };
+                let actual = check_displays(&[changed], skeletons, welded).unwrap_err();
+                assert_eq!(actual, vec![expected.clone()]);
+                assert_eq!(
+                    actual[0].to_string(),
+                    format!(
+                        "M058 DisplaySyntax document=Some(\"main\") unit=Some(\"sec:fixture:caption\") language=Some(\"en\") target=Some(Latex) at {}: {}",
+                        expected.site, expected.fault
+                    )
+                );
+                assert_eq!(
+                    check_displays(std::slice::from_ref(&original), skeletons, welded)
+                        .unwrap()
+                        .bodies(),
+                    baseline.bodies()
+                );
+            }
+            for value in [
+                minimum.to_string(),
+                maximum.to_string(),
+                format!(" \t{valid}\n "),
+            ] {
+                let restored = companion("> A", &render(field, &value));
+                assert!(
+                    check_displays(&[restored], skeletons, welded).is_ok(),
+                    "{field} {value}"
+                );
+            }
+        }
+    });
 }
 
 #[test]

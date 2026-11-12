@@ -4,9 +4,82 @@ use super::*;
 mod acceptance;
 mod brackets;
 mod displays;
-mod native_evidence;
+pub(super) mod native_evidence;
+mod spacing;
 mod sweep;
 use brackets::CaseEvidence;
+
+#[test]
+fn comment_spacing_writer_consumes_only_semantic_spaces() {
+    use plan::Inline;
+    let site = UnitSite {
+        file: "fixture.toml".into(),
+        path: vec![],
+        anchor: ftoo_manifest::SourceAnchor::WholeFile,
+        decoded: None,
+        occurrence: None,
+    };
+    for citation in [false, true] {
+        let insertion = || {
+            if citation {
+                Inline::Citation {
+                    text: "dec:fixture:source".into(),
+                    site: site.clone(),
+                }
+            } else {
+                Inline::Tag {
+                    handle: "c:1".into(),
+                    label: "def:fixture:one".into(),
+                    token: "u0-t0".into(),
+                    site: site.clone(),
+                }
+            }
+        };
+        let prefix = if citation {
+            "\\texttt{dec:fixture:source}% cite dec:fixture:source\n"
+        } else {
+            "\\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n"
+        };
+        for (following, expected) in [
+            (" word", r"\space{}word"),
+            (".", "."),
+            (" .", r"\space{}."),
+            ("", ""),
+        ] {
+            let runs = vec![
+                insertion(),
+                Inline::Text(String::new()),
+                Inline::Text(following.into()),
+            ];
+            let mut output = String::new();
+            latex::inline(&mut output, &runs);
+            assert_eq!(output, format!("{prefix}{expected}"));
+            assert_eq!(latex::inline_size(&runs), output.len());
+        }
+        let runs = vec![
+            insertion(),
+            Inline::Text(" ".into()),
+            Inline::Math {
+                key: "x".into(),
+                markdown: "x".into(),
+                latex: "x".into(),
+                site: site.clone(),
+            },
+            insertion(),
+            insertion(),
+        ];
+        let mut output = String::new();
+        latex::inline(&mut output, &runs);
+        assert_eq!(
+            output,
+            format!("{prefix}\\space{{}}\\(x\\){prefix}{prefix}")
+        );
+        assert_eq!(latex::inline_size(&runs), output.len());
+        // A new region cannot inherit the previous region's comment boundary.
+        latex::inline(&mut output, &[Inline::Text(" next".into())]);
+        assert!(output.ends_with("\n next"));
+    }
+}
 #[test]
 fn native_preparation_refuses_unsafe_archives_and_restores()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -665,14 +738,7 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
             file: "units/documents.toml".into(),
             bytes: input::read(&root, "units/documents.toml")?,
         },
-        input::sources(
-            &root,
-            &[
-                "units/statements/overview.toml".into(),
-                "units/statements/first-value.toml".into(),
-                "units/statements/value-context.toml".into(),
-            ],
-        )?,
+        input::sources(&root, &input::discover(&root, "units/statements", false)?)?,
     )?;
     let site = |file: &str, path: Vec<ftoo_manifest::PathPart>| UnitSite {
         file: file.into(),
@@ -697,6 +763,7 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
     };
     let first = reference("sec:coefficients:first-value", 0);
     let context = reference("sec:coefficients:value-context", 1);
+    let table = reference("sec:coefficients:value-table", 2);
     let heading = LocatedString {
         value: "sec:coefficients:overview".into(),
         site: site(
@@ -726,6 +793,7 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
             children: vec![
                 SkeletonChild::Unit(first.clone()),
                 SkeletonChild::Unit(context.clone()),
+                SkeletonChild::Unit(table.clone()),
             ],
         }],
     };
@@ -751,6 +819,13 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
                 vec![Key("unit".into()), Key("id".into())],
             ),
         ),
+        (
+            "sec:coefficients:value-table".into(),
+            site(
+                "units/statements/value-table.toml",
+                vec![Key("unit".into()), Key("id".into())],
+            ),
+        ),
     ]);
     let documents = BTreeMap::from([(
         "main".into(),
@@ -763,6 +838,7 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
         ("sec:coefficients:overview", Some(1), heading.site.clone()),
         ("sec:coefficients:first-value", None, first.site.clone()),
         ("sec:coefficients:value-context", None, context.site.clone()),
+        ("sec:coefficients:value-table", None, table.site.clone()),
     ];
     let checked = ftoo_manifest::check_skeletons(
         &corpus,
@@ -783,7 +859,7 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
         let mut changed = draft.clone();
         let mut sites = Vec::new();
         let primary = if duplicate {
-            let repeated = reference("sec:coefficients:first-value", 2);
+            let repeated = reference("sec:coefficients:first-value", 3);
             sites = vec![first.site.clone(), repeated.site.clone()];
             changed.sections[0]
                 .children
@@ -1668,8 +1744,17 @@ fn support_required_native_lost_character_is_a_complete_hard_error(
         |path| scratch = path.into(),
         |_, _| {},
     );
-    let stdout=format!("note: using only cached resource files\nnote: generating format \"latex\"\nnote: Running TeX ...\nnote: Writing `{}` (12.64 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
-    let stderr=b"warning: open of input /dev/null failed\ncaused by: access to the path `/dev/null` is forbidden\nerror: halted on potentially-recoverable error as specified\n".to_vec();
+    let format_progress = if support.cold_format.get() {
+        "note: generating format \"latex\"\n"
+    } else {
+        ""
+    };
+    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.64 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
+    let stderr = if support.cold_format.get() {
+        b"warning: open of input /dev/null failed\ncaused by: access to the path `/dev/null` is forbidden\nerror: halted on potentially-recoverable error as specified\n".to_vec()
+    } else {
+        b"error: halted on potentially-recoverable error as specified\n".to_vec()
+    };
     let expected = DocumentError::Assembly(
         AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
             rule: RuleId::M056,
@@ -1841,9 +1926,9 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
-struct Directory(PathBuf);
+pub(super) struct Directory(pub(super) PathBuf);
 impl Directory {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
             "assembly-test-{}-{}",
             std::process::id(),

@@ -8,6 +8,7 @@ mod latex;
 mod lock_scan;
 mod markdown;
 mod native;
+mod native_format;
 mod native_support;
 mod plan;
 mod runtime;

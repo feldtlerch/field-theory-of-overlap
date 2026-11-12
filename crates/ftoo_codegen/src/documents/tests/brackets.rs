@@ -72,10 +72,19 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
     let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+    *support.evidence.borrow_mut() = Some(Vec::new());
     let results = support.scope(&lock, || -> Result<_, DocumentError> {
         // Helpers retain pure source assertions; consumer evidence stays private.
         let mut checks = Vec::new();
         let run = |checks: &mut Vec<CaseEvidence>| -> Result<(), Box<dyn std::error::Error>> {
+            support.cold_format.set(true);
+            support_required_actual_native_faces_framing_and_expanded_live_keys(&support, &lock, checks)?;
+            support_required_actual_native_unknown_tag_has_complete_decoded_refusal(&support, &lock, checks)?;
+            support_required_native_lost_character_is_a_complete_hard_error(&support, &lock, checks)?;
+            acceptance::support_required_native_negative_contexts_pin_complete_evidence_and_restore(&support, &lock, checks)?;
+            displays::support_required_real_table_and_picture_consume_pending_math_and_literal_spans(&support, &lock, checks)?;
+            for check in checks.iter_mut() { check.name = format!("cold/{}", check.name); }
+            support.cold_format.set(false);
             support_required_native_unexpanded_live_lookup_is_refused_and_restores(&support, &lock, checks)?;
             support_required_actual_native_faces_framing_and_expanded_live_keys(&support, &lock, checks)?;
             support_required_actual_native_unknown_tag_has_complete_decoded_refusal(&support, &lock, checks)?;
@@ -92,6 +101,58 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
         Ok(checks)
     })?;
     assert_eq!(support.closing_hash(), Some(Ok(())));
+    let raw = support.evidence.borrow_mut().take().unwrap();
+    assert_eq!(raw.len(), results.len());
+    for (result, evidence) in results.iter().zip(&raw) {
+        let name = result.name.strip_prefix("cold/").unwrap_or(&result.name);
+        if matches!(
+            name,
+            "faces/accepted"
+                | "unknown/refusal"
+                | "lost-character/refusal"
+                | "negative/stored/refusal"
+                | "negative/collision/refusal"
+                | "negative/include/refusal"
+                | "negative/closure/refusal"
+                | "display/0"
+                | "display/1"
+                | "display/2"
+        ) {
+            let (status, stdout, stderr, log) = native_evidence::raw_evidence(&result.name);
+            let stdout = stdout.replace("@SCRATCH@", evidence.scratch.to_str().unwrap());
+            // Successful PDF sizes are independently observed filesystem facts,
+            // like scratch paths; the engine's PDF bytes vary between runs.
+            let stdout = if status == 0 {
+                let size =
+                    u32::try_from(evidence.pdf_bytes.expect("successful private PDF")).unwrap();
+                stdout.replace("@PDF-KIB@", &format!("{:.2}", f64::from(size) / 1024.0))
+            } else {
+                stdout
+            };
+            // The engine enumerates its two output files in either order.
+            // Admit both complete frames, without normalizing actual evidence.
+            let mut alternate: Vec<_> = stdout.split_inclusive('\n').collect();
+            let writes: Vec<_> = alternate
+                .iter()
+                .enumerate()
+                .filter_map(|(index, line)| line.starts_with("note: Writing `").then_some(index))
+                .collect();
+            if writes.len() == 2 {
+                assert_eq!(writes[1], writes[0] + 1);
+                alternate.swap(writes[0], writes[1]);
+            }
+            assert_eq!(evidence.status, Some(status), "{}", result.name);
+            assert!(
+                evidence.stdout == stdout.as_bytes()
+                    || evidence.stdout == alternate.concat().as_bytes(),
+                "{} stdout: {:?}",
+                result.name,
+                evidence.stdout
+            );
+            assert_eq!(evidence.stderr, stderr.as_bytes(), "{}", result.name);
+            assert_eq!(evidence.log, log.as_bytes(), "{}", result.name);
+        }
+    }
     let mut expected: Vec<String> = [
         "lookup/refusal",
         "lookup/restored",
@@ -139,10 +200,39 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
         .map(str::to_owned),
     );
     assert_eq!(expected.len(), 87);
+    let mut cold = vec![
+        "cold/faces/accepted".into(),
+        "cold/unknown/refusal".into(),
+        "cold/lost-character/refusal".into(),
+    ];
+    for name in ["stored", "collision", "include", "closure"] {
+        if name == "stored" {
+            cold.push(format!("cold/negative/{name}/declaration"));
+        }
+        for outcome in ["refusal", "restored"] {
+            cold.push(format!("cold/negative/{name}/{outcome}"));
+        }
+    }
+    for index in 0..3 {
+        cold.push(format!("cold/display/{index}"));
+    }
+    assert_eq!(cold.len(), 15);
+    cold.extend(expected);
+    let expected = cold;
     assert_eq!(
         results.iter().map(|r| &r.name).collect::<Vec<_>>(),
         expected.iter().collect::<Vec<_>>()
     );
+    // Each mode has its own complete byte oracle above. Compare the semantic
+    // causes and sites as well, excluding only engine progress/log payloads.
+    for cold in results
+        .iter()
+        .filter(|result| result.name.starts_with("cold/"))
+    {
+        let name = cold.name.strip_prefix("cold/").unwrap();
+        let seeded = results.iter().find(|result| result.name == name).unwrap();
+        assert_eq!(semantic(&cold.actual), semantic(&seeded.actual), "{name}");
+    }
     for result in results {
         result.check();
     }
@@ -150,6 +240,53 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
 }
 
 pub(super) static MUTATIONS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn support_required_held_directory_replacement_is_observed_and_restores()
+-> Result<(), Box<dyn std::error::Error>> {
+    let _serial = MUTATIONS.lock().unwrap();
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = NativeSupport::from_environment(&repository).map_err(|e| format!("{e:?}"))?;
+    let directory = Directory(
+        support
+            .directory()
+            .join("downloads")
+            .join(format!("held-{}", std::process::id())),
+    );
+    let selected = directory.0.join("selected");
+    let replacement = directory.0.join("replacement");
+    let saved = directory.0.join("saved");
+    fs::create_dir_all(&selected)?;
+    fs::create_dir(&replacement)?;
+    fs::write(selected.join("member"), b"same bytes")?;
+    fs::write(replacement.join("member"), b"same bytes")?;
+    let roots = vec![selected.clone()];
+    let before = identity(&selected.join("member"));
+    let snapshot =
+        crate::support_bracket::Snapshot::capture(&roots).map_err(|e| format!("{e:?}"))?;
+    assert_eq!(snapshot.check().unwrap(), snapshot.member_count());
+    // The retained descriptor still reaches the original directory. Its parent
+    // entry must nevertheless detect that the selected path now reaches another.
+    fs::rename(&selected, &saved)?;
+    fs::rename(&replacement, &selected)?;
+    let fault = crate::support_bracket::Fault::Changed {
+        path: selected.join("member"),
+        expected: before,
+        actual: Some(identity(&selected.join("member"))),
+    };
+    assert_eq!(
+        format!("{:?}", snapshot.check().unwrap_err()),
+        format!("{fault:?}")
+    );
+    drop(snapshot);
+    fs::rename(&selected, &replacement)?;
+    fs::rename(&saved, &selected)?;
+    assert_eq!(fs::read(selected.join("member"))?, b"same bytes");
+    let restored =
+        crate::support_bracket::Snapshot::capture(&roots).map_err(|e| format!("{e:?}"))?;
+    assert_eq!(restored.check().unwrap(), restored.member_count());
+    Ok(())
+}
 
 #[test]
 fn native_scope_keeps_pure_failure_before_lazy_support_opening() {
@@ -409,4 +546,120 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
         Ok(())
     );
     Ok(())
+}
+
+fn semantic(result: &Result<(), DocumentError>) -> Result<(), DocumentError> {
+    let mut result = result.clone();
+    if let Err(DocumentError::Assembly(errors)) = &mut result {
+        let rows = errors
+            .diagnostics()
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                if let AssemblyFault::NativeRejected {
+                    stdout,
+                    stderr,
+                    log,
+                    ..
+                } = &mut row.fault
+                {
+                    stdout.clear();
+                    stderr.clear();
+                    log.clear();
+                }
+                row
+            })
+            .collect();
+        *errors = AssemblyErrors::from_diagnostics(rows).unwrap();
+    }
+    result
+}
+
+#[test]
+fn support_required_format_state_fault_poison_discards_provisional_results_and_never_resumes() {
+    use super::super::{native_format::Seed, native_support::Lock};
+    use sha2::{Digest, Sha256};
+    let _serial = MUTATIONS.lock().unwrap();
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let original = NativeSupport::from_environment(&repository).unwrap();
+    let directory = Directory(
+        original
+            .directory()
+            .join("downloads")
+            .join(format!("format-state-{}", std::process::id())),
+    );
+    fs::create_dir(&directory.0).unwrap();
+    for name in ["runtime/bin", "bundle", "downloads", "tmp/case/cache"] {
+        fs::create_dir_all(directory.0.join(name)).unwrap();
+    }
+    fs::write(directory.0.join("runtime/bin/tectonic"), b"engine").unwrap();
+    let digest = "d".repeat(64);
+    fs::write(directory.0.join("bundle/SHA256SUM"), &digest).unwrap();
+    let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    let lock = Lock {
+        source: None,
+        engine: hash(b"engine"),
+        files: BTreeMap::from([("SHA256SUM".into(), hash(digest.as_bytes()))]),
+        bundle_digest: digest,
+    };
+    let support = NativeSupport::at(directory.0.clone());
+    let cache = directory.0.join("tmp/case/cache");
+    let seed = Seed {
+        files: BTreeMap::from([("a.fmt".into(), b"seed".to_vec())]),
+    };
+    for phase in [FormatPhase::BeforeCase, FormatPhase::AfterCase] {
+        let fault = NativeAdapterFault::FormatState {
+            phase: phase.clone(),
+            missing: vec![],
+            unexpected: vec![],
+            changed: vec![FormatChange {
+                member: "a.fmt".into(),
+                expected: b"seed".to_vec(),
+                actual: b"mutation".to_vec(),
+            }],
+        };
+        let result = support.scope(&lock, || -> Result<Vec<&str>, NativeAdapterFault> {
+            support.observe(&lock)?;
+            seed.copy(&cache)?;
+            fs::write(cache.join("Tectonic/formats/a.fmt"), b"mutation").unwrap();
+            assert_eq!(
+                seed.check(&cache, phase)
+                    .map_err(|fault| support.poison(fault)),
+                Err(fault.clone())
+            );
+            seed.copy(&cache)?;
+            assert_eq!(support.observe(&lock), Err(fault.clone()));
+            let started = std::cell::Cell::new(false);
+            let refused = super::super::native::consume_with(
+                &support,
+                &lock,
+                "",
+                "",
+                "",
+                super::super::NativeCase::Document {
+                    document: "fixture".into(),
+                    language: "en".into(),
+                },
+                vec![],
+                |_| started.set(true),
+                |_, _| {},
+            );
+            assert_eq!(refused, Err(DocumentError::Native(fault.clone())));
+            assert!(!started.get());
+            Ok(vec!["provisional"])
+        });
+        assert_eq!(result, Err(fault.clone()));
+        assert_eq!(support.closing_hash(), Some(Ok(())));
+        assert_eq!(
+            fs::read(cache.join("Tectonic/formats/a.fmt")).unwrap(),
+            b"seed"
+        );
+        assert_eq!(
+            support.scope(&lock, || {
+                support.observe(&lock)?;
+                seed.check(&cache, FormatPhase::BeforeCase)
+            }),
+            Ok(())
+        );
+    }
 }

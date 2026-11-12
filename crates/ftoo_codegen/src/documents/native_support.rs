@@ -23,12 +23,20 @@ pub struct NativeSupport {
     pub(super) root: PathBuf,
     active: RefCell<Option<Active>>,
     #[cfg(test)]
+    pub(super) cold_format: std::cell::Cell<bool>,
+    #[cfg(test)]
+    pub(super) evidence: RefCell<Option<Vec<super::native::Evidence>>>,
+    #[cfg(test)]
+    pub(super) bootstrap_evidence: RefCell<Option<super::native::Evidence>>,
+    #[cfg(test)]
     closing_hash: RefCell<Option<Result<()>>>,
 }
 #[derive(Debug)]
 struct Active {
     snapshot: Option<crate::support_bracket::Snapshot>,
     poison: Option<NativeAdapterFault>,
+    formats: Vec<super::native_format::Lease>,
+    observation_available: bool,
 }
 struct Scope<'a>(&'a NativeSupport);
 impl Drop for Scope<'_> {
@@ -44,10 +52,89 @@ impl Clone for NativeSupport {
     }
 }
 impl NativeSupport {
+    pub(super) fn invalidate_observation(&self) {
+        self.active
+            .borrow_mut()
+            .as_mut()
+            .expect("open bracket")
+            .observation_available = false;
+    }
+    pub(super) fn before_consumer(&self, lock: &Lock) -> Result<()> {
+        self.ensure_open(lock)?;
+        let available = self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .observation_available;
+        if !available {
+            self.observe(lock)?;
+        }
+        self.invalidate_observation();
+        Ok(())
+    }
+    pub(super) fn after_consumer(&self, lock: &Lock) -> Result<()> {
+        self.observe(lock)?;
+        // No consumer runs between this observation and the next ordinary
+        // invocation. Injection hooks invalidate it before making any writes.
+        self.active
+            .borrow_mut()
+            .as_mut()
+            .expect("open bracket")
+            .observation_available = true;
+        Ok(())
+    }
+    pub(super) fn format_seed(
+        &self,
+        lock: &Lock,
+        bootstrap: &str,
+    ) -> std::result::Result<std::sync::Arc<super::native_format::Seed>, super::DocumentError> {
+        self.ensure_open(lock)?;
+        let _lookup = crate::telemetry::Phase::new("native.format_lookup");
+        if let Some(seed) = self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .formats
+            .iter()
+            .find(|lease| lease.matches(bootstrap))
+            .and_then(|lease| lease.seed.clone())
+        {
+            return Ok(seed);
+        }
+        let key = super::native_format::Key::read(self, lock, bootstrap)?;
+        let mut lease = super::native_format::Lease::acquire(key);
+        let seed = if let Some(seed) = &lease.seed {
+            seed.clone()
+        } else {
+            let seed = std::sync::Arc::new(super::native::bootstrap(self, lock, bootstrap)?);
+            lease.seed = Some(seed.clone());
+            seed
+        };
+        self.active
+            .borrow_mut()
+            .as_mut()
+            .expect("open bracket")
+            .formats
+            .push(lease);
+        Ok(seed)
+    }
+    pub(super) fn poison(&self, fault: NativeAdapterFault) -> NativeAdapterFault {
+        let mut active = self.active.borrow_mut();
+        let active = active.as_mut().expect("open bracket");
+        active.poison.get_or_insert(fault).clone()
+    }
     pub(super) fn at(root: PathBuf) -> Self {
         Self {
             root,
             active: RefCell::new(None),
+            #[cfg(test)]
+            cold_format: std::cell::Cell::new(false),
+            #[cfg(test)]
+            evidence: RefCell::new(None),
+            #[cfg(test)]
+            bootstrap_evidence: RefCell::new(None),
             #[cfg(test)]
             closing_hash: RefCell::new(None),
         }
@@ -201,6 +288,8 @@ impl NativeSupport {
         *self.active.borrow_mut() = Some(Active {
             snapshot: None,
             poison: None,
+            formats: Vec::new(),
+            observation_available: false,
         });
         let guard = Scope(self);
         let result = run();
@@ -236,7 +325,7 @@ impl NativeSupport {
             .expect("verified opening")
             .check()
             .map_err(|e| self.observation_fault(lock, e));
-        let active = self.active.borrow_mut().take().expect("open bracket");
+        let mut active = self.active.borrow_mut().take().expect("open bracket");
         drop(guard);
         let closing = active.poison.map_or(full.and(identity.map(|_| ())), Err);
         close_phase.finish(closing.is_ok());
@@ -245,6 +334,11 @@ impl NativeSupport {
         }
         closing?;
         crate::telemetry::counter("native.bracket_closed", 1);
+        if result.is_ok() {
+            for lease in &mut active.formats {
+                lease.publish();
+            }
+        }
         result
     }
     /// # Errors

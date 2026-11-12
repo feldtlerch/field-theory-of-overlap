@@ -587,11 +587,14 @@ impl Parser<'_> {
         }
         let value = &self.source.value[start..self.at];
         let digits = value.strip_prefix('-').unwrap_or(value);
-        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        if digits.is_empty()
+            || !digits.bytes().all(|byte| byte.is_ascii_digit())
+            || (digits.starts_with('0') && value != "0")
+        {
             return Err(self.syntax(
                 start..self.at,
                 DisplaySyntaxReason::InvalidInteger,
-                &["decimal integer"],
+                &["minimal decimal integer"],
             ));
         }
         match value.parse::<i32>() {

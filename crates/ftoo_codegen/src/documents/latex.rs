@@ -141,22 +141,39 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
 }
 
 pub(super) fn inline(output: &mut String, runs: &[Inline]) {
+    let mut commented = false;
     for run in runs {
+        if matches!(run, Inline::Text(value) if value.is_empty()) {
+            continue;
+        }
+        let previous_comment = std::mem::replace(&mut commented, false);
         match run {
-            Inline::Text(value) => output.push_str(&text(value)),
+            Inline::Text(value) => {
+                let value = if previous_comment && let Some(rest) = value.strip_prefix(' ') {
+                    output.push_str(r"\space{}");
+                    rest
+                } else {
+                    value
+                };
+                output.push_str(&text(value));
+            }
             Inline::Tag {
                 handle,
                 label,
                 token,
                 ..
-            } => writeln!(output, "\\FtdocTag{{{handle}}}{{{token}}}% label {label}")
-                .expect("string write"),
+            } => {
+                writeln!(output, "\\FtdocTag{{{handle}}}{{{token}}}% label {label}")
+                    .expect("string write");
+                commented = true;
+            }
             Inline::Math { latex, .. } => {
                 write!(output, "\\({latex}\\)").expect("string write");
             }
             Inline::Citation { text: value, .. } => {
                 writeln!(output, "\\texttt{{{}}}% cite {value}", text(value))
                     .expect("string write");
+                commented = true;
             }
             Inline::Mention { text: value, .. } => {
                 write!(output, "\\texttt{{{}}}", text(value)).expect("string write");
@@ -167,17 +184,32 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
 
 pub(super) fn inline_size(runs: &[Inline]) -> usize {
     let mut size: usize = 0;
+    let mut commented = false;
     for run in runs {
+        if matches!(run, Inline::Text(value) if value.is_empty()) {
+            continue;
+        }
+        let previous_comment = std::mem::replace(&mut commented, false);
         let count = match run {
-            Inline::Text(value) => text_size(value),
+            Inline::Text(value) => {
+                if previous_comment && let Some(rest) = value.strip_prefix(' ') {
+                    text_size(rest).saturating_add(r"\space{}".len())
+                } else {
+                    text_size(value)
+                }
+            }
             Inline::Tag {
                 handle,
                 label,
                 token,
                 ..
-            } => format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len(),
+            } => {
+                commented = true;
+                format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len()
+            }
             Inline::Math { latex, .. } => latex.len().saturating_add(4),
             Inline::Citation { text, .. } => {
+                commented = true;
                 text_size(text).saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
             }
             Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
