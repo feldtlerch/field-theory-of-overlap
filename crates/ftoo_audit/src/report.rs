@@ -10,9 +10,8 @@ use nrz_cas::{Rational, limits::Limits};
 pub struct JetSummary {
     pub subject: &'static str,
     pub jet: Vec<Rational>,
-    pub increment: Vec<Rational>,
-    pub input_orders: [u32; 2],
-    pub default_order: bool,
+    pub source: &'static str,
+    pub clause: &'static str,
     pub order: u32,
     pub derivative_order: u32,
     pub residual_order: u32,
@@ -95,7 +94,7 @@ impl Receipt {
     pub const fn summary(&self) -> &JetSummary {
         &self.summary
     }
-    /// Compose, evaluated residual, then Member with its full premise closure.
+    /// Source including Defined, evaluated residual, then Member with its full premise closure.
     #[must_use]
     pub const fn evidence(&self) -> &[Vec<u8>; 3] {
         &self.evidence
@@ -107,8 +106,10 @@ pub struct Measurement {
     pub claim: NodeId,
     pub member_work: u64,
     pub total_work: u64,
-    /// Total Work charged by replay calls within this execution.
-    pub replay_work: u64,
+    /// Cumulative Work spent across all replay calls in this audit.
+    pub cumulative_replay_work: u64,
+    /// Largest single replay requirement; the `ReplayWork` ceiling is per call.
+    pub max_replay_work: u64,
     pub(crate) execution: u64,
 }
 #[cfg(test)]
@@ -459,7 +460,7 @@ pub(crate) fn outcome_drafts(
             }
             if let Verdict::Certified(receipt) | Verdict::Refuted(receipt) = &row.verdict {
                 if receipt.limits()
-                    != &crate::theory::limits(ftoo_manifest::BudgetProfile::PinnedTrialLimitsV1)
+                    != &crate::theory::limits(ftoo_manifest::BudgetProfile::PinnedTrialLimitsV2)
                     || receipt.target() != receipt.producer().descriptor().target
                 {
                     return Err(crate::AuditError::Report(vec![report_error(

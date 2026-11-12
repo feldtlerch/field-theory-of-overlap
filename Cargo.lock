@@ -155,7 +155,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "nrz-cas"
 version = "0.1.0"
-source = "git+https://github.com/naturrhythmuszentrum/naturrhythmuszentrum?rev=a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad#a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad"
+source = "git+https://github.com/naturrhythmuszentrum/naturrhythmuszentrum?rev=598ff683a57caca07cf9d44e3fd28c716afb81ef#598ff683a57caca07cf9d44e3fd28c716afb81ef"
 dependencies = [
  "num-bigint",
  "num-complex",

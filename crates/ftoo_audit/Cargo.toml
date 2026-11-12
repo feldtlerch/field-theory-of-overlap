@@ -8,7 +8,7 @@ publish.workspace = true
 
 [dependencies]
 ftoo_manifest = { path = "../ftoo_manifest" }
-nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad" }
+nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "598ff683a57caca07cf9d44e3fd28c716afb81ef" }
 
 [lints]
 workspace = true

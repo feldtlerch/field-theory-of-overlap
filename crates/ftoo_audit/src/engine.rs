@@ -6,7 +6,7 @@ use nrz_cas::{
     proof::{Judgment, Statement, VerifiedWitness},
     series::{
         ResidualReference as R, ResidualRow, ResidualSolve, ResidualSubject, SeriesObject,
-        SeriesOperation, SeriesStatement,
+        SeriesStatement, SourceClause, SourceRequest,
     },
     solving::{
         CertificateMembership, CoefficientDomainData, Coordinate, CoordinateRole,
@@ -29,13 +29,13 @@ pub(crate) struct Frame {
     pub cas: Cas,
     pub budget: Budget,
     nodes: Vec<(Operator, Vec<Handle>, Handle)>,
-    header: Handle,
-    coefficients: Handle,
-    region: Handle,
-    context: Handle,
-    field: Handle,
-    centre: Handle,
-    x: Handle,
+    pub(crate) header: Handle,
+    pub(crate) coefficients: Handle,
+    pub(crate) region: Handle,
+    pub(crate) context: Handle,
+    pub(crate) field: Handle,
+    pub(crate) centre: Handle,
+    pub(crate) x: Handle,
     y: Handle,
 }
 fn admit(cas: &mut Cas, budget: &mut Budget, draft: Draft) -> Result<Handle, Fault> {
@@ -178,7 +178,7 @@ impl Frame {
         }))?;
         Ok(())
     }
-    fn admit(&mut self, draft: Draft) -> Result<Handle, Fault> {
+    pub(crate) fn admit(&mut self, draft: Draft) -> Result<Handle, Fault> {
         admit(&mut self.cas, &mut self.budget, draft)
     }
     pub fn node(&mut self, operator: Operator, operands: &[Handle]) -> Result<Handle, Fault> {
@@ -208,7 +208,11 @@ impl Frame {
             .push((original, operands.to_vec(), handle.clone()));
         Ok(handle)
     }
-    fn condition(&mut self, kind: PredicateKind, arguments: &[Handle]) -> Result<Handle, Fault> {
+    pub(crate) fn condition(
+        &mut self,
+        kind: PredicateKind,
+        arguments: &[Handle],
+    ) -> Result<Handle, Fault> {
         self.admit(Draft::Condition {
             header: Reference::Existing(self.header.clone()),
             scope: Vec::new(),
@@ -239,22 +243,145 @@ impl Frame {
             coefficients,
         }))
     }
-    pub fn compose(
+    pub fn polynomial_seed(&mut self, jet: &[Rational]) -> Result<Handle, Fault> {
+        let mut terms = Vec::new();
+        for (degree, coefficient) in jet.iter().enumerate() {
+            if coefficient == &Rational::zero() {
+                continue;
+            }
+            let negative = degree != 0 && coefficient.is_negative();
+            let value = if negative {
+                Rational::zero().sub(coefficient, &mut self.budget)?
+            } else {
+                coefficient.clone()
+            };
+            let coefficient = self.node(Operator::Rational(value), &[])?;
+            let term = match degree {
+                0 => coefficient,
+                1 => self.node(Operator::Mul, &[coefficient, self.x.clone()])?,
+                _ => {
+                    let x = self.x.clone();
+                    let power = self.node(
+                        Operator::IntegerPower(i64::try_from(degree).map_err(|_| invalid())?),
+                        &[x],
+                    )?;
+                    self.node(Operator::Mul, &[coefficient, power])?
+                }
+            };
+            terms.push((negative, term));
+        }
+        let mut terms = terms.into_iter();
+        let mut result = match terms.next() {
+            Some((true, term)) => self.node(Operator::Neg, &[term])?,
+            Some((_, term)) => term,
+            None => self.centre.clone(),
+        };
+        for (negative, term) in terms {
+            result = self.node(
+                if negative {
+                    Operator::Sub
+                } else {
+                    Operator::Add
+                },
+                &[result, term],
+            )?;
+        }
+        Ok(result)
+    }
+    pub fn defined(&mut self, source: &Handle) -> Result<VerifiedWitness, Fault> {
+        let witness = self
+            .cas
+            .defined_total(source, &self.context, &mut self.budget)?;
+        self.check_defined(source, &witness)?;
+        Ok(witness)
+    }
+    pub fn check_defined(
         &mut self,
-        jet: &[Rational],
-        increment: &[Rational],
-    ) -> Result<VerifiedWitness, Fault> {
-        let left = self.object(jet)?;
-        let right = self.object(increment)?;
-        self.cas.compute_series(
-            &SeriesOperation::Compose {
-                left,
-                right,
-                order: None,
-            },
-            &[],
+        source: &Handle,
+        witness: &VerifiedWitness,
+    ) -> Result<(), Fault> {
+        use nrz_cas::proof::{ApplicationDraft, Certificate, Primitive};
+        if !witness.is_unconditional() {
+            return Err(Fault::invalid(
+                InvalidCode::Rule,
+                Location::new("source unconditionality"),
+            ));
+        }
+        let citations = self
+            .cas
+            .proof_citations(witness.proof(), &mut self.budget)?;
+        let root = citations
+            .iter()
+            .find(|citation| &citation.proof == witness.proof())
+            .ok_or_else(invalid)?;
+        if !root.premises.is_empty() {
+            return Err(Fault::invalid(
+                InvalidCode::Rule,
+                Location::new("source defined premises"),
+            ));
+        }
+        if root.primitive != Primitive::DefinedTotal {
+            return Err(Fault::invalid(
+                InvalidCode::Rule,
+                Location::new("source defined primitive"),
+            ));
+        }
+        let predicate = self.condition(PredicateKind::Defined, std::slice::from_ref(source))?;
+        let expected = self.judgment(Statement::PredicateFact {
+            region: self.region.clone(),
+            predicate,
+        });
+        if witness.judgment() != &expected {
+            return Err(invalid());
+        }
+        // The public citation view does not expose certificate payloads. Recheck the
+        // exact no-certificate application and compare graph-owned proof identity:
+        // this binds the actual certificate and substitutions, not only their schema.
+        let canonical = self.cas.check_proof(
+            &self.context,
+            &[ApplicationDraft {
+                rule: Primitive::DefinedTotal,
+                context: self.context.clone(),
+                conclusion: expected.statement,
+                premises: Vec::new(),
+                substitutions: Vec::new(),
+                certificate: Certificate::None,
+            }],
             &mut self.budget,
-        )
+        )?;
+        if canonical.proof() != witness.proof() {
+            return Err(Fault::invalid(
+                InvalidCode::Rule,
+                Location::new("source defined application"),
+            ));
+        }
+        Ok(())
+    }
+    pub fn source(
+        &mut self,
+        source: &Handle,
+        defined: &VerifiedWitness,
+    ) -> Result<VerifiedWitness, Fault> {
+        self.check_defined(source, defined)?;
+        let witness = self.cas.expand_series_source(
+            &SourceRequest {
+                clause: SourceClause::PolynomialSeed,
+                source: source.clone(),
+                domain: self.region.clone(),
+                field: self.field.clone(),
+                centre: self.centre.clone(),
+                variable: self.x.clone(),
+                scope: Vec::new(),
+                context: self.context.clone(),
+                order: 5,
+            },
+            &[defined.proof().clone()],
+            &mut self.budget,
+        )?;
+        if !witness.is_unconditional() {
+            return Err(invalid());
+        }
+        Ok(witness)
     }
     pub fn residual(
         &mut self,
@@ -285,7 +412,11 @@ impl Frame {
             Some(&solving),
             &mut self.budget,
         )?;
-        Ok((residual, member.ok_or_else(invalid)?))
+        let member = member.ok_or_else(invalid)?;
+        if !residual.is_unconditional() || !member.is_unconditional() {
+            return Err(invalid());
+        }
+        Ok((residual, member))
     }
     pub fn export(&mut self, witness: &VerifiedWitness) -> Result<Vec<u8>, Fault> {
         self.cas.export_witness(witness, &mut self.budget)
@@ -310,16 +441,21 @@ impl Frame {
             assumptions: Vec::new(),
         }))?;
         let j = self.rationals(&[(0, 1), (1, 3), (0, 1), (-1, 45), (0, 1)])?;
-        let h = self.rationals(&[(0, 1), (1, 1), (0, 1), (0, 1), (0, 1)])?;
         let left = self.object(&j)?;
-        let right = self.object(&h)?;
-        let subject = ResidualSubject::Compose {
-            left: left.clone(),
-            right: right.clone(),
+        let third = self.node(Operator::Rational(j[1].clone()), &[])?;
+        let positive = Rational::from_ratio(1, 45, &mut self.budget)?;
+        let cubic = self.node(Operator::Rational(positive), &[])?;
+        let linear = self.node(Operator::Mul, &[third, self.x.clone()])?;
+        let x = self.x.clone();
+        let power = self.node(Operator::IntegerPower(3), &[x])?;
+        let cubic = self.node(Operator::Mul, &[cubic, power])?;
+        let source = self.node(Operator::Sub, &[linear, cubic])?;
+        let subject = ResidualSubject::Source(nrz_cas::series::SourceStatement {
+            clause: SourceClause::PolynomialSeed,
+            source,
+            domain: self.region.clone(),
             output: left.clone(),
-            order: 5,
-            default_order: true,
-        };
+        });
         // Independently specify ((x*y') + (2*y)) + (x*y^2) - x.
         let dependent = self.y.clone();
         let derivative = self.node(

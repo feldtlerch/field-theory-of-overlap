@@ -1369,9 +1369,9 @@ fn budget(value: &Value, path: &str) -> Result<BudgetAssertion, WireError> {
     token(
         get(fields, "profile"),
         &format!("{path}.profile"),
-        &[((), "pinned-trial-limits-v1")],
+        &[((), "pinned-trial-limits-v2")],
     )?;
-    let names = BudgetProfile::PinnedTrialLimitsV1
+    let names = BudgetProfile::PinnedTrialLimitsV2
         .resolved()
         .fields()
         .map(|(name, _)| name);
@@ -2076,7 +2076,7 @@ fn budget_value(budget: BudgetSpec) -> Value {
         [
             ("id", s(spelling(budget.id, BUDGETS))),
             ("producer", s(spelling(budget.producer, PRODUCERS))),
-            ("profile", s("pinned-trial-limits-v1")),
+            ("profile", s("pinned-trial-limits-v2")),
             ("pin", s(budget.pin.0)),
             (
                 "limits",

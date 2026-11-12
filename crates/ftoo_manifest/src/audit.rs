@@ -2,7 +2,7 @@
 use crate::{BudgetId, NodeId};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EnginePin(pub &'static str);
-pub const ENGINE_PIN: EnginePin = EnginePin("a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad");
+pub const ENGINE_PIN: EnginePin = EnginePin("598ff683a57caca07cf9d44e3fd28c716afb81ef");
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CapabilityId {
     ExactRationalLinearEquivalence,
@@ -34,7 +34,7 @@ pub const CAPABILITIES: [CapabilitySpec; 4] = [
         id: CapabilityId::FormalTruncatedPowerSeries,
         availability: EngineAvailability::Present,
         adapter_implemented: true,
-        evidence: "Fixed object Compose, evaluated residual and Member. Source/reciprocal are registered but not exposed. Product polynomial Defined is unavailable: source requires it and region partition rejects Product.",
+        evidence: "Fixed adapter checks structural Defined on Product, PolynomialSeed, evaluated residual and Member without assumptions. Region partition still rejects Product; no general source or reciprocal adapter is exposed.",
     },
     CapabilitySpec {
         id: CapabilityId::SymbolicTrigonometry,
@@ -114,7 +114,7 @@ impl ProducerId {
             dependencies,
             capabilities: &[CapabilityId::FormalTruncatedPowerSeries],
             budget,
-            revision: 1,
+            revision: 2,
             target,
             region: RegionContract::AmbientProductXNoAssumptions,
         }

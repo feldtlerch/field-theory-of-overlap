@@ -667,13 +667,13 @@ fn t05_noncanonical_space_has_exact_offset_and_diff() {
 fn t06_budget_work_assertion() {
     let f = Fixture::new();
     f.check(
-        &f.clean.replacen("\"work\":8000000", "\"work\":8000001", 1),
+        &f.clean.replacen("\"work\":3000000", "\"work\":3000001", 1),
         assertion(
             "$.budgets[0].limits.work",
             Some(0),
             ProjectionFault::BudgetLimitsMismatch {
-                expected: 8_000_000,
-                actual: 8_000_001,
+                expected: 3_000_000,
+                actual: 3_000_001,
             },
         ),
     );
@@ -712,13 +712,13 @@ fn t15_binding_source_mismatch_precedes_registry() {
 fn t16_producer_revision_assertion() {
     let f = Fixture::new();
     f.check(
-        &f.clean.replacen("\"revision\":1", "\"revision\":2", 1),
+        &f.clean.replacen("\"revision\":2", "\"revision\":1", 1),
         assertion(
             "$.producers[0].revision",
             Some(0),
             ProjectionFault::ContractMismatch {
-                expected: Box::new(ProjectionValue::Integer(1)),
-                actual: Box::new(ProjectionValue::Integer(2)),
+                expected: Box::new(ProjectionValue::Integer(2)),
+                actual: Box::new(ProjectionValue::Integer(1)),
             },
         ),
     );
@@ -745,7 +745,7 @@ fn t17_adapter_implementation_assertion() {
 #[test]
 fn t18_engine_pin_assertion() {
     let f = Fixture::new();
-    let old = "a5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad";
+    let old = "598ff683a57caca07cf9d44e3fd28c716afb81ef";
     let new = "b5cb0ab0d1763e8ed620f7c765fdd8d3b26b65ad";
     f.check(
         &f.clean.replacen(old, new, 1),

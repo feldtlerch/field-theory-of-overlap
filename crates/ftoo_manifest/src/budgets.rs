@@ -7,7 +7,7 @@ pub enum BudgetId {
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BudgetProfile {
-    PinnedTrialLimitsV1,
+    PinnedTrialLimitsV2,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BudgetSpec {
@@ -22,27 +22,27 @@ impl BudgetSpec {
         Self {
             id: producer.descriptor().budget,
             producer,
-            profile: BudgetProfile::PinnedTrialLimitsV1,
+            profile: BudgetProfile::PinnedTrialLimitsV2,
             pin: ENGINE_PIN,
         }
     }
 }
 
 impl BudgetProfile {
-    /// Complete-route measurement at `ENGINE_PIN`: 6,073,177 for both targets.
-    /// Round up to 500,000 (6,500,000), then step by 500,000 until headroom is at least 25%.
+    /// Complete-route measurement at `ENGINE_PIN`: 2,294,507, the largest complete counterstatement route.
+    /// Round up to 500,000 (2,500,000), then step by 500,000 until headroom is at least 25%.
     #[must_use]
     pub const fn work(self) -> u64 {
         match self {
-            Self::PinnedTrialLimitsV1 => 8_000_000,
+            Self::PinnedTrialLimitsV2 => 3_000_000,
         }
     }
-    /// Combined replay measurement: 3,465,362 for both targets.
-    /// Round up to 500,000 (3,500,000), then step by 500,000 until headroom is at least 25%.
+    /// Largest single replay: 1,190,540; cumulative replay Work with a counterstatement is 1,248,034.
+    /// The per-call ceiling rounds to 1,500,000, already providing at least 25% headroom.
     #[must_use]
     pub const fn replay_work(self) -> u64 {
         match self {
-            Self::PinnedTrialLimitsV1 => 4_500_000,
+            Self::PinnedTrialLimitsV2 => 1_500_000,
         }
     }
 }
