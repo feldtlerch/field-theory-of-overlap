@@ -339,6 +339,7 @@ fn file_rows(node: &Node) -> Result<BTreeMap<String, String>> {
     Ok(files)
 }
 fn hash(path: &Path) -> Result<String> {
+    let mut bytes = 0;
     let mut file = fs::File::open(path).map_err(|e| io_error(NativeOperation::Read, path, &e))?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0; 65_536];
@@ -350,7 +351,9 @@ fn hash(path: &Path) -> Result<String> {
             break;
         }
         hasher.update(&buffer[..count]);
+        bytes += count as u64;
     }
+    crate::telemetry::hashed(bytes);
     Ok(format!("{:x}", hasher.finalize()))
 }
 fn list(root: &Path, relative: &str, output: &mut Vec<String>) -> Result<()> {
@@ -390,6 +393,12 @@ fn list(root: &Path, relative: &str, output: &mut Vec<String>) -> Result<()> {
     Ok(())
 }
 pub(super) fn verify(support: &NativeSupport, lock: &Lock) -> Result<()> {
+    let phase = crate::telemetry::Phase::new("native.full_verification");
+    let result = verify_inner(support, lock);
+    phase.finish(result.is_ok());
+    result
+}
+fn verify_inner(support: &NativeSupport, lock: &Lock) -> Result<()> {
     inspect(&support.root, None, true)?;
     if std::env::consts::OS != "linux" || std::env::consts::ARCH != "x86_64" {
         return Err(configuration(

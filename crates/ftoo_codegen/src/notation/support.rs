@@ -598,7 +598,7 @@ fn runtime_inventory(file: &Path, value: &Value) -> Result<BTreeMap<String, Stri
     Ok(runtimes)
 }
 
-fn read(file: &Path) -> Result<Vec<u8>> {
+pub(super) fn read(file: &Path) -> Result<Vec<u8>> {
     let mut bytes = vec![];
     fs::File::open(file)
         .and_then(|f| f.take((METADATA_BYTES + 1) as u64).read_to_end(&mut bytes))
@@ -716,6 +716,7 @@ fn files(directory: &Path) -> Result<BTreeSet<PathBuf>> {
     Ok(files)
 }
 pub(super) fn hash(file: &Path) -> Result<String> {
+    let mut bytes = 0;
     let mut f = fs::File::open(file).map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?;
     let mut sha = Sha256::new();
     let mut buffer = vec![0u8; 65_536];
@@ -727,7 +728,9 @@ pub(super) fn hash(file: &Path) -> Result<String> {
             break;
         }
         sha.update(&buffer[..count]);
+        bytes += count as u64;
     }
+    crate::telemetry::hashed(bytes);
     Ok(format!("{:x}", sha.finalize()))
 }
 fn check_hash(file: &Path, expected: &str) -> Result<()> {
@@ -808,11 +811,14 @@ pub(super) fn resolve(value: Option<&Path>) -> std::result::Result<Support, Nota
 }
 impl Support {
     pub fn check(&self) -> std::result::Result<(), NotationAdapterFault> {
+        let phase = crate::telemetry::Phase::new("notation.full_verification");
         // Re-resolve every invocation: a prior successful path lookup is no trust cache.
         let current = resolve(Some(&self.root))?;
-        current
+        let result = current
             .check_inventory(DIGESTS, std::env::consts::OS, std::env::consts::ARCH)
-            .map_err(NotationAdapterFault::Integrity)
+            .map_err(NotationAdapterFault::Integrity);
+        phase.finish(result.is_ok());
+        result
     }
     pub(super) fn check_inventory(
         &self,

@@ -190,6 +190,8 @@ pub fn prepare_documents(
     root: &Path,
     support: &NativeSupport,
 ) -> Result<PreparedDocuments, DocumentError> {
+    let _preparation = crate::telemetry::Phase::new("documents.preparation");
+    let admission = crate::telemetry::Phase::new("documents.source_admission");
     let support = NativeSupport::resolve(root, Some(support.directory()))?;
     let projection = input::read(root, "generated/manifest.json")?;
     crate::check_projection(root).map_err(DocumentError::Projection)?;
@@ -251,6 +253,7 @@ pub fn prepare_documents(
         })?;
     let catalogue = ftoo_manifest::notation(&book)
         .map_err(|e| DocumentError::Notation(crate::NotationRenderError::Admission(e)))?;
+    drop(admission);
     let notation = crate::prepare_notation(&catalogue)?;
     let plans = plan::build(&skeletons, &welded, &notation, &metadata, &displays)?;
     let artifacts = render_artifacts(root, &support, &book, &plans, &notation)?;
@@ -278,6 +281,7 @@ fn finish_snapshot(
     inventories: [(&str, Vec<String>, bool); 3],
     artifacts: Vec<DocumentArtifact>,
 ) -> Result<PreparedDocuments, DocumentError> {
+    let _phase = crate::telemetry::Phase::new("documents.snapshot_io");
     let mut observed_outputs = BTreeMap::new();
     for source in markdown.sources() {
         if source.file.starts_with("generated/documents/") {

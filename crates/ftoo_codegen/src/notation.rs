@@ -33,7 +33,7 @@ pub enum AdapterOperation {
     WriteInput,
     WaitOutput,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProtocolReason {
     InvalidUtf8,
     UnexpectedStatus,
@@ -42,6 +42,17 @@ pub enum ProtocolReason {
     MissingMathml,
     InvalidVersionResponse,
     SetupFailure,
+    BatchFrame { index: usize, reason: BatchReason },
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BatchReason {
+    TruncatedHeader,
+    TruncatedPayload,
+    WrongIndex { expected: u64, actual: u64 },
+    UnknownStatus { value: u8 },
+    TooManyRequests { maximum: usize, actual: usize },
+    UnexpectedEof,
+    ChangedAdapter { expected: Vec<u8>, actual: Vec<u8> },
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SupportReason {
@@ -342,25 +353,11 @@ impl<'a, 'catalogue, 'book, 'graph> RenderedExpression<'a, 'catalogue, 'book, 'g
 pub fn prepare_notation<'catalogue, 'book, 'graph>(
     catalogue: &'catalogue CheckedNotation<'book, 'graph>,
 ) -> Result<RenderableNotation<'catalogue, 'book, 'graph>> {
+    let _phase = crate::telemetry::Phase::new("notation.preparation");
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
     let support = support::resolve(location.as_deref())?;
-    if let Err(message) = katex::invoke(&support, None)? {
-        return Err(NotationAdapterFault::Protocol {
-            status: Some(2),
-            stdout: message.into_bytes(),
-            stderr: vec![],
-            reason: ProtocolReason::UnexpectedStatus,
-        }
-        .into());
-    }
     let records = render::declarations(catalogue)?;
-    sweep::inventory(catalogue, &records)?;
-    sweep::namespace(&support, &records, "")?;
-    let declarations = records
-        .iter()
-        .map(|r| r.source.as_str())
-        .collect::<String>();
-    let rows = sweep::run(catalogue, &support, &declarations)?;
+    let (declarations, rows) = sweep::prepared(catalogue, &support, &records, false)?;
     Ok(RenderableNotation {
         catalogue,
         support,

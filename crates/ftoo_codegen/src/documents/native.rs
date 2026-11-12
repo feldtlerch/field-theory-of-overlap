@@ -338,8 +338,10 @@ pub(super) fn consume_with(
     );
     completed(&scratch, &result);
     let checked = native_support::verify(support, lock);
+    let cleanup_phase = crate::telemetry::Phase::new("native.cleanup");
     let cleanup = fs::remove_dir_all(&scratch)
         .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e));
+    drop(cleanup_phase);
     checked?;
     cleanup?;
     result
@@ -368,9 +370,15 @@ fn invoke(
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
     }
     let executable = support.root.join("runtime/bin/tectonic");
-    let output = command(support, scratch)
-        .output()
+    let invocation = crate::telemetry::Phase::new(match &case {
+        NativeCase::Document { .. } => "native.document",
+        NativeCase::Sweep { .. } => "native.sweep",
+        NativeCase::Runtime { .. } => "native.runtime",
+        NativeCase::Collision { .. } => "native.collision",
+    });
+    let output = measured_output(&mut command(support, scratch))
         .map_err(|e| native_support::io_error(NativeOperation::Spawn, &executable, &e))?;
+    drop(invocation);
     let path = scratch.join("output/document.log");
     let log = match fs::read(&path) {
         Ok(log) => log,
@@ -401,6 +409,52 @@ fn invoke(
         case,
         scratch.join("output/document.pdf").is_file(),
     )
+}
+
+fn measured_output(command: &mut Command) -> std::io::Result<std::process::Output> {
+    use std::io::{BufRead, BufReader, Read};
+    use std::process::Stdio;
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let _started = crate::telemetry::Phase::new("native.process_started");
+    let stdout = child.stdout.take().expect("piped stdout");
+    let mut stderr = child.stderr.take().expect("piped stderr");
+    std::thread::scope(|scope| {
+        let stdout = scope.spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            let mut bytes = vec![];
+            let mut line = vec![];
+            let mut format = None;
+            while reader.read_until(b'\n', &mut line)? != 0 {
+                if line == b"note: generating format \"latex\"\n" {
+                    format = Some(crate::telemetry::Phase::new("native.format_build"));
+                } else if line == b"note: Running TeX ...\n"
+                    && let Some(format) = format.take()
+                {
+                    format.finish(true);
+                }
+                bytes.extend_from_slice(&line);
+                line.clear();
+            }
+            Ok::<_, std::io::Error>(bytes)
+        });
+        let stderr = scope.spawn(move || {
+            let mut bytes = vec![];
+            stderr.read_to_end(&mut bytes)?;
+            Ok::<_, std::io::Error>(bytes)
+        });
+        let status = child.wait();
+        let stdout = stdout.join().expect("native stdout reader");
+        let stderr = stderr.join().expect("native stderr reader");
+        Ok(std::process::Output {
+            status: status?,
+            stdout: stdout?,
+            stderr: stderr?,
+        })
+    })
 }
 pub(super) fn classify(
     output: std::process::Output,

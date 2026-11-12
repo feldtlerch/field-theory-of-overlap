@@ -34,6 +34,505 @@ fn prepared() -> support::Support {
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
     support::resolve(location.as_deref()).unwrap()
 }
+
+#[test]
+fn support_required_batch_matches_single_expression_markup_errors_and_isolation() {
+    let support = prepared();
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let records = render::declarations(&catalogue).unwrap();
+    let declarations: String = records.iter().map(|r| r.source.as_str()).collect();
+    let mut sources: Vec<String> = vec![
+        "x".into(),
+        "{x".into(),
+        "α".into(),
+        "x^1^2".into(),
+        "x".into(),
+        r"\gdef\FixtureMacro{x}\FixtureMacro".into(),
+        r"\FixtureMacro".into(),
+        "x".into(),
+        format!("\\newcommand{{\\FtooQCoefficientOne}}[0]{{x}}{declarations}"),
+        format!("{declarations}\\FtooQCoefficientOne{{}}"),
+    ];
+    for record in &records {
+        sources.push(record.source.clone());
+    }
+    let controls: Vec<_> = sources
+        .iter()
+        .map(|source| katex::invoke(&support, Some(source)).unwrap())
+        .collect();
+    let mut observed = vec![];
+    let results = katex::batch(&support, &sources, |index, result| {
+        observed.push((index, result.clone()));
+    })
+    .unwrap();
+    assert_eq!(
+        observed,
+        controls.iter().cloned().enumerate().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        results,
+        controls
+            .into_iter()
+            .map(|result| result.map(|_| ()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        katex::batch(&support, &["x".into()], |_, _| {}).unwrap(),
+        vec![Ok(())]
+    );
+
+    let first = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    let warm = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    assert_eq!(first.0, declarations);
+    assert_eq!(warm.0, declarations);
+    {
+        assert_eq!(warm.1.len(), first.1.len());
+        for (actual, expected) in warm.1.iter().zip(&first.1) {
+            assert_eq!(
+                (
+                    actual.owner(),
+                    actual.case(),
+                    actual.macro_source(),
+                    actual.unicode_source()
+                ),
+                (
+                    expected.owner(),
+                    expected.case(),
+                    expected.macro_source(),
+                    expected.unicode_source()
+                )
+            );
+        }
+    }
+}
+
+#[test]
+fn support_required_parse_error_constructor_belongs_to_the_request_realm() {
+    let support = prepared();
+    support.check().unwrap();
+    let script = r"
+const fs = require('node:fs');
+const { realm, render } = require(process.argv[1]);
+const distribution = fs.readFileSync(process.argv[2], 'utf8');
+const own = realm(distribution);
+const foreign = realm(distribution);
+for (const error of [new own.ParseError('fixture'), new foreign.ParseError('fixture'), new Error('fixture')]) {
+  own.renderToString = () => { throw error; };
+  process.stdout.write(JSON.stringify(render(own, 'x')) + '\n');
+}
+const source = 'globalThis.count = (globalThis.count || 0) + 1; module.exports = { renderToString: () => String(globalThis.count) };';
+process.stdout.write(render(realm(source), 'x')[1] + render(realm(source), 'x')[1] + '\n');
+process.stdout.write(String(render(realm(distribution), 'x')[0]) + '\n');
+";
+    let output = std::process::Command::new(&support.runtime)
+        .arg("-e")
+        .arg(script)
+        .arg(support::repository().join("tools/notation/check.cjs"))
+        .arg(&support.entry)
+        .env_remove("NODE_PATH")
+        .env_remove("NODE_OPTIONS")
+        .output()
+        .unwrap();
+    crate::telemetry::counter("notation.process_starts", 1);
+    support.check().unwrap();
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stderr, b"");
+    assert_eq!(output.stdout, b"[2,\"KaTeX parse error: fixture\"]\n[3,\"KaTeX parse error: fixture\"]\n[3,\"fixture\"]\n11\n0\n");
+}
+
+#[test]
+fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes() {
+    use sha2::{Digest, Sha256};
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let records = render::declarations(&catalogue).unwrap();
+    let original = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    let path = support.entry.clone();
+    let bytes = fs::read(&path).unwrap();
+    let mut altered = bytes.clone();
+    altered.push(b'\n');
+    let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
+        file: path.clone(),
+        expected: format!("{:x}", Sha256::digest(&bytes)),
+        actual: format!("{:x}", Sha256::digest(&altered)),
+    });
+    fs::write(&path, &altered).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), altered);
+    let error = sweep::prepared(&catalogue, &support, &records, false).unwrap_err();
+    assert_eq!(error, NotationRenderError::Adapter(expected.clone()));
+    assert_eq!(
+        error.to_string(),
+        format!("{:?}", NotationRenderError::Adapter(expected))
+    );
+    fs::write(&path, &bytes).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    support.check().unwrap();
+    let restored = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    assert_eq!(original, restored);
+}
+
+#[test]
+fn support_required_batch_protocol_post_request_full_hash_refuses_mutation_and_rereads_restoration()
+{
+    use sha2::{Digest, Sha256};
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    let bytes = fs::read(&support.entry).unwrap();
+    let mut changed = bytes.clone();
+    changed.push(b'\n');
+    let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
+        file: support.entry.clone(),
+        expected: format!("{:x}", Sha256::digest(&bytes)),
+        actual: format!("{:x}", Sha256::digest(&changed)),
+    });
+    let result = katex::batch(&support, &["x".into(), "y".into()], |index, _| {
+        assert_eq!(index, 0);
+        fs::write(&support.entry, &changed).unwrap();
+        assert_eq!(fs::read(&support.entry).unwrap(), changed);
+    });
+    exact_adapter(result.unwrap_err(), expected);
+    fs::write(&support.entry, &bytes).unwrap();
+    assert_eq!(fs::read(&support.entry).unwrap(), bytes);
+    support.check().unwrap();
+    assert_eq!(
+        katex::batch(&support, &["x".into(), "y".into()], |_, _| {}).unwrap(),
+        vec![Ok(()), Ok(())]
+    );
+}
+
+#[test]
+fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_control() {
+    fn frame(index: u64, status: u8, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = index.to_be_bytes().to_vec();
+        bytes.push(status);
+        bytes.extend_from_slice(&(payload.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+    fn script(stdout: &[u8], stderr: &[u8]) -> String {
+        format!(
+            "const fs = require('node:fs'); const timer = setInterval(() => {{}}, 1000); process.stdin.on('end', () => clearInterval(timer)); process.stdin.resume(); process.stderr.write(Buffer.from({})); const bytes = Buffer.from({}); let at = 0; while (at < bytes.length) {{ at += fs.writeSync(1, bytes, at, bytes.length - at); }} fs.closeSync(1);",
+            serde_json::to_string(stderr).unwrap(),
+            serde_json::to_string(stdout).unwrap()
+        )
+    }
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    let adapter = support.root.join("tmp/protocol.cjs");
+    let handshake = b"22.16.0\n0.16.22\n";
+    let mut valid = handshake.to_vec();
+    valid.extend(frame(0, 0, b"<math>x</math>"));
+    let mut cases = vec![];
+    for count in 0..17 {
+        let mut raw = handshake.to_vec();
+        raw.extend_from_slice(&frame(0, 0, b"x")[..count]);
+        cases.push((
+            raw,
+            ProtocolReason::BatchFrame {
+                index: 0,
+                reason: if count == 0 {
+                    BatchReason::UnexpectedEof
+                } else {
+                    BatchReason::TruncatedHeader
+                },
+            },
+        ));
+    }
+    for (bytes, reason) in [
+        (
+            frame(1, 0, b"<math/>"),
+            ProtocolReason::BatchFrame {
+                index: 0,
+                reason: BatchReason::WrongIndex {
+                    expected: 0,
+                    actual: 1,
+                },
+            },
+        ),
+        (
+            frame(0, 1, b""),
+            ProtocolReason::BatchFrame {
+                index: 0,
+                reason: BatchReason::UnknownStatus { value: 1 },
+            },
+        ),
+        (frame(0, 0, b""), ProtocolReason::EmptyOutput),
+        (frame(0, 0, b"plain"), ProtocolReason::MissingMathml),
+        (frame(0, 0, &[255]), ProtocolReason::InvalidUtf8),
+        (
+            frame(0, 0, "\u{feff}<math/>".as_bytes()),
+            ProtocolReason::InvalidUtf8,
+        ),
+        (
+            frame(0, 3, b"adapter failure"),
+            ProtocolReason::SetupFailure,
+        ),
+        (
+            frame(0, 0, b"123")[..18].to_vec(),
+            ProtocolReason::BatchFrame {
+                index: 0,
+                reason: BatchReason::TruncatedPayload,
+            },
+        ),
+    ] {
+        let mut raw = handshake.to_vec();
+        raw.extend(bytes);
+        cases.push((raw, reason));
+    }
+    cases.push((
+        b"22.16.0\nmalformed\n".to_vec(),
+        ProtocolReason::InvalidVersionResponse,
+    ));
+    cases.push((
+        b"22.16.0\n".to_vec(),
+        ProtocolReason::InvalidVersionResponse,
+    ));
+    cases.push((
+        [handshake.as_slice(), b"1.2.3\n", &frame(0, 0, b"<math/>")].concat(),
+        ProtocolReason::InvalidVersionResponse,
+    ));
+    cases.push((
+        [valid.as_slice(), &frame(0, 0, b"<math/>")].concat(),
+        ProtocolReason::UnexpectedStatus,
+    ));
+    cases.push((
+        [valid.as_slice(), &[0; 5]].concat(),
+        ProtocolReason::BatchFrame {
+            index: 1,
+            reason: BatchReason::TruncatedHeader,
+        },
+    ));
+    for (raw, reason) in cases {
+        fs::write(
+            &adapter,
+            script(&raw, b"").replace("() => clearInterval(timer)", "() => {}"),
+        )
+        .unwrap();
+        exact_adapter(
+            katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap_err(),
+            NotationAdapterFault::Protocol {
+                status: None,
+                stdout: raw,
+                stderr: vec![],
+                reason,
+            },
+        );
+        let restored = script(&valid, b"");
+        fs::write(&adapter, &restored).unwrap();
+        assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
+        assert_eq!(
+            katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
+            vec![Ok(())]
+        );
+    }
+    let stderr = vec![b'e'; 131_072];
+    fs::write(&adapter, script(&valid, &stderr)).unwrap();
+    exact_adapter(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap_err(),
+        NotationAdapterFault::Protocol {
+            status: Some(0),
+            stdout: valid.clone(),
+            stderr,
+            reason: ProtocolReason::UnexpectedStderr,
+        },
+    );
+    let restored = script(&valid, b"");
+    fs::write(&adapter, &restored).unwrap();
+    assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
+    assert_eq!(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
+        vec![Ok(())]
+    );
+    let large = format!("<math>{}</math>", "x".repeat(1_048_576));
+    let framed = [handshake.as_slice(), &frame(0, 0, large.as_bytes())].concat();
+    fs::write(&adapter, script(&framed, b"")).unwrap();
+    let mut observed = vec![];
+    assert_eq!(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |index, result| {
+            observed.push((index, result.clone()));
+        })
+        .unwrap(),
+        vec![Ok(())]
+    );
+    assert_eq!(observed, vec![(0, Ok(large))]);
+    fs::write(&adapter, &restored).unwrap();
+    assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
+    assert_eq!(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
+        vec![Ok(())]
+    );
+    let before = script(&valid, b"")
+        .replace("() => clearInterval(timer)", "() => {}")
+        .into_bytes();
+    let mut after = before.clone();
+    after.push(b'\n');
+    fs::write(&adapter, &before).unwrap();
+    exact_adapter(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {
+            fs::write(&adapter, &after).unwrap();
+            assert_eq!(fs::read(&adapter).unwrap(), after);
+        })
+        .unwrap_err(),
+        NotationAdapterFault::Protocol {
+            status: None,
+            stdout: valid,
+            stderr: vec![],
+            reason: ProtocolReason::BatchFrame {
+                index: 0,
+                reason: BatchReason::ChangedAdapter {
+                    expected: before,
+                    actual: after,
+                },
+            },
+        },
+    );
+    fs::write(&adapter, &restored).unwrap();
+    assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
+    assert_eq!(
+        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
+        vec![Ok(())]
+    );
+}
+
+#[test]
+fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
+    use std::io::{Read, Write};
+    use std::process::{Child, ChildStdout, Command, Stdio};
+    fn start(support: &support::Support, entry: &Path) -> (Child, ChildStdout) {
+        let mut child = Command::new(&support.runtime)
+            .arg(support::repository().join("tools/notation/check.cjs"))
+            .arg("--batch")
+            .arg(entry)
+            .env_remove("NODE_PATH")
+            .env_remove("NODE_OPTIONS")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        crate::telemetry::counter("notation.process_starts", 1);
+        crate::telemetry::counter("notation.version_probes", 1);
+        let mut stdout = child.stdout.take().unwrap();
+        let mut handshake = [0; 16];
+        stdout.read_exact(&mut handshake).unwrap();
+        assert_eq!(&handshake, b"22.16.0\n0.16.22\n");
+        (child, stdout)
+    }
+    fn request(child: &mut Child, index: u64, bytes: &[u8]) {
+        crate::telemetry::counter("notation.logical_requests", 1);
+        let stdin = child.stdin.as_mut().unwrap();
+        stdin.write_all(&index.to_be_bytes()).unwrap();
+        stdin
+            .write_all(&u32::try_from(bytes.len()).unwrap().to_be_bytes())
+            .unwrap();
+        stdin.write_all(bytes).unwrap();
+        stdin.flush().unwrap();
+        crate::telemetry::counter("notation.submitted_requests", 1);
+    }
+    fn response(stdout: &mut ChildStdout, index: u64, status: u8, expected: &[u8]) {
+        let mut header = [0; 17];
+        stdout.read_exact(&mut header).unwrap();
+        let mut wanted = index.to_be_bytes().to_vec();
+        wanted.push(status);
+        wanted.extend_from_slice(&(expected.len() as u64).to_be_bytes());
+        assert_eq!(header.as_slice(), wanted);
+        let mut payload = vec![0; expected.len()];
+        stdout.read_exact(&mut payload).unwrap();
+        assert_eq!(payload, expected);
+    }
+    fn end(mut child: Child, mut stdout: ChildStdout, status: i32, stderr: &[u8]) {
+        drop(child.stdin.take());
+        let mut rest = vec![];
+        stdout.read_to_end(&mut rest).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(output.status.code(), Some(status));
+        assert_eq!(output.stderr, stderr);
+        assert_eq!(output.stdout, b"");
+        assert_eq!(rest, b"");
+    }
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    let entry = support.root.join("tmp/distribution.js");
+    fs::write(&entry, "module.exports = { version: '0.16.22', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
+    support.check().unwrap();
+    for excess in [true, false] {
+        let (mut child, mut stdout) = start(&support, &entry);
+        for index in 0..4096_u64 {
+            let bytes = match index {
+                0 => vec![255],
+                1 => vec![239, 187, 191],
+                2 => vec![b'x'; 262_144],
+                _ => vec![b'x'],
+            };
+            request(&mut child, index, &bytes);
+            match index {
+                0 => response(
+                    &mut stdout,
+                    index,
+                    3,
+                    b"The encoded data was not valid for encoding utf-8",
+                ),
+                1 => response(&mut stdout, index, 3, b"input BOM"),
+                _ => response(&mut stdout, index, 0, b"<math>1</math>"),
+            }
+        }
+        if excess {
+            let stdin = child.stdin.as_mut().unwrap();
+            stdin.write_all(&4096_u64.to_be_bytes()).unwrap();
+            stdin.write_all(&0_u32.to_be_bytes()).unwrap();
+            end(
+                child,
+                stdout,
+                3,
+                b"batch request limit exceeded: maximum 4096, actual 4097",
+            );
+        } else {
+            end(child, stdout, 0, b"");
+        }
+    }
+    for (bytes, stderr) in [
+        (vec![0], b"partial batch frame".as_slice()),
+        (
+            [
+                0_u64.to_be_bytes().as_slice(),
+                2_u32.to_be_bytes().as_slice(),
+                b"x",
+            ]
+            .concat(),
+            b"partial batch frame".as_slice(),
+        ),
+        (
+            [
+                1_u64.to_be_bytes().as_slice(),
+                0_u32.to_be_bytes().as_slice(),
+            ]
+            .concat(),
+            b"batch request index mismatch".as_slice(),
+        ),
+        (
+            [
+                0_u64.to_be_bytes().as_slice(),
+                262_145_u32.to_be_bytes().as_slice(),
+            ]
+            .concat(),
+            b"expression input limit exceeded".as_slice(),
+        ),
+    ] {
+        let (mut child, stdout) = start(&support, &entry);
+        child.stdin.as_mut().unwrap().write_all(&bytes).unwrap();
+        end(child, stdout, 3, stderr);
+        let (mut child, mut stdout) = start(&support, &entry);
+        request(&mut child, 0, b"x");
+        response(&mut stdout, 0, 0, b"<math>1</math>");
+        end(child, stdout, 0, b"");
+    }
+    support.check().unwrap();
+}
 struct Fixture {
     root: PathBuf,
 }
@@ -60,6 +559,7 @@ impl Fixture {
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&root).unwrap();
+        fs::create_dir(root.join("tmp")).unwrap();
         copy_tree(&original.root.join("packages"), &root.join("packages"));
         fs::create_dir_all(root.join("runtime/bin")).unwrap();
         fs::copy(&original.runtime, root.join("runtime/bin/node")).unwrap();

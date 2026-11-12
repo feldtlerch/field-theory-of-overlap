@@ -4,11 +4,13 @@ mod artifact;
 mod documents;
 pub use documents::*;
 mod notation;
+mod telemetry;
 pub use notation::{
-    AdapterComponent, AdapterOperation, InstalledPackageChange, MAX_NOTATION_OUTPUT_BYTES,
-    NotationAdapterFault, NotationRenderError, ProtocolReason, RenderableExpression,
-    RenderableNotation, RenderedExpression, SupportCopy, SupportEntryKind, SupportIntegrityFault,
-    SupportIoOperation, SupportMetadataReason, SupportReason, SweepRow, prepare_notation,
+    AdapterComponent, AdapterOperation, BatchReason, InstalledPackageChange,
+    MAX_NOTATION_OUTPUT_BYTES, NotationAdapterFault, NotationRenderError, ProtocolReason,
+    RenderableExpression, RenderableNotation, RenderedExpression, SupportCopy, SupportEntryKind,
+    SupportIntegrityFault, SupportIoOperation, SupportMetadataReason, SupportReason, SweepRow,
+    prepare_notation,
 };
 mod labels;
 mod projection;
