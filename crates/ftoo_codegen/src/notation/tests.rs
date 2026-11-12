@@ -1883,12 +1883,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     support.check().unwrap();
 }
 
-const ONE: &str =
-    r"\underbrace{{c}_{1}}_{\text{pending: retained formulation def:langevin:coefficient-one}}";
-const THREE: &str =
-    r"\underbrace{{c}_{3}}_{\text{pending: retained formulation def:langevin:coefficient-three}}";
+const ONE: &str = r"\underbrace{{c}_{1}}_{\text{pending}}";
+const THREE: &str = r"\underbrace{{c}_{3}}_{\text{pending}}";
 const ONE_REASON: &str = "retained formulation claim:langevin:coefficient-one-value; retained formulation def:langevin:coefficient-one; claim evidence claim:langevin:coefficient-one-value awaits audit-run-required";
-const THREE_REASON: &str = "retained formulation claim:langevin:coefficient-three-value; retained formulation def:langevin:coefficient-three; claim evidence claim:langevin:coefficient-three-value awaits audit-run-required";
 fn literal(s: &str) -> ExprDraft {
     ExprDraft::Literal { value: s.into() }
 }
@@ -1904,8 +1901,8 @@ fn definition(id: DefinitionId, arguments: Vec<ExprDraft>) -> ExprDraft {
         arguments,
     }
 }
-fn pending(body: &str, reason: &str) -> String {
-    format!("\\underbrace{{{body}}}_{{\\text{{pending: {reason}}}}}")
+fn pending(body: &str) -> String {
+    format!("\\underbrace{{{body}}}_{{\\text{{pending}}}}")
 }
 fn declaration_goldens() -> Vec<(DefinitionId, String)> {
     use DefinitionId::{
@@ -1921,7 +1918,7 @@ fn declaration_goldens() -> Vec<(DefinitionId, String)> {
             CoefficientOneValue,
             format!(
                 "\\newcommand{{\\FtooOCoefficientOneValue}}[0]{{{}}}\n",
-                pending(r"({\FtooQCoefficientOne{}}={\frac{1}{3}})", ONE_REASON)
+                pending(r"({\FtooQCoefficientOne{}}={\frac{1}{3}})")
             ),
         ),
         (
@@ -1932,10 +1929,7 @@ fn declaration_goldens() -> Vec<(DefinitionId, String)> {
             CoefficientThreeValue,
             format!(
                 "\\newcommand{{\\FtooOCoefficientThreeValue}}[0]{{{}}}\n",
-                pending(
-                    r"({\FtooQCoefficientThree{}}={(-{\frac{1}{45}})})",
-                    THREE_REASON
-                )
+                pending(r"({\FtooQCoefficientThree{}}={(-{\frac{1}{45}})})")
             ),
         ),
         (
@@ -1946,10 +1940,7 @@ fn declaration_goldens() -> Vec<(DefinitionId, String)> {
             FirstCoefficient,
             format!(
                 "\\newcommand{{\\FtooAFirstCoefficient}}[0]{{{}}}\n",
-                pending(
-                    r"\FtooQCoefficientOne{}",
-                    "retained formulation def:langevin:coefficient-one"
-                )
+                pending(r"\FtooQCoefficientOne{}")
             ),
         ),
         (
@@ -1976,20 +1967,17 @@ fn declarations_claims_aliases_and_nested_grouping_goldens() {
         (
             definition(DefinitionId::CoefficientOneValue, vec![]),
             r"\FtooOCoefficientOneValue{}",
-            pending(&format!("({{{ONE}}}={{\\frac{{1}}{{3}}}})"), ONE_REASON),
+            pending(&format!("({{{ONE}}}={{\\frac{{1}}{{3}}}})")),
         ),
         (
             definition(DefinitionId::CoefficientThreeValue, vec![]),
             r"\FtooOCoefficientThreeValue{}",
-            pending(
-                &format!("({{{THREE}}}={{(−{{\\frac{{1}}{{45}}}})}})"),
-                THREE_REASON,
-            ),
+            pending(&format!("({{{THREE}}}={{(−{{\\frac{{1}}{{45}}}})}})")),
         ),
         (
             definition(DefinitionId::FirstCoefficient, vec![]),
             r"\FtooAFirstCoefficient{}",
-            pending(ONE, "retained formulation def:langevin:coefficient-one"),
+            pending(ONE),
         ),
         (
             definition(
@@ -2350,15 +2338,12 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             DefinitionId::CoefficientOne => ONE.into(),
             DefinitionId::CoefficientThree => THREE.into(),
             DefinitionId::CoefficientOneValue => {
-                pending(&format!("({{{ONE}}}={{\\frac{{1}}{{3}}}})"), ONE_REASON)
+                pending(&format!("({{{ONE}}}={{\\frac{{1}}{{3}}}})"))
             }
-            DefinitionId::CoefficientThreeValue => pending(
-                &format!("({{{THREE}}}={{(−{{\\frac{{1}}{{45}}}})}})"),
-                THREE_REASON,
-            ),
-            DefinitionId::FirstCoefficient => {
-                pending(ONE, "retained formulation def:langevin:coefficient-one")
+            DefinitionId::CoefficientThreeValue => {
+                pending(&format!("({{{THREE}}}={{(−{{\\frac{{1}}{{45}}}})}})"))
             }
+            DefinitionId::FirstCoefficient => pending(ONE),
             DefinitionId::Dimension => format!("[{{{}}}]", a[0]),
             DefinitionId::Product => format!("({{{}}}⋅{{{}}})", a[0], a[1]),
         },
@@ -2738,7 +2723,7 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
 }
 
 #[test]
-fn pending_annotations_use_the_exported_reason_text_in_both_targets() {
+fn pending_annotations_keep_compact_markers_in_both_targets() {
     use ftoo_manifest::{Awaiting, CapabilityId, ClaimAudit, Maturity, NodeId, NodePayload};
     for (awaits, text) in [
         (Awaiting::AuditBinding, "audit-binding"),
@@ -2782,7 +2767,7 @@ fn pending_annotations_use_the_exported_reason_text_in_both_targets() {
         )
         .unwrap()
         .source;
-        assert_eq!(source, pending(r"({{c}_{1}}={\frac{1}{3}})", &reason));
+        assert_eq!(source, pending(r"({{c}_{1}}={\frac{1}{3}})"));
         let declarations = render::declarations(&n).unwrap();
         assert_eq!(
             declarations
@@ -2792,7 +2777,7 @@ fn pending_annotations_use_the_exported_reason_text_in_both_targets() {
                 .source,
             format!(
                 "\\newcommand{{\\FtooOCoefficientOneValue}}[0]{{{}}}\n",
-                pending(r"({\FtooQCoefficientOne{}}={\frac{1}{3}})", &reason)
+                pending(r"({\FtooQCoefficientOne{}}={\frac{1}{3}})")
             )
         );
         assert_eq!(
@@ -2954,7 +2939,7 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
     let collision = sweep::namespace(&support, &records, context);
     checks.push(Box::new(move || exact_admission(collision.unwrap_err(),
         RuleId::M050, NotationStage::Typesetting,
-        NotationSite::Rendered { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case: "declaration".into(), bytes: 39..166, origins: vec![NotationOrigin { definition: Some(DefinitionId::CoefficientOne), path: vec![] }] },
+        NotationSite::Rendered { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case: "declaration".into(), bytes: 39..115, origins: vec![NotationOrigin { definition: Some(DefinitionId::CoefficientOne), path: vec![] }] },
         NotationFault::HostCollision { command: r"\FtooQCoefficientOne".into(), message: r"KaTeX parse error: \newcommand{\FtooQCoefficientOne} attempting to redefine \FtooQCoefficientOne; use \renewcommand".into() })));
     let restored_namespace = sweep::namespace(&support, &records, "");
     checks.push(Box::new(move || { restored_namespace.unwrap(); }));
@@ -3150,4 +3135,70 @@ fn primitive_goldens_are_independent() {
             );
         }
     }
+}
+
+#[test]
+fn support_required_pending_entries_preserve_order_reasons_and_transitive_origins() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    super::with_preparation(&catalogue, |prepared| -> Result<()> {
+        let expression = prepared.check_expression(primitive(
+            PrimitiveId::Add,
+            vec![
+                definition(DefinitionId::CoefficientOneValue, vec![]),
+                definition(DefinitionId::FirstCoefficient, vec![]),
+            ],
+        ))?;
+        for target in [RenderTarget::Macro, RenderTarget::Unicode] {
+            let rendered = expression.render(target)?;
+            let entries = rendered.pending_entries();
+            let expected: Vec<_> = catalogue
+                .definitions()
+                .iter()
+                .map(|d| d.spec().id())
+                .filter(|id| {
+                    matches!(
+                        id,
+                        DefinitionId::CoefficientOne
+                            | DefinitionId::FirstCoefficient
+                            | DefinitionId::CoefficientOneValue
+                    )
+                })
+                .collect();
+            assert_eq!(
+                entries
+                    .iter()
+                    .map(PendingEntry::definition)
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            for entry in entries {
+                let used = rendered
+                    .uses()
+                    .iter()
+                    .find(|u| u.definition() == entry.definition())
+                    .unwrap();
+                assert_eq!(entry.origins(), used.origins());
+                assert_ne!(entry.origins(), []);
+                let reasons = entry
+                    .reasons()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let body = if entry.definition() == DefinitionId::CoefficientOneValue {
+                    assert_eq!(reasons, ONE_REASON);
+                    r"({{c}_{1}}={\frac{1}{3}})"
+                } else {
+                    assert_eq!(reasons, "retained formulation def:langevin:coefficient-one");
+                    r"{c}_{1}"
+                };
+                assert_eq!(entry.body(RenderTarget::Macro), body);
+                assert_eq!(entry.body(RenderTarget::Unicode), body);
+            }
+        }
+        Ok(())
+    })
+    .unwrap();
 }

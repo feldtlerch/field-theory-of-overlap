@@ -25,6 +25,14 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
                 ))
                 .saturating_add(1);
         }
+        size = size.saturating_add(
+            super::pending::paragraph(
+                block,
+                &plan.language,
+                ftoo_manifest::DocumentTarget::Markdown,
+            )
+            .len(),
+        );
     }
     size.saturating_sub(1)
 }
@@ -101,6 +109,11 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
             ));
             output.push('\n');
         }
+        output.push_str(&super::pending::paragraph(
+            block,
+            &plan.language,
+            ftoo_manifest::DocumentTarget::Markdown,
+        ));
     }
     output.pop();
     output

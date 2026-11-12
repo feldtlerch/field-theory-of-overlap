@@ -8,10 +8,10 @@ mod support_bracket;
 mod telemetry;
 pub use notation::{
     AdapterComponent, AdapterOperation, BatchReason, InstalledPackageChange,
-    MAX_NOTATION_OUTPUT_BYTES, NotationAdapterFault, NotationRenderError, ProtocolReason,
-    RenderableExpression, RenderableNotation, RenderedExpression, SupportCopy, SupportEntryKind,
-    SupportIntegrityFault, SupportIoOperation, SupportMetadataReason, SupportReason, SweepRow,
-    prepare_notation,
+    MAX_NOTATION_OUTPUT_BYTES, NotationAdapterFault, NotationRenderError, PendingEntry,
+    ProtocolReason, RenderableExpression, RenderableNotation, RenderedExpression, SupportCopy,
+    SupportEntryKind, SupportIntegrityFault, SupportIoOperation, SupportMetadataReason,
+    SupportReason, SweepRow, prepare_notation,
 };
 pub use support_bracket::SupportIdentity;
 mod labels;

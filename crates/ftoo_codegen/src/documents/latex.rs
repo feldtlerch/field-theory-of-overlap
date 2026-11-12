@@ -27,7 +27,9 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 pub(super) fn size(plan: &DocumentPlan) -> usize {
     let mut size = start(&plan.document, &plan.language).len();
     for paragraph in &plan.coverage {
-        size = size.saturating_add(text_size(paragraph)).saturating_add(2);
+        size = size
+            .saturating_add(coverage(paragraph).len())
+            .saturating_add(2);
     }
     for block in &plan.blocks {
         size = size.saturating_add(
@@ -60,6 +62,10 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
                 ))
                 .saturating_add(1);
         }
+        size = size.saturating_add(
+            super::pending::paragraph(block, &plan.language, ftoo_manifest::DocumentTarget::Latex)
+                .len(),
+        );
     }
     size.saturating_add("\\end{document}\n".len())
 }
@@ -94,6 +100,22 @@ pub(super) fn text(source: &str) -> String {
     }
     output
 }
+fn coverage(paragraph: &str) -> String {
+    let Some(slice) = paragraph
+        .strip_prefix("Declared slice: ")
+        .and_then(|s| s.strip_suffix('.'))
+    else {
+        return text(paragraph);
+    };
+    format!(
+        "Declared slice: {}.",
+        slice
+            .split(", ")
+            .map(super::pending::identity_text)
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
 pub(super) fn start(document: &str, language: &str) -> String {
     let mut output = String::new();
     append(&mut output, Piece::Raw(RawTex(PREAMBLE)));
@@ -104,7 +126,7 @@ pub(super) fn start(document: &str, language: &str) -> String {
 pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = start(&plan.document, &plan.language);
     for paragraph in &plan.coverage {
-        writeln!(output, "{}\n", text(paragraph)).expect("string write");
+        writeln!(output, "{}\n", coverage(paragraph)).expect("string write");
     }
     for block in &plan.blocks {
         writeln!(
@@ -135,6 +157,11 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
             ));
             output.push('\n');
         }
+        output.push_str(&super::pending::paragraph(
+            block,
+            &plan.language,
+            ftoo_manifest::DocumentTarget::Latex,
+        ));
     }
     output.push_str("\\end{document}\n");
     output
@@ -171,8 +198,12 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                 write!(output, "\\({latex}\\)").expect("string write");
             }
             Inline::Citation { text: value, .. } => {
-                writeln!(output, "\\texttt{{{}}}% cite {value}", text(value))
-                    .expect("string write");
+                writeln!(
+                    output,
+                    "\\texttt{{{}}}% cite {value}",
+                    super::pending::identity_text(value)
+                )
+                .expect("string write");
                 commented = true;
             }
             Inline::Mention { text: value, .. } => {
@@ -210,7 +241,9 @@ pub(super) fn inline_size(runs: &[Inline]) -> usize {
             Inline::Math { latex, .. } => latex.len().saturating_add(4),
             Inline::Citation { text, .. } => {
                 commented = true;
-                text_size(text).saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
+                super::pending::identity_text(text)
+                    .len()
+                    .saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
             }
             Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
         };

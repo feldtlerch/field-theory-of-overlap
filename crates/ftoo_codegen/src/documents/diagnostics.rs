@@ -469,8 +469,9 @@ impl fmt::Display for AssemblyErrors {
     }
 }
 impl std::error::Error for AssemblyErrors {}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmissionKind {
+    PendingExplanation(Box<PendingExplanation>),
     Heading,
     Paragraph,
     Caption,
@@ -740,4 +741,19 @@ impl From<NotationRenderError> for DocumentError {
     fn from(value: NotationRenderError) -> Self {
         Self::Notation(value)
     }
+}
+
+/// One complete pending explanation with every contributing occurrence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingExplanation {
+    pub definition: ftoo_manifest::DefinitionId,
+    pub body_macro: String,
+    pub body_unicode: String,
+    pub reasons: Vec<ftoo_manifest::PendingReason>,
+    pub occurrences: Vec<PendingOccurrence>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingOccurrence {
+    pub source: ftoo_manifest::SourceOrigin,
+    pub notation: Vec<ftoo_manifest::NotationOrigin>,
 }

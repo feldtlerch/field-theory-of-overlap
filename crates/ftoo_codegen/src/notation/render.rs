@@ -158,17 +158,16 @@ pub(super) fn append(
     }
     Ok(())
 }
-fn pending(n: &CheckedNotation<'_, '_>, id: DefinitionId) -> Option<String> {
+fn pending(n: &CheckedNotation<'_, '_>, id: DefinitionId) -> bool {
     n.definition(id)
         .status()
-        .filter(|s| s.tier() == SymbolTier::Pending)
-        .map(|s| {
-            s.reasons()
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("; ")
-        })
+        .is_some_and(|s| s.tier() == SymbolTier::Pending)
+}
+#[derive(Clone, Copy)]
+enum Mode {
+    Expression,
+    Declaration,
+    PendingBody,
 }
 fn definition<'a>(
     n: &'a CheckedNotation<'_, '_>,
@@ -176,12 +175,10 @@ fn definition<'a>(
     environment: Rc<Vec<Frame<'a>>>,
     mut origins: Vec<NotationOrigin>,
     stack: &mut Vec<Action<'a>>,
+    unmarked: bool,
 ) {
-    if let Some(reason) = pending(n, id) {
-        stack.push(Action::Text(
-            format!("}}_{{\\text{{pending: {reason}}}}}"),
-            origins.clone(),
-        ));
+    if !unmarked && pending(n, id) {
+        stack.push(Action::Text("}_{\\text{pending}}".into(), origins.clone()));
     }
     match n.definition(id).spec().kind() {
         DefinitionKind::Alias { target, .. } => {
@@ -189,7 +186,7 @@ fn definition<'a>(
                 definition: Some(id),
                 path: vec![NotationPathPart::Field("target".into())],
             });
-            definition(n, *target, environment, origins.clone(), stack);
+            definition(n, *target, environment, origins.clone(), stack, unmarked);
         }
         DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => stack
             .push(Action::Visit(Frame {
@@ -200,7 +197,7 @@ fn definition<'a>(
                 origins: origins.clone(),
             })),
     }
-    if pending(n, id).is_some() {
+    if !unmarked && pending(n, id) {
         stack.push(Action::Text("\\underbrace{".into(), origins));
     }
 }
@@ -210,8 +207,9 @@ fn emit<'a>(
     target: RenderTarget,
     owner: RenderOwner,
     case: &str,
-    declaration: bool,
+    mode: Mode,
 ) -> Result<Candidate> {
+    let unmarked = matches!(mode, Mode::PendingBody);
     let mut output = Candidate {
         source: String::new(),
         origins: vec![],
@@ -226,7 +224,7 @@ fn emit<'a>(
                     ExprDraft::Literal { value } => {
                         append(&mut output, value, origins, owner, case)?;
                     }
-                    ExprDraft::Slot { index } if declaration => append(
+                    ExprDraft::Slot { index } if matches!(mode, Mode::Declaration) => append(
                         &mut output,
                         &format!("#{}", index + 1),
                         origins,
@@ -258,7 +256,7 @@ fn emit<'a>(
                     ExprDraft::Call {
                         callee: Callee::Definition(id),
                         arguments,
-                    } if target == RenderTarget::Macro => {
+                    } if target == RenderTarget::Macro && !unmarked => {
                         if arguments.is_empty() {
                             stack.push(Action::Text("{}".into(), origins.clone()));
                         }
@@ -280,7 +278,7 @@ fn emit<'a>(
                                 .map(|(i, arg)| frame.child(arg, i))
                                 .collect(),
                         );
-                        definition(n, *id, environment, origins, &mut stack);
+                        definition(n, *id, environment, origins, &mut stack, unmarked);
                     }
                 }
             }
@@ -333,7 +331,7 @@ pub(super) fn expression(
         target,
         owner,
         case,
-        false,
+        Mode::Expression,
     )
 }
 #[cfg(test)]
@@ -370,7 +368,7 @@ pub(super) fn fixture_body(
         RenderTarget::Unicode,
         RenderOwner::Definition(DefinitionId::Product),
         "fixture",
-        false,
+        Mode::Expression,
     )
 }
 pub(super) fn combine(prefix: &str, source: &str, site: NotationSite) -> Result<String> {
@@ -448,9 +446,9 @@ pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaratio
             RenderTarget::Macro,
             RenderOwner::Definition(id),
             "declaration",
-            true,
+            Mode::Declaration,
         )?;
-        if let Some(reason) = pending(n, id) {
+        if pending(n, id) {
             body.source = combine(
                 "\\underbrace{",
                 &body.source,
@@ -458,7 +456,7 @@ pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaratio
             )?;
             body.source = combine(
                 &body.source,
-                &format!("}}_{{\\text{{pending: {reason}}}}}"),
+                "}_{\\text{pending}}",
                 body.site(RenderOwner::Definition(id), "declaration"),
             )?;
         }
@@ -497,4 +495,22 @@ pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaratio
         emitted.insert(id);
     }
     Ok(records)
+}
+
+/// Private explanation mode: expand every project call without status wrappers.
+pub(super) fn pending_body(
+    n: &CheckedNotation<'_, '_>,
+    id: DefinitionId,
+    target: RenderTarget,
+) -> Result<Candidate> {
+    let mut stack = vec![];
+    definition(n, id, Rc::new(vec![]), vec![], &mut stack, true);
+    emit(
+        n,
+        stack,
+        target,
+        RenderOwner::Definition(id),
+        "pending-body",
+        Mode::PendingBody,
+    )
 }

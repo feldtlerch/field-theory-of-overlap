@@ -1312,6 +1312,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
                     key: key.into(),
                     markdown: "1".into(),
                     latex: "1".into(),
+                    pending: vec![],
                     site: UnitSite {
                         occurrence: Some(index),
                         ..input::site("units/statements/fixture.toml")
@@ -1358,6 +1359,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                     key: "value".into(),
                     markdown: "1".into(),
                     latex: "1".into(),
+                    pending: vec![],
                     site: occurrence(1),
                 },
                 plan::Inline::Text(" ".into()),
@@ -1402,7 +1404,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             (
                 "\\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n",
                 "\\(1\\)",
-                "\\texttt{dec:fixture:source}% cite dec:fixture:source\n",
+                "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n",
                 "% unit ",
             )
         };

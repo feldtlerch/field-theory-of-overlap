@@ -1510,7 +1510,7 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 
 ]
 (document.aux) )
-Output written on document.xdv (1 page, 1944 bytes).
+Output written on document.xdv (1 page, 1484 bytes).
 ",
 );
 const FORMAT_CHANNEL_6: &str = r#"note: using only cached resource files
@@ -1518,15 +1518,12 @@ note: generating format "latex"
 note: Running TeX ...
 note: Rerunning TeX because "document.aux" changed ...
 note: Running xdvipdfmx ...
-note: Writing `@SCRATCH@/output/document.log` (13.05 KiB)
+note: Writing `@SCRATCH@/output/document.log` (12.82 KiB)
 note: Writing `@SCRATCH@/output/document.pdf` (@PDF-KIB@ KiB)
 note: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)
 "#;
 const FORMAT_CHANNEL_7: &str = r"warning: open of input /dev/null failed
 caused by: access to the path `/dev/null` is forbidden
-warning: document.tex:19: Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-warning: document.tex:19: Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-warning: warnings were issued by the TeX engine; use --print and/or --keep-logs for details.
 ";
 const FORMAT_CHANNEL_8: &str = concat!(
     r"**
@@ -1835,18 +1832,11 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 17.
 
  (umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-[]\TU/lmroman10(0)/m/n/10 Relation $\OT1/cmr/m/n/10 ([] = [])$\TU/lmroman10(0)/
-m/n/10 ; see \TU/lmmono10(0)/m/n/10 dec:weld:equal-address-sets\TU/lmroman10(0)
-",
-    "/m/n/10 . \n",
-    r" []
+) [1
 
-[1
-
-] (document.aux) )
-Output written on document.xdv (1 page, 2636 bytes).
+]
+(document.aux) )
+Output written on document.xdv (1 page, 1680 bytes).
 ",
 );
 const FORMAT_CHANNEL_9: &str = r#"note: using only cached resource files
@@ -1855,7 +1845,7 @@ note: Running TeX ...
 note: Rerunning TeX because "document.aux" changed ...
 note: Running xdvipdfmx ...
 note: Writing `@SCRATCH@/output/document.pdf` (@PDF-KIB@ KiB)
-note: Writing `@SCRATCH@/output/document.log` (13.05 KiB)
+note: Writing `@SCRATCH@/output/document.log` (12.82 KiB)
 note: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)
 "#;
 const FORMAT_CHANNEL_10: &str = concat!(
@@ -2165,18 +2155,11 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 17.
 
  (umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-[]\TU/lmroman10(0)/m/n/10 Relation $\OT1/cmr/m/n/10 ([] = [])$\TU/lmroman10(0)/
-m/n/10 ; see \TU/lmmono10(0)/m/n/10 dec:weld:equal-address-sets\TU/lmroman10(0)
-",
-    "/m/n/10 . \n",
-    r" []
+) [1
 
-[1
-
-] (document.aux) )
-Output written on document.xdv (1 page, 2112 bytes).
+]
+(document.aux) )
+Output written on document.xdv (1 page, 1648 bytes).
 ",
 );
 const FORMAT_CHANNEL_11: &str = r#"note: using only cached resource files
@@ -4274,19 +4257,16 @@ note: Running TeX ...
 note: Rerunning TeX because "document.aux" changed ...
 note: Running xdvipdfmx ...
 note: Writing `@SCRATCH@/output/document.pdf` (@PDF-KIB@ KiB)
-note: Writing `@SCRATCH@/output/document.log` (13.05 KiB)
+note: Writing `@SCRATCH@/output/document.log` (12.82 KiB)
 note: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)
 "#;
-const FORMAT_CHANNEL_34: &str = r"warning: document.tex:19: Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-warning: document.tex:19: Overfull \hbox (79.16977pt too wide) in paragraph at lines 17--19
-warning: warnings were issued by the TeX engine; use --print and/or --keep-logs for details.
-";
+const FORMAT_CHANNEL_34: &str = r"";
 const FORMAT_CHANNEL_35: &str = r#"note: using only cached resource files
 note: Running TeX ...
 note: Rerunning TeX because "document.aux" changed ...
 note: Running xdvipdfmx ...
 note: Writing `@SCRATCH@/output/document.pdf` (@PDF-KIB@ KiB)
-note: Writing `@SCRATCH@/output/document.log` (13.05 KiB)
+note: Writing `@SCRATCH@/output/document.log` (12.82 KiB)
 note: Skipped writing 1 intermediate files (use --keep-intermediates to keep them)
 "#;
 const FORMAT_CHANNEL_36: &str = r#"note: using only cached resource files

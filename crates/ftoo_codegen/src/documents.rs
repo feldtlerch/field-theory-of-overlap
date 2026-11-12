@@ -10,6 +10,7 @@ mod markdown;
 mod native;
 mod native_format;
 mod native_support;
+mod pending;
 mod plan;
 mod runtime;
 #[cfg(test)]
@@ -476,12 +477,11 @@ fn consume_sweep(
     let mut sweep = latex::start("assembly-sweep", "en");
     let mut rows = Vec::new();
     for row in notation.sweep_rows() {
-        rows.push(native::sweep_row(
-            &mut sweep,
-            row.owner(),
-            row.case(),
-            row.macro_source(),
-        ));
+        let mut origin = native::sweep_row(&mut sweep, row.owner(), row.case(), row.macro_source());
+        sweep.push_str(&pending::sweep(row.pending_entries()));
+        origin.bytes.end = sweep.len();
+        origin.origin.site.anchor = SourceAnchor::Bytes(origin.bytes.start, origin.bytes.end);
+        rows.push(origin);
     }
     let cases = sweep
         .lines()

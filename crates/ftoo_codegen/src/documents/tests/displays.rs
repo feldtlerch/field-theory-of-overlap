@@ -703,7 +703,16 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
                 ));
             }
             for math in region.math() {
-                replacements.push((math.site().decoded.clone().unwrap(),plan::Inline::Math {key:math.name().into(),markdown:r"\underbrace{{c}_{1}}_{\text{pending: retained formulation def:langevin:coefficient-one}}".into(),latex:r"\FtooQCoefficientOne{}".into(),site:region.site(math.site())}));
+                replacements.push((
+                    math.site().decoded.clone().unwrap(),
+                    plan::Inline::Math {
+                        key: math.name().into(),
+                        markdown: r"\underbrace{{c}_{1}}_{\text{pending}}".into(),
+                        latex: r"\FtooQCoefficientOne{}".into(),
+                        pending: vec![],
+                        site: region.site(math.site()),
+                    },
+                ));
             }
             for (value, site, citation) in region.spans() {
                 replacements.push((
@@ -1065,11 +1074,20 @@ pub(super) fn support_required_real_table_and_picture_consume_pending_math_and_l
 fn relation_caption(plan: &mut plan::DocumentPlan) {
     let block = &mut plan.blocks[0];
     block.unit = "sec:coefficients:relation".into();
-    block.runs=vec![
+    block.runs = vec![
         plan::Inline::Text("Relation ".into()),
-        plan::Inline::Math {key:"value".into(),markdown:r"({\underbrace{{c}_{1}}_{\text{pending: retained formulation def:langevin:coefficient-one}}}={\frac{1}{3}})".into(),latex:r"({\FtooQCoefficientOne{}}={\frac{1}{3}})".into(),site:input::site("units/statements/relation.toml")},
+        plan::Inline::Math {
+            key: "value".into(),
+            markdown: r"({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})".into(),
+            latex: r"({\FtooQCoefficientOne{}}={\frac{1}{3}})".into(),
+            pending: vec![],
+            site: input::site("units/statements/relation.toml"),
+        },
         plan::Inline::Text("; see ".into()),
-        plan::Inline::Citation {text:"dec:weld:equal-address-sets".into(),site:input::site("units/statements/relation.toml")},
+        plan::Inline::Citation {
+            text: "dec:weld:equal-address-sets".into(),
+            site: input::site("units/statements/relation.toml"),
+        },
         plan::Inline::Text(".".into()),
     ];
     for body in block.displays.values_mut() {
@@ -1086,7 +1104,7 @@ fn complete_figure_caption_pending_math_and_citation_match_literal_blocks() {
     let markdown = concat!(
         "<!-- generated document main language en -->\nCoverage.\nSlice.\n\n",
         "<!-- unit sec:coefficients:relation document main language en -->\n",
-        r"Relation $({\underbrace{{c}_{1}}_{\text{pending: retained formulation def:langevin:coefficient-one}}}={\frac{1}{3}})$; see <code>dec:weld:equal-address-sets</code><!-- cite dec:weld:equal-address-sets -->.",
+        r"Relation $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$; see <code>dec:weld:equal-address-sets</code><!-- cite dec:weld:equal-address-sets -->.",
         "\n\n> c:1<!-- label def:langevin:coefficient-one --> → c:3<!-- label def:langevin:coefficient-three -->\n",
     );
     let latex = format!(
@@ -1099,7 +1117,7 @@ Coverage.
 Slice.
 
 % unit sec:coefficients:relation document main language en
-Relation \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\); see \texttt{dec:weld:equal-address-sets}% cite dec:weld:equal-address-sets
+Relation \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\); see \texttt{dec:\allowbreak{}weld:\allowbreak{}equal-\allowbreak{}address-\allowbreak{}sets}% cite dec:weld:equal-address-sets
 .
 
 \begingroup\setlength{\unitlength}{1pt}

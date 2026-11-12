@@ -32,7 +32,7 @@ fn support_required_complete_typesetter_consumer_requires_prepared_support()
     let snapshot = ftoo_manifest::Snapshot::capture(book.graph());
     let prepared = prepare_notation(&n)?;
     assert_eq!(prepared.sweep_rows().len(), 237);
-    assert_eq!(prepared.typesetting_calls(), 474);
+    assert_eq!(prepared.typesetting_calls(), 484);
     let expression = prepared.check_expression(ExprDraft::Call {
         callee: Callee::Definition(DefinitionId::Dimension),
         arguments: vec![ExprDraft::Literal { value: "x".into() }],

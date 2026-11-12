@@ -5,6 +5,7 @@ mod acceptance;
 mod brackets;
 mod displays;
 pub(super) mod native_evidence;
+mod pending;
 mod spacing;
 mod sweep;
 use brackets::CaseEvidence;
@@ -36,7 +37,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             }
         };
         let prefix = if citation {
-            "\\texttt{dec:fixture:source}% cite dec:fixture:source\n"
+            "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n"
         } else {
             "\\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n"
         };
@@ -63,6 +64,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
                 key: "x".into(),
                 markdown: "x".into(),
                 latex: "x".into(),
+                pending: vec![],
                 site: site.clone(),
             },
             insertion(),
@@ -1822,6 +1824,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                     key: "value".into(),
                     markdown: "1".into(),
                     latex: "1".into(),
+                    pending: vec![],
                     site: site.clone(),
                 },
                 Inline::Text(". See ".into()),

@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::typeset;
 use super::{
-    NotationRenderError, Result, admission, katex,
+    NotationRenderError, PendingEntry, Result, SymbolTier, admission, katex,
     render::{self, Declaration},
     rendered_site,
     support::Support,
@@ -118,6 +118,7 @@ struct Candidates {
     requests: Vec<Request>,
     declarations: String,
     rows: Vec<SweepRow>,
+    pending: Vec<PendingEntry>,
     key: Vec<Vec<u8>>,
 }
 
@@ -162,6 +163,42 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
         key.push(vec![record.arity]);
         key.push(record.source.as_bytes().to_vec());
     }
+    let mut pending = vec![];
+    for (order, definition) in n.definitions().iter().enumerate() {
+        let Some(status) = definition
+            .status()
+            .filter(|s| s.tier() == SymbolTier::Pending)
+        else {
+            continue;
+        };
+        let id = definition.spec().id();
+        let macro_body = render::pending_body(n, id, RenderTarget::Macro)?;
+        let unicode_body = render::pending_body(n, id, RenderTarget::Unicode)?;
+        for (target, body) in [
+            (RenderTarget::Macro, &macro_body),
+            (RenderTarget::Unicode, &unicode_body),
+        ] {
+            requests.push(Request {
+                source: body.source.clone(),
+                target,
+                site: body.site(RenderOwner::Definition(id), "pending-body"),
+                collision: None,
+            });
+        }
+        let reasons = status.reasons().to_vec();
+        key.push(id.token().as_bytes().to_vec());
+        for reason in &reasons {
+            key.push(reason.to_string().into_bytes());
+        }
+        pending.push(PendingEntry {
+            definition: id,
+            order,
+            macro_body: macro_body.source,
+            unicode_body: unicode_body.source,
+            reasons,
+            origins: vec![],
+        });
+    }
     for (owner, case, draft) in cases(n) {
         let checked = ftoo_manifest::check_expression(n, draft)?;
         let macro_form = render::expression(n, checked.draft(), RenderTarget::Macro, owner, &case)?;
@@ -189,6 +226,7 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
             case,
             macro_source: macro_form.source,
             unicode_source: unicode.source,
+            pending: super::pending_uses(&pending, checked.uses()),
         });
     }
     for request in &requests {
@@ -203,6 +241,7 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
         requests,
         declarations,
         rows,
+        pending,
         key,
     })
 }
@@ -213,7 +252,7 @@ pub(super) fn prepared(
     support: &Support,
     records: &[Declaration],
     bypass: bool,
-) -> Result<(String, Vec<SweepRow>)> {
+) -> Result<(String, Vec<SweepRow>, Vec<PendingEntry>)> {
     with_prepared(n, support, records, bypass, Ok)
 }
 
@@ -222,7 +261,7 @@ pub(super) fn with_prepared<T, E>(
     support: &Support,
     records: &[Declaration],
     bypass: bool,
-    run: impl FnOnce((String, Vec<SweepRow>)) -> std::result::Result<T, E>,
+    run: impl FnOnce((String, Vec<SweepRow>, Vec<PendingEntry>)) -> std::result::Result<T, E>,
 ) -> std::result::Result<T, E>
 where
     E: From<super::NotationRenderError> + From<super::NotationAdapterFault>,
@@ -240,11 +279,12 @@ fn prepared_inner(
     records: &[Declaration],
     bypass: bool,
     candidates: Candidates,
-) -> Result<(String, Vec<SweepRow>)> {
+) -> Result<(String, Vec<SweepRow>, Vec<PendingEntry>)> {
     let Candidates {
         requests,
         declarations,
         rows,
+        pending,
         mut key,
     } = candidates;
     let adapter_path = super::support::repository().join("tools/notation/check.cjs");
@@ -333,7 +373,7 @@ fn prepared_inner(
         support.after_close(move || reservation.publish());
     }
     drop(memo_phase);
-    Ok((declarations, rows))
+    Ok((declarations, rows, pending))
 }
 
 #[derive(Debug)]
@@ -343,8 +383,13 @@ pub struct SweepRow {
     case: String,
     macro_source: String,
     unicode_source: String,
+    pending: Vec<PendingEntry>,
 }
 impl SweepRow {
+    #[must_use]
+    pub fn pending_entries(&self) -> &[PendingEntry] {
+        &self.pending
+    }
     #[must_use]
     pub const fn owner(&self) -> RenderOwner {
         self.owner
@@ -559,6 +604,7 @@ pub(super) fn row(
     case: &str,
     draft: ExprDraft,
 ) -> Result<SweepRow> {
+    let pending = prepared(n, support, &render::declarations(n)?, false)?.2;
     let mut errors = vec![];
     let checked = ftoo_manifest::check_expression(n, draft)?;
     let macro_form = render::expression(n, checked.draft(), RenderTarget::Macro, owner, case)?;
@@ -590,6 +636,7 @@ pub(super) fn row(
             case: case.into(),
             macro_source: macro_form.source,
             unicode_source: unicode.source,
+            pending: super::pending_uses(&pending, checked.uses()),
         }),
     }
 }

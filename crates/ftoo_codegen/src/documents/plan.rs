@@ -20,6 +20,7 @@ pub(super) enum Inline {
         key: String,
         markdown: String,
         latex: String,
+        pending: Vec<crate::PendingEntry>,
         site: UnitSite,
     },
     Citation {
@@ -165,10 +166,82 @@ enum TexLine {
     MidLine,
     SkipBlanks,
 }
+// Literal coverage prose has no TeX whitespace normalization or control spaces.
+fn exact_literal(mut encoded: &str, expected: &str) -> bool {
+    for scalar in expected.chars() {
+        if encoded.starts_with('\\') {
+            let Some((decoded, size)) = tex_literal(encoded) else {
+                return false;
+            };
+            if decoded != scalar || decoded == ' ' {
+                return false;
+            }
+            encoded = &encoded[size..];
+        } else {
+            if matches!(
+                scalar,
+                '\\' | '{' | '}' | '%' | '_' | '#' | '$' | '&' | '^' | '~'
+            ) {
+                return false;
+            }
+            let Some(rest) = encoded.strip_prefix(scalar) else {
+                return false;
+            };
+            encoded = rest;
+        }
+    }
+    encoded.is_empty()
+}
+// Read escaped identity bytes and validate their discretionary boundaries from
+// decoded scalar positions, independently of the writer's segment traversal.
+fn recover_identity(source: &str) -> Option<String> {
+    let mut value = String::new();
+    let mut boundaries = Vec::new();
+    let mut rest = source;
+    while !rest.is_empty() {
+        if let Some(tail) = rest.strip_prefix(r"\allowbreak{}") {
+            boundaries.push(value.chars().count());
+            rest = tail;
+        } else if rest.starts_with('\\') {
+            let (scalar, size) = tex_literal(rest)?;
+            value.push(scalar);
+            rest = &rest[size..];
+        } else {
+            let scalar = rest.chars().next()?;
+            if matches!(scalar, '{' | '}' | '%' | '_' | '#' | '$' | '&' | '^' | '~') {
+                return None;
+            }
+            value.push(scalar);
+            rest = &rest[scalar.len_utf8()..];
+        }
+    }
+    let scalars: Vec<_> = value.chars().collect();
+    let separator = |c: &char| matches!(c, ':' | '-' | '/' | '.');
+    let expected: Vec<_> = (1..scalars.len())
+        .filter(|&at| {
+            if separator(&scalars[at - 1]) {
+                return true;
+            }
+            let left = scalars[..at]
+                .iter()
+                .rposition(separator)
+                .map_or(0, |i| i + 1);
+            let right = scalars[at..]
+                .iter()
+                .position(separator)
+                .map_or(scalars.len(), |i| at + i);
+            at < right && right - left > 24
+        })
+        .collect();
+    (boundaries == expected).then_some(value)
+}
 // TeX's input processor precedes the closed-grammar recognizer. Opaque inline
 // commands emit a nonblank token; comments discard their endline. Explicit
 // control spaces expand independently of the input processor's blank state.
 fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
+    recover_latex_with_pending_breaks(body, false)
+}
+fn recover_latex_with_pending_breaks(body: &str, pending: bool) -> Option<Vec<Recovered>> {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
@@ -201,7 +274,9 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
             let mut value = String::new();
             let mut end = 0;
             while !tail[end..].starts_with('}') {
-                if tail[end..].starts_with('\\') {
+                if tail[end..].starts_with(r"\allowbreak{}") {
+                    end += r"\allowbreak{}".len();
+                } else if tail[end..].starts_with('\\') {
                     let (c, n) = tex_literal(&tail[end..])?;
                     value.push(c);
                     end += n;
@@ -212,7 +287,9 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
                 }
             }
             at += 8 + end + 1;
+            let encoded = &tail[..end];
             if let Some(tail) = body[at..].strip_prefix("% cite ") {
+                let value = recover_identity(encoded)?;
                 let end = tail.find('\n')?;
                 if tail[..end] != value {
                     return None;
@@ -221,9 +298,14 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
                 output.push(Recovered::Citation(value));
                 line = TexLine::NewLine;
             } else {
+                if encoded.contains(r"\allowbreak{}") {
+                    return None;
+                }
                 output.push(Recovered::Mention(value));
                 line = TexLine::MidLine;
             }
+        } else if pending && tail.starts_with(r"\allowbreak{}") {
+            at += r"\allowbreak{}".len();
         } else if tail.starts_with('\\') {
             let (c, n) = tex_literal(tail)?;
             text.push(c);
@@ -343,6 +425,20 @@ pub(super) fn check_emission(
             "\n\n"
         };
         let framed = body.strip_suffix(separator);
+        let (framed, explanation) =
+            match framed.and_then(|body| body.split_once("\n\nPending notation: ")) {
+                Some((main, explanation)) => (Some(main), Some(explanation)),
+                None => (framed, None),
+            };
+        let pending_expected = pending_records(plan, block, target);
+        let pending_actual = recover_pending(plan, block, target, explanation, &pending_expected);
+        if pending_actual != pending_expected {
+            first_range.get_or_insert(start..end);
+        }
+        let records: Vec<_> = records
+            .into_iter()
+            .filter(|r| !matches!(r.kind, EmissionKind::PendingExplanation(_)))
+            .collect();
         if let Some(display) = block.displays.get(&target) {
             let actual = framed
                 .and_then(|body| recover_display_block(body, block, display, &records, target));
@@ -376,6 +472,7 @@ pub(super) fn check_emission(
                 }
                 first_range.get_or_insert(start..end);
             }
+            actual_records.extend(pending_actual);
             continue;
         }
         let recovered = framed.and_then(|body| recover_block(body, block, target));
@@ -399,6 +496,7 @@ pub(super) fn check_emission(
             actual_records.push(actual);
             first_range.get_or_insert(start..end);
         }
+        actual_records.extend(pending_actual);
     }
     difference(
         &expected,
@@ -499,14 +597,39 @@ fn envelope(plan: &DocumentPlan, source: &str, target: DocumentTarget) -> bool {
             plan.document, plan.language, plan.coverage[0], plan.coverage[1]
         )
     } else {
-        format!(
-            "{}\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}\n{}\n\n{}\n\n",
+        let start = format!(
+            "{}\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}\n",
             super::latex::PREAMBLE,
             plan.document,
             plan.language,
-            super::latex::text(&plan.coverage[0]),
-            super::latex::text(&plan.coverage[1])
-        )
+        );
+        let Some(mut rest) = source.strip_prefix(&start) else {
+            return false;
+        };
+        for expected in &plan.coverage {
+            let Some((paragraph, tail)) = rest.split_once("\n\n") else {
+                return false;
+            };
+            if let Some(slice) = paragraph
+                .strip_prefix("Declared slice: ")
+                .and_then(|s| s.strip_suffix('.'))
+            {
+                let Some(identities) = slice
+                    .split(", ")
+                    .map(recover_identity)
+                    .collect::<Option<Vec<_>>>()
+                else {
+                    return false;
+                };
+                if format!("Declared slice: {}.", identities.join(", ")) != *expected {
+                    return false;
+                }
+            } else if !exact_literal(paragraph, expected) {
+                return false;
+            }
+            rest = tail;
+        }
+        return source.ends_with("\\end{document}\n");
     };
     source.starts_with(&prefix)
         && if target == DocumentTarget::Markdown {
@@ -602,6 +725,7 @@ impl DocumentPlan {
                     records.extend(region_records(region, &plan, target));
                 }
             }
+            records.extend(pending_records(self, block, target));
         }
         records
     }
@@ -678,7 +802,7 @@ pub(super) fn build(
     }
     Ok(plans)
 }
-type Equations = BTreeMap<(String, String), (String, String)>;
+type Equations = BTreeMap<(String, String), (String, String, Vec<crate::PendingEntry>)>;
 fn equations(
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     notation: &RenderableNotation<'_, '_, '_>,
@@ -722,9 +846,12 @@ fn equations(
                     notation
                         .check_expression(parsed.into_draft())
                         .and_then(|expr| {
+                            let unicode = expr.render(RenderTarget::Unicode)?;
+                            let macro_form = expr.render(RenderTarget::Macro)?;
                             Ok((
-                                expr.render(RenderTarget::Unicode)?.source().to_owned(),
-                                expr.render(RenderTarget::Macro)?.source().to_owned(),
+                                unicode.source().to_owned(),
+                                macro_form.source().to_owned(),
+                                unicode.pending_entries().to_vec(),
                             ))
                         })
                         .map_err(|cause| {
@@ -831,7 +958,7 @@ fn runs(
         ));
     }
     for occurrence in text.occurrences() {
-        let (markdown, latex) =
+        let (markdown, latex, pending) =
             &equations[&(unit.label().as_str().into(), occurrence.name().into())];
         replacements.push((
             occurrence
@@ -843,6 +970,7 @@ fn runs(
                 key: occurrence.name().into(),
                 markdown: markdown.clone(),
                 latex: latex.clone(),
+                pending: pending.clone(),
                 site: occurrence.site().clone(),
             },
         ));
@@ -1210,7 +1338,7 @@ pub(super) fn display_plans(
                 ));
             }
             for occurrence in region.math() {
-                let (markdown, latex) =
+                let (markdown, latex, pending) =
                     &equations[&(unit.label().as_str().into(), occurrence.name().into())];
                 replacements.push((
                     occurrence.site().decoded.clone().expect("insertion"),
@@ -1218,6 +1346,7 @@ pub(super) fn display_plans(
                         key: occurrence.name().into(),
                         markdown: markdown.clone(),
                         latex: latex.clone(),
+                        pending: pending.clone(),
                         site: region.site(occurrence.site()),
                     },
                 ));
@@ -1435,9 +1564,209 @@ fn recover_display_block(
     Some(result)
 }
 
+fn pending_records(
+    plan: &DocumentPlan,
+    block: &Block,
+    target: DocumentTarget,
+) -> Vec<EmissionRecord> {
+    // Independently walk the caption/heading/prose and each target region.
+    // Deduplicate by semantic identity, then order by the checked catalogue index.
+    let mut collected = BTreeMap::new();
+    let mut regions = vec![block.runs.as_slice()];
+    if let Some(display) = block.displays.get(&target) {
+        for region in &display.regions {
+            regions.push(region.runs.as_slice());
+        }
+    }
+    for runs in regions {
+        for run in runs {
+            if let Inline::Math { pending, site, .. } = run {
+                for entry in pending {
+                    let (_, explanation) =
+                        collected.entry(entry.definition()).or_insert_with(|| {
+                            (
+                                entry.order(),
+                                super::PendingExplanation {
+                                    definition: entry.definition(),
+                                    body_macro: entry.body_macro().into(),
+                                    body_unicode: entry.body_unicode().into(),
+                                    reasons: entry.reasons().to_vec(),
+                                    occurrences: vec![],
+                                },
+                            )
+                        });
+                    explanation.occurrences.push(super::PendingOccurrence {
+                        source: SourceOrigin {
+                            unit: Some(block.unit.clone()),
+                            language: Some(plan.language.clone()),
+                            target: Some(target),
+                            site: site.clone(),
+                        },
+                        notation: entry.origins().to_vec(),
+                    });
+                }
+            }
+        }
+    }
+    let mut entries: Vec<_> = collected.into_values().collect();
+    entries.sort_by_key(|(order, _)| *order);
+    entries
+        .into_iter()
+        .map(|(_, entry)| entry)
+        .map(|entry| {
+            let body = if target == DocumentTarget::Latex {
+                &entry.body_macro
+            } else {
+                &entry.body_unicode
+            };
+            let value = format!(
+                "{body}: {}",
+                entry
+                    .reasons
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            );
+            EmissionRecord {
+                kind: EmissionKind::PendingExplanation(Box::new(entry)),
+                unit: block.unit.clone(),
+                language: plan.language.clone(),
+                target,
+                occurrence: None,
+                value,
+                site: block.site.clone(),
+            }
+        })
+        .collect()
+}
+fn recover_pending(
+    plan: &DocumentPlan,
+    block: &Block,
+    target: DocumentTarget,
+    source: Option<&str>,
+    expected: &[EmissionRecord],
+) -> Vec<EmissionRecord> {
+    let Some(source) = source else { return vec![] };
+    let mut wanted = vec![Recovered::Text("Pending notation: ".into())];
+    for (index, record) in expected.iter().enumerate() {
+        let EmissionKind::PendingExplanation(entry) = &record.kind else {
+            unreachable!("pending record")
+        };
+        wanted.push(Recovered::Math(if target == DocumentTarget::Latex {
+            entry.body_macro.clone()
+        } else {
+            entry.body_unicode.clone()
+        }));
+        wanted.push(Recovered::Text(format!(
+            ": {}.{}",
+            entry
+                .reasons
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; "),
+            if index + 1 == expected.len() { "" } else { " " }
+        )));
+    }
+    let full = format!("Pending notation: {source}");
+    let recovered = match target {
+        DocumentTarget::Markdown => recover_markdown(&full, block),
+        DocumentTarget::Latex if pending_breaks(&full) => {
+            recover_latex_with_pending_breaks(&full, true)
+        }
+        DocumentTarget::Latex => None,
+    };
+    if recovered == Some(wanted) {
+        return expected.to_vec();
+    }
+    let mut record = expected.first().cloned().unwrap_or_else(|| EmissionRecord {
+        kind: EmissionKind::Paragraph,
+        unit: block.unit.clone(),
+        language: plan.language.clone(),
+        target,
+        occurrence: None,
+        value: String::new(),
+        site: block.site.clone(),
+    });
+    record.value = full;
+    vec![record]
+}
+
+fn pending_breaks(mut source: &str) -> bool {
+    let prose = |text: &str| {
+        text.split_ascii_whitespace()
+            .all(|token| recover_identity(token).is_some())
+    };
+    while let Some((before, math)) = source.split_once(r"\(") {
+        if !prose(before) {
+            return false;
+        }
+        let Some((_, rest)) = math.split_once(r"\)") else {
+            return false;
+        };
+        source = rest;
+    }
+    prose(source)
+}
+
 #[cfg(test)]
 mod spacing_tests {
     use super::*;
+
+    #[test]
+    fn identity_literals_require_exact_escaping() {
+        for (raw, escaped) in [
+            ("_", r"\_"),
+            ("#", r"\#"),
+            ("$", r"\$"),
+            ("&", r"\&"),
+            ("^", r"\textasciicircum{}"),
+            ("~", r"\textasciitilde{}"),
+        ] {
+            assert_eq!(recover_identity(raw), None);
+            assert_eq!(recover_identity(escaped), Some(raw.into()));
+            assert!(exact_literal(escaped, raw));
+            assert!(!exact_literal(raw, raw));
+        }
+        assert!(exact_literal("Coverage text.", "Coverage text."));
+        for encoded in [
+            r"Coverage\space{}text.",
+            "Coverage  text.",
+            "Coverage\ntext.",
+            r"Cover\allowbreak{}age text.",
+        ] {
+            assert!(!exact_literal(encoded, "Coverage text."));
+        }
+    }
+
+    #[test]
+    fn identity_boundaries_decode_exactly_and_refuse_extra_or_missing_breaks() {
+        for (encoded, decoded) in [
+            (
+                r"a:\allowbreak{}b-\allowbreak{}c/\allowbreak{}d.\allowbreak{}e",
+                "a:b-c/d.e",
+            ),
+            ("abcdefghijklmnopqrstuvwx", "abcdefghijklmnopqrstuvwx"),
+            (
+                r"a\allowbreak{}b\allowbreak{}c\allowbreak{}d\allowbreak{}e\allowbreak{}f\allowbreak{}g\allowbreak{}h\allowbreak{}i\allowbreak{}j\allowbreak{}k\allowbreak{}l\allowbreak{}m\allowbreak{}n\allowbreak{}o\allowbreak{}p\allowbreak{}q\allowbreak{}r\allowbreak{}s\allowbreak{}t\allowbreak{}u\allowbreak{}v\allowbreak{}w\allowbreak{}x\allowbreak{}λ",
+                "abcdefghijklmnopqrstuvwxλ",
+            ),
+        ] {
+            assert_eq!(recover_identity(encoded), Some(decoded.into()));
+            assert_eq!(
+                recover_identity(&format!("{encoded}\\allowbreak{{}}")),
+                None
+            );
+            if encoded.contains(r"\allowbreak{}") {
+                assert_eq!(
+                    recover_identity(&encoded.replacen(r"\allowbreak{}", "", 1)),
+                    None
+                );
+            }
+            assert_eq!(recover_identity(encoded), Some(decoded.into()));
+        }
+    }
 
     #[test]
     fn token_spaces_normalize_source_lines_and_observe_tex_line_states() {

@@ -44,6 +44,159 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
 }
 
 #[test]
+fn extra_break_markers_refuse_prose_heading_mention_and_coverage_with_reread() {
+    let directory = Directory::new();
+    let path = directory.0.join("extra.tex");
+    for shape in 0..4 {
+        let mut plan = fixture(false, (shape == 1).then_some(1), "");
+        plan.blocks[0].runs = if shape == 2 {
+            vec![plan::Inline::Mention {
+                text: "word".into(),
+                site: site(),
+            }]
+        } else {
+            vec![plan::Inline::Text("word".into())]
+        };
+        let correct = latex::render(&plan);
+        let mutated = if shape == 3 {
+            correct.replace("Coverage.", r"Cover\allowbreak{}age.")
+        } else {
+            correct.replace("word", r"wo\allowbreak{}rd")
+        };
+        let records = plan.records(DocumentTarget::Latex);
+        let (range, fault) = if shape == 3 {
+            (
+                mutated.len()..mutated.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: records,
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            )
+        } else {
+            let mut actual = records[0].clone();
+            actual.value = if shape == 2 {
+                r"\texttt{wo\allowbreak{}rd}"
+            } else if shape == 1 {
+                r"\section*{wo\allowbreak{}rd}"
+            } else {
+                r"wo\allowbreak{}rd"
+            }
+            .into();
+            (
+                mutated.find("% unit ").unwrap()..mutated.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: records[1..].to_vec(),
+                    unexpected: vec![],
+                    changed: vec![EmissionChange {
+                        expected: records[0].clone(),
+                        actual,
+                    }],
+                },
+            )
+        };
+        let expected = failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/fixture/en.tex".into(),
+                bytes: range,
+                origins: plan.origins(DocumentTarget::Latex),
+            },
+            fault,
+        );
+        fs::write(&path, &mutated).unwrap();
+        let reread = fs::read_to_string(&path).unwrap();
+        let actual = plan::check_emission(&plan, &reread, DocumentTarget::Latex).unwrap_err();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), expected.to_string());
+        fs::write(&path, &correct).unwrap();
+        let restored = fs::read_to_string(&path).unwrap();
+        assert_eq!(restored, correct);
+        assert_eq!(
+            plan::check_emission(&plan, &restored, DocumentTarget::Latex),
+            Ok(())
+        );
+    }
+}
+
+#[test]
+fn identity_breaks_refuse_missing_and_misplaced_markers_and_reread_restoration() {
+    let directory = Directory::new();
+    let path = directory.0.join("identity.tex");
+    for coverage in [false, true] {
+        let mut plan = fixture(true, None, " word");
+        if coverage {
+            plan.coverage[1] = "Declared slice: dec:fixture:source.".into();
+        }
+        let correct = latex::render(&plan);
+        assert_eq!(latex::size(&plan), correct.len());
+        let marker = r"dec:\allowbreak{}fixture:\allowbreak{}source";
+        assert!(correct.contains(marker));
+        for replacement in [
+            r"dec:fixture:\allowbreak{}source",
+            r"de\allowbreak{}c:fixture:\allowbreak{}source",
+        ] {
+            let mutated = correct.replacen(marker, replacement, 1);
+            fs::write(&path, &mutated).unwrap();
+            let records = plan.records(DocumentTarget::Latex);
+            let (range, fault) = if coverage {
+                (
+                    mutated.len()..mutated.len(),
+                    AssemblyFault::EmissionMismatch {
+                        missing: records,
+                        unexpected: vec![],
+                        changed: vec![],
+                    },
+                )
+            } else {
+                let mut actual = records[0].clone();
+                actual.value =
+                    format!("\\texttt{{{replacement}}}% cite dec:fixture:source\n\\space{{}}word");
+                (
+                    mutated.find("% unit ").unwrap()..mutated.len(),
+                    AssemblyFault::EmissionMismatch {
+                        missing: records[1..].to_vec(),
+                        unexpected: vec![],
+                        changed: vec![EmissionChange {
+                            expected: records[0].clone(),
+                            actual,
+                        }],
+                    },
+                )
+            };
+            let expected = failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Generated {
+                    path: "generated/documents/fixture/en.tex".into(),
+                    bytes: range,
+                    origins: plan.origins(DocumentTarget::Latex),
+                },
+                fault,
+            );
+            let actual = plan::check_emission(
+                &plan,
+                &fs::read_to_string(&path).unwrap(),
+                DocumentTarget::Latex,
+            )
+            .unwrap_err();
+            assert_eq!(actual, expected);
+            assert_eq!(actual.to_string(), expected.to_string());
+            fs::write(&path, &correct).unwrap();
+            assert_eq!(
+                plan::check_emission(
+                    &plan,
+                    &fs::read_to_string(&path).unwrap(),
+                    DocumentTarget::Latex
+                ),
+                Ok(())
+            );
+        }
+    }
+}
+
+#[test]
 fn token_spaces_refuse_old_comment_indentation_with_exact_m055_and_restore() {
     for citation in [false, true] {
         for depth in [None, Some(1), Some(2), Some(3), Some(4), Some(5), Some(6)] {
@@ -185,7 +338,7 @@ fn token_spaces_check_caption_cell_and_picture_regions_independently() {
                 Ok(())
             );
             let insertion = if citation {
-                "\\texttt{dec:fixture:source}% cite dec:fixture:source\n"
+                "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n"
             } else {
                 "\\FtdocTag{c:1}{u0-t0}% label def:langevin:coefficient-one\n"
             };
@@ -284,7 +437,7 @@ fn support_required_native_comment_glue_matches_authored_controls()
     let mut count = 0;
     for citation in [false, true] {
         let control = if citation {
-            r"\texttt{dec:fixture:source}"
+            r"\texttt{dec:\allowbreak{}fixture:\allowbreak{}source}"
         } else {
             r"\FtdocTag{c:1}{u0-t0}"
         };
@@ -300,6 +453,7 @@ fn support_required_native_comment_glue_matches_authored_controls()
                     key: "x".into(),
                     markdown: "x".into(),
                     latex: "x".into(),
+                    pending: vec![],
                     site: site(),
                 });
             }

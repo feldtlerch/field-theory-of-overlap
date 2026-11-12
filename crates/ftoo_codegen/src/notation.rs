@@ -9,9 +9,9 @@ mod sweep;
 mod tests;
 
 use ftoo_manifest::{
-    CheckedExpression, CheckedNotation, NotationDiagnostic, NotationErrors, NotationFault,
-    NotationOrigin, NotationSite, NotationStage, RenderOwner, RenderTarget, RuleId,
-    SymbolLookupFault, SymbolUse,
+    CheckedExpression, CheckedNotation, DefinitionId, NotationDiagnostic, NotationErrors,
+    NotationFault, NotationOrigin, NotationSite, NotationStage, PendingReason, RenderOwner,
+    RenderTarget, RuleId, SymbolLookupFault, SymbolTier, SymbolUse,
 };
 use std::{fmt, io, path::PathBuf};
 pub use support::{
@@ -205,6 +205,7 @@ pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     support: std::rc::Rc<support::Support>,
     declarations: String,
     rows: Vec<SweepRow>,
+    pending: Vec<PendingEntry>,
 }
 impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     #[must_use]
@@ -217,7 +218,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     }
     #[must_use]
     pub fn typesetting_calls(&self) -> usize {
-        self.rows.len() * 2
+        (self.rows.len() + self.pending.len()) * 2
     }
     #[must_use]
     pub const fn catalogue(&self) -> &'catalogue CheckedNotation<'book, 'graph> {
@@ -297,6 +298,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
             notation: self,
             source,
             uses: expression.uses().to_vec(),
+            pending: pending_uses(&self.pending, expression.uses()),
         })
     }
 }
@@ -345,11 +347,16 @@ pub struct RenderedExpression<'a, 'catalogue, 'book, 'graph> {
     notation: &'a RenderableNotation<'catalogue, 'book, 'graph>,
     source: String,
     uses: Vec<SymbolUse>,
+    pending: Vec<PendingEntry>,
 }
 impl<'a, 'catalogue, 'book, 'graph> RenderedExpression<'a, 'catalogue, 'book, 'graph> {
     #[must_use]
     pub fn source(&self) -> &str {
         &self.source
+    }
+    #[must_use]
+    pub fn pending_entries(&self) -> &[PendingEntry] {
+        &self.pending
     }
     #[must_use]
     pub fn uses(&self) -> &[SymbolUse] {
@@ -372,12 +379,13 @@ pub fn prepare_notation<'catalogue, 'book, 'graph>(
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
     let support = std::rc::Rc::new(support::resolve(location.as_deref())?);
     let records = render::declarations(catalogue)?;
-    let (declarations, rows) = sweep::prepared(catalogue, &support, &records, false)?;
+    let (declarations, rows, pending) = sweep::prepared(catalogue, &support, &records, false)?;
     Ok(RenderableNotation {
         catalogue,
         support,
         declarations,
         rows,
+        pending,
     })
 }
 
@@ -396,14 +404,88 @@ where
         &support,
         &records,
         false,
-        |(declarations, rows)| {
+        |(declarations, rows, pending)| {
             let notation = RenderableNotation {
                 catalogue,
                 support: std::rc::Rc::clone(&support),
                 declarations,
                 rows,
+                pending,
             };
             run(&notation)
         },
     )
+}
+
+/// Checked explanation for one pending symbol. Construction is private to preparation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingEntry {
+    definition: DefinitionId,
+    order: usize,
+    macro_body: String,
+    unicode_body: String,
+    reasons: Vec<PendingReason>,
+    origins: Vec<NotationOrigin>,
+}
+impl PendingEntry {
+    #[cfg(test)]
+    pub(crate) fn fixture(
+        definition: DefinitionId,
+        order: usize,
+        body: &str,
+        reasons: Vec<PendingReason>,
+        origins: Vec<NotationOrigin>,
+    ) -> Self {
+        Self {
+            definition,
+            order,
+            macro_body: body.into(),
+            unicode_body: body.into(),
+            reasons,
+            origins,
+        }
+    }
+    pub(crate) const fn order(&self) -> usize {
+        self.order
+    }
+    #[must_use]
+    pub fn body_macro(&self) -> &str {
+        &self.macro_body
+    }
+    #[must_use]
+    pub fn body_unicode(&self) -> &str {
+        &self.unicode_body
+    }
+    #[must_use]
+    pub const fn definition(&self) -> DefinitionId {
+        self.definition
+    }
+    #[must_use]
+    pub fn body(&self, target: RenderTarget) -> &str {
+        match target {
+            RenderTarget::Macro => &self.macro_body,
+            RenderTarget::Unicode => &self.unicode_body,
+        }
+    }
+    #[must_use]
+    pub fn reasons(&self) -> &[PendingReason] {
+        &self.reasons
+    }
+    #[must_use]
+    pub fn origins(&self) -> &[NotationOrigin] {
+        &self.origins
+    }
+}
+fn pending_uses(prepared: &[PendingEntry], uses: &[SymbolUse]) -> Vec<PendingEntry> {
+    prepared
+        .iter()
+        .filter_map(|entry| {
+            let occurrence = uses
+                .iter()
+                .find(|used| used.definition() == entry.definition)?;
+            let mut result = entry.clone();
+            result.origins = occurrence.origins().to_vec();
+            Some(result)
+        })
+        .collect()
 }
