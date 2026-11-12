@@ -254,24 +254,25 @@ pub fn prepare_documents(
     let catalogue = ftoo_manifest::notation(&book)
         .map_err(|e| DocumentError::Notation(crate::NotationRenderError::Admission(e)))?;
     drop(admission);
-    let notation = crate::prepare_notation(&catalogue)?;
-    let plans = plan::build(&skeletons, &welded, &notation, &metadata, &displays)?;
-    let artifacts = render_artifacts(root, &support, &book, &plans, &notation)?;
-    finish_snapshot(
-        root,
-        inputs,
-        &markdown,
-        std::iter::once(declaration)
-            .chain(statements)
-            .chain(sources)
-            .chain(display_sources),
-        [
-            ("units/statements", statement_files, false),
-            ("units/skeletons", skeleton_files, false),
-            ("units/displays", display_files, true),
-        ],
-        artifacts,
-    )
+    crate::notation::with_preparation(&catalogue, |notation| {
+        let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
+        let artifacts = render_artifacts(root, &support, &book, &plans, notation)?;
+        finish_snapshot(
+            root,
+            inputs,
+            &markdown,
+            std::iter::once(declaration)
+                .chain(statements)
+                .chain(sources)
+                .chain(display_sources),
+            [
+                ("units/statements", statement_files, false),
+                ("units/skeletons", skeleton_files, false),
+                ("units/displays", display_files, true),
+            ],
+            artifacts,
+        )
+    })
 }
 fn finish_snapshot(
     root: &Path,
@@ -368,76 +369,79 @@ fn render_artifacts(
 ) -> Result<Vec<DocumentArtifact>, DocumentError> {
     let addressing = runtime::render(book, plans)?;
     let lock = native_support::lock(root)?;
-    let mut artifacts = Vec::new();
-    for plan in plans {
-        document_size(plan)?;
-        let md = markdown::render(plan);
-        let tex = latex::render(plan);
-        plan::check_emission(plan, &md, DocumentTarget::Markdown)?;
-        plan::check_emission(plan, &tex, DocumentTarget::Latex)?;
-        let md_path = format!("generated/documents/{}/{}.md", plan.document, plan.language);
-        let checked = ftoo_manifest::check_markdown_sources(vec![ftoo_manifest::MarkdownSource {
-            file: md_path.clone(),
-            bytes: md.as_bytes().to_vec(),
-        }])
-        .map_err(|e| DocumentError::Labels(crate::LabelFileError::Source(e)))?;
-        neutral(&checked, false, AssemblyStage::Emission)?;
-        native::consume_plan(
-            support,
-            &lock,
-            &tex,
-            notation.declarations(),
-            &addressing,
-            plan,
-        )?;
-        artifacts.push(DocumentArtifact {
-            path: md_path,
-            bytes: md.into_bytes(),
-            origins: plan.origins(DocumentTarget::Markdown),
-            emissions: plan.records(DocumentTarget::Markdown),
-        });
-        artifacts.push(DocumentArtifact {
-            path: format!(
-                "generated/documents/{}/{}.tex",
-                plan.document, plan.language
-            ),
-            bytes: tex.into_bytes(),
-            origins: plan.origins(DocumentTarget::Latex),
-            emissions: plan.records(DocumentTarget::Latex),
-        });
-    }
-    consume_sweep(support, &lock, notation, &addressing)?;
-    artifacts.push(DocumentArtifact {
-        path: "generated/notation.tex".into(),
-        bytes: notation.declarations().as_bytes().to_vec(),
-        origins: Vec::new(),
-        emissions: Vec::new(),
-    });
-    artifacts.push(DocumentArtifact {
-        path: "generated/addressing.tex".into(),
-        bytes: addressing.into_bytes(),
-        origins: Vec::new(),
-        emissions: Vec::new(),
-    });
-    for artifact in &artifacts {
-        if artifact.bytes.len() > 16_777_216 {
-            return Err(failure(
-                RuleId::M055,
-                AssemblyStage::Emission,
-                AssemblySite::Generated {
-                    path: artifact.path.clone(),
-                    bytes: 16_777_216..16_777_217,
-                    origins: artifact.origins.clone(),
-                },
-                AssemblyFault::Limit {
-                    resource: ftoo_manifest::AssemblyResource::DocumentBytes,
-                    limit: 16_777_216,
-                    actual: 16_777_217,
-                },
-            ));
+    support.scope(&lock, || {
+        let mut artifacts = Vec::new();
+        for plan in plans {
+            document_size(plan)?;
+            let md = markdown::render(plan);
+            let tex = latex::render(plan);
+            plan::check_emission(plan, &md, DocumentTarget::Markdown)?;
+            plan::check_emission(plan, &tex, DocumentTarget::Latex)?;
+            let md_path = format!("generated/documents/{}/{}.md", plan.document, plan.language);
+            let checked =
+                ftoo_manifest::check_markdown_sources(vec![ftoo_manifest::MarkdownSource {
+                    file: md_path.clone(),
+                    bytes: md.as_bytes().to_vec(),
+                }])
+                .map_err(|e| DocumentError::Labels(crate::LabelFileError::Source(e)))?;
+            neutral(&checked, false, AssemblyStage::Emission)?;
+            native::consume_plan(
+                support,
+                &lock,
+                &tex,
+                notation.declarations(),
+                &addressing,
+                plan,
+            )?;
+            artifacts.push(DocumentArtifact {
+                path: md_path,
+                bytes: md.into_bytes(),
+                origins: plan.origins(DocumentTarget::Markdown),
+                emissions: plan.records(DocumentTarget::Markdown),
+            });
+            artifacts.push(DocumentArtifact {
+                path: format!(
+                    "generated/documents/{}/{}.tex",
+                    plan.document, plan.language
+                ),
+                bytes: tex.into_bytes(),
+                origins: plan.origins(DocumentTarget::Latex),
+                emissions: plan.records(DocumentTarget::Latex),
+            });
         }
-    }
-    Ok(artifacts)
+        consume_sweep(support, &lock, notation, &addressing)?;
+        artifacts.push(DocumentArtifact {
+            path: "generated/notation.tex".into(),
+            bytes: notation.declarations().as_bytes().to_vec(),
+            origins: Vec::new(),
+            emissions: Vec::new(),
+        });
+        artifacts.push(DocumentArtifact {
+            path: "generated/addressing.tex".into(),
+            bytes: addressing.into_bytes(),
+            origins: Vec::new(),
+            emissions: Vec::new(),
+        });
+        for artifact in &artifacts {
+            if artifact.bytes.len() > 16_777_216 {
+                return Err(failure(
+                    RuleId::M055,
+                    AssemblyStage::Emission,
+                    AssemblySite::Generated {
+                        path: artifact.path.clone(),
+                        bytes: 16_777_216..16_777_217,
+                        origins: artifact.origins.clone(),
+                    },
+                    AssemblyFault::Limit {
+                        resource: ftoo_manifest::AssemblyResource::DocumentBytes,
+                        limit: 16_777_216,
+                        actual: 16_777_217,
+                    },
+                ));
+            }
+        }
+        Ok(artifacts)
+    })
 }
 
 fn document_sites(corpus: &ftoo_manifest::LanguageCheckedUnits) -> BTreeMap<String, UnitSite> {

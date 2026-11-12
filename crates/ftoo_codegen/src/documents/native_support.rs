@@ -9,6 +9,7 @@ use crate::{
 use ftoo_manifest::{ShapeKind, UnitDiagnostic, UnitSite};
 use sha2::{Digest, Sha256};
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     fs,
     io::{self, Read},
@@ -17,11 +18,235 @@ use std::{
 
 type Result<T> = std::result::Result<T, NativeAdapterFault>;
 /// Explicit support location; execution never consults PATH or a default bundle.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NativeSupport {
     pub(super) root: PathBuf,
+    active: RefCell<Option<Active>>,
+    #[cfg(test)]
+    closing_hash: RefCell<Option<Result<()>>>,
+}
+#[derive(Debug)]
+struct Active {
+    snapshot: Option<crate::support_bracket::Snapshot>,
+    poison: Option<NativeAdapterFault>,
+}
+struct Scope<'a>(&'a NativeSupport);
+impl Drop for Scope<'_> {
+    fn drop(&mut self) {
+        if self.0.active.borrow_mut().take().is_some() {
+            crate::telemetry::counter("native.bracket_aborted", 1);
+        }
+    }
+}
+impl Clone for NativeSupport {
+    fn clone(&self) -> Self {
+        Self::at(self.root.clone())
+    }
 }
 impl NativeSupport {
+    pub(super) fn at(root: PathBuf) -> Self {
+        Self {
+            root,
+            active: RefCell::new(None),
+            #[cfg(test)]
+            closing_hash: RefCell::new(None),
+        }
+    }
+    #[cfg(test)]
+    pub(super) fn closing_hash(&self) -> Option<Result<()>> {
+        self.closing_hash.borrow().clone()
+    }
+    fn observation_fault(
+        &self,
+        lock: &Lock,
+        fault: crate::support_bracket::Fault,
+    ) -> NativeAdapterFault {
+        use crate::support_bracket::Fault;
+        match fault {
+            Fault::Changed {
+                path,
+                expected,
+                actual,
+            } => NativeAdapterFault::SupportChanged {
+                member: path.to_string_lossy().into_owned(),
+                expected,
+                actual,
+            },
+            Fault::Io { path, kind } => {
+                verify(self, lock).err().unwrap_or(NativeAdapterFault::Io {
+                    operation: NativeOperation::Inspect,
+                    path,
+                    kind,
+                })
+            }
+            Fault::Inventory {
+                missing,
+                unexpected,
+            } => verify(self, lock)
+                .err()
+                .unwrap_or_else(|| NativeAdapterFault::Inventory {
+                    component: NativeComponent::Bundle,
+                    missing: missing
+                        .iter()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .collect(),
+                    unexpected: unexpected
+                        .iter()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .collect(),
+                }),
+        }
+    }
+    pub(super) fn observe(&self, lock: &Lock) -> Result<()> {
+        self.ensure_open(lock)?;
+        let (phase, result) = {
+            let active = self.active.borrow();
+            let active = active.as_ref().expect("private bracket is open");
+            if let Some(fault) = &active.poison {
+                return Err(fault.clone());
+            }
+            let phase = crate::telemetry::Phase::new("native.identity_pass");
+            (
+                phase,
+                active.snapshot.as_ref().expect("verified opening").check(),
+            )
+        };
+        let result = result
+            .map(|members| crate::telemetry::counter("native.identity_members", members))
+            .map_err(|fault| self.observation_fault(lock, fault));
+        if let Err(fault) = &result {
+            self.active
+                .borrow_mut()
+                .as_mut()
+                .expect("open bracket")
+                .poison = Some(fault.clone());
+        }
+        phase.finish(result.is_ok());
+        result
+    }
+    pub(super) fn scope<T, E: From<NativeAdapterFault>>(
+        &self,
+        lock: &Lock,
+        run: impl FnOnce() -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        if self.active.borrow().is_none() {
+            return self.owned_scope(lock, run);
+        }
+        if let Some(fault) = self.active.borrow().as_ref().and_then(|a| a.poison.clone()) {
+            return Err(fault.into());
+        }
+        run()
+    }
+    pub(super) fn ensure_open(&self, lock: &Lock) -> Result<()> {
+        {
+            let active = self.active.borrow();
+            let active = active.as_ref().expect("private scope owns opening");
+            if let Some(fault) = &active.poison {
+                return Err(fault.clone());
+            }
+            if active.snapshot.is_some() {
+                return Ok(());
+            }
+        }
+        let open_phase = crate::telemetry::Phase::new("native.bracket_open");
+        let opening = (|| {
+            let mut roots = vec![
+                self.root.join("runtime/bin/tectonic"),
+                self.root.join("bundle"),
+            ];
+            if let Some((path, _)) = &lock.source {
+                roots.push(path.clone());
+            }
+            let snapshot = crate::support_bracket::Snapshot::capture(&roots)
+                .map_err(|e| self.observation_fault(lock, e))?;
+            crate::telemetry::counter("native.opening_members", snapshot.member_count());
+            verify(self, lock)?;
+            let stabilization = crate::telemetry::Phase::new("native.opening_stabilization");
+            let stabilized = snapshot
+                .check()
+                .map_err(|e| self.observation_fault(lock, e));
+            stabilization.finish(stabilized.is_ok());
+            crate::telemetry::counter("native.stabilized_members", stabilized?);
+            Ok::<_, NativeAdapterFault>(snapshot)
+        })();
+        open_phase.finish(opening.is_ok());
+        let snapshot = match opening {
+            Ok(snapshot) => snapshot,
+            Err(fault) => {
+                self.active
+                    .borrow_mut()
+                    .as_mut()
+                    .expect("owning scope")
+                    .poison = Some(fault.clone());
+                return Err(fault);
+            }
+        };
+        self.active
+            .borrow_mut()
+            .as_mut()
+            .expect("owning scope")
+            .snapshot = Some(snapshot);
+        crate::telemetry::counter("native.bracket_opened", 1);
+        Ok(())
+    }
+    fn owned_scope<T, E: From<NativeAdapterFault>>(
+        &self,
+        lock: &Lock,
+        run: impl FnOnce() -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        #[cfg(test)]
+        {
+            *self.closing_hash.borrow_mut() = None;
+        }
+        *self.active.borrow_mut() = Some(Active {
+            snapshot: None,
+            poison: None,
+        });
+        let guard = Scope(self);
+        let result = run();
+        if self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("owning scope")
+            .snapshot
+            .is_none()
+        {
+            let active = self.active.borrow_mut().take().expect("owning scope");
+            drop(guard);
+            if let Some(fault) = active.poison {
+                crate::telemetry::counter("native.bracket_aborted", 1);
+                return Err(fault.into());
+            }
+            return result;
+        }
+        let close_phase = crate::telemetry::Phase::new("native.bracket_close");
+        let full = verify(self, lock);
+        #[cfg(test)]
+        {
+            *self.closing_hash.borrow_mut() = Some(full.clone());
+        }
+        let identity = self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .snapshot
+            .as_ref()
+            .expect("verified opening")
+            .check()
+            .map_err(|e| self.observation_fault(lock, e));
+        let active = self.active.borrow_mut().take().expect("open bracket");
+        drop(guard);
+        let closing = active.poison.map_or(full.and(identity.map(|_| ())), Err);
+        close_phase.finish(closing.is_ok());
+        if closing.is_err() {
+            crate::telemetry::counter("native.bracket_aborted", 1);
+        }
+        closing?;
+        crate::telemetry::counter("native.bracket_closed", 1);
+        result
+    }
     /// # Errors
     /// Missing, relative, overlapping and linked support locations are refused.
     pub fn from_environment(repository: &Path) -> Result<Self> {
@@ -74,7 +299,7 @@ impl NativeSupport {
             ));
         }
         inspect(value, None, true)?;
-        Ok(Self { root: support })
+        Ok(Self::at(support))
     }
     #[must_use]
     pub fn directory(&self) -> &Path {
@@ -189,15 +414,14 @@ fn url(n: &Node) -> Result<String> {
 }
 #[derive(Debug)]
 pub(super) struct Lock {
+    pub source: Option<(PathBuf, String)>,
     pub engine: String,
     pub files: BTreeMap<String, String>,
     pub bundle_digest: String,
 }
-pub(super) fn lock(root: &Path) -> Result<Lock> {
-    let path = root.join("tools/assembly/native-lock.toml");
-    inspect(&path, None, false)?;
-    let metadata =
-        fs::metadata(&path).map_err(|e| io_error(NativeOperation::Inspect, &path, &e))?;
+fn lock_bytes(path: &Path) -> Result<Vec<u8>> {
+    inspect(path, None, false)?;
+    let metadata = fs::metadata(path).map_err(|e| io_error(NativeOperation::Inspect, path, &e))?;
     if metadata.len() > 16_777_216 {
         return Err(NativeAdapterFault::Metadata {
             site: super::input::site("tools/assembly/native-lock.toml"),
@@ -209,9 +433,9 @@ pub(super) fn lock(root: &Path) -> Result<Lock> {
         });
     }
     let mut bytes = Vec::new();
-    fs::File::open(&path)
+    crate::support_bracket::open_file(path)
         .and_then(|file| file.take(16_777_217).read_to_end(&mut bytes))
-        .map_err(|e| io_error(NativeOperation::Read, &path, &e))?;
+        .map_err(|e| io_error(NativeOperation::Read, path, &e))?;
     if bytes.len() > 16_777_216 {
         return Err(NativeAdapterFault::Metadata {
             site: super::input::site("tools/assembly/native-lock.toml"),
@@ -222,6 +446,12 @@ pub(super) fn lock(root: &Path) -> Result<Lock> {
             },
         });
     }
+    Ok(bytes)
+}
+pub(super) fn lock(root: &Path) -> Result<Lock> {
+    let root = fs::canonicalize(root).map_err(|e| io_error(NativeOperation::Inspect, root, &e))?;
+    let path = root.join("tools/assembly/native-lock.toml");
+    let bytes = lock_bytes(&path)?;
     let source = UnitSource {
         file: "tools/assembly/native-lock.toml".into(),
         bytes,
@@ -287,6 +517,10 @@ pub(super) fn lock(root: &Path) -> Result<Lock> {
     let bundle_digest = digest(b[2])?;
     let files = file_rows(b[3])?;
     Ok(Lock {
+        source: Some((
+            fs::canonicalize(&path).map_err(|e| io_error(NativeOperation::Inspect, &path, &e))?,
+            format!("{:x}", Sha256::digest(&source.bytes)),
+        )),
         engine,
         files,
         bundle_digest,
@@ -339,8 +573,16 @@ fn file_rows(node: &Node) -> Result<BTreeMap<String, String>> {
     Ok(files)
 }
 fn hash(path: &Path) -> Result<String> {
+    let file = crate::support_bracket::open_file(path)
+        .map_err(|e| io_error(NativeOperation::Read, path, &e))?;
+    hash_file(path, file)
+}
+fn hash_file(path: &Path, mut file: fs::File) -> Result<String> {
     let mut bytes = 0;
-    let mut file = fs::File::open(path).map_err(|e| io_error(NativeOperation::Read, path, &e))?;
+    let before = file
+        .metadata()
+        .map_err(|e| io_error(NativeOperation::Inspect, path, &e))?;
+    crate::telemetry::hash_identity();
     let mut hasher = Sha256::new();
     let mut buffer = vec![0; 65_536];
     loop {
@@ -354,6 +596,17 @@ fn hash(path: &Path) -> Result<String> {
         bytes += count as u64;
     }
     crate::telemetry::hashed(bytes);
+    let after = file
+        .metadata()
+        .map_err(|e| io_error(NativeOperation::Inspect, path, &e))?;
+    crate::telemetry::hash_identity();
+    if crate::SupportIdentity::from(&before) != crate::SupportIdentity::from(&after) {
+        return Err(NativeAdapterFault::SupportChanged {
+            member: path.to_string_lossy().into_owned(),
+            expected: (&before).into(),
+            actual: Some((&after).into()),
+        });
+    }
     Ok(format!("{:x}", hasher.finalize()))
 }
 fn list(root: &Path, relative: &str, output: &mut Vec<String>) -> Result<()> {
@@ -399,6 +652,16 @@ pub(super) fn verify(support: &NativeSupport, lock: &Lock) -> Result<()> {
     result
 }
 fn verify_inner(support: &NativeSupport, lock: &Lock) -> Result<()> {
+    if let Some((path, expected)) = &lock.source {
+        let actual = hash(path)?;
+        if actual != *expected {
+            return Err(invalid(
+                &super::input::site("tools/assembly/native-lock.toml"),
+                expected,
+                &actual,
+            ));
+        }
+    }
     inspect(&support.root, None, true)?;
     if std::env::consts::OS != "linux" || std::env::consts::ARCH != "x86_64" {
         return Err(configuration(
@@ -446,8 +709,13 @@ fn verify_inner(support: &NativeSupport, lock: &Lock) -> Result<()> {
             unexpected,
         });
     }
+    let directory = crate::support_bracket::open_directory(&root)
+        .map_err(|e| io_error(NativeOperation::Inspect, &root, &e))?;
     for (member, expected) in &lock.files {
-        let actual = hash(&root.join(member))?;
+        let path = root.join(member);
+        let file = crate::support_bracket::file_beneath(&directory, Path::new(member))
+            .map_err(|e| io_error(NativeOperation::Read, &path, &e))?;
+        let actual = hash_file(&path, file)?;
         if &actual != expected {
             return Err(NativeAdapterFault::Integrity {
                 component: NativeComponent::Bundle,

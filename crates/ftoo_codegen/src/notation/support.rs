@@ -7,6 +7,7 @@ use serde::{
 use serde_json::value::RawValue;
 use sha2::{Digest, Sha256};
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     fmt, fs,
     io::{self, Read},
@@ -600,8 +601,17 @@ fn runtime_inventory(file: &Path, value: &Value) -> Result<BTreeMap<String, Stri
 
 pub(super) fn read(file: &Path) -> Result<Vec<u8>> {
     let mut bytes = vec![];
-    fs::File::open(file)
-        .and_then(|f| f.take((METADATA_BYTES + 1) as u64).read_to_end(&mut bytes))
+    crate::support_bracket::open_file(file)
+        .and_then(|mut f| {
+            let before = crate::SupportIdentity::from(&f.metadata()?);
+            (&mut f)
+                .take((METADATA_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)?;
+            if crate::SupportIdentity::from(&f.metadata()?) != before {
+                return Err(io::ErrorKind::InvalidData.into());
+            }
+            Ok(())
+        })
         .map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?;
     Ok(bytes)
 }
@@ -717,7 +727,13 @@ fn files(directory: &Path) -> Result<BTreeSet<PathBuf>> {
 }
 pub(super) fn hash(file: &Path) -> Result<String> {
     let mut bytes = 0;
-    let mut f = fs::File::open(file).map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?;
+    let mut f = crate::support_bracket::open_file(file)
+        .map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?;
+    let before = crate::SupportIdentity::from(
+        &f.metadata()
+            .map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?,
+    );
+    crate::telemetry::hash_identity();
     let mut sha = Sha256::new();
     let mut buffer = vec![0u8; 65_536];
     loop {
@@ -731,6 +747,18 @@ pub(super) fn hash(file: &Path) -> Result<String> {
         bytes += count as u64;
     }
     crate::telemetry::hashed(bytes);
+    let after = crate::SupportIdentity::from(
+        &f.metadata()
+            .map_err(|e| io_fault(file, SupportIoOperation::Read, &e))?,
+    );
+    crate::telemetry::hash_identity();
+    if after != before {
+        return Err(io_fault(
+            file,
+            SupportIoOperation::Read,
+            &io::ErrorKind::InvalidData.into(),
+        ));
+    }
     Ok(format!("{:x}", sha.finalize()))
 }
 fn check_hash(file: &Path, expected: &str) -> Result<()> {
@@ -745,11 +773,39 @@ fn check_hash(file: &Path, expected: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
 pub(super) struct Support {
     pub root: PathBuf,
     pub runtime: PathBuf,
     pub entry: PathBuf,
+    active: RefCell<Option<Active>>,
+    #[cfg(test)]
+    closing_hash: RefCell<Option<std::result::Result<(), NotationAdapterFault>>>,
+    #[cfg(test)]
+    submitted: std::cell::Cell<usize>,
+}
+impl fmt::Debug for Support {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Support")
+            .field("root", &self.root)
+            .finish_non_exhaustive()
+    }
+}
+struct Active {
+    snapshot: crate::support_bracket::Snapshot,
+    anchors: Vec<(PathBuf, String)>,
+    poison: Option<NotationAdapterFault>,
+    scratch: PathBuf,
+    publish: Vec<Box<dyn FnOnce()>>,
+    evidence: Vec<Vec<Vec<u8>>>,
+}
+struct Scope<'a>(&'a Support);
+impl Drop for Scope<'_> {
+    fn drop(&mut self) {
+        if let Some(active) = self.0.active.borrow_mut().take() {
+            crate::telemetry::counter("notation.bracket_aborted", 1);
+            let _ = fs::remove_dir_all(active.scratch);
+        }
+    }
 }
 pub(super) fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -807,9 +863,257 @@ pub(super) fn resolve(value: Option<&Path>) -> std::result::Result<Support, Nota
         root,
         runtime,
         entry,
+        active: RefCell::new(None),
+        #[cfg(test)]
+        closing_hash: RefCell::new(None),
+        #[cfg(test)]
+        submitted: std::cell::Cell::new(0),
     })
 }
 impl Support {
+    #[cfg(test)]
+    pub(super) fn closing_hash(&self) -> Option<std::result::Result<(), NotationAdapterFault>> {
+        self.closing_hash.borrow().clone()
+    }
+    #[cfg(test)]
+    pub(super) fn submitted(&self) -> usize {
+        self.submitted.get()
+    }
+    #[cfg(test)]
+    pub(super) fn count_submission(&self) {
+        self.submitted.set(self.submitted.get() + 1);
+    }
+    fn observation_fault(&self, fault: crate::support_bracket::Fault) -> NotationAdapterFault {
+        use crate::support_bracket::Fault;
+        match fault {
+            Fault::Changed {
+                path,
+                expected,
+                actual,
+            } => NotationAdapterFault::SupportChanged {
+                member: path.to_string_lossy().into_owned(),
+                expected,
+                actual,
+            },
+            Fault::Io { path, kind } => self.check().err().unwrap_or({
+                NotationAdapterFault::Integrity(SupportIntegrityFault::SupportIo {
+                    file: path,
+                    operation: SupportIoOperation::Inspect,
+                    kind,
+                })
+            }),
+            Fault::Inventory {
+                missing,
+                unexpected,
+            } => self.check().err().unwrap_or_else(|| {
+                NotationAdapterFault::Integrity(SupportIntegrityFault::FileInventoryMismatch {
+                    directory: self.root.clone(),
+                    missing: missing
+                        .iter()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .collect(),
+                    unexpected: unexpected
+                        .iter()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .collect(),
+                })
+            }),
+        }
+    }
+    pub(super) fn observe(&self) -> std::result::Result<(), NotationAdapterFault> {
+        let (phase, result) = {
+            let active = self.active.borrow();
+            let active = active.as_ref().expect("private bracket is open");
+            if let Some(fault) = &active.poison {
+                return Err(fault.clone());
+            }
+            let phase = crate::telemetry::Phase::new("notation.identity_pass");
+            (phase, active.snapshot.check())
+        };
+        let result = result
+            .map(|members| crate::telemetry::counter("notation.identity_members", members))
+            .map_err(|fault| self.observation_fault(fault));
+        if let Err(fault) = &result {
+            self.active
+                .borrow_mut()
+                .as_mut()
+                .expect("open bracket")
+                .poison = Some(fault.clone());
+        }
+        phase.finish(result.is_ok());
+        result
+    }
+    pub(super) fn after_close(&self, publish: impl FnOnce() + 'static) {
+        self.active
+            .borrow_mut()
+            .as_mut()
+            .expect("open bracket")
+            .publish
+            .push(Box::new(publish));
+    }
+    pub(super) fn has_evidence(&self, key: &[Vec<u8>]) -> bool {
+        self.active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .evidence
+            .iter()
+            .any(|value| value == key)
+    }
+    pub(super) fn remember(&self, key: Vec<Vec<u8>>) {
+        let mut active = self.active.borrow_mut();
+        let evidence = &mut active.as_mut().expect("open bracket").evidence;
+        // Keep owning-bracket evidence until close so a repeated key cannot
+        // wait on its own unpublished reservation. The shared memo remains bounded.
+        evidence.push(key);
+    }
+    pub(super) fn scratch(&self) -> PathBuf {
+        self.active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .scratch
+            .clone()
+    }
+    pub(super) fn scope<T, E: From<NotationAdapterFault>>(
+        &self,
+        adapter: &Path,
+        run: impl FnOnce() -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        self.scope_with_inputs(adapter, &[], run)
+    }
+    #[allow(clippy::too_many_lines)] // Opening, closing and publication have one unwind owner.
+    pub(super) fn scope_with_inputs<T, E: From<NotationAdapterFault>>(
+        &self,
+        adapter: &Path,
+        inputs: &[PathBuf],
+        run: impl FnOnce() -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        if self.active.borrow().is_some() {
+            if let Some(fault) = self.active.borrow().as_ref().and_then(|a| a.poison.clone()) {
+                return Err(fault.into());
+            }
+            return run();
+        }
+        #[cfg(test)]
+        {
+            *self.closing_hash.borrow_mut() = None;
+        }
+        let scratch = self.root.join("tmp/brackets").join(format!(
+            "{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(&scratch).map_err(|e| {
+            NotationAdapterFault::Integrity(io_fault(&scratch, SupportIoOperation::Read, &e))
+        })?;
+        let mut roots = vec![
+            self.runtime.clone(),
+            self.root.join("packages/package.json"),
+            self.root.join("packages/package-lock.json"),
+            self.root.join("packages/node_modules/.package-lock.json"),
+            self.root.join("packages/node_modules/katex"),
+            self.root.join("packages/node_modules/commander"),
+            adapter.into(),
+        ];
+        for name in [
+            ".node-version",
+            "package.json",
+            "package-lock.json",
+            "support-digests.json",
+        ] {
+            roots.push(repository().join("tools/notation").join(name));
+        }
+        roots.extend_from_slice(inputs);
+        let open_phase = crate::telemetry::Phase::new("notation.bracket_open");
+        let opening = (|| {
+            let snapshot = crate::support_bracket::Snapshot::capture(&roots)
+                .map_err(|e| self.observation_fault(e))?;
+            crate::telemetry::counter("notation.opening_members", snapshot.member_count());
+            self.check()?;
+            let anchor_phase = crate::telemetry::Phase::new("notation.anchor_verification");
+            let anchors = roots
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| (1..=3).contains(index) || *index >= 6)
+                .map(|(_, path)| path)
+                .map(|path| {
+                    hash(path)
+                        .map(|digest| (path.clone(), digest))
+                        .map_err(NotationAdapterFault::Integrity)
+                })
+                .collect::<std::result::Result<Vec<_>, _>>();
+            anchor_phase.finish(anchors.is_ok());
+            let anchors = anchors?;
+            let stabilization = crate::telemetry::Phase::new("notation.opening_stabilization");
+            let stabilized = snapshot.check().map_err(|e| self.observation_fault(e));
+            stabilization.finish(stabilized.is_ok());
+            crate::telemetry::counter("notation.stabilized_members", stabilized?);
+            Ok::<_, NotationAdapterFault>((snapshot, anchors))
+        })();
+        open_phase.finish(opening.is_ok());
+        let (snapshot, anchors) = match opening {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = fs::remove_dir_all(scratch);
+                return Err(error.into());
+            }
+        };
+        crate::telemetry::counter("notation.bracket_opened", 1);
+        *self.active.borrow_mut() = Some(Active {
+            snapshot,
+            anchors,
+            poison: None,
+            scratch,
+            publish: vec![],
+            evidence: vec![],
+        });
+        let guard = Scope(self);
+        let result = run();
+        let close_phase = crate::telemetry::Phase::new("notation.bracket_close");
+        let full = self.check();
+        let anchor_phase = crate::telemetry::Phase::new("notation.anchor_verification");
+        let anchors = self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .anchors
+            .iter()
+            .try_for_each(|(path, expected)| check_hash(path, expected))
+            .map_err(NotationAdapterFault::Integrity);
+        anchor_phase.finish(anchors.is_ok());
+        let identity = self
+            .active
+            .borrow()
+            .as_ref()
+            .expect("open bracket")
+            .snapshot
+            .check()
+            .map_err(|e| self.observation_fault(e));
+        let active = self.active.borrow_mut().take().expect("open bracket");
+        let _ = fs::remove_dir_all(&active.scratch);
+        drop(guard);
+        let full = full.and(anchors);
+        #[cfg(test)]
+        {
+            *self.closing_hash.borrow_mut() = Some(full.clone());
+        }
+        let closing = active.poison.map_or(full.and(identity.map(|_| ())), Err);
+        close_phase.finish(closing.is_ok());
+        if closing.is_err() {
+            crate::telemetry::counter("notation.bracket_aborted", 1);
+        }
+        closing?;
+        crate::telemetry::counter("notation.bracket_closed", 1);
+        let value = result?;
+        for publish in active.publish {
+            publish();
+        }
+        Ok(value)
+    }
     pub fn check(&self) -> std::result::Result<(), NotationAdapterFault> {
         let phase = crate::telemetry::Phase::new("notation.full_verification");
         // Re-resolve every invocation: a prior successful path lookup is no trust cache.

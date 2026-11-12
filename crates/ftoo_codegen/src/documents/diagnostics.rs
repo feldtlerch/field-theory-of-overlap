@@ -666,6 +666,11 @@ pub enum NativeMetadataReason {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeAdapterFault {
+    SupportChanged {
+        member: String,
+        expected: crate::SupportIdentity,
+        actual: Option<crate::SupportIdentity>,
+    },
     Configuration {
         component: Option<NativeComponent>,
         path: Option<PathBuf>,
@@ -706,6 +711,11 @@ pub enum NativeAdapterFault {
 impl From<NativeAdapterFault> for DocumentError {
     fn from(value: NativeAdapterFault) -> Self {
         Self::Native(value)
+    }
+}
+impl From<crate::NotationAdapterFault> for DocumentError {
+    fn from(value: crate::NotationAdapterFault) -> Self {
+        Self::Notation(crate::NotationRenderError::Adapter(value))
     }
 }
 impl From<NotationRenderError> for DocumentError {

@@ -66,6 +66,11 @@ pub enum SupportReason {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NotationAdapterFault {
+    SupportChanged {
+        member: String,
+        expected: crate::SupportIdentity,
+        actual: Option<crate::SupportIdentity>,
+    },
     SupportConfiguration {
         value: Option<PathBuf>,
         reason: SupportReason,
@@ -197,7 +202,7 @@ fn typeset(
 #[derive(Debug)]
 pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     catalogue: &'catalogue CheckedNotation<'book, 'graph>,
-    support: support::Support,
+    support: std::rc::Rc<support::Support>,
     declarations: String,
     rows: Vec<SweepRow>,
 }
@@ -232,6 +237,16 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
         })
     }
     fn render<'a>(
+        &'a self,
+        expression: &CheckedExpression<'catalogue, 'book, 'graph>,
+        target: RenderTarget,
+    ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
+        self.support.scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || self.render_inner(expression, target),
+        )
+    }
+    fn render_inner<'a>(
         &'a self,
         expression: &CheckedExpression<'catalogue, 'book, 'graph>,
         target: RenderTarget,
@@ -355,7 +370,7 @@ pub fn prepare_notation<'catalogue, 'book, 'graph>(
 ) -> Result<RenderableNotation<'catalogue, 'book, 'graph>> {
     let _phase = crate::telemetry::Phase::new("notation.preparation");
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
-    let support = support::resolve(location.as_deref())?;
+    let support = std::rc::Rc::new(support::resolve(location.as_deref())?);
     let records = render::declarations(catalogue)?;
     let (declarations, rows) = sweep::prepared(catalogue, &support, &records, false)?;
     Ok(RenderableNotation {
@@ -364,4 +379,31 @@ pub fn prepare_notation<'catalogue, 'book, 'graph>(
         declarations,
         rows,
     })
+}
+
+pub(crate) fn with_preparation<T, E>(
+    catalogue: &CheckedNotation<'_, '_>,
+    run: impl FnOnce(&RenderableNotation<'_, '_, '_>) -> std::result::Result<T, E>,
+) -> std::result::Result<T, E>
+where
+    E: From<NotationRenderError> + From<NotationAdapterFault>,
+{
+    let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
+    let support = std::rc::Rc::new(support::resolve(location.as_deref())?);
+    let records = render::declarations(catalogue)?;
+    sweep::with_prepared(
+        catalogue,
+        &support,
+        &records,
+        false,
+        |(declarations, rows)| {
+            let notation = RenderableNotation {
+                catalogue,
+                support: std::rc::Rc::clone(&support),
+                declarations,
+                rows,
+            };
+            run(&notation)
+        },
+    )
 }

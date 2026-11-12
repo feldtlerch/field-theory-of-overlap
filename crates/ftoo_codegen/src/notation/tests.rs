@@ -35,6 +35,311 @@ fn prepared() -> support::Support {
     support::resolve(location.as_deref()).unwrap()
 }
 
+fn observed_identity(path: &Path) -> crate::SupportIdentity {
+    use std::os::unix::fs::MetadataExt;
+    let value = fs::symlink_metadata(path).unwrap();
+    crate::SupportIdentity {
+        device: value.dev(),
+        inode: value.ino(),
+        size: value.size(),
+        mode: value.mode(),
+        mtime_seconds: value.mtime(),
+        mtime_nanoseconds: value.mtime_nsec(),
+        ctime_seconds: value.ctime(),
+        ctime_nanoseconds: value.ctime_nsec(),
+    }
+}
+
+fn distinct_timestamp(path: &Path, probe: &Path) {
+    let original = observed_identity(path);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        fs::write(probe, b"timestamp quantum").unwrap();
+        let current = observed_identity(probe);
+        if (current.ctime_seconds, current.ctime_nanoseconds)
+            != (original.ctime_seconds, original.ctime_nanoseconds)
+        {
+            return;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "filesystem timestamp did not advance"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn support_required_bracket_identity_mutations_poison_and_restore() {
+    use sha2::{Digest, Sha256};
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    let adapter = support::repository().join("tools/notation/check.cjs");
+    let path = support.root.join("packages/node_modules/katex/README.md");
+    let bytes = fs::read(&path).unwrap();
+    let mut changed = bytes.clone();
+    changed[0] ^= 1;
+    for mutation in ["identical", "mtime", "rename"] {
+        let before = observed_identity(&path);
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
+        distinct_timestamp(&path, &support.root.join("tmp/clock"));
+        let mut captured = None;
+        let mut repeated = None;
+        let mut resumed = false;
+        let result: std::result::Result<(), NotationAdapterFault> = support.scope(&adapter, || {
+            let provisional = katex::batch(&support, &["x".into()], |_, _| {})?;
+            assert_eq!(provisional, vec![Ok(())]); // Private raw evidence, never returned yet.
+            match mutation {
+                "identical" => {
+                    fs::write(&path, &bytes).unwrap();
+                    fs::File::options()
+                        .write(true)
+                        .open(&path)
+                        .unwrap()
+                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .unwrap();
+                }
+                "mtime" => {
+                    fs::write(&path, &changed).unwrap();
+                    fs::File::options()
+                        .write(true)
+                        .open(&path)
+                        .unwrap()
+                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .unwrap();
+                }
+                "rename" => {
+                    let replacement = support.root.join("tmp/replacement");
+                    fs::write(&replacement, &bytes).unwrap();
+                    fs::rename(replacement, &path).unwrap();
+                }
+                _ => unreachable!(),
+            }
+            captured = Some(observed_identity(&path));
+            let fault = support.observe().unwrap_err();
+            repeated = Some(support.observe().unwrap_err());
+            let attempt: std::result::Result<(), NotationAdapterFault> =
+                support.scope(&adapter, || {
+                    resumed = true;
+                    Ok(())
+                });
+            assert_eq!(attempt, Err(fault));
+            Ok(())
+        });
+        let actual = captured.unwrap();
+        assert_ne!(before, actual);
+        if mutation != "rename" {
+            assert_eq!(before.size, actual.size);
+            assert_ne!(
+                (before.ctime_seconds, before.ctime_nanoseconds),
+                (actual.ctime_seconds, actual.ctime_nanoseconds)
+            );
+            assert_eq!(
+                (before.mtime_seconds, before.mtime_nanoseconds),
+                (actual.mtime_seconds, actual.mtime_nanoseconds)
+            );
+        } else if mutation == "rename" {
+            assert_ne!(before.inode, actual.inode);
+        }
+        let expected = NotationAdapterFault::SupportChanged {
+            member: path.to_string_lossy().into_owned(),
+            expected: before,
+            actual: Some(actual),
+        };
+        exact_adapter(result.unwrap_err(), expected.clone());
+        exact_adapter(repeated.unwrap(), expected);
+        assert!(!resumed);
+        if mutation == "mtime" {
+            assert_eq!(
+                support.closing_hash(),
+                Some(Err(NotationAdapterFault::Integrity(
+                    SupportIntegrityFault::DigestMismatch {
+                        file: path.clone(),
+                        expected: format!("{:x}", Sha256::digest(&bytes)),
+                        actual: format!("{:x}", Sha256::digest(&changed)),
+                    }
+                )))
+            );
+        } else {
+            assert_eq!(support.closing_hash(), Some(Ok(())));
+        }
+        fs::write(&path, &bytes).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            katex::batch(&support, &["x".into()], |_, _| {}).unwrap(),
+            vec![Ok(())]
+        );
+    }
+}
+
+#[test]
+fn support_required_bracket_failed_close_discards_results_and_memo() {
+    use sha2::{Digest, Sha256};
+    use std::{cell::Cell, rc::Rc};
+    let fixture = Fixture::new();
+    let support = fixture.support();
+    // An admitted but distinct exact metadata key cannot hit another test's memo.
+    let hidden = support
+        .root
+        .join("packages/node_modules/.package-lock.json");
+    let mut hidden_bytes = fs::read(&hidden).unwrap();
+    hidden_bytes.extend_from_slice(b"\n \t \t \t\n");
+    fs::write(&hidden, hidden_bytes).unwrap();
+    let path = support.root.join("packages/node_modules/katex/README.md");
+    let bytes = fs::read(&path).unwrap();
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let records = render::declarations(&catalogue).unwrap();
+    let published = Rc::new(Cell::new(false));
+    let publish = Rc::clone(&published);
+    let result: Result<_> = support.scope(
+        &support::repository().join("tools/notation/check.cjs"),
+        || {
+            let provisional = sweep::prepared(&catalogue, &support, &records, false)?;
+            let submissions = support.submitted();
+            assert!(submissions > 0);
+            assert_eq!(
+                sweep::prepared(&catalogue, &support, &records, false)?,
+                provisional
+            );
+            assert_eq!(support.submitted(), submissions);
+            support.after_close(move || publish.set(true));
+            assert!(!published.get());
+            fs::write(&path, b"changed after final request").unwrap();
+            Ok(provisional)
+        },
+    );
+    let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
+        file: path.clone(),
+        expected: format!("{:x}", Sha256::digest(&bytes)),
+        actual: format!("{:x}", Sha256::digest(b"changed after final request")),
+    });
+    assert_eq!(support.closing_hash(), Some(Err(expected.clone())));
+    let NotationRenderError::Adapter(error) = result.unwrap_err() else {
+        panic!("adapter failure");
+    };
+    exact_adapter(error, expected);
+    assert!(!published.get());
+    fs::write(&path, &bytes).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    let before = support.submitted();
+    sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    assert!(
+        support.submitted() > before,
+        "failed close published memo evidence"
+    );
+    let before = support.submitted();
+    sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    assert_eq!(support.submitted(), before);
+}
+
+#[test]
+fn support_required_telemetry_failures_preserve_values_and_original_errors() {
+    let support = prepared();
+    let script = r#"
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { realm, render } = require(process.argv[1]);
+const mode = process.argv[2];
+const counts = { stat: 0, open: 0, write: 0, close: 0 };
+const chunks = [];
+process.env.FTOO_GATE_TELEMETRY = '/measurement-fixture';
+fs.statSync = () => {
+  counts.stat++;
+  if (mode === 'stat') throw new Error('stat failure');
+  return { isDirectory: () => mode !== 'not-directory' };
+};
+fs.openSync = () => {
+  counts.open++;
+  if (mode === 'open') throw new Error('open failure');
+  return 42;
+};
+const write = fs.writeSync;
+fs.writeSync = (fd, bytes, at, length) => {
+  if (fd !== 42) return write(fd, bytes, at, length);
+  counts.write++;
+  if (mode === 'write' || mode === 'close') throw new Error('write failure');
+  if (mode === 'zero') return 0;
+  const n = Math.min(length, 7);
+  chunks.push(Buffer.from(bytes.subarray(at, at + n)));
+  return n;
+};
+fs.closeSync = fd => {
+  assert.equal(fd, 42);
+  counts.close++;
+  if (mode === 'close') throw new Error('close failure');
+};
+assert.throws(() => realm('throw new Error("original realm error")'),
+  { message: 'original realm error' });
+const katex = realm(`
+class ParseError extends Error {}
+module.exports = { ParseError, renderToString(source) {
+  if (source === 'parse') throw new ParseError('original parse error');
+  if (source === 'setup') throw new Error('original setup error');
+  return 'original markup';
+}};
+`);
+assert.deepEqual(render(katex, 'valid'), [0, 'original markup']);
+assert.deepEqual(render(katex, 'parse'), [2, 'original parse error']);
+assert.deepEqual(render(katex, 'setup'), [3, 'original setup error']);
+assert.equal(counts.stat, 1);
+assert.equal(counts.open, ['stat', 'not-directory'].includes(mode) ? 0 : 1);
+if (mode === 'control') {
+  assert.ok(counts.write > 5);
+  assert.equal(counts.close, 0);
+  const records = Buffer.concat(chunks).toString('utf8').trimEnd().split('\n').map(JSON.parse);
+  assert.deepEqual(records.map(r => r.phase), [
+    'notation.realm_evaluation', 'notation.realm_evaluation',
+    'notation.expression_evaluation', 'notation.expression_evaluation',
+    'notation.expression_evaluation']);
+  for (const r of records) {
+    assert.equal(r.pid, process.pid);
+    assert.equal(r.members, 0);
+    assert.equal(r.bytes, 0);
+    assert.ok(Number.isSafeInteger(r.inclusive_ns) && r.inclusive_ns >= 0);
+  }
+} else {
+  const attempted = ['write', 'zero', 'close'].includes(mode) ? 1 : 0;
+  assert.equal(counts.write, attempted);
+  assert.equal(counts.close, attempted);
+  assert.deepEqual(chunks, []);
+}
+process.stdout.write('values and original errors preserved\n');
+"#;
+    let outputs = support
+        .scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || {
+                let mut outputs = vec![];
+                for mode in ["stat", "not-directory", "open", "write", "zero", "close"] {
+                    for mode in [mode, "control"] {
+                        support.observe()?;
+                        let output = std::process::Command::new(&support.runtime)
+                            .arg("-e")
+                            .arg(script)
+                            .arg(support::repository().join("tools/notation/check.cjs"))
+                            .arg(mode)
+                            .env_remove("NODE_PATH")
+                            .env_remove("NODE_OPTIONS")
+                            .output()
+                            .unwrap();
+                        crate::telemetry::counter("notation.process_starts", 1);
+                        support.observe()?;
+                        outputs.push((mode, output));
+                    }
+                }
+                Ok::<_, NotationAdapterFault>(outputs)
+            },
+        )
+        .unwrap();
+    for (mode, output) in outputs {
+        assert_eq!(output.status.code(), Some(0), "{mode}: {output:?}");
+        assert_eq!(output.stderr, b"", "{mode}");
+        assert_eq!(output.stdout, b"values and original errors preserved\n");
+    }
+}
+
 #[test]
 fn support_required_batch_matches_single_expression_markup_errors_and_isolation() {
     let support = prepared();
@@ -58,15 +363,23 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
     for record in &records {
         sources.push(record.source.clone());
     }
-    let controls: Vec<_> = sources
-        .iter()
-        .map(|source| katex::invoke(&support, Some(source)).unwrap())
-        .collect();
-    let mut observed = vec![];
-    let results = katex::batch(&support, &sources, |index, result| {
-        observed.push((index, result.clone()));
-    })
-    .unwrap();
+    let (controls, results, observed, restored) = support
+        .scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || {
+                let controls = sources
+                    .iter()
+                    .map(|source| katex::invoke(&support, Some(source)))
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                let mut observed = vec![];
+                let results = katex::batch(&support, &sources, |index, result| {
+                    observed.push((index, result.clone()));
+                })?;
+                let restored = katex::batch(&support, &["x".into()], |_, _| {})?;
+                Ok::<_, NotationAdapterFault>((controls, results, observed, restored))
+            },
+        )
+        .unwrap();
     assert_eq!(
         observed,
         controls.iter().cloned().enumerate().collect::<Vec<_>>()
@@ -78,10 +391,7 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
             .map(|result| result.map(|_| ()))
             .collect::<Vec<_>>()
     );
-    assert_eq!(
-        katex::batch(&support, &["x".into()], |_, _| {}).unwrap(),
-        vec![Ok(())]
-    );
+    assert_eq!(restored, vec![Ok(())]);
 
     let first = sweep::prepared(&catalogue, &support, &records, false).unwrap();
     let warm = sweep::prepared(&catalogue, &support, &records, false).unwrap();
@@ -111,7 +421,6 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
 #[test]
 fn support_required_parse_error_constructor_belongs_to_the_request_realm() {
     let support = prepared();
-    support.check().unwrap();
     let script = r"
 const fs = require('node:fs');
 const { realm, render } = require(process.argv[1]);
@@ -126,17 +435,26 @@ const source = 'globalThis.count = (globalThis.count || 0) + 1; module.exports =
 process.stdout.write(render(realm(source), 'x')[1] + render(realm(source), 'x')[1] + '\n');
 process.stdout.write(String(render(realm(distribution), 'x')[0]) + '\n');
 ";
-    let output = std::process::Command::new(&support.runtime)
-        .arg("-e")
-        .arg(script)
-        .arg(support::repository().join("tools/notation/check.cjs"))
-        .arg(&support.entry)
-        .env_remove("NODE_PATH")
-        .env_remove("NODE_OPTIONS")
-        .output()
+    let output = support
+        .scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || {
+                support.observe()?;
+                let output = std::process::Command::new(&support.runtime)
+                    .arg("-e")
+                    .arg(script)
+                    .arg(support::repository().join("tools/notation/check.cjs"))
+                    .arg(&support.entry)
+                    .env_remove("NODE_PATH")
+                    .env_remove("NODE_OPTIONS")
+                    .output()
+                    .unwrap();
+                crate::telemetry::counter("notation.process_starts", 1);
+                support.observe()?;
+                Ok::<_, NotationAdapterFault>(output)
+            },
+        )
         .unwrap();
-    crate::telemetry::counter("notation.process_starts", 1);
-    support.check().unwrap();
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(output.stderr, b"");
     assert_eq!(output.stdout, b"[2,\"KaTeX parse error: fixture\"]\n[3,\"KaTeX parse error: fixture\"]\n[3,\"fixture\"]\n11\n0\n");
@@ -190,12 +508,23 @@ fn support_required_batch_protocol_post_request_full_hash_refuses_mutation_and_r
         expected: format!("{:x}", Sha256::digest(&bytes)),
         actual: format!("{:x}", Sha256::digest(&changed)),
     });
+    let before = observed_identity(&support.entry);
+    let mut after = None;
     let result = katex::batch(&support, &["x".into(), "y".into()], |index, _| {
         assert_eq!(index, 0);
         fs::write(&support.entry, &changed).unwrap();
         assert_eq!(fs::read(&support.entry).unwrap(), changed);
+        after = Some(observed_identity(&support.entry));
     });
-    exact_adapter(result.unwrap_err(), expected);
+    exact_adapter(
+        result.unwrap_err(),
+        NotationAdapterFault::SupportChanged {
+            member: support.entry.to_string_lossy().into_owned(),
+            expected: before,
+            actual: after,
+        },
+    );
+    assert_eq!(support.closing_hash(), Some(Err(expected)));
     fs::write(&support.entry, &bytes).unwrap();
     assert_eq!(fs::read(&support.entry).unwrap(), bytes);
     support.check().unwrap();
@@ -372,23 +701,19 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
     let mut after = before.clone();
     after.push(b'\n');
     fs::write(&adapter, &before).unwrap();
+    let before_identity = observed_identity(&adapter);
+    let mut after_identity = None;
+    let result = katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {
+        fs::write(&adapter, &after).unwrap();
+        assert_eq!(fs::read(&adapter).unwrap(), after);
+        after_identity = Some(observed_identity(&adapter));
+    });
     exact_adapter(
-        katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {
-            fs::write(&adapter, &after).unwrap();
-            assert_eq!(fs::read(&adapter).unwrap(), after);
-        })
-        .unwrap_err(),
-        NotationAdapterFault::Protocol {
-            status: None,
-            stdout: valid,
-            stderr: vec![],
-            reason: ProtocolReason::BatchFrame {
-                index: 0,
-                reason: BatchReason::ChangedAdapter {
-                    expected: before,
-                    actual: after,
-                },
-            },
+        result.unwrap_err(),
+        NotationAdapterFault::SupportChanged {
+            member: adapter.to_string_lossy().into_owned(),
+            expected: before_identity,
+            actual: after_identity,
         },
     );
     fs::write(&adapter, &restored).unwrap();
@@ -400,30 +725,47 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // Complete protocol limits and restoration share one bracket.
 fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
     use std::io::{Read, Write};
     use std::process::{Child, ChildStdout, Command, Stdio};
-    fn start(support: &support::Support, entry: &Path) -> (Child, ChildStdout) {
-        let mut child = Command::new(&support.runtime)
-            .arg(support::repository().join("tools/notation/check.cjs"))
-            .arg("--batch")
-            .arg(entry)
-            .env_remove("NODE_PATH")
-            .env_remove("NODE_OPTIONS")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
+    use std::result::Result;
+    type Evidence = Vec<(Vec<u8>, Vec<u8>)>;
+    fn start(
+        support: &support::Support,
+        entry: &Path,
+        evidence: &mut Evidence,
+    ) -> Result<(katex::ChildGuard, ChildStdout), NotationAdapterFault> {
+        support.observe()?;
+        let mut child = katex::ChildGuard(
+            Command::new(&support.runtime)
+                .arg(support::repository().join("tools/notation/check.cjs"))
+                .arg("--batch")
+                .arg(entry)
+                .env_remove("NODE_PATH")
+                .env_remove("NODE_OPTIONS")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
         crate::telemetry::counter("notation.process_starts", 1);
         crate::telemetry::counter("notation.version_probes", 1);
         let mut stdout = child.stdout.take().unwrap();
         let mut handshake = [0; 16];
         stdout.read_exact(&mut handshake).unwrap();
-        assert_eq!(&handshake, b"22.16.0\n0.16.22\n");
-        (child, stdout)
+        evidence.push((handshake.to_vec(), b"22.16.0\n0.16.22\n".to_vec()));
+        support.observe()?;
+        Ok((child, stdout))
     }
-    fn request(child: &mut Child, index: u64, bytes: &[u8]) {
+    fn request(
+        support: &support::Support,
+        child: &mut Child,
+        index: u64,
+        bytes: &[u8],
+    ) -> Result<(), NotationAdapterFault> {
+        support.observe()?;
         crate::telemetry::counter("notation.logical_requests", 1);
         let stdin = child.stdin.as_mut().unwrap();
         stdin.write_all(&index.to_be_bytes()).unwrap();
@@ -433,112 +775,210 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
         stdin.write_all(bytes).unwrap();
         stdin.flush().unwrap();
         crate::telemetry::counter("notation.submitted_requests", 1);
+        Ok(())
     }
-    fn response(stdout: &mut ChildStdout, index: u64, status: u8, expected: &[u8]) {
+    fn response(
+        support: &support::Support,
+        evidence: &mut Evidence,
+        stdout: &mut ChildStdout,
+        index: u64,
+        status: u8,
+        expected: &[u8],
+    ) -> Result<(), NotationAdapterFault> {
         let mut header = [0; 17];
         stdout.read_exact(&mut header).unwrap();
         let mut wanted = index.to_be_bytes().to_vec();
         wanted.push(status);
         wanted.extend_from_slice(&(expected.len() as u64).to_be_bytes());
-        assert_eq!(header.as_slice(), wanted);
-        let mut payload = vec![0; expected.len()];
+        let length = usize::try_from(u64::from_be_bytes(header[9..].try_into().unwrap())).unwrap();
+        let mut payload = vec![0; length];
         stdout.read_exact(&mut payload).unwrap();
-        assert_eq!(payload, expected);
+        evidence.push((header.to_vec(), wanted));
+        evidence.push((payload, expected.to_vec()));
+        support.observe()?;
+        Ok(())
     }
-    fn end(mut child: Child, mut stdout: ChildStdout, status: i32, stderr: &[u8]) {
+    fn end(
+        support: &support::Support,
+        evidence: &mut Evidence,
+        statuses: &mut Vec<(Option<i32>, i32)>,
+        mut child: katex::ChildGuard,
+        mut stdout: ChildStdout,
+        status: i32,
+        stderr: &[u8],
+    ) -> Result<(), NotationAdapterFault> {
+        support.observe()?;
         drop(child.stdin.take());
         let mut rest = vec![];
         stdout.read_to_end(&mut rest).unwrap();
-        let output = child.wait_with_output().unwrap();
-        assert_eq!(output.status.code(), Some(status));
-        assert_eq!(output.stderr, stderr);
-        assert_eq!(output.stdout, b"");
-        assert_eq!(rest, b"");
+        let mut errors = vec![];
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_end(&mut errors)
+            .unwrap();
+        statuses.push((child.wait().unwrap().code(), status));
+        evidence.push((errors, stderr.to_vec()));
+        evidence.push((rest, vec![]));
+        support.observe()?;
+        Ok(())
     }
     let fixture = Fixture::new();
     let support = fixture.support();
     let entry = support.root.join("tmp/distribution.js");
     fs::write(&entry, "module.exports = { version: '0.16.22', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
-    support.check().unwrap();
-    for excess in [true, false] {
-        let (mut child, mut stdout) = start(&support, &entry);
-        for index in 0..4096_u64 {
-            let bytes = match index {
-                0 => vec![255],
-                1 => vec![239, 187, 191],
-                2 => vec![b'x'; 262_144],
-                _ => vec![b'x'],
-            };
-            request(&mut child, index, &bytes);
-            match index {
-                0 => response(
-                    &mut stdout,
-                    index,
-                    3,
-                    b"The encoded data was not valid for encoding utf-8",
-                ),
-                1 => response(&mut stdout, index, 3, b"input BOM"),
-                _ => response(&mut stdout, index, 0, b"<math>1</math>"),
-            }
-        }
-        if excess {
-            let stdin = child.stdin.as_mut().unwrap();
-            stdin.write_all(&4096_u64.to_be_bytes()).unwrap();
-            stdin.write_all(&0_u32.to_be_bytes()).unwrap();
-            end(
-                child,
-                stdout,
-                3,
-                b"batch request limit exceeded: maximum 4096, actual 4097",
-            );
-        } else {
-            end(child, stdout, 0, b"");
-        }
+    let (evidence, statuses) = support
+        .scope_with_inputs(
+            &support::repository().join("tools/notation/check.cjs"),
+            std::slice::from_ref(&entry),
+            || {
+                let mut evidence = vec![];
+                let mut statuses = vec![];
+                for excess in [true, false] {
+                    let (mut child, mut stdout) = start(&support, &entry, &mut evidence)?;
+                    for index in 0..4096_u64 {
+                        let bytes = match index {
+                            0 => vec![255],
+                            1 => vec![239, 187, 191],
+                            2 => vec![b'x'; 262_144],
+                            _ => vec![b'x'],
+                        };
+                        request(&support, &mut child, index, &bytes)?;
+                        match index {
+                            0 => response(
+                                &support,
+                                &mut evidence,
+                                &mut stdout,
+                                index,
+                                3,
+                                b"The encoded data was not valid for encoding utf-8",
+                            ),
+                            1 => response(
+                                &support,
+                                &mut evidence,
+                                &mut stdout,
+                                index,
+                                3,
+                                b"input BOM",
+                            ),
+                            _ => response(
+                                &support,
+                                &mut evidence,
+                                &mut stdout,
+                                index,
+                                0,
+                                b"<math>1</math>",
+                            ),
+                        }?;
+                    }
+                    if excess {
+                        support.observe()?;
+                        let stdin = child.stdin.as_mut().unwrap();
+                        stdin.write_all(&4096_u64.to_be_bytes()).unwrap();
+                        stdin.write_all(&0_u32.to_be_bytes()).unwrap();
+                        end(
+                            &support,
+                            &mut evidence,
+                            &mut statuses,
+                            child,
+                            stdout,
+                            3,
+                            b"batch request limit exceeded: maximum 4096, actual 4097",
+                        )?;
+                    } else {
+                        end(
+                            &support,
+                            &mut evidence,
+                            &mut statuses,
+                            child,
+                            stdout,
+                            0,
+                            b"",
+                        )?;
+                    }
+                }
+                for (bytes, stderr) in [
+                    (vec![0], b"partial batch frame".as_slice()),
+                    (
+                        [
+                            0_u64.to_be_bytes().as_slice(),
+                            2_u32.to_be_bytes().as_slice(),
+                            b"x",
+                        ]
+                        .concat(),
+                        b"partial batch frame".as_slice(),
+                    ),
+                    (
+                        [
+                            1_u64.to_be_bytes().as_slice(),
+                            0_u32.to_be_bytes().as_slice(),
+                        ]
+                        .concat(),
+                        b"batch request index mismatch".as_slice(),
+                    ),
+                    (
+                        [
+                            0_u64.to_be_bytes().as_slice(),
+                            262_145_u32.to_be_bytes().as_slice(),
+                        ]
+                        .concat(),
+                        b"expression input limit exceeded".as_slice(),
+                    ),
+                ] {
+                    let (mut child, stdout) = start(&support, &entry, &mut evidence)?;
+                    support.observe()?;
+                    child.stdin.as_mut().unwrap().write_all(&bytes).unwrap();
+                    end(
+                        &support,
+                        &mut evidence,
+                        &mut statuses,
+                        child,
+                        stdout,
+                        3,
+                        stderr,
+                    )?;
+                    let (mut child, mut stdout) = start(&support, &entry, &mut evidence)?;
+                    request(&support, &mut child, 0, b"x")?;
+                    response(
+                        &support,
+                        &mut evidence,
+                        &mut stdout,
+                        0,
+                        0,
+                        b"<math>1</math>",
+                    )?;
+                    end(
+                        &support,
+                        &mut evidence,
+                        &mut statuses,
+                        child,
+                        stdout,
+                        0,
+                        b"",
+                    )?;
+                }
+                Ok::<_, NotationAdapterFault>((evidence, statuses))
+            },
+        )
+        .unwrap();
+    assert_eq!(statuses.len(), 10);
+    assert_eq!(evidence.len(), 16_422);
+    for (actual, expected) in evidence {
+        assert_eq!(actual, expected);
     }
-    for (bytes, stderr) in [
-        (vec![0], b"partial batch frame".as_slice()),
-        (
-            [
-                0_u64.to_be_bytes().as_slice(),
-                2_u32.to_be_bytes().as_slice(),
-                b"x",
-            ]
-            .concat(),
-            b"partial batch frame".as_slice(),
-        ),
-        (
-            [
-                1_u64.to_be_bytes().as_slice(),
-                0_u32.to_be_bytes().as_slice(),
-            ]
-            .concat(),
-            b"batch request index mismatch".as_slice(),
-        ),
-        (
-            [
-                0_u64.to_be_bytes().as_slice(),
-                262_145_u32.to_be_bytes().as_slice(),
-            ]
-            .concat(),
-            b"expression input limit exceeded".as_slice(),
-        ),
-    ] {
-        let (mut child, stdout) = start(&support, &entry);
-        child.stdin.as_mut().unwrap().write_all(&bytes).unwrap();
-        end(child, stdout, 3, stderr);
-        let (mut child, mut stdout) = start(&support, &entry);
-        request(&mut child, 0, b"x");
-        response(&mut stdout, 0, 0, b"<math>1</math>");
-        end(child, stdout, 0, b"");
+    for (actual, expected) in statuses {
+        assert_eq!(actual, Some(expected));
     }
-    support.check().unwrap();
 }
 struct Fixture {
     root: PathBuf,
+    _serial: std::sync::MutexGuard<'static, ()>,
 }
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
+        static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
         fn copy_tree(from: &Path, to: &Path) {
             fs::create_dir_all(to).unwrap();
             for entry in fs::read_dir(from).unwrap() {
@@ -551,9 +991,15 @@ impl Fixture {
                 }
             }
         }
+        let serial = SERIAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let original = prepared();
+        fs::create_dir_all(original.root.join("tmp/brackets")).unwrap();
+        let fixtures = original.root.join("tmp/fixtures");
+        fs::create_dir_all(&fixtures).unwrap();
         original.check().unwrap();
-        let root = original.root.parent().unwrap().join(format!(
+        let root = fixtures.join(format!(
             "notation-test-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
@@ -563,7 +1009,10 @@ impl Fixture {
         copy_tree(&original.root.join("packages"), &root.join("packages"));
         fs::create_dir_all(root.join("runtime/bin")).unwrap();
         fs::copy(&original.runtime, root.join("runtime/bin/node")).unwrap();
-        Self { root }
+        Self {
+            root,
+            _serial: serial,
+        }
     }
     fn support(&self) -> support::Support {
         support::resolve(Some(&self.root)).unwrap()
@@ -1109,12 +1558,23 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
                 .unwrap()
                 .contains("<math")
         );
+        let before = observed_identity(&file);
+        let mut after = None;
         let result = katex::invoke_with(&support, false, || {
             fs::write(&file, &changed).unwrap();
+            after = Some(observed_identity(&file));
             Ok(output(0, b"<math>untrusted result</math>", &[]))
         });
         fs::write(&file, &original).unwrap();
-        exact_adapter(result.unwrap_err(), fault);
+        exact_adapter(
+            result.unwrap_err(),
+            NotationAdapterFault::SupportChanged {
+                member: file.to_string_lossy().into_owned(),
+                expected: before,
+                actual: after,
+            },
+        );
+        assert_eq!(support.closing_hash(), Some(Err(fault)));
         support.check().unwrap();
     }
     for operation in [AdapterOperation::WriteInput, AdapterOperation::WaitOutput] {
@@ -1317,7 +1777,13 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
         }),
     );
     support.check().unwrap();
-    let socket = std::os::unix::net::UnixListener::bind(&extra).unwrap();
+    let socket_parent = fs::File::open(extra.parent().unwrap()).unwrap();
+    let socket_alias = format!(
+        "/proc/self/fd/{}/{}",
+        std::os::fd::AsRawFd::as_raw_fd(&socket_parent),
+        extra.file_name().unwrap().to_str().unwrap()
+    );
+    let socket = std::os::unix::net::UnixListener::bind(socket_alias).unwrap();
     let result = support.check();
     drop(socket);
     fs::remove_file(&extra).unwrap();
@@ -2214,39 +2680,60 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
             .filter(|(_, _, a)| *a == 0)
             .map(|(id, _, _)| definition(id, vec![])),
     );
-    for target in [RenderTarget::Macro, RenderTarget::Unicode] {
-        let mut concatenations = vec![];
-        for atom in &atoms {
-            for suffix in ["x", "1", r"\beta{}", "^2", "{x}"] {
-                let actual = render::expression(&n, atom, target, RenderOwner::Expression, "atom")
-                    .unwrap()
-                    .source;
-                let joined = format!("{actual}{suffix}");
-                assert_eq!(
-                    joined,
-                    format!("{}{suffix}", oracle(atom, target == RenderTarget::Unicode))
-                );
-                concatenations.push(format!("{{{joined}}}"));
-            }
-        }
-        let source = concatenations.join(r"\,");
-        let source = if target == RenderTarget::Macro {
-            format!("{declarations}{source}")
-        } else {
-            source
-        };
-        typeset(
-            &support,
-            target,
-            &source,
-            rendered_site(
-                RenderOwner::Expression,
-                "concatenated-atoms",
-                &source,
-                vec![],
-            ),
+    let results = support
+        .scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || {
+                let mut results = vec![];
+                for target in [RenderTarget::Macro, RenderTarget::Unicode] {
+                    let mut concatenations = vec![];
+                    for atom in &atoms {
+                        for suffix in ["x", "1", r"\beta{}", "^2", "{x}"] {
+                            let actual = render::expression(
+                                &n,
+                                atom,
+                                target,
+                                RenderOwner::Expression,
+                                "atom",
+                            )
+                            .unwrap()
+                            .source;
+                            let joined = format!("{actual}{suffix}");
+                            assert_eq!(
+                                joined,
+                                format!(
+                                    "{}{suffix}",
+                                    oracle(atom, target == RenderTarget::Unicode)
+                                )
+                            );
+                            concatenations.push(format!("{{{joined}}}"));
+                        }
+                    }
+                    let source = concatenations.join(r"\,");
+                    let source = if target == RenderTarget::Macro {
+                        format!("{declarations}{source}")
+                    } else {
+                        source
+                    };
+                    results.push(typeset(
+                        &support,
+                        target,
+                        &source,
+                        rendered_site(
+                            RenderOwner::Expression,
+                            "concatenated-atoms",
+                            &source,
+                            vec![],
+                        ),
+                    ));
+                }
+                Ok::<_, NotationAdapterFault>(results)
+            },
         )
         .unwrap();
+    assert_eq!(results.len(), 2);
+    for result in results {
+        result.unwrap();
     }
 }
 
@@ -2392,6 +2879,8 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
         definition: None,
         path: vec![],
     };
+    let checks = support.scope(&support::repository().join("tools/notation/check.cjs"), || {
+    let mut checks: Vec<Box<dyn FnOnce() + '_>> = vec![];
     for (source, message) in [
         (
             r"\NotDefined",
@@ -2440,8 +2929,9 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
             origins: vec![origin.clone()],
         };
         assert_eq!(emitted.site(RenderOwner::Expression, "grammar"), site);
-        exact_admission(
-            typeset(&support, target, &emitted.source, site.clone()).unwrap_err(),
+        let refused = typeset(&support, target, &emitted.source, site.clone());
+        checks.push(Box::new(move || exact_admission(
+            refused.unwrap_err(),
             RuleId::M051,
             NotationStage::Typesetting,
             site,
@@ -2450,29 +2940,27 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
                 source: source.into(),
                 message: message.into(),
             },
-        );
+        )));
         emitted.source = restored;
-        typeset(
+        let restored = typeset(
             &support,
             target,
             &emitted.source,
             emitted.site(RenderOwner::Expression, "restored"),
-        )
-        .unwrap();
+        );
+        checks.push(Box::new(move || { restored.unwrap(); }));
     }
     let context = r"\newcommand{\FtooQCoefficientOne}[0]{x}";
-    exact_admission(sweep::namespace(&support, &records, context).unwrap_err(),
+    let collision = sweep::namespace(&support, &records, context);
+    checks.push(Box::new(move || exact_admission(collision.unwrap_err(),
         RuleId::M050, NotationStage::Typesetting,
         NotationSite::Rendered { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case: "declaration".into(), bytes: 39..166, origins: vec![NotationOrigin { definition: Some(DefinitionId::CoefficientOne), path: vec![] }] },
-        NotationFault::HostCollision { command: r"\FtooQCoefficientOne".into(), message: r"KaTeX parse error: \newcommand{\FtooQCoefficientOne} attempting to redefine \FtooQCoefficientOne; use \renewcommand".into() });
-    sweep::namespace(&support, &records, "").unwrap();
+        NotationFault::HostCollision { command: r"\FtooQCoefficientOne".into(), message: r"KaTeX parse error: \newcommand{\FtooQCoefficientOne} attempting to redefine \FtooQCoefficientOne; use \renewcommand".into() })));
+    let restored_namespace = sweep::namespace(&support, &records, "");
+    checks.push(Box::new(move || { restored_namespace.unwrap(); }));
     let declaration = "\\newcommand{\\FtooQCoefficientOne}[0]{\\NotDefined}\n";
-    assert!(
-        katex::invoke(&support, Some(declaration))
-            .unwrap()
-            .unwrap()
-            .contains("<math")
-    );
+    let declared = katex::invoke(&support, Some(declaration));
+    checks.push(Box::new(move || assert!(declared.unwrap().unwrap().contains("<math"))));
     let mut mutated = records.clone();
     mutated[0].source = declaration.into();
     sweep::inventory(&n, &mutated).unwrap();
@@ -2519,10 +3007,11 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
             },
         ],
     };
-    exact_admission(sweep::row(&n, &support, &bundle, RenderOwner::Definition(DefinitionId::CoefficientOne), "base", definition(DefinitionId::CoefficientOne, vec![])).unwrap_err(),
+    let refused = sweep::row(&n, &support, &bundle, RenderOwner::Definition(DefinitionId::CoefficientOne), "base", definition(DefinitionId::CoefficientOne, vec![]));
+    checks.push(Box::new(move || exact_admission(refused.unwrap_err(),
         RuleId::M051, NotationStage::Typesetting, site,
         NotationFault::KaTeXRejected { target: RenderTarget::Macro, source: full,
-            message: "KaTeX parse error: Undefined control sequence: \\NotDefined at position 38: …ficientOne}[0]{\\\u{332}N\u{332}o\u{332}t\u{332}D\u{332}e\u{332}f\u{332}i\u{332}n\u{332}e\u{332}d\u{332}}\n\\newcommand{\\…".into() });
+            message: "KaTeX parse error: Undefined control sequence: \\NotDefined at position 38: …ficientOne}[0]{\\\u{332}N\u{332}o\u{332}t\u{332}D\u{332}e\u{332}f\u{332}i\u{332}n\u{332}e\u{332}d\u{332}}\n\\newcommand{\\…".into() })));
     mutated[0] = records[0].clone();
     sweep::inventory(&n, &mutated).unwrap();
     let bundle = mutated
@@ -2536,15 +3025,17 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
         RenderOwner::Definition(DefinitionId::CoefficientOne),
         "base",
         definition(DefinitionId::CoefficientOne, vec![]),
-    )
-    .unwrap();
-    assert_eq!(restored_row.macro_source(), r"\FtooQCoefficientOne{}");
-    assert_eq!(restored_row.unicode_source(), ONE);
+    );
+    checks.push(Box::new(move || {
+        let restored_row = restored_row.unwrap();
+        assert_eq!(restored_row.macro_source(), r"\FtooQCoefficientOne{}");
+        assert_eq!(restored_row.unicode_source(), ONE);
+    }));
     let restored = format!(
         "{}\\FtooQCoefficientOne{{}}\\alpha{{}}",
         declaration_goldens()[0].1
     );
-    typeset(
+    let restored = typeset(
         &support,
         RenderTarget::Macro,
         &restored,
@@ -2554,8 +3045,14 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
             &restored,
             vec![],
         ),
-    )
-    .unwrap();
+    );
+    checks.push(Box::new(move || { restored.unwrap(); }));
+    Ok::<_, NotationAdapterFault>(checks)
+    }).unwrap();
+    assert_eq!(checks.len(), 16);
+    for check in checks {
+        check();
+    }
 }
 
 #[test]

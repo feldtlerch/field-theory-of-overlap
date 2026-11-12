@@ -14,6 +14,19 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT: AtomicU64 = AtomicU64::new(0);
+struct Scratch(std::path::PathBuf);
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+struct Process(std::process::Child);
+impl Drop for Process {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
 
 pub(super) struct SweepOrigin {
     pub case: NativeCase,
@@ -324,30 +337,36 @@ pub(super) fn consume_with(
     before: impl FnOnce(&Path),
     completed: impl FnOnce(&Path, &Result<(), DocumentError>),
 ) -> Result<(), DocumentError> {
-    native_support::verify(support, lock)?;
-    let scratch = support.root.join("tmp").join(format!(
-        "document-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
-    fs::create_dir(&scratch)
-        .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e))?;
-    before(&scratch);
-    let result = invoke(
-        support, &scratch, source, notation, addressing, case, origins,
-    );
-    completed(&scratch, &result);
-    let checked = native_support::verify(support, lock);
-    let cleanup_phase = crate::telemetry::Phase::new("native.cleanup");
-    let cleanup = fs::remove_dir_all(&scratch)
-        .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e));
-    drop(cleanup_phase);
-    checked?;
-    cleanup?;
-    result
+    support.scope(lock, || {
+        support.ensure_open(lock)?;
+        let scratch = support.root.join("tmp").join(format!(
+            "document-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&scratch)
+            .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e))?;
+        let guard = Scratch(scratch.clone());
+        before(&scratch);
+        let result = invoke(
+            support, lock, &scratch, source, notation, addressing, case, origins,
+        );
+        completed(&scratch, &result);
+        let checked = support.observe(lock);
+        let cleanup_phase = crate::telemetry::Phase::new("native.cleanup");
+        let cleanup = fs::remove_dir_all(&scratch)
+            .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &scratch, &e));
+        drop(guard);
+        drop(cleanup_phase);
+        checked?;
+        cleanup?;
+        result
+    })
 }
+#[allow(clippy::too_many_arguments)] // Lock belongs to the invocation's owning bracket.
 fn invoke(
     support: &NativeSupport,
+    lock: &Lock,
     scratch: &Path,
     source: &str,
     notation: &str,
@@ -370,6 +389,7 @@ fn invoke(
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
     }
     let executable = support.root.join("runtime/bin/tectonic");
+    support.observe(lock)?;
     let invocation = crate::telemetry::Phase::new(match &case {
         NativeCase::Document { .. } => "native.document",
         NativeCase::Sweep { .. } => "native.sweep",
@@ -423,6 +443,7 @@ fn measured_output(command: &mut Command) -> std::io::Result<std::process::Outpu
     let stdout = child.stdout.take().expect("piped stdout");
     let mut stderr = child.stderr.take().expect("piped stderr");
     std::thread::scope(|scope| {
+        let mut child = Process(child);
         let stdout = scope.spawn(move || {
             let mut reader = BufReader::new(stdout);
             let mut bytes = vec![];
@@ -446,7 +467,7 @@ fn measured_output(command: &mut Command) -> std::io::Result<std::process::Outpu
             stderr.read_to_end(&mut bytes)?;
             Ok::<_, std::io::Error>(bytes)
         });
-        let status = child.wait();
+        let status = child.0.wait();
         let stdout = stdout.join().expect("native stdout reader");
         let stderr = stderr.join().expect("native stderr reader");
         Ok(std::process::Output {

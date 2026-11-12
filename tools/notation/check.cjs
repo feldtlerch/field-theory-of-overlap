@@ -4,14 +4,42 @@ const path = require('node:path');
 const { TextDecoder } = require('node:util');
 const vm = require('node:vm');
 
+// Telemetry is optional, including when the destination disappears or fills.
+// Validate once per process and stop recording after the first I/O failure.
+let telemetry;
+function record(phase, elapsed) {
+  try {
+    if (telemetry === undefined) {
+      telemetry = null;
+      const directory = process.env.FTOO_GATE_TELEMETRY;
+      if (directory && fs.statSync(directory).isDirectory()) {
+        telemetry = fs.openSync(path.join(directory, process.pid + '.jsonl'), 'a');
+      }
+    }
+    if (telemetry !== null) {
+      const bytes = Buffer.from(JSON.stringify({ pid: process.pid, phase,
+        inclusive_ns: Number(elapsed), members: 0, bytes: 0 }) + '\n');
+      let at = 0;
+      while (at < bytes.length) {
+        const written = fs.writeSync(telemetry, bytes, at, bytes.length - at);
+        if (written === 0) throw new Error('telemetry write made no progress');
+        at += written;
+      }
+    }
+  } catch {
+    const descriptor = telemetry;
+    telemetry = null;
+    if (typeof descriptor === 'number') {
+      try { fs.closeSync(descriptor); } catch { /* Measurement cannot replace a result. */ }
+    }
+  }
+}
+
 function measured(phase, operation) {
   const start = process.hrtime.bigint();
   try { return operation(); }
   finally {
-    if (process.env.FTOO_GATE_TELEMETRY) {
-      fs.appendFileSync(path.join(process.env.FTOO_GATE_TELEMETRY, process.pid + '.jsonl'),
-        JSON.stringify({ pid: process.pid, phase, inclusive_ns: Number(process.hrtime.bigint() - start), members: 0, bytes: 0 }) + '\n');
-    }
+    record(phase, process.hrtime.bigint() - start);
   }
 }
 

@@ -983,16 +983,16 @@ fn display_writers_have_independent_full_document_goldens_and_neutral_harvests()
         assert_eq!(harvest.citations(), []);
     }
 }
-#[test]
-fn support_required_real_table_and_picture_consume_pending_math_and_literal_spans()
--> Result<(), Box<dyn std::error::Error>> {
+pub(super) fn support_required_real_table_and_picture_consume_pending_math_and_literal_spans(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(DocumentError::Native)?;
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let notation = fs::read_to_string(root.join("generated/notation.tex"))?;
-    for (kind, md, tex) in [
+    for (index, (kind, md, tex)) in [
         (
             DisplayKind::Table,
             "| Value |\n| --- |\n| @math{value} `dec:weld:equal-address-sets` |",
@@ -1004,7 +1004,7 @@ fn support_required_real_table_and_picture_consume_pending_math_and_literal_span
             r"\begin{picture}(120,20)\put(0,10){@math{value} @tag{c:1}}\put(35,0){\line(1,0){40}}\end{picture}",
         ),
         (DisplayKind::Figure, FIGURE_MD, FIGURE_TEX),
-    ] {
+    ].into_iter().enumerate() {
         let mut plan = fixture_plan(kind, md, tex);
         if kind == DisplayKind::Figure {
             relation_caption(&mut plan);
@@ -1015,7 +1015,7 @@ fn support_required_real_table_and_picture_consume_pending_math_and_literal_span
             plan::check_emission(&plan, &source, DocumentTarget::Latex),
             Ok(())
         );
-        native::consume_plan(&support, &lock, &source, &notation, &address, &plan)?;
+        checks.push(CaseEvidence::new(format!("display/{index}"), native::consume_plan(support, lock, &source, &notation, &address, &plan), Ok(())));
         assert_eq!(
             runtime::check(&book, std::slice::from_ref(&plan), &address),
             Ok(())

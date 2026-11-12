@@ -214,19 +214,45 @@ pub(super) fn prepared(
     records: &[Declaration],
     bypass: bool,
 ) -> Result<(String, Vec<SweepRow>)> {
+    with_prepared(n, support, records, bypass, Ok)
+}
+
+pub(super) fn with_prepared<T, E>(
+    n: &CheckedNotation<'_, '_>,
+    support: &Support,
+    records: &[Declaration],
+    bypass: bool,
+    run: impl FnOnce((String, Vec<SweepRow>)) -> std::result::Result<T, E>,
+) -> std::result::Result<T, E>
+where
+    E: From<super::NotationRenderError> + From<super::NotationAdapterFault>,
+{
+    let candidates = candidates(n, records)?;
+    support.scope(
+        &super::support::repository().join("tools/notation/check.cjs"),
+        || run(prepared_inner(support, records, bypass, candidates)?),
+    )
+}
+
+#[allow(clippy::too_many_lines)]
+fn prepared_inner(
+    support: &Support,
+    records: &[Declaration],
+    bypass: bool,
+    candidates: Candidates,
+) -> Result<(String, Vec<SweepRow>)> {
     let Candidates {
         requests,
         declarations,
         rows,
         mut key,
-    } = candidates(n, records)?;
-    support.check()?;
+    } = candidates;
     let adapter_path = super::support::repository().join("tools/notation/check.cjs");
     let adapter = std::fs::read(&adapter_path).map_err(|e| super::NotationAdapterFault::Io {
         operation: super::AdapterOperation::WaitOutput,
         kind: e.kind(),
     })?;
-    key.push(adapter.clone());
+    key.push(adapter);
     for name in [
         ".node-version",
         "package.json",
@@ -255,12 +281,13 @@ pub(super) fn prepared(
         )
         .map_err(super::NotationAdapterFault::Integrity)?,
     );
-    let reservation = if bypass {
+    let private_hit = !bypass && support.has_evidence(&key);
+    let reservation = if bypass || private_hit {
         None
     } else {
-        Some(MEMO.acquire(MemoKey(key)))
+        Some(MEMO.acquire(MemoKey(key.clone())))
     };
-    let hit = reservation.as_ref().is_some_and(|r| r.key.is_none());
+    let hit = private_hit || reservation.as_ref().is_some_and(|r| r.key.is_none());
     let memo_phase = crate::telemetry::Phase::new(if hit {
         "notation.memo_hit"
     } else {
@@ -298,29 +325,12 @@ pub(super) fn prepared(
             None => Ok(()),
         }
     };
-    support.check()?;
-    let actual = std::fs::read(&adapter_path).map_err(|e| super::NotationAdapterFault::Io {
-        operation: super::AdapterOperation::WaitOutput,
-        kind: e.kind(),
-    })?;
-    if actual != adapter {
-        return Err(super::NotationAdapterFault::Protocol {
-            status: None,
-            stdout: vec![],
-            stderr: vec![],
-            reason: super::ProtocolReason::BatchFrame {
-                index: requests.len(),
-                reason: super::BatchReason::ChangedAdapter {
-                    expected: adapter,
-                    actual,
-                },
-            },
-        }
-        .into());
-    }
     result?;
+    if !bypass {
+        support.remember(key);
+    }
     if let Some(reservation) = reservation {
-        reservation.publish();
+        support.after_close(move || reservation.publish());
     }
     drop(memo_phase);
     Ok((declarations, rows))

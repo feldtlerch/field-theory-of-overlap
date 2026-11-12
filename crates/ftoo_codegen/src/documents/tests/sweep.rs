@@ -163,12 +163,11 @@ fn sweep_failure_lines_select_exact_rows_and_preserve_complete_evidence() {
     }
 }
 
-#[test]
-fn support_required_native_sweep_row_has_complete_evidence_and_restores()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+pub(super) fn support_required_native_sweep_row_has_complete_evidence_and_restores(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -197,8 +196,8 @@ fn support_required_native_sweep_row_has_complete_evidence_and_restores()
     let notation = "\\def\\FtdocStored{\\UndefinedStoredCommand}\n";
     let mut scratch = PathBuf::new();
     let error = native::consume_with(
-        &support,
-        &lock,
+        support,
+        lock,
         &source,
         notation,
         &addressing,
@@ -209,8 +208,7 @@ fn support_required_native_sweep_row_has_complete_evidence_and_restores()
         rows.iter().map(|row| row.origin.clone()).collect(),
         |path| scratch = path.into(),
         |_, _| {},
-    )
-    .unwrap_err();
+    );
     let (stdout, stderr, log): (String, String, String) = serde_json::from_str(include_str!(
         "../../../tests/fixtures/assembly/sweep-rejection.json"
     ))?;
@@ -239,23 +237,28 @@ fn support_required_native_sweep_row_has_complete_evidence_and_restores()
             log: log.into_bytes(),
         },
     );
-    exact(&native::sweep_origin(error, &source, &rows), &expected);
+    checks.push(CaseEvidence::new(
+        "sweep/refusal",
+        error.map_err(|error| native::sweep_origin(error, &source, &rows)),
+        Err(expected),
+    ));
     let restored = notation.replace("\\UndefinedStoredCommand", "1");
-    assert_eq!(
+    checks.push(CaseEvidence::new(
+        "sweep/restored",
         native::consume(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             &restored,
             &addressing,
             NativeCase::Sweep {
                 owner: RenderOwner::Expression,
-                case: "complete".into()
+                case: "complete".into(),
             },
-            rows.iter().map(|row| row.origin.clone()).collect()
+            rows.iter().map(|row| row.origin.clone()).collect(),
         )
         .map_err(|error| native::sweep_origin(error, &source, &rows)),
-        Ok(())
-    );
+        Ok(()),
+    ));
     Ok(())
 }

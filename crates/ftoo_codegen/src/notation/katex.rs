@@ -16,6 +16,25 @@ use super::BatchReason;
 pub(super) const BATCH_LIMIT: usize = 4096;
 static NEXT_SPOOL: AtomicU64 = AtomicU64::new(0);
 
+pub(super) struct ChildGuard(pub(super) std::process::Child);
+impl std::ops::Deref for ChildGuard {
+    type Target = std::process::Child;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ChildGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)] // Used directly as the owning map_err conversion.
 fn batch_io(error: io::Error) -> NotationAdapterFault {
     NotationAdapterFault::Io {
@@ -30,7 +49,7 @@ struct Spool {
 }
 impl Spool {
     fn new(support: &Support) -> Result<Self, NotationAdapterFault> {
-        let path = support.root.join("tmp").join(format!(
+        let path = support.scratch().join(format!(
             "notation-{}-{}",
             std::process::id(),
             NEXT_SPOOL.fetch_add(1, Ordering::Relaxed)
@@ -152,10 +171,9 @@ pub(super) fn batch_with_adapter(
             ),
         });
     }
-    support.check()?;
-    let result = batch_transport(support, adapter_path, sources, observed);
-    support.check()?;
-    result
+    support.scope(adapter_path, || {
+        batch_transport(support, adapter_path, sources, observed)
+    })
 }
 
 #[allow(clippy::too_many_lines)] // Retain a single reaping boundary for every protocol exit.
@@ -165,12 +183,11 @@ fn batch_transport(
     sources: &[String],
     mut observed: impl FnMut(usize, &Result<String, String>),
 ) -> Result<Vec<Result<(), String>>, NotationAdapterFault> {
-    let adapter = fs::read(adapter_path).map_err(batch_io)?;
     let mut stdout_spool = Spool::new(support)?;
     let mut stderr_spool = Spool::new(support)?;
     let mut stderr_file = stderr_spool.file.try_clone().map_err(batch_io)?;
     let startup = crate::telemetry::Phase::new("notation.process_start");
-    let mut child = Command::new(&support.runtime)
+    let child = Command::new(&support.runtime)
         .arg(adapter_path)
         .arg("--batch")
         .arg(&support.entry)
@@ -193,6 +210,7 @@ fn batch_transport(
                 }
             }
         })?;
+    let mut child = ChildGuard(child);
     drop(startup);
     crate::telemetry::counter("notation.process_starts", 1);
     crate::telemetry::counter("notation.version_probes", 1);
@@ -236,7 +254,7 @@ fn batch_transport(
             lines += usize::from(byte[0] == b'\n');
         }
         drop(version_phase);
-        support.check()?;
+        support.observe()?;
         match classify(
             Output {
                 status: std::process::ExitStatus::from_raw(0),
@@ -254,18 +272,7 @@ fn batch_transport(
         }
         for (index, source) in sources.iter().enumerate() {
             crate::telemetry::counter("notation.logical_requests", 1);
-            support.check()?;
-            let actual = fs::read(adapter_path).map_err(batch_io)?;
-            if actual != adapter {
-                reason = Some(frame_reason(
-                    index,
-                    BatchReason::ChangedAdapter {
-                        expected: adapter.clone(),
-                        actual,
-                    },
-                ));
-                return Ok(());
-            }
+            support.observe()?;
             let exchange = crate::telemetry::Phase::new("notation.request_exchange");
             let request = (|| {
                 let length = u32::try_from(source.len())
@@ -283,6 +290,8 @@ fn batch_transport(
                         kind: e.kind(),
                     })?;
                 crate::telemetry::counter("notation.submitted_requests", 1);
+                #[cfg(test)]
+                support.count_submission();
                 let mut header = [0; 17];
                 let count = read_frame(&mut output, &mut stdout_spool.file, &mut header)?;
                 if index == 0
@@ -339,17 +348,7 @@ fn batch_transport(
                 Ok(())
             })();
             drop(exchange);
-            support.check()?;
-            let actual = fs::read(adapter_path).map_err(batch_io)?;
-            if actual != adapter {
-                reason = Some(frame_reason(
-                    index,
-                    BatchReason::ChangedAdapter {
-                        expected: adapter.clone(),
-                        actual,
-                    },
-                ));
-            }
+            support.observe()?;
             request?;
             if reason.is_some() {
                 break;
@@ -485,6 +484,32 @@ pub(super) fn classify(
         _ => Err(protocol(output, ProtocolReason::UnexpectedStatus)),
     }
 }
+fn collected_output(child: ChildGuard) -> io::Result<Output> {
+    std::thread::scope(|scope| {
+        // Own the child inside the scope so unwinding kills it before reader joins.
+        let mut child = child;
+        let mut stdout = child.stdout.take().expect("piped stdout");
+        let mut stderr = child.stderr.take().expect("piped stderr");
+        let stdout = scope.spawn(move || {
+            let mut bytes = Vec::new();
+            stdout.read_to_end(&mut bytes)?;
+            Ok::<_, io::Error>(bytes)
+        });
+        let stderr = scope.spawn(move || {
+            let mut bytes = Vec::new();
+            stderr.read_to_end(&mut bytes)?;
+            Ok::<_, io::Error>(bytes)
+        });
+        let status = child.wait();
+        let stdout = stdout.join().expect("stdout reader");
+        let stderr = stderr.join().expect("stderr reader");
+        Ok(Output {
+            status: status?,
+            stdout: stdout?,
+            stderr: stderr?,
+        })
+    })
+}
 fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapterFault> {
     let _phase = crate::telemetry::Phase::new(if source.is_some() {
         "notation.expression_process"
@@ -493,7 +518,7 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
     });
     let adapter = support::repository().join("tools/notation/check.cjs");
     let startup = crate::telemetry::Phase::new("notation.process_start");
-    let mut child = Command::new(&support.runtime)
+    let child = Command::new(&support.runtime)
         .arg(adapter)
         .arg(if source.is_some() {
             "--expression"
@@ -520,6 +545,7 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
                 }
             }
         })?;
+    let mut child = ChildGuard(child);
     drop(startup);
     crate::telemetry::counter("notation.process_starts", 1);
     let result = if let Some(source) = source {
@@ -540,12 +566,10 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
     if result.is_ok() && source.is_some() {
         crate::telemetry::counter("notation.submitted_requests", 1);
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|e| NotationAdapterFault::Io {
-            operation: AdapterOperation::WaitOutput,
-            kind: e.kind(),
-        });
+    let output = collected_output(child).map_err(|e| NotationAdapterFault::Io {
+        operation: AdapterOperation::WaitOutput,
+        kind: e.kind(),
+    });
     result?;
     output
 }
@@ -573,10 +597,15 @@ pub(super) fn invoke_with(
     version: bool,
     run: impl FnOnce() -> Result<Output, NotationAdapterFault>,
 ) -> Result<Result<String, String>, NotationAdapterFault> {
-    support.check()?;
-    let output = run();
-    support.check()?;
-    classify(output?, version)
+    support.scope(
+        &support::repository().join("tools/notation/check.cjs"),
+        || {
+            support.observe()?;
+            let output = run();
+            support.observe()?;
+            classify(output?, version)
+        },
+    )
 }
 
 #[cfg(test)]

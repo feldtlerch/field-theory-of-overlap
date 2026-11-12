@@ -84,6 +84,7 @@ version = "0.0.0"
 dependencies = [
  "ftoo_audit",
  "ftoo_manifest",
+ "libc",
  "serde",
  "serde_json",
  "sha2",

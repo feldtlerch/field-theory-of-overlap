@@ -4,6 +4,7 @@ mod artifact;
 mod documents;
 pub use documents::*;
 mod notation;
+mod support_bracket;
 mod telemetry;
 pub use notation::{
     AdapterComponent, AdapterOperation, BatchReason, InstalledPackageChange,
@@ -12,6 +13,7 @@ pub use notation::{
     SupportIntegrityFault, SupportIoOperation, SupportMetadataReason, SupportReason, SweepRow,
     prepare_notation,
 };
+pub use support_bracket::SupportIdentity;
 mod labels;
 mod projection;
 mod units;

@@ -2,9 +2,11 @@
 #![allow(clippy::too_many_lines)]
 use super::*;
 mod acceptance;
+mod brackets;
 mod displays;
 mod native_evidence;
 mod sweep;
+use brackets::CaseEvidence;
 #[test]
 fn native_preparation_refuses_unsafe_archives_and_restores()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -441,12 +443,11 @@ fn expected_runtime_refusal(source: &str, input: &str, message: &str) -> Documen
         .unwrap(),
     )
 }
-#[test]
-fn support_required_native_unexpanded_live_lookup_is_refused_and_restores()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+fn support_required_native_unexpanded_live_lookup_is_refused_and_restores(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let original = runtime::render(&book, &[])?;
@@ -462,23 +463,25 @@ fn support_required_native_unexpanded_live_lookup_is_refused_and_restores()
         language: "en".into(),
     };
     let expected = expected_runtime_refusal(&source, "c:1", "tag \"c:1\": unknown");
-    assert_eq!(
+    checks.push(CaseEvidence::new(
+        "lookup/refusal",
         native::consume(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             "",
             &changed,
             case.clone(),
-            Vec::new()
+            Vec::new(),
         ),
-        Err(expected)
-    );
+        Err(expected),
+    ));
     assert_eq!(runtime::render(&book, &[])?, original);
-    assert_eq!(
-        native::consume(&support, &lock, &source, "", &original, case, Vec::new()),
-        Ok(())
-    );
+    checks.push(CaseEvidence::new(
+        "lookup/restored",
+        native::consume(support, lock, &source, "", &original, case, Vec::new()),
+        Ok(()),
+    ));
     Ok(())
 }
 #[test]
@@ -1229,8 +1232,14 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let original = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
     let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
-    native_support::verify(&original, &lock).map_err(|e| format!("{e:?}"))?;
-    let directory = Directory::new();
+    let _serial = brackets::MUTATIONS.lock().unwrap();
+    let directory = Directory(
+        original
+            .directory()
+            .join("downloads")
+            .join(format!("bundle-copy-{}", std::process::id())),
+    );
+    let copy_phase = crate::telemetry::Phase::new("native.private_bundle_copy");
     for path in ["runtime/bin", "bundle", "downloads", "tmp"] {
         fs::create_dir_all(directory.0.join(path))?;
     }
@@ -1246,6 +1255,8 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
             destination,
         )?;
     }
+    copy_phase.finish(true);
+    crate::telemetry::counter("native.private_bundle_copies", 1);
     let support =
         NativeSupport::resolve(&root, Some(&directory.0)).map_err(|e| format!("{e:?}"))?;
     let graph = ftoo_manifest::seed()?;
@@ -1313,6 +1324,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
             Ok(())
         );
     }
+    let before = brackets::identity(&path);
     let actual = native::consume_with(
         &support,
         &lock,
@@ -1323,11 +1335,26 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
         Vec::new(),
         |scratch| {
             assert_eq!(fs::read_dir(scratch).unwrap().count(), 0);
+        },
+        |_, result| {
+            assert_eq!(result, &Ok(()));
             fs::write(&path, b"b").unwrap();
         },
-        |_, result| assert_eq!(result, &Ok(())),
     );
-    assert_eq!(actual, Err(expected));
+    let fault = NativeAdapterFault::SupportChanged {
+        member: path.to_string_lossy().into_owned(),
+        expected: before,
+        actual: Some(brackets::identity(&path)),
+    };
+    assert_eq!(actual, Err(DocumentError::Native(fault.clone())));
+    assert_eq!(
+        actual.unwrap_err().to_string(),
+        format!("Native({fault:?})")
+    );
+    let DocumentError::Native(expected_hash) = expected else {
+        unreachable!()
+    };
+    assert_eq!(support.closing_hash(), Some(Err(expected_hash)));
     assert_eq!(fs::read(&path)?, b"b");
     fs::write(&path, &saved)?;
     assert_eq!(fs::read(&path)?, saved);
@@ -1428,9 +1455,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
 fn native_invocation_has_exact_local_bundle_arguments_and_confined_environment() {
     use std::ffi::OsString;
     let directory = Directory::new();
-    let support = NativeSupport {
-        root: directory.0.clone(),
-    };
+    let support = NativeSupport::at(directory.0.clone());
     let scratch = directory.0.join("tmp/invocation");
     let command = native::command(&support, &scratch);
     assert_eq!(
@@ -1527,12 +1552,11 @@ fn a_zero_status_cannot_accept_the_complete_lost_character_log() {
         Err(expected)
     );
 }
-#[test]
-fn support_required_actual_native_faces_framing_and_expanded_live_keys()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+fn support_required_actual_native_faces_framing_and_expanded_live_keys(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -1549,30 +1573,30 @@ COMMENTTAIL
 \end{document}
 ",
     );
-    assert_eq!(
+    checks.push(CaseEvidence::new(
+        "faces/accepted",
         native::consume(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             "",
             &addressing,
             NativeCase::Document {
                 document: "fixture".into(),
-                language: "en".into()
+                language: "en".into(),
             },
-            Vec::new()
+            Vec::new(),
         ),
-        Ok(())
-    );
+        Ok(()),
+    ));
     Ok(())
 }
 
-#[test]
-fn support_required_actual_native_unknown_tag_has_complete_decoded_refusal()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+fn support_required_actual_native_unknown_tag_has_complete_decoded_refusal(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -1600,29 +1624,29 @@ fn support_required_actual_native_unknown_tag_has_complete_decoded_refusal()
         }])
         .unwrap(),
     );
-    assert_eq!(
+    checks.push(CaseEvidence::new(
+        "unknown/refusal",
         native::consume(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             "",
             &addressing,
             NativeCase::Runtime {
-                site_token: "u0-t0".into()
+                site_token: "u0-t0".into(),
             },
-            Vec::new()
+            Vec::new(),
         ),
-        Err(expected)
-    );
+        Err(expected),
+    ));
     Ok(())
 }
 
-#[test]
-fn support_required_native_lost_character_is_a_complete_hard_error()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+fn support_required_native_lost_character_is_a_complete_hard_error(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -1634,8 +1658,8 @@ fn support_required_native_lost_character_is_a_complete_hard_error()
     };
     let mut scratch = PathBuf::new();
     let actual = native::consume_with(
-        &support,
-        &lock,
+        support,
+        lock,
         &source,
         "",
         &addressing,
@@ -1669,7 +1693,11 @@ fn support_required_native_lost_character_is_a_complete_hard_error()
         }])
         .unwrap(),
     );
-    assert_eq!(actual, Err(expected));
+    checks.push(CaseEvidence::new(
+        "lost-character/refusal",
+        actual,
+        Err(expected),
+    ));
     Ok(())
 }
 
@@ -1837,10 +1865,15 @@ fn native_preflight_faults_restore_and_never_execute() {
     use sha2::{Digest, Sha256};
     const A: &str = "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb";
     const B: &str = "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d";
-    let directory = Directory::new();
-    let support = NativeSupport {
-        root: directory.0.clone(),
-    };
+    // The shared temporary directory has concurrent creators. This fixture
+    // needs stable ancestors so its deliberate member faults stay primary.
+    let directory = Directory(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join(format!("native-preflight-{}", std::process::id())),
+    );
+    fs::create_dir(&directory.0).unwrap();
+    let support = NativeSupport::at(directory.0.clone());
     let missing = NativeAdapterFault::Configuration {
         component: None,
         path: Some(directory.0.join("runtime")),
@@ -1848,6 +1881,7 @@ fn native_preflight_faults_restore_and_never_execute() {
     };
     let digest = "d".repeat(64);
     let lock = native_support::Lock {
+        source: None,
         engine: A.into(),
         files: BTreeMap::from([
             (
@@ -2008,7 +2042,13 @@ fn native_preflight_faults_restore_and_never_execute() {
     assert_eq!(fs::read(&extra).unwrap(), b"a");
     fs::remove_file(&extra).unwrap();
     assert_eq!(native_support::verify(&support, &lock), Ok(()));
-    let socket = std::os::unix::net::UnixListener::bind(&extra).unwrap();
+    let socket_parent = fs::File::open(extra.parent().unwrap()).unwrap();
+    let socket_alias = format!(
+        "/proc/self/fd/{}/{}",
+        std::os::fd::AsRawFd::as_raw_fd(&socket_parent),
+        extra.file_name().unwrap().to_str().unwrap()
+    );
+    let socket = std::os::unix::net::UnixListener::bind(socket_alias).unwrap();
     refuse(NativeAdapterFault::Configuration {
         component: Some(NativeComponent::Bundle),
         path: Some(extra.clone()),

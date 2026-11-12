@@ -94,30 +94,30 @@ fn native_negative_sources() -> Vec<(&'static str, String, String, NativeCase)> 
     ]
 }
 
-#[test]
-fn support_required_native_negative_contexts_pin_complete_evidence_and_restore()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
+pub(super) fn support_required_native_negative_contexts_pin_complete_evidence_and_restore(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
     for (name, source, notation, case) in native_negative_sources() {
         if name == "stored" {
             let control = source.replace("\\FtdocStored\n", "Declaration control.\n");
-            assert_eq!(
+            checks.push(CaseEvidence::new(
+                format!("negative/{name}/declaration"),
                 native::consume(
-                    &support,
-                    &lock,
+                    support,
+                    lock,
                     &control,
                     &notation,
                     &addressing,
                     case.clone(),
-                    vec![]
+                    vec![],
                 ),
-                Ok(())
-            );
+                Ok(()),
+            ));
         }
         let origins = vec![SourceOrigin {
             unit: Some("sec:fixture:unit".into()),
@@ -133,8 +133,8 @@ fn support_required_native_negative_contexts_pin_complete_evidence_and_restore()
         }];
         let mut scratch = PathBuf::new();
         let result = native::consume_with(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             &notation,
             &addressing,
@@ -179,14 +179,10 @@ fn support_required_native_negative_contexts_pin_complete_evidence_and_restore()
             }])
             .unwrap(),
         );
-        let actual = result.unwrap_err();
-        assert_eq!(actual, expected);
-        assert_eq!(
-            actual.to_string(),
-            format!(
+        let actual = result;
+        checks.push(CaseEvidence::with_display(format!("negative/{name}/refusal"), actual, Err(expected), format!(
                 "M056 Native document={document:?} unit=None language={language:?} target={target:?} at {site:?}: {fault:?}\n"
-            )
-        );
+            )));
         let restored = if name == "stored" {
             source.clone()
         } else {
@@ -196,18 +192,19 @@ fn support_required_native_negative_contexts_pin_complete_evidence_and_restore()
             )
         };
         let restored_notation = notation.replace("\\UndefinedStoredCommand", "Restored");
-        assert_eq!(
+        checks.push(CaseEvidence::new(
+            format!("negative/{name}/restored"),
             native::consume(
-                &support,
-                &lock,
+                support,
+                lock,
                 &restored,
                 &restored_notation,
                 &addressing,
                 case,
-                origins
+                origins,
             ),
-            Ok(())
-        );
+            Ok(()),
+        ));
     }
     Ok(())
 }
@@ -1589,13 +1586,12 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
     }
 }
 
-#[test]
-fn support_required_native_lifecycle_tables_reject_at_prose_and_display_sites_and_restore()
--> Result<(), Box<dyn std::error::Error>> {
+pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_display_sites_and_restore(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::fmt::Write;
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let encode = |value: &str| {
@@ -1850,15 +1846,10 @@ fn support_required_native_lifecycle_tables_reject_at_prose_and_display_sites_an
                 }])
                 .unwrap(),
             );
-            let actual =
-                native::consume_plan(&support, &lock, &tex, "", &source, &plan).unwrap_err();
-            assert_eq!(actual, expected);
-            assert_eq!(
-                actual.to_string(),
-                format!(
+            let actual = native::consume_plan(support, lock, &tex, "", &source, &plan);
+            checks.push(CaseEvidence::with_display(format!("lifecycle/{fixture}/{handle}/{position}/refusal"), actual, Err(expected), format!(
                     "M055 Native document=Some(\"fixture\") unit=Some(\"sec:fixture:unit\") language=Some(\"en\") target=Some(Latex) at {site:?}: {fault:?}\n"
-                )
-            );
+                )));
             assert_eq!(
                 runtime::render(&book, std::slice::from_ref(&plan))?,
                 original
@@ -1867,22 +1858,22 @@ fn support_required_native_lifecycle_tables_reject_at_prose_and_display_sites_an
                 runtime::check(&book, std::slice::from_ref(&plan), &original),
                 Ok(())
             );
-            assert_eq!(
-                native::consume_plan(&support, &lock, &tex, "", &original, &plan),
-                Ok(())
-            );
+            checks.push(CaseEvidence::new(
+                format!("lifecycle/{fixture}/{handle}/{position}/restored"),
+                native::consume_plan(support, lock, &tex, "", &original, &plan),
+                Ok(()),
+            ));
         }
     }
     Ok(())
 }
 
-#[test]
-fn support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_complete_records()
--> Result<(), Box<dyn std::error::Error>> {
+pub(super) fn support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_complete_records(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::fmt::Write;
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -1895,12 +1886,15 @@ fn support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_
             u32::from(scalar)
         )?;
     }
-    for position in [
+    for (index, position) in [
         r"\section*{\FtdocTag{\fixtureInput}{u0-t0}}",
         r"\begin{tabular}{l}\FtdocTag{\fixtureInput}{u0-t0} \\ Cell \\ \end{tabular}",
         r"\begin{tabular}{l}Cell \\ \FtdocTag{\fixtureInput}{u0-t0} \\ \end{tabular}",
         r"\begin{picture}(100,20)\put(0,10){\FtdocTag{\fixtureInput}{u0-t0}}\end{picture}",
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let source = format!(
             "{}\\ExplSyntaxOn\n\\cs_new:Npn \\fixtureInput {{{definition}}}\n\\ExplSyntaxOff\n{position}\n\\end{{document}}\n",
             latex::start("fixture", "en")
@@ -1915,21 +1909,25 @@ fn support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_
             "tag \"é\\\"\\\\\\t\\n\\r\\u{1}\\u{7f}\\u{80}\": unknown",
         );
         let actual = native::consume(
-            &support,
-            &lock,
+            support,
+            lock,
             &source,
             "",
             &addressing,
             case.clone(),
             vec![],
-        )
-        .unwrap_err();
-        assert_eq!(actual, expected);
-        let restored = source.replace(&definition, "c:1");
-        assert_eq!(
-            native::consume(&support, &lock, &restored, "", &addressing, case, vec![]),
-            Ok(())
         );
+        checks.push(CaseEvidence::new(
+            format!("unicode/{index}/refusal"),
+            actual,
+            Err(expected),
+        ));
+        let restored = source.replace(&definition, "c:1");
+        checks.push(CaseEvidence::new(
+            format!("unicode/{index}/restored"),
+            native::consume(support, lock, &restored, "", &addressing, case, vec![]),
+            Ok(()),
+        ));
         assert_eq!(runtime::render(&book, &[])?, addressing);
     }
     Ok(())
