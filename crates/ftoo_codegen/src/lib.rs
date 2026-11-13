@@ -13,7 +13,7 @@ pub use notation::{
     SupportEntryKind, SupportIntegrityFault, SupportIoOperation, SupportMetadataReason,
     SupportReason, SweepRow, prepare_notation,
 };
-pub use support_bracket::SupportIdentity;
+pub use support_bracket::{ConfinementOperation, SupportIdentity};
 mod labels;
 mod projection;
 mod units;

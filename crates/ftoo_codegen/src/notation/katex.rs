@@ -188,7 +188,10 @@ fn batch_transport(
     let mut stderr_file = stderr_spool.file.try_clone().map_err(batch_io)?;
     let startup = crate::telemetry::Phase::new("notation.process_start");
     let _consumer = crate::support_bracket::consumer_started();
-    let child = Command::new(&support.runtime)
+    let scratch =
+        crate::support_bracket::confinement::Scratch::new(&support.scratch()).map_err(batch_io)?;
+    let mut command = Command::new(&support.runtime);
+    command
         .arg(adapter_path)
         .arg("--batch")
         .arg(&support.entry)
@@ -196,21 +199,10 @@ fn batch_transport(
         .env_remove("NODE_OPTIONS")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            if e.kind() == io::ErrorKind::NotFound {
-                NotationAdapterFault::Unavailable {
-                    component: AdapterComponent::Runtime,
-                    kind: e.kind(),
-                }
-            } else {
-                NotationAdapterFault::Io {
-                    operation: AdapterOperation::Spawn,
-                    kind: e.kind(),
-                }
-            }
-        })?;
+        .stderr(Stdio::piped());
+    let _telemetry =
+        crate::support_bracket::confinement::Telemetry::new(&mut command, scratch.path());
+    let child = support.spawn(&mut command, scratch.path())?;
     let mut child = ChildGuard(child);
     drop(startup);
     crate::telemetry::counter("notation.process_starts", 1);
@@ -520,7 +512,10 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
     let adapter = support::repository().join("tools/notation/check.cjs");
     let startup = crate::telemetry::Phase::new("notation.process_start");
     let _consumer = crate::support_bracket::consumer_started();
-    let child = Command::new(&support.runtime)
+    let scratch =
+        crate::support_bracket::confinement::Scratch::new(&support.scratch()).map_err(batch_io)?;
+    let mut command = Command::new(&support.runtime);
+    command
         .arg(adapter)
         .arg(if source.is_some() {
             "--expression"
@@ -532,21 +527,10 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
         .env_remove("NODE_OPTIONS")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| {
-            if e.kind() == io::ErrorKind::NotFound {
-                NotationAdapterFault::Unavailable {
-                    component: AdapterComponent::Runtime,
-                    kind: e.kind(),
-                }
-            } else {
-                NotationAdapterFault::Io {
-                    operation: AdapterOperation::Spawn,
-                    kind: e.kind(),
-                }
-            }
-        })?;
+        .stderr(Stdio::piped());
+    let _telemetry =
+        crate::support_bracket::confinement::Telemetry::new(&mut command, scratch.path());
+    let child = support.spawn(&mut command, scratch.path())?;
     let mut child = ChildGuard(child);
     drop(startup);
     crate::telemetry::counter("notation.process_starts", 1);

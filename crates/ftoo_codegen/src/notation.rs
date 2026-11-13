@@ -66,6 +66,11 @@ pub enum SupportReason {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NotationAdapterFault {
+    Confinement {
+        operation: crate::ConfinementOperation,
+        path: PathBuf,
+        kind: io::ErrorKind,
+    },
     SupportChanged {
         member: String,
         expected: crate::SupportIdentity,

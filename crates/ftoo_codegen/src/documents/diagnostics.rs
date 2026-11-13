@@ -782,6 +782,11 @@ pub struct FormatChange {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NativeAdapterFault {
+    Confinement {
+        operation: crate::ConfinementOperation,
+        path: PathBuf,
+        kind: std::io::ErrorKind,
+    },
     FormatState {
         phase: FormatPhase,
         missing: Vec<String>,

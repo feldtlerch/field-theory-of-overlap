@@ -137,6 +137,21 @@ impl NativeSupport {
         let active = active.as_mut().expect("open bracket");
         active.poison.get_or_insert(fault).clone()
     }
+
+    pub(super) fn spawn_error(&self, path: &Path, error: &io::Error) -> NativeAdapterFault {
+        if let Some(fault) = error
+            .get_ref()
+            .and_then(|error| error.downcast_ref::<crate::support_bracket::confinement::Fault>())
+        {
+            self.poison(NativeAdapterFault::Confinement {
+                operation: fault.operation,
+                path: fault.path.clone(),
+                kind: fault.kind,
+            })
+        } else {
+            io_error(NativeOperation::Spawn, path, error)
+        }
+    }
     pub(super) fn at(root: PathBuf) -> Self {
         #[cfg(test)]
         crate::support_bracket::mutation::register(&root);

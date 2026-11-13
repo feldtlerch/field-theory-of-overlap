@@ -11,7 +11,7 @@ use super::{
 use ftoo_manifest::{AssemblySite, AssemblyStage, RuleId, SourceOrigin};
 use std::{
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     process::Command,
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -569,8 +569,12 @@ fn invoke(
         NativeCase::Runtime { .. } => "native.runtime",
         NativeCase::Collision { .. } => "native.collision",
     });
-    let output = measured_output(&mut command(support, scratch))
-        .map_err(|e| native_support::io_error(NativeOperation::Spawn, &executable, &e))?;
+    let mut invocation_command = command(support, scratch);
+    let output = measured_output(
+        &mut invocation_command.command,
+        &invocation_command.writable,
+    )
+    .map_err(|e| support.spawn_error(&executable, &e))?;
     drop(invocation);
     let path = scratch.join("output/document.log");
     let log = match fs::read(&path) {
@@ -665,13 +669,12 @@ pub(super) fn bootstrap(
         fs::write(&input, source)
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &input, &e))?;
         support.before_consumer(lock)?;
-        let output = measured_output(&mut command(support, &scratch)).map_err(|e| {
-            native_support::io_error(
-                NativeOperation::Spawn,
-                &support.root.join("runtime/bin/tectonic"),
-                &e,
-            )
-        });
+        let mut invocation_command = command(support, &scratch);
+        let output = measured_output(
+            &mut invocation_command.command,
+            &invocation_command.writable,
+        )
+        .map_err(|e| support.spawn_error(&support.root.join("runtime/bin/tectonic"), &e));
         support.after_consumer(lock)?;
         let output = output?;
         let path = scratch.join("output/document.log");
@@ -714,15 +717,26 @@ pub(super) fn bootstrap(
     result
 }
 
-pub(super) fn measured_output(command: &mut Command) -> std::io::Result<std::process::Output> {
+pub(super) fn measured_output(
+    command: &mut Command,
+    directories: &[PathBuf],
+) -> std::io::Result<std::process::Output> {
     use std::io::{BufRead, BufReader, Read};
     use std::process::Stdio;
     let _consumer = crate::support_bracket::consumer_started();
-    let mut child = command
+    command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    let writable: Vec<_> = directories
+        .iter()
+        .map(std::path::PathBuf::as_path)
+        .collect();
+    let mut child = crate::support_bracket::confinement::spawn_measured(
+        command,
+        &writable,
+        "native.confinement.setup",
+    )?;
     let _started = crate::telemetry::Phase::new("native.process_started");
     let stdout = child.stdout.take().expect("piped stdout");
     let mut stderr = child.stderr.take().expect("piped stderr");
@@ -1040,7 +1054,18 @@ pub(super) fn decode(log: &[u8]) -> Option<(String, String, String)> {
     Some((values.next()?, values.next()?, values.next()?))
 }
 
-pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
+pub(super) struct Invocation {
+    command: Command,
+    writable: Vec<PathBuf>,
+}
+impl std::ops::Deref for Invocation {
+    type Target = Command;
+    fn deref(&self) -> &Command {
+        &self.command
+    }
+}
+
+pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Invocation {
     let executable = support.root.join("runtime/bin/tectonic");
     let mut command = Command::new(executable);
 
@@ -1062,5 +1087,10 @@ pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
         .arg("--outdir")
         .arg(scratch.join("output"))
         .arg(scratch.join("document.tex"));
-    command
+    Invocation {
+        command,
+        writable: std::iter::once(scratch.to_owned())
+            .chain(["output", "cache", "config", "bundle-cache"].map(|name| scratch.join(name)))
+            .collect(),
+    }
 }

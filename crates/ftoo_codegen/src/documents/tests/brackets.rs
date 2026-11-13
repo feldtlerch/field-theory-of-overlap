@@ -3,11 +3,114 @@ use crate::support_bracket::mutation::FileMutation as _;
 use sha2::{Digest, Sha256};
 use std::os::unix::fs::PermissionsExt;
 
+// Both tiny fixtures anchor ancestor identities in the crate directory. Keep
+// their creation/removal outside each other's observation intervals, including
+// the separate process used by the consumer-epoch fixture.
+static CONFINEMENT_FIXTURES: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn confinement_native_fault_poison_discards_provisional_results_and_rereads() {
+    let _serial = CONFINEMENT_FIXTURES.lock().unwrap();
+    let directory = Directory(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!(".confinement-fixture-{}", std::process::id())),
+    );
+    for name in ["runtime/bin", "bundle", "tmp", "downloads"] {
+        fs::create_dir_all(directory.0.join(name)).unwrap();
+    }
+    let engine = b"#!/bin/sh\nif [ \"$2\" = attempt ]; then\n  if (printf changed > \"$1\") 2>/dev/null; then exit 7; fi\n  printf 'refused\\n'\nelse\n  printf consumer > \"$1\"\nfi\n";
+    let executable = directory.0.join("runtime/bin/tectonic");
+    fs::write(&executable, engine).unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    let digest = "d".repeat(64);
+    fs::write(directory.0.join("bundle/SHA256SUM"), &digest).unwrap();
+    let lock = native_support::Lock {
+        source: None,
+        engine: format!("{:x}", Sha256::digest(engine)),
+        files: BTreeMap::from([(
+            "SHA256SUM".into(),
+            format!("{:x}", Sha256::digest(digest.as_bytes())),
+        )]),
+        bundle_digest: digest,
+    };
+    let support = NativeSupport::at(directory.0.clone());
+    let scratch =
+        crate::support_bracket::confinement::Scratch::new(&directory.0.join("tmp")).unwrap();
+    let marker = scratch.path().join("marker");
+    let expected = NativeAdapterFault::Confinement {
+        operation: crate::ConfinementOperation::MakePrivate,
+        path: "/".into(),
+        kind: std::io::ErrorKind::PermissionDenied,
+    };
+    let result: Result<&str, DocumentError> = support.scope(&lock, || {
+        support.before_consumer(&lock)?;
+        let refused = crate::support_bracket::confinement::with_fault(
+            crate::ConfinementOperation::MakePrivate,
+            || {
+                native::measured_output(
+                    std::process::Command::new(&executable)
+                        .arg(&marker)
+                        .current_dir(scratch.path()),
+                    &[scratch.path().to_owned()],
+                )
+                .map_err(|error| support.spawn_error(&executable, &error))
+            },
+        );
+        assert_eq!(refused.map(|_| ()), Err(expected.clone()));
+        assert_eq!(support.before_consumer(&lock), Err(expected.clone()));
+        Ok("provisional success cannot escape")
+    });
+    assert_eq!(result, Err(DocumentError::Native(expected)));
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "Native(Confinement { operation: MakePrivate, path: \"/\", kind: PermissionDenied })"
+    );
+    assert_eq!(support.closing_hash(), Some(Ok(())));
+    assert_eq!(
+        fs::read(&marker).map_err(|error| error.raw_os_error()),
+        Err(Some(libc::ENOENT))
+    );
+    assert_eq!(fs::read(&executable).unwrap(), engine);
+    let restored: Result<(), DocumentError> = support.scope(&lock, || {
+        support.before_consumer(&lock)?;
+        let output = native::measured_output(
+            std::process::Command::new(&executable)
+                .arg(&marker)
+                .current_dir(scratch.path()),
+            &[scratch.path().to_owned()],
+        )
+        .map_err(|error| support.spawn_error(&executable, &error))?;
+        support.after_consumer(&lock)?;
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(output.stdout, b"");
+        assert_eq!(output.stderr, b"");
+        support.before_consumer(&lock)?;
+        let protected = directory.0.join("bundle/SHA256SUM");
+        let output = native::measured_output(
+            std::process::Command::new(&executable)
+                .arg(&protected)
+                .arg("attempt")
+                .current_dir(directory.0.join("bundle")),
+            &[],
+        )
+        .map_err(|error| support.spawn_error(&executable, &error))?;
+        support.after_consumer(&lock)?;
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(output.stdout, b"refused\n");
+        assert_eq!(output.stderr, b"");
+        assert_eq!(fs::read_to_string(protected).unwrap(), lock.bundle_digest);
+        Ok(())
+    });
+    assert_eq!(restored, Ok(()));
+    assert_eq!(fs::read(marker).unwrap(), b"consumer");
+}
+
 #[test]
 fn intervening_and_inflight_consumers_invalidate_shared_observation()
 -> Result<(), Box<dyn std::error::Error>> {
     // Isolate the process-wide clock from other concurrently running tests.
     const CHILD: &str = "FTOO_OBSERVATION_CONTROL_CHILD";
+    let _serial = CONFINEMENT_FIXTURES.lock().unwrap();
     if std::env::var_os(CHILD).is_none() {
         let output = std::process::Command::new(std::env::current_exe()?)
             .args(["--exact", "documents::tests::brackets::intervening_and_inflight_consumers_invalidate_shared_observation", "--nocapture"])
@@ -61,6 +164,7 @@ fn intervening_and_inflight_consumers_invalidate_shared_observation()
         let output = native::measured_output(
             std::process::Command::new(support.directory().join("runtime/bin/tectonic"))
                 .arg("--version"),
+            &[],
         )
         .unwrap();
         assert!(output.status.success());
@@ -69,9 +173,11 @@ fn intervening_and_inflight_consumers_invalidate_shared_observation()
         assert_eq!(support.identity_observations.get(), count + 1);
 
         support.after_consumer_observed(&lock, || {
-            let output =
-                native::measured_output(std::process::Command::new(&executable).arg("--version"))
-                    .unwrap();
+            let output = native::measured_output(
+                std::process::Command::new(&executable).arg("--version"),
+                &[],
+            )
+            .unwrap();
             assert!(output.status.success());
         })?;
         let count = support.identity_observations.get();
@@ -79,11 +185,9 @@ fn intervening_and_inflight_consumers_invalidate_shared_observation()
         assert_eq!(support.identity_observations.get(), count + 1);
 
         let flight = crate::support_bracket::consumer_started();
-        let mut child = std::process::Command::new(&executable)
-            .arg("wait")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
+        let mut command = std::process::Command::new(&executable);
+        command.arg("wait").stdin(std::process::Stdio::piped());
+        let mut child = crate::support_bracket::confinement::spawn(&mut command, &[]).unwrap();
         assert_eq!(child.try_wait().unwrap(), None);
         support.after_consumer(&lock)?;
         let count = support.identity_observations.get();

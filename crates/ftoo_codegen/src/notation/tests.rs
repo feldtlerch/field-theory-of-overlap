@@ -317,15 +317,16 @@ process.stdout.write('values and original errors preserved\n');
                     for mode in [mode, "control"] {
                         support.observe()?;
                         let _consumer = crate::support_bracket::consumer_started();
-                        let output = std::process::Command::new(&support.runtime)
-                            .arg("-e")
-                            .arg(script)
-                            .arg(support::repository().join("tools/notation/check.cjs"))
-                            .arg(mode)
-                            .env_remove("NODE_PATH")
-                            .env_remove("NODE_OPTIONS")
-                            .output()
-                            .unwrap();
+                        let output = confined_output(
+                            &support,
+                            std::process::Command::new(&support.runtime)
+                                .arg("-e")
+                                .arg(script)
+                                .arg(support::repository().join("tools/notation/check.cjs"))
+                                .arg(mode)
+                                .env_remove("NODE_PATH")
+                                .env_remove("NODE_OPTIONS"),
+                        );
                         crate::telemetry::counter("notation.process_starts", 1);
                         support.observe()?;
                         outputs.push((mode, output));
@@ -443,15 +444,16 @@ process.stdout.write(String(render(realm(distribution), 'x')[0]) + '\n');
             || {
                 support.observe()?;
                 let _consumer = crate::support_bracket::consumer_started();
-                let output = std::process::Command::new(&support.runtime)
-                    .arg("-e")
-                    .arg(script)
-                    .arg(support::repository().join("tools/notation/check.cjs"))
-                    .arg(&support.entry)
-                    .env_remove("NODE_PATH")
-                    .env_remove("NODE_OPTIONS")
-                    .output()
-                    .unwrap();
+                let output = confined_output(
+                    &support,
+                    std::process::Command::new(&support.runtime)
+                        .arg("-e")
+                        .arg(script)
+                        .arg(support::repository().join("tools/notation/check.cjs"))
+                        .arg(&support.entry)
+                        .env_remove("NODE_PATH")
+                        .env_remove("NODE_OPTIONS"),
+                );
                 crate::telemetry::counter("notation.process_starts", 1);
                 support.observe()?;
                 Ok::<_, NotationAdapterFault>(output)
@@ -733,27 +735,51 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
     use std::io::{Read, Write};
     use std::process::{Child, ChildStdout, Command, Stdio};
     use std::result::Result;
+    struct ConfinedChild {
+        process: katex::ChildGuard,
+        _telemetry: crate::support_bracket::confinement::Telemetry,
+        _scratch: crate::support_bracket::confinement::Scratch,
+        _consumer: crate::support_bracket::Consumer,
+    }
+    impl std::ops::Deref for ConfinedChild {
+        type Target = Child;
+        fn deref(&self) -> &Child {
+            &self.process
+        }
+    }
+    impl std::ops::DerefMut for ConfinedChild {
+        fn deref_mut(&mut self) -> &mut Child {
+            &mut self.process
+        }
+    }
     type Evidence = Vec<(Vec<u8>, Vec<u8>)>;
     fn start(
         support: &support::Support,
         entry: &Path,
         evidence: &mut Evidence,
-    ) -> Result<(katex::ChildGuard, ChildStdout), NotationAdapterFault> {
+    ) -> Result<(ConfinedChild, ChildStdout), NotationAdapterFault> {
         support.observe()?;
-        let _consumer = crate::support_bracket::consumer_started();
-        let mut child = katex::ChildGuard(
-            Command::new(&support.runtime)
-                .arg(support::repository().join("tools/notation/check.cjs"))
-                .arg("--batch")
-                .arg(entry)
-                .env_remove("NODE_PATH")
-                .env_remove("NODE_OPTIONS")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .unwrap(),
-        );
+        let consumer = crate::support_bracket::consumer_started();
+        let scratch =
+            crate::support_bracket::confinement::Scratch::new(&support.scratch()).unwrap();
+        let mut command = Command::new(&support.runtime);
+        command
+            .arg(support::repository().join("tools/notation/check.cjs"))
+            .arg("--batch")
+            .arg(entry)
+            .env_remove("NODE_PATH")
+            .env_remove("NODE_OPTIONS")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let telemetry =
+            crate::support_bracket::confinement::Telemetry::new(&mut command, scratch.path());
+        let mut child = ConfinedChild {
+            process: katex::ChildGuard(support.spawn(&mut command, scratch.path())?),
+            _telemetry: telemetry,
+            _scratch: scratch,
+            _consumer: consumer,
+        };
         crate::telemetry::counter("notation.process_starts", 1);
         crate::telemetry::counter("notation.version_probes", 1);
         let mut stdout = child.stdout.take().unwrap();
@@ -806,7 +832,7 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
         support: &support::Support,
         evidence: &mut Evidence,
         statuses: &mut Vec<(Option<i32>, i32)>,
-        mut child: katex::ChildGuard,
+        mut child: ConfinedChild,
         mut stdout: ChildStdout,
         status: i32,
         stderr: &[u8],
@@ -975,6 +1001,77 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
         assert_eq!(actual, Some(expected));
     }
 }
+#[test]
+fn support_required_confinement_poison_prevents_publication_and_rereads() {
+    use std::{cell::Cell, rc::Rc};
+    let locked_fixture = Fixture::new();
+    let support = locked_fixture.support();
+    let adapter = support::repository().join("tools/notation/check.cjs");
+    let fixture =
+        crate::support_bracket::confinement::Scratch::new(&support.root.join("tmp")).unwrap();
+    let checked = fixture.path().join("checked-input");
+    fs::write(&checked, b"locked").unwrap();
+    let published = Rc::new(Cell::new(false));
+    let publish = Rc::clone(&published);
+    let expected = NotationAdapterFault::Confinement {
+        operation: crate::ConfinementOperation::MakePrivate,
+        path: "/".into(),
+        kind: std::io::ErrorKind::PermissionDenied,
+    };
+    let result: std::result::Result<&str, NotationAdapterFault> = support.scope_with_inputs(&adapter, std::slice::from_ref(&checked), || {
+        {
+            let scratch = crate::support_bracket::confinement::Scratch::new(&support.scratch()).unwrap();
+            let mut command = std::process::Command::new(&support.runtime);
+            command.arg("-e").arg("try { require('node:fs').writeFileSync(process.argv[1], 'changed'); process.exit(9); } catch (e) { process.stdout.write(JSON.stringify({code:e.code,errno:e.errno,syscall:e.syscall,path:e.path,message:e.message})); }")
+                .arg(&checked).env_remove("NODE_PATH").env_remove("NODE_OPTIONS")
+                .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+            support.observe()?;
+            let _consumer = crate::support_bracket::consumer_started();
+            let child = support.spawn(&mut command, scratch.path())?;
+            crate::telemetry::counter("notation.process_starts", 1);
+            let output = child.wait_with_output().unwrap();
+            support.observe()?;
+            assert_eq!(output.status.code(), Some(0));
+            assert_eq!(output.stderr, b"");
+            let evidence: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(evidence, serde_json::json!({"code":"EROFS","errno":-30,"syscall":"open","path":checked,"message":format!("EROFS: read-only file system, open '{}'", checked.display())}));
+            assert_eq!(fs::read(&checked).unwrap(), b"locked");
+        }
+        assert_eq!(katex::batch(&support, &["x".into()], |_, _| {})?, vec![Ok(())]);
+        support.after_close(move || publish.set(true));
+        assert!(!published.get());
+        let refused = crate::support_bracket::confinement::with_fault(crate::ConfinementOperation::MakePrivate, || katex::batch(&support, &["x".into()], |_, _| panic!("consumer started")));
+        assert_eq!(refused, Err(expected.clone()));
+        assert_eq!(support.observe(), Err(expected.clone()));
+        Ok("provisional success cannot escape")
+    });
+    assert_eq!(result, Err(expected.clone()));
+    exact_adapter(result.unwrap_err(), expected);
+    assert_eq!(support.closing_hash(), Some(Ok(())));
+    assert!(!published.get());
+    assert_eq!(
+        katex::batch(&support, &["x".into()], |_, _| {}),
+        Ok(vec![Ok(())])
+    );
+}
+
+fn confined_output(
+    support: &support::Support,
+    command: &mut std::process::Command,
+) -> std::process::Output {
+    let scratch = crate::support_bracket::confinement::Scratch::new(&support.scratch()).unwrap();
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let _telemetry = crate::support_bracket::confinement::Telemetry::new(command, scratch.path());
+    support
+        .spawn(command, scratch.path())
+        .unwrap()
+        .wait_with_output()
+        .unwrap()
+}
+
 struct Fixture {
     root: PathBuf,
     _serial: std::sync::MutexGuard<'static, ()>,

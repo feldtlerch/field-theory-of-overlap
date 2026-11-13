@@ -56,6 +56,10 @@ pub(crate) fn counter(name: &'static str, count: usize) {
     emit(name, 0, (0, 0, 0), None, count);
 }
 
+pub(crate) fn measurement(name: &'static str, ns: u64, success: bool) {
+    emit(name, u128::from(ns), (0, 0, 0), Some(success), 1);
+}
+
 fn emit(name: &str, ns: u128, hashed: (u64, u64, u64), success: Option<bool>, count: usize) {
     let Some(output) = OUTPUT.get_or_init(|| {
         let directory = std::env::var_os("FTOO_GATE_TELEMETRY")?;

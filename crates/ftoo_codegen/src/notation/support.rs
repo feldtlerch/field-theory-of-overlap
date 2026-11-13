@@ -977,6 +977,48 @@ impl Support {
             .scratch
             .clone()
     }
+
+    pub(super) fn spawn(
+        &self,
+        command: &mut std::process::Command,
+        scratch: &Path,
+    ) -> std::result::Result<std::process::Child, NotationAdapterFault> {
+        // Each adapter deliberately runs in its own fresh scratch directory.
+        command.current_dir(scratch);
+        crate::support_bracket::confinement::spawn_measured(
+            command,
+            &[scratch],
+            "notation.confinement.setup",
+        )
+        .map_err(|error| {
+            if let Some(fault) = error.get_ref().and_then(|error| {
+                error.downcast_ref::<crate::support_bracket::confinement::Fault>()
+            }) {
+                let fault = NotationAdapterFault::Confinement {
+                    operation: fault.operation,
+                    path: fault.path.clone(),
+                    kind: fault.kind,
+                };
+                self.active
+                    .borrow_mut()
+                    .as_mut()
+                    .expect("open bracket")
+                    .poison
+                    .get_or_insert(fault)
+                    .clone()
+            } else if error.kind() == io::ErrorKind::NotFound {
+                NotationAdapterFault::Unavailable {
+                    component: AdapterComponent::Runtime,
+                    kind: error.kind(),
+                }
+            } else {
+                NotationAdapterFault::Io {
+                    operation: super::AdapterOperation::Spawn,
+                    kind: error.kind(),
+                }
+            }
+        })
+    }
     pub(super) fn scope<T, E: From<NotationAdapterFault>>(
         &self,
         adapter: &Path,

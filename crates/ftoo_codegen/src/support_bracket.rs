@@ -1,5 +1,7 @@
 //! Descriptor-relative observations anchored to complete support verification.
 #![allow(clippy::result_large_err)] // Preserve both complete identity observations.
+pub(crate) mod confinement;
+pub use confinement::ConfinementOperation;
 use std::{
     collections::BTreeMap,
     ffi::{CStr, CString, OsString},
