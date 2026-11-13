@@ -9,6 +9,10 @@ publish.workspace = true
 [dependencies]
 ftoo_manifest = { path = "../ftoo_manifest" }
 nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "598ff683a57caca07cf9d44e3fd28c716afb81ef" }
+serde = "=1.0.229"
+serde_json = { version = "=1.0.154", features = ["raw_value"] }
+sha2 = { version = "=0.10.9", default-features = false }
+toml_edit = { version = "=0.22.27", default-features = false, features = ["parse"] }
 
 [lints]
 workspace = true

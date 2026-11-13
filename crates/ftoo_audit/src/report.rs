@@ -36,6 +36,7 @@ pub struct Receipt {
     target: usize,
     summary: JetSummary,
     evidence: [Vec<u8>; 3],
+    pub(crate) rational_components: [(String, String); 5],
     pub(crate) contrary: Option<Counterstatement>,
 }
 impl Receipt {
@@ -44,6 +45,7 @@ impl Receipt {
         limits: Limits,
         summary: JetSummary,
         evidence: [Vec<u8>; 3],
+        rational_components: [(String, String); 5],
     ) -> Self {
         Self {
             claim: descriptor.claim,
@@ -55,6 +57,7 @@ impl Receipt {
             target: descriptor.target,
             summary,
             evidence,
+            rational_components,
             contrary: None,
         }
     }
@@ -157,6 +160,7 @@ impl<'a> ProducerRun<'a> {
 pub struct Counterstatement {
     pub(crate) claimed: Rational,
     pub(crate) witness: Vec<u8>,
+    pub(crate) components: (String, String),
 }
 impl Counterstatement {
     #[must_use]

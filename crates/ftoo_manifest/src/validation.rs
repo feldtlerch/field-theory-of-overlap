@@ -71,6 +71,8 @@ pub enum RuleId {
     M058,
     M059,
     M060,
+    M061,
+    M062,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,7 +93,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 60] = [
+pub const RULES: [RuleSpec; 62] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -509,6 +511,20 @@ pub const RULES: [RuleSpec; 60] = [
         number: RuleId::M060,
         statement: "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle.",
         scope: "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M061,
+        statement: "Retained audit bytes bind the exact current projection, audit/codec contract revision and linked engine source revision, and no retained assertion is accepted before complete gated re-derivation and byte equality.",
+        scope: "Strict retained-report admission, provenance, bounds, canonical equality and every retained evidence context supplied to a consumer.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M062,
+        statement: "Report generation and check use one canonical writer; a release claiming retained audit evidence requires a stable reread accepted report and matching generated artifacts.",
+        scope: "Retained-report file lifecycle, committed report byte gate and release-retention consumer.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

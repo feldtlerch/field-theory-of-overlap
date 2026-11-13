@@ -735,7 +735,7 @@ fn display_ownership_and_language_faults_restore_complete_bodies() {
 #[test]
 fn display_and_documentary_register_statements_are_exact() {
     assert_eq!(
-        RULES[57..]
+        RULES[57..60]
             .iter()
             .map(|r| (r.number, r.statement, r.scope, r.state, r.deferred_reason))
             .collect::<Vec<_>>(),

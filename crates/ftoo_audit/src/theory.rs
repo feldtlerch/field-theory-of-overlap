@@ -92,8 +92,9 @@ pub(crate) fn checked_claim_with_prior(
             .work(prior_work, nrz_cas::Location::new("audit prior spend"))
             .map_err(error(RunStage::Setup))?;
     }
+    let candidate = [(0, 1), (1, 3), (0, 1), (-1, 45), (0, 1)];
     let jet = frame
-        .rationals(&[(0, 1), (1, 3), (0, 1), (-1, 45), (0, 1)])
+        .rationals(&candidate)
         .map_err(error(RunStage::Candidate))?;
     let source = frame
         .polynomial_seed(&jet)
@@ -134,7 +135,11 @@ pub(crate) fn checked_claim_with_prior(
                 .map_err(error(RunStage::Projection))?;
             cumulative_replay_work += contrary_replay;
             max_replay_work = max_replay_work.max(contrary_replay);
-            Some(crate::Counterstatement { claimed, witness })
+            Some(crate::Counterstatement {
+                claimed,
+                witness,
+                components: components(numerator, denominator),
+            })
         }
     } else {
         None
@@ -153,7 +158,13 @@ pub(crate) fn checked_claim_with_prior(
         region: d.region,
         analytic_scope: "The regular germ coth(x)-1/x satisfies this ODE. The triangular finite equations have leading coefficients 2,3,4,5 and uniquely fix c0..c3; c4 is free terminal candidate data. The polynomial residual has nonzero tail -2*x^5/135 + x^7/2025. No exact polynomial solution, convergence, analytic source equality or global equality is certified.",
     };
-    let mut receipt = Receipt::accepted(d, limits, summary, evidence);
+    let mut receipt = Receipt::accepted(
+        d,
+        limits,
+        summary,
+        evidence,
+        candidate.map(|(n, d)| components(n, d)),
+    );
     receipt.contrary = contrary;
     Ok((
         receipt,
@@ -166,4 +177,17 @@ pub(crate) fn checked_claim_with_prior(
             max_replay_work,
         },
     ))
+}
+
+// Preserve the closed producer's exact rational inputs in reduced decimal form.
+// This needs no additional engine budget and changes no construction or replay.
+fn components(numerator: i64, denominator: u64) -> (String, String) {
+    let mut a = numerator.unsigned_abs();
+    let mut b = denominator;
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    let magnitude = numerator.unsigned_abs() / a;
+    let sign = if numerator < 0 { "-" } else { "" };
+    (format!("{sign}{magnitude}"), (denominator / a).to_string())
 }

@@ -16,5 +16,5 @@
 - **Explainer** — a companion publication writing the paper's ideas for a reader who will not read the proofs; authored as units like the paper, with its own declared language set.
 - **Projection** — the generated artifact that carries the authority into the toolchain: the one data file the typesetting runtime and the audit both consume.
 - **Pin** — the recorded public commit of the calculation engine the audit depends on; moved only along that repository's main branch, by review.
-- **Verdict** — the audit's typed outcome for one claim: certified, refuted, undecided with what ran out, or deferred with the named capability.
+- **Verdict** — the audit's typed outcome for one claim: certified, refuted, undecided with what ran out, or deferred with its exact binding, capability, outside-slice or premise blocker; retained outcomes become reader evidence only after provenance checking and gated re-derivation.
 - **Ruling** — a registered editorial judgment of the theory (a classification the authority records as an object of its own, with status like any other).

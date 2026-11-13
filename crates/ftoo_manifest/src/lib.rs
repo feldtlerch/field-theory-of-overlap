@@ -97,6 +97,8 @@ pub use validation::{
 };
 
 #[cfg(test)]
+mod retention_tests;
+#[cfg(test)]
 mod tests;
 
 pub use audit::{

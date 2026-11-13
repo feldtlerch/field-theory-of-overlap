@@ -11,6 +11,7 @@
 mod engine;
 mod registry;
 mod report;
+pub mod retention;
 mod runner;
 mod theory;
 pub use report::{

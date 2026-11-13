@@ -407,7 +407,9 @@ impl ResolvedLimits {
     pub const fn work(self) -> u64 {
         self.work
     }
-    pub(crate) fn fields(self) -> [(&'static str, u64); 71] {
+    /// Canonical field order shared by projection and retained audit codecs.
+    #[must_use]
+    pub fn fields(self) -> [(&'static str, u64); 71] {
         [
             ("arithmetic-steps", self.arithmetic_steps),
             ("boundary-nodes", self.boundary_nodes),

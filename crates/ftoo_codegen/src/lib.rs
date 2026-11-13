@@ -16,6 +16,7 @@ pub use notation::{
 pub use support_bracket::SupportIdentity;
 mod labels;
 mod projection;
+pub mod retention;
 mod units;
 mod weld;
 pub use labels::{

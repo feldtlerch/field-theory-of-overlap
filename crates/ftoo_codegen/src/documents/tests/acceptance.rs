@@ -806,7 +806,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
 -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let prepared = check_documents(&root, &support)?;
+    let (retained, prepared) = crate::retention::check_release_with_documents(&root, &support)?;
     assert_eq!(
         prepared
             .artifacts()
@@ -823,7 +823,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let projection = fs::read(root.join("generated/manifest.json"))?;
     assert_eq!(prepared.projection(), projection);
     let loaded = ftoo_manifest::load_projection(&projection)?;
-    let report = ftoo_audit::audit(loaded.manifest())?;
+    let report = retained.report();
     assert_eq!(
         report
             .outcomes()

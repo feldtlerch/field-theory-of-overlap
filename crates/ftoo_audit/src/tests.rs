@@ -883,9 +883,13 @@ fn wrong_target_never_yields_accepted_receipt() -> TestResult {
 }
 #[test]
 fn dependency_pin_matches_manifest_cargo_and_lock() {
-    let pin = ftoo_manifest::ENGINE_PIN.0;
-    assert!(include_str!("../Cargo.toml").contains(&format!("rev = \"{pin}\"")));
-    assert!(include_str!("../../../Cargo.lock").contains(&format!("?rev={pin}#{pin}")));
+    assert_eq!(
+        crate::retention::check_current_engine(
+            include_str!("../../../Cargo.lock"),
+            include_str!("../Cargo.toml")
+        ),
+        Ok(())
+    );
     assert_eq!(
         ftoo_manifest::CAPABILITIES
             .iter()
@@ -1479,6 +1483,7 @@ fn m026_checked_counterstatement_refutes_and_partial_release_refuses() -> TestRe
     entries[0].produce = refuted_first;
     entries[1].produce = must_not_execute;
     let report = crate::runner::audit_entries(&graph, &entries)?;
+    crate::retention::tests::assert_fixture(&graph, &report);
     let crate::Verdict::Refuted(receipt) = report.outcomes()[0].verdict() else {
         panic!("expected checked refutation: {:?}", report.outcomes())
     };
@@ -1527,6 +1532,7 @@ fn m026_typed_exhaustion_is_undecided_and_partial_release_allows_it() -> TestRes
     entries[0].produce = exhausted_first;
     entries[1].produce = must_not_execute;
     let report = crate::runner::audit_entries(&graph, &entries)?;
+    crate::retention::tests::assert_fixture(&graph, &report);
     let crate::Verdict::Undecided { stage, exhaustion } = report.outcomes()[0].verdict() else {
         panic!("Undecided")
     };
@@ -1635,6 +1641,7 @@ fn m015_real_partial_complete_and_incomplete_assessments() -> TestResult {
         draft.coverage.slice = slice.clone();
         let graph = validate(draft)?;
         let report = crate::audit(&graph)?;
+        crate::retention::tests::assert_fixture(&graph, &report);
         assert_eq!(report.assessment().disposition(), D::Pass);
         assert_eq!(report.outcomes().len(), 2);
         for row in report.outcomes() {

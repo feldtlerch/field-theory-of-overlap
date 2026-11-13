@@ -47,7 +47,7 @@ M1b does not ride with either M3 half. The library consumes ValidatedManifest fr
 
 ADR 007 and the glossary prescribe the projection as eventual audit input; M1's settled successor register permits Rust consumption before that boundary exists. M1b/M6 must feed the same graph and registry admission, not an audit-specific JSON schema or selection path. Their writer and reader must include ClaimAudit, budgets and every edge rather than restore the kernel's earlier restrictions (`reg:glossary:terms`, `arg:process:reasons`).
 
-Neither half introduces a release-report loader or committed serialized report. M3a returns execution receipts; M3b returns owned verdict evidence and separate measurements. Durable storage and its strict writer/reader enter with the publication consumer before any release claims ADR 007's retained-per-release obligation is fulfilled. Engine witness bytes remain engine-owned proof data, not a second manifest interchange format. Q6's persistence recommendation is independent of the M3a/M3b split.
+Neither half introduces a release-report loader or committed serialized report. M3a returns execution receipts; M3b returns owned verdict evidence and separate measurements. The retention consumer supplies durable generated/audit-report.json with strict writing, rereading, equality of projection bytes, audit/codec contract revision and linked engine source revision and complete byte-equal gated re-derivation before release retention or reader assertions are accepted; equal-input non-reproducibility refuses acceptance. Engine witness bytes remain engine-owned proof data, not a second manifest interchange format. Q6's persistence recommendation is independent of the M3a/M3b split.
 
 ## Authority contracts and the closed registry · `sec:manifest3:binding`
 
@@ -220,7 +220,7 @@ M3b mutates each snapshot component independently, including descriptions, matur
 
 Run the five checks under the pinned toolchain (`rust-toolchain.toml`), with no `+` override: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3 -I tools/check_labels.py --self-test` and `python3 -I tools/check_labels.py`. Record each wall time; do not change limits or pins to reinterpret failure. Both bites require their named consumers and tests before acceptance.
 
-Markdown checks do not prove cross-surface Rust identity-mint uniqueness; M6 retains that consumer. M1b byte tests, exclusive-route tests and durable report retention remain named deferrals. M1b/M6 must add strict projection loading, every-edge comparison and surface-correct status assertions for this vocabulary; publication must add strict archival output. This note does not imply those consumers exist.
+Markdown checks do not prove cross-surface Rust identity-mint uniqueness; M6 retains that consumer. M1b byte tests and exclusive-route tests remain named deferrals. M1b/M6 must add strict projection loading, every-edge comparison and surface-correct status assertions for this vocabulary; the retention consumer supplies strict archival output with its actual-file acceptance and release byte gate. This note does not imply those consumers exist.
 
 ## Review questions and recommended dispositions · `sec:manifest3:questions`
 
@@ -236,4 +236,4 @@ There are six contestable review choices, each with a recommendation specifying 
 
 **Q5 — Partial release.** Should undecided/deferred claims prevent all publication? M3b permits them under ExplicitPartial, visibly uncertified, but rejects refutation and requires all Certified for Complete. M3a makes no release assessment.
 
-**Q6 — Persistence.** Should M3 add codecs and a runner executable? Keep typed results and gate evidence; admit strict archival output and CLI with their release consumer. Until then retention is unfulfilled, while each M3 half has a real library consumer.
+**Q6 — Persistence.** Should M3 add codecs and a runner executable? Keep typed results and gate evidence; admit strict archival output with its release consumer; any CLI is separate packaging. Retention is fulfilled by the strict report writer, reader and release-retention library consumer; audited notation and documents are a separate extension, and no CLI is required to discharge storage, acceptance or release checking. Generated reader documents remain in the explicitly unaudited base context; retained reader text is a separate extension.
