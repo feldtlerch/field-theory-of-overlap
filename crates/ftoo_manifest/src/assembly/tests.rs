@@ -46,7 +46,7 @@ fn native_lifecycle_fixture_tables_come_from_complete_valid_books()
         let mut actual = Vec::new();
         for tag in book.live() {
             let key = tag.descriptor().spelling();
-            actual.push(("live", key, book.resolve(key)?.semantic_name().to_owned()));
+            actual.push(("live", key, book.resolve(key)?.label().to_owned()));
         }
         for (store, tags) in [
             (
@@ -312,7 +312,7 @@ fn math_byte_and_group_limits_have_exact_boundary_controls()
     Ok(())
 }
 #[test]
-fn assembly_register_is_exactly_five_appended_enforced_rules() {
+fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
     let previous: [RuleSpec; 52] = include!("../../tests/fixtures/assembly/rules_before.rs");
     assert_eq!(RULES[..52], previous);
     assert_eq!(
@@ -337,7 +337,7 @@ fn assembly_register_is_exactly_five_appended_enforced_rules() {
             ),
             (
                 RuleId::M055,
-                "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag.",
+                "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text.",
                 "Both document targets and their generated notation and addressing support.",
                 RuleState::Enforced,
                 None
@@ -371,7 +371,7 @@ fn assembly_register_is_exactly_five_appended_enforced_rules() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (59, 50, 4, 5)
+        (60, 51, 4, 5)
     );
 }
 fn literal(value: &str) -> ExprDraft {

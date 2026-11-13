@@ -447,6 +447,63 @@ fn w10_tag_sets_missing_unexpected_and_both_directions() {
         );
     }
 }
+
+#[test]
+fn citation_to_tag_swap_keeps_two_families_despite_the_same_reader_handle() {
+    let graph = seed().unwrap();
+    let book = addressing(&graph).unwrap();
+    let md = markdown();
+    let label = "def:langevin:coefficient-one";
+    let text = format!("See `{label}`.");
+    for changed in [true, false] {
+        let corpus = corpus(&[
+            ("en", &text),
+            ("fr", if changed { "See @tag{c:1}." } else { &text }),
+        ]);
+        let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+        let integrated = integrate_labels(&resolved, &md).unwrap();
+        if changed {
+            let actual = weld_units(&integrated).unwrap_err();
+            assert_errors(
+                &actual,
+                &[
+                    inequality(
+                        UNIT,
+                        "fr",
+                        WeldFault::TagSetMismatch {
+                            reference: tag_side("en", &[]),
+                            actual: tag_side(
+                                "fr",
+                                &[("c:1", NodeId::LangevinCoefficientOne, 4, 13, 0)],
+                            ),
+                            missing: vec![],
+                            unexpected: vec!["c:1".into()],
+                        },
+                    ),
+                    inequality(
+                        UNIT,
+                        "fr",
+                        WeldFault::LabelSetMismatch {
+                            reference: label_side("en", &[(label, 4, 6 + label.len(), 0)]),
+                            actual: label_side("fr", &[]),
+                            missing: vec![label.into()],
+                            unexpected: vec![],
+                        },
+                    ),
+                ],
+            );
+        } else {
+            let restored = weld_units(&integrated).unwrap();
+            for language in restored.units()[0].languages() {
+                assert_eq!(language.tags(), &tag_side(language.language(), &[]));
+                assert_eq!(
+                    language.labels(),
+                    &label_side(language.language(), &[(label, 4, 6 + label.len(), 0)])
+                );
+            }
+        }
+    }
+}
 #[test]
 fn w08_w10_label_sets_and_self_citation_are_separate_from_metadata() {
     let graph = seed().unwrap();

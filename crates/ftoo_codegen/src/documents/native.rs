@@ -277,6 +277,19 @@ pub(super) fn runtime_origin(
                         }
                     }
                     for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
+                        if let super::plan::Inline::Citation { identity, site, .. } = run
+                            && identity.token == *site_token
+                        {
+                            diagnostic.unit = Some(block.unit.clone());
+                            if let AssemblySite::Generated { origins, .. } = &mut diagnostic.site {
+                                *origins = super::plan::citation_origins(
+                                    identity,
+                                    site,
+                                    &block.unit,
+                                    &plan.language,
+                                );
+                            }
+                        }
                         if let super::plan::Inline::Tag { token, site, .. } = run
                             && token == site_token
                         {

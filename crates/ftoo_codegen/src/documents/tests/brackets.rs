@@ -210,6 +210,7 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
             sweep::support_required_native_sweep_row_has_complete_evidence_and_restores(&support, &lock, checks)?;
             displays::support_required_real_table_and_picture_consume_pending_math_and_literal_spans(&support, &lock, checks)?;
             overfull::support_required_overfull_boxes_refuse_complete_frames_and_restore_at_boundary(&support, &lock, checks)?;
+            support_required_native_citation_keys_and_retirement(&support,&lock,checks)?;
             Ok(())
         };
         // A pure fixture failure unwinds the owning scope and discards evidence.
@@ -233,6 +234,11 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
                 | "display/0"
                 | "display/1"
                 | "display/2"
+                | "citation/literal"
+                | "citation/composed"
+                | "citation/retired"
+                | "citation/restored"
+                | "citation/encoded"
         ) {
             let (status, stdout, stderr, log) = native_evidence::raw_evidence(&result.name);
             let stdout = stdout.replace("@SCRATCH@", evidence.scratch.to_str().unwrap());
@@ -320,6 +326,16 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
         expected.push(format!("overfull/{index}/refusal"));
         expected.push(format!("overfull/{index}/restored"));
     }
+    expected.extend(
+        [
+            "citation/literal",
+            "citation/composed",
+            "citation/retired",
+            "citation/restored",
+            "citation/encoded",
+        ]
+        .map(str::to_owned),
+    );
     let mut cold = vec![
         "cold/faces/accepted".into(),
         "cold/unknown/refusal".into(),

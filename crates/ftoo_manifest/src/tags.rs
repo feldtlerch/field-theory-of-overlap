@@ -1,9 +1,53 @@
-use std::{error::Error, fmt};
+use std::{collections::BTreeMap, error::Error, fmt};
 
 use crate::tag_history::seed_history;
 use crate::tag_validation::construct;
 use crate::{AddressingErrors, HistoryEvent, NodeId, RetirementCause, ValidatedManifest};
 
+/// Semantic domains share one exact handle namespace.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum AddressTarget {
+    Theory(NodeId),
+    Documentary(String),
+}
+impl AddressTarget {
+    #[must_use]
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Theory(id) => id.semantic_name(),
+            Self::Documentary(label) => label,
+        }
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)] // Keep complete source provenance in the public descriptor.
+pub enum CommonOrigin {
+    Theory(TagId),
+    Documentary {
+        admitted_at: crate::UnitSite,
+        mint: crate::MintOrigin,
+    },
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommonDescriptor {
+    handle: String,
+    target: AddressTarget,
+    origin: CommonOrigin,
+}
+impl CommonDescriptor {
+    #[must_use]
+    pub fn handle(&self) -> &str {
+        &self.handle
+    }
+    #[must_use]
+    pub fn target(&self) -> &AddressTarget {
+        &self.target
+    }
+    #[must_use]
+    pub fn origin(&self) -> &CommonOrigin {
+        &self.origin
+    }
+}
 /// Permanent opaque handles. Their prefixes carry no type information.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TagId {
@@ -160,6 +204,10 @@ impl OutOfSliceEntry {
 /// ```
 #[derive(Debug)]
 pub struct AddressBook<'a> {
+    pub(crate) documentary: Vec<crate::DocumentaryBinding>,
+    pub(crate) documentary_history: Vec<crate::DocumentaryEventDraft>,
+    pub(crate) joint_mints: Option<BTreeMap<String, crate::MintOrigin>>,
+    pub(crate) common: BTreeMap<String, CommonDescriptor>,
     pub(super) graph: &'a ValidatedManifest,
     pub(super) descriptors: Vec<TagDescriptor>,
     pub(super) history: Vec<HistoryEvent>,
@@ -177,21 +225,53 @@ impl AddressBook<'_> {
     /// Select the sole live reader name for an exact semantic object.
     /// # Errors
     /// Retains every candidate and its exact resolution when no unique name exists.
-    pub fn reader_identity(&self, target: NodeId) -> Result<String, ReaderIdentityFault> {
-        let mut descriptors: Vec<_> = self
-            .descriptors()
-            .iter()
-            .filter(|descriptor| descriptor.target() == target)
-            .collect();
-        descriptors.sort_by_key(|descriptor| descriptor.spelling());
-        let candidates = descriptors
-            .into_iter()
-            .map(|descriptor| ReaderTagCandidate {
-                handle: descriptor.spelling().into(),
-                outcome: self.resolve(descriptor.spelling()),
+    pub fn reader_identity(
+        &self,
+        target: impl Into<AddressTarget>,
+    ) -> Result<String, ReaderIdentityFault> {
+        let target = target.into();
+        let candidates = self
+            .common
+            .values()
+            .filter(|d| d.target == target)
+            .map(|d| ReaderTagCandidate {
+                handle: d.handle.clone(),
+                outcome: self.resolve(&d.handle),
             })
             .collect();
         select_reader_identity(target, candidates)
+    }
+    pub fn common_descriptors(&self) -> impl Iterator<Item = &CommonDescriptor> {
+        self.common.values()
+    }
+    pub(crate) fn reindex(&mut self) {
+        self.common = self
+            .descriptors
+            .iter()
+            .map(|d| {
+                (
+                    d.spelling.into(),
+                    CommonDescriptor {
+                        handle: d.spelling.into(),
+                        target: AddressTarget::Theory(d.target),
+                        origin: CommonOrigin::Theory(d.tag),
+                    },
+                )
+            })
+            .chain(self.documentary.iter().map(|d| {
+                (
+                    d.handle.clone(),
+                    CommonDescriptor {
+                        handle: d.handle.clone(),
+                        target: AddressTarget::Documentary(d.label.clone()),
+                        origin: CommonOrigin::Documentary {
+                            admitted_at: d.admitted_at.clone(),
+                            mint: d.origin.clone(),
+                        },
+                    },
+                )
+            }))
+            .collect();
     }
     #[must_use]
     pub const fn graph(&self) -> &ValidatedManifest {
@@ -216,14 +296,37 @@ impl AddressBook<'_> {
     /// # Panics
     /// Panics only if the checked partition is internally corrupted, which
     /// callers cannot arrange through this immutable API.
-    pub fn resolve(&self, input: &str) -> Result<NodeId, TagResolutionFault> {
-        let Some(d) = self.descriptors.iter().find(|d| d.spelling == input) else {
+    #[allow(clippy::result_large_err)] // The exact refusal retains the complete retirement site.
+    pub fn resolve(&self, input: &str) -> Result<AddressTarget, TagResolutionFault> {
+        let Some(common) = self.common.get(input) else {
             return Err(TagResolutionFault::UnknownTag {
                 input: input.into(),
             });
         };
+        if let AddressTarget::Documentary(label) = &common.target {
+            let binding = self
+                .documentary
+                .iter()
+                .find(|d| d.handle == input)
+                .expect("checked common index");
+            return match &binding.state {
+                crate::DocumentaryState::Live => Ok(common.target.clone()),
+                crate::DocumentaryState::Retired(event) => {
+                    Err(TagResolutionFault::RetiredDocumentaryTag {
+                        input: input.into(),
+                        label: label.clone(),
+                        event: event.clone(),
+                    })
+                }
+            };
+        }
+        let d = self
+            .descriptors
+            .iter()
+            .find(|d| d.spelling == input)
+            .expect("checked theory index");
         if self.live.contains(&d.tag) {
-            return Ok(d.target);
+            return Ok(AddressTarget::Theory(d.target));
         }
         if let Some(entry) = self.retired.iter().find(|e| e.tag == d.tag) {
             return Err(TagResolutionFault::RetiredTag {
@@ -261,6 +364,11 @@ pub fn addressing(graph: &ValidatedManifest) -> Result<AddressBook<'_>, Addressi
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TagResolutionFault {
+    RetiredDocumentaryTag {
+        input: String,
+        label: String,
+        event: crate::DocumentaryRetirement,
+    },
     UnknownTag {
         input: String,
     },
@@ -280,6 +388,15 @@ pub enum TagResolutionFault {
 impl fmt::Display for TagResolutionFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::RetiredDocumentaryTag {
+                input,
+                label,
+                event,
+            } => write!(
+                f,
+                "tag {input:?}: retired; label {label}; event {}; authority {}; reason {:?}",
+                event.ordinal, event.authority_record, event.reason
+            ),
             Self::UnknownTag { input } => write!(f, "tag {input:?}: unknown"),
             Self::RetiredTag {
                 input,
@@ -315,7 +432,7 @@ impl Error for TagResolutionFault {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReaderTagCandidate {
     pub handle: String,
-    pub outcome: Result<NodeId, TagResolutionFault>,
+    pub outcome: Result<AddressTarget, TagResolutionFault>,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReaderIdentityReason {
@@ -325,7 +442,7 @@ pub enum ReaderIdentityReason {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReaderIdentityFault {
-    pub target: NodeId,
+    pub target: AddressTarget,
     pub reason: ReaderIdentityReason,
     pub candidates: Vec<ReaderTagCandidate>,
 }
@@ -336,12 +453,13 @@ impl fmt::Display for ReaderIdentityFault {
 }
 impl Error for ReaderIdentityFault {}
 pub(super) fn select_reader_identity(
-    target: NodeId,
+    target: impl Into<AddressTarget>,
     candidates: Vec<ReaderTagCandidate>,
 ) -> Result<String, ReaderIdentityFault> {
+    let target = target.into();
     let live: Vec<_> = candidates
         .iter()
-        .filter(|candidate| candidate.outcome == Ok(target))
+        .filter(|candidate| candidate.outcome.as_ref() == Ok(&target))
         .collect();
     if let [candidate] = live.as_slice() {
         return Ok(candidate.handle.clone());

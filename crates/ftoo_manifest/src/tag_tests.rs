@@ -36,7 +36,7 @@ fn reader_identity_selection_retains_complete_unavailable_evidence_and_restores(
         }),
     };
     let expected = ReaderIdentityFault {
-        target: Three,
+        target: AddressTarget::Theory(Three),
         reason: ReaderIdentityReason::NoLiveTag,
         candidates: vec![candidate.clone()],
     };
@@ -64,7 +64,7 @@ fn reader_identity_selection_retains_complete_unavailable_evidence_and_restores(
         (tombstone(), Three, C3, "c:3", O::TargetAbsent),
     ] {
         let expected = ReaderIdentityFault {
-            target: object,
+            target: AddressTarget::Theory(object),
             reason: ReaderIdentityReason::NoLiveTag,
             candidates: vec![ReaderTagCandidate {
                 handle: handle.into(),
@@ -87,7 +87,7 @@ fn reader_identity_selection_retains_complete_unavailable_evidence_and_restores(
     // These decision vectors are not claimed to be constructible closed books.
     let selected = ReaderTagCandidate {
         handle: "live".into(),
-        outcome: Ok(Three),
+        outcome: Ok(AddressTarget::Theory(Three)),
     };
     assert_eq!(
         crate::tags::select_reader_identity(Three, vec![candidate, selected.clone()]),
@@ -100,14 +100,14 @@ fn reader_identity_selection_retains_complete_unavailable_evidence_and_restores(
                 selected.clone(),
                 ReaderTagCandidate {
                     handle: "second".into(),
-                    outcome: Ok(Three),
+                    outcome: Ok(AddressTarget::Theory(Three)),
                 },
             ],
             ReaderIdentityReason::AmbiguousLiveTags,
         ),
     ] {
         let expected = ReaderIdentityFault {
-            target: Three,
+            target: AddressTarget::Theory(Three),
             reason,
             candidates: candidates.clone(),
         };
@@ -273,7 +273,10 @@ fn seed_descriptors_history_resolution_and_snapshot() -> TestResult {
             (tag, spelling, target)
         );
         let resolved = book.resolve(spelling)?;
-        assert_eq!(resolved, target);
+        assert_eq!(resolved, AddressTarget::Theory(target));
+        let AddressTarget::Theory(resolved) = resolved else {
+            unreachable!("theory fixture")
+        };
         assert_eq!(resolved.semantic_name(), name);
         assert_eq!(graph.node(resolved).unwrap().id, target);
         assert_eq!(
@@ -920,7 +923,7 @@ fn resolution_unknown_exact_inputs() -> TestResult {
             },
             message,
         );
-        assert_eq!(book.resolve("c:1")?, One);
+        assert_eq!(book.resolve("c:1")?, AddressTarget::Theory(One));
     }
     let owned = {
         let input = String::from("unregistered");
@@ -951,7 +954,7 @@ fn resolution_opaque_unicode_and_misleading_prefix() -> TestResult {
         ("e\u{301}", OneValue),
         ("λ→值", ThreeValue),
     ] {
-        assert_eq!(book.resolve(input)?, target);
+        assert_eq!(book.resolve(input)?, AddressTarget::Theory(target));
     }
     resolution(
         &book,
@@ -961,7 +964,7 @@ fn resolution_opaque_unicode_and_misleading_prefix() -> TestResult {
         },
         "tag \"v:quantity\": unknown",
     );
-    assert_eq!(book.resolve("v:quantity!?")?, One);
+    assert_eq!(book.resolve("v:quantity!?")?, AddressTarget::Theory(One));
     assert_eq!(book.live().collect::<Vec<_>>(), [V1, C1, C3, V3]);
     Ok(())
 }
@@ -1045,8 +1048,8 @@ fn partitions_claim_one_empty_absent_and_transitive_support() -> TestResult {
     );
     let restored = seed()?;
     let book = addressing(&restored)?;
-    assert_eq!(book.resolve("c:3")?, Three);
-    assert_eq!(book.resolve("v:3")?, ThreeValue);
+    assert_eq!(book.resolve("c:3")?, AddressTarget::Theory(Three));
+    assert_eq!(book.resolve("v:3")?, AddressTarget::Theory(ThreeValue));
     Ok(())
 }
 
@@ -1201,7 +1204,10 @@ fn awaiting_claim_keeps_its_audit_blocker_outside_addressing_slice() -> TestResu
         assert_eq!(NodeId::ALL.map(|id| graph.status(id)), statuses);
     }
     let graph = seed()?;
-    assert_eq!(addressing(&graph)?.resolve("v:1")?, OneValue);
+    assert_eq!(
+        addressing(&graph)?.resolve("v:1")?,
+        AddressTarget::Theory(OneValue)
+    );
     Ok(())
 }
 
@@ -1280,7 +1286,7 @@ fn m4_register_statements_scopes_and_consumer_inventory() {
         (
             RuleId::M031,
             "Tag spellings are nonempty, contain no whitespace or control character, and are unique by exact UTF-8 bytes.",
-            "CatalogAdmission over all descriptors including retired handles.",
+            "CatalogAdmission over theory and documentary descriptors, including retired handles in both domains.",
             RuleState::Enforced,
         ),
         (
@@ -1309,8 +1315,8 @@ fn m4_register_statements_scopes_and_consumer_inventory() {
         ),
         (
             RuleId::M036,
-            "Every permanent identity has a tag, and resolution returns its bound NodeId only for a live exact handle, otherwise its exact named refusal.",
-            "Completed catalog coverage and the resolution consumer.",
+            "Every permanent theory identity has a tag, and the theory branch of resolution returns its bound NodeId in a Theory result only for a live exact handle, otherwise its exact named refusal.",
+            "Completed theory catalog coverage and the theory branch of the common resolution consumer.",
             RuleState::Enforced,
         ),
     ];

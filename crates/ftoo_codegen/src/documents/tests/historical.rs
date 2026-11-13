@@ -19,9 +19,16 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     };
     let statements = input::sources(&root, &input::discover(&root, "units/statements", false)?)?;
     let corpus = crate::load_unit_sources(declaration, statements.clone()).unwrap();
-    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book).unwrap();
     let markdown = crate::load_markdown_files(&root).unwrap();
-    let integrated = ftoo_manifest::integrate_labels(&resolved, &markdown).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let book = book
+        .with_documentary(
+            &joint,
+            registry::load(&registry::read(&root).unwrap()).unwrap(),
+        )
+        .unwrap();
+    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book).unwrap();
+    let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint).unwrap();
     let welded = ftoo_manifest::weld_units(&integrated).unwrap();
     let sources = input::sources(&root, &input::discover(&root, "units/skeletons", false)?)?;
     let displays = input::sources(&root, &input::discover(&root, "units/displays", true)?)?;
@@ -36,6 +43,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     let directory = Directory::new();
     let path = directory.0.join("historical.tex");
     crate::notation::with_preparation(&catalogue, |notation| -> Result<(), DocumentError> {
+        plan::citation_tests::support_required_literal_build_controls(notation);
         super::pending::support_required_pending_paragraphs_are_complete_label_neutral_and_independently_consumed(&book, notation)?;
         let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
         let plan = plans
@@ -72,10 +80,13 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
 
         let modern = latex::render(plan);
         // Retain historical body bytes, including the two endangered spaces.
-        // Only the later envelope, citation-break and pending-paragraph contracts
+        // Only the later envelope, live-citation and pending-paragraph contracts
         // are supplied, so their independent refusals cannot mask the spacing.
         let body = &old[old.find("% unit ").unwrap()..];
-        let body = body.replace(r"\texttt{dec:weld:equal-address-sets}", r"\texttt{dec:\allowbreak{}weld:\allowbreak{}equal-\allowbreak{}address-\allowbreak{}sets}");
+        let body = body.replace(
+            r"\texttt{dec:weld:equal-address-sets}",
+            r"\FtdocTag{dec:weld}{u2-c0}",
+        );
         let body = body.replace("\n\n% unit sec:coefficients:value-table", "\n\nPending notation: \\({c}_{1}\\): retained formulation \\FtdocTag{c:1}{u0-p0-r0}% label def:langevin:coefficient-one\n.\n\n% unit sec:coefficients:value-table");
         let candidate = format!("{}{body}", &modern[..modern.find("% unit ").unwrap()]);
         let changed = [

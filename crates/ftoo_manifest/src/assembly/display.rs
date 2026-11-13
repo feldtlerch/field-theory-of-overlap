@@ -1041,7 +1041,7 @@ fn resolve_bodies(
                 for tag in region.tags() {
                     let site = region.site(tag.site());
                     match welded.integrated().resolved().book().resolve(tag.input()) {
-                        Ok(id) => tags
+                        Ok(crate::AddressTarget::Theory(id)) => tags
                             .entry(tag.input().into())
                             .or_insert_with(|| BodyAddressMember {
                                 value: tag.input().into(),
@@ -1050,6 +1050,18 @@ fn resolve_bodies(
                             })
                             .sites
                             .push(site),
+                        Ok(crate::AddressTarget::Documentary(label)) => errors.push(diagnostic(
+                            Some(unit),
+                            draft,
+                            Some(*target),
+                            Some(language),
+                            AssemblyStage::DisplayResolution,
+                            site,
+                            AssemblyInputFault::DocumentaryTagTarget {
+                                input: tag.input().into(),
+                                label,
+                            },
+                        )),
                         Err(cause) => errors.push(diagnostic(
                             Some(unit),
                             draft,

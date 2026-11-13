@@ -1,6 +1,91 @@
 use super::*;
 use ftoo_manifest::{NodeId, ReaderIdentityPosition};
 
+#[test]
+fn reader_diagnostics_sort_families_before_owners_and_indices() {
+    use ftoo_manifest::{AddressTarget, DefinitionId, ReaderIdentityReason};
+    use std::fmt::Write;
+    let diagnostic = |position, unit: Option<&str>| AssemblyDiagnostic {
+        rule: RuleId::M055,
+        stage: AssemblyStage::Emission,
+        document: Some("main".into()),
+        unit: unit.map(String::from),
+        language: Some("en".into()),
+        target: None,
+        site: AssemblySite::ReaderIdentity {
+            position,
+            origins: vec![],
+        },
+        fault: AssemblyFault::ReaderIdentity {
+            target: AddressTarget::Theory(NodeId::LangevinCoefficientOne),
+            reason: ReaderIdentityReason::MissingTag,
+            candidates: vec![],
+        },
+    };
+    let coverage = diagnostic(
+        ReaderIdentityPosition::Coverage {
+            index: 0,
+            object: NodeId::LangevinCoefficientOne,
+        },
+        None,
+    );
+    let pending = diagnostic(
+        ReaderIdentityPosition::Pending {
+            unit: "sec:z:pending".into(),
+            definition: DefinitionId::FirstCoefficient,
+            reason: 0,
+        },
+        Some("sec:z:pending"),
+    );
+    let first = diagnostic(
+        ReaderIdentityPosition::Citation {
+            unit: "sec:a:citation".into(),
+            span: 0,
+            target: None,
+        },
+        Some("sec:a:citation"),
+    );
+    let second = diagnostic(
+        ReaderIdentityPosition::Citation {
+            unit: "sec:a:citation".into(),
+            span: 1,
+            target: None,
+        },
+        Some("sec:a:citation"),
+    );
+    let mut no_live = first.clone();
+    if let AssemblyFault::ReaderIdentity { reason, .. } = &mut no_live.fault {
+        *reason = ReaderIdentityReason::NoLiveTag;
+    }
+    let mut documentary = first.clone();
+    if let AssemblyFault::ReaderIdentity { target, .. } = &mut documentary.fault {
+        *target = AddressTarget::Documentary("dec:fixture:source".into());
+    }
+    let expected = vec![
+        coverage.clone(),
+        pending.clone(),
+        first.clone(),
+        no_live.clone(),
+        documentary.clone(),
+        second.clone(),
+    ];
+    let actual = AssemblyErrors::from_diagnostics(vec![
+        second,
+        documentary,
+        no_live,
+        first,
+        pending,
+        coverage,
+    ])
+    .unwrap();
+    assert_eq!(actual.diagnostics(), expected);
+    let mut display = String::new();
+    for diagnostic in expected {
+        writeln!(display, "{diagnostic}").unwrap();
+    }
+    assert_eq!(actual.to_string(), display);
+}
+
 fn plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {
     DocumentPlan {
         document: "fixture".into(),
@@ -362,7 +447,9 @@ fn reader_fault_mapping_retains_context_candidates_and_projection_origin() {
                     origins: origins.clone(),
                 },
                 fault: AssemblyFault::ReaderIdentity {
-                    target: NodeId::LangevinCoefficientOneValue,
+                    target: ftoo_manifest::AddressTarget::Theory(
+                        NodeId::LangevinCoefficientOneValue,
+                    ),
                     reason,
                     candidates: candidates.clone(),
                 },
@@ -371,7 +458,7 @@ fn reader_fault_mapping_retains_context_candidates_and_projection_origin() {
         );
         let actual = reader_failure(
             ftoo_manifest::ReaderIdentityFault {
-                target: NodeId::LangevinCoefficientOneValue,
+                target: ftoo_manifest::AddressTarget::Theory(NodeId::LangevinCoefficientOneValue),
                 reason,
                 candidates,
             },
@@ -813,7 +900,7 @@ fn reader_pending_collects_unavailable_objects_with_real_mixed_origins() {
                         origins: origins.clone(),
                     },
                     fault: AssemblyFault::ReaderIdentity {
-                        target: object,
+                        target: ftoo_manifest::AddressTarget::Theory(object),
                         reason: ReaderIdentityReason::NoLiveTag,
                         candidates: vec![ReaderTagCandidate {
                             handle: handle.into(),

@@ -733,7 +733,7 @@ fn display_ownership_and_language_faults_restore_complete_bodies() {
     });
 }
 #[test]
-fn display_register_appends_two_literal_enforced_statements() {
+fn display_and_documentary_register_statements_are_exact() {
     assert_eq!(
         RULES[57..]
             .iter()
@@ -751,6 +751,13 @@ fn display_register_appends_two_literal_enforced_statements() {
                 RuleId::M059,
                 "Within each display, addressed tag sets and cited label sets are separately equal across all target and language bodies, retaining every occurrence independently of order and multiplicity.",
                 "All display bodies after complete body reference resolution.",
+                RuleState::Enforced,
+                None
+            ),
+            (
+                RuleId::M060,
+                "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle.",
+                "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
                 RuleState::Enforced,
                 None
             ),
@@ -1367,6 +1374,95 @@ fn display_address_families_keep_both_complete_sides_and_all_repetitions() {
 }
 
 #[test]
+fn display_citation_to_tag_swap_retains_distinct_address_families() {
+    with_context(|skeletons, welded| {
+        let label = "def:langevin:coefficient-one";
+        let original = companion(
+            &format!("> `{label}`"),
+            &format!("\\begin{{picture}}(1,1)\\put(0,0){{`{label}`}}\\end{{picture}}"),
+        );
+        let baseline = check_displays(std::slice::from_ref(&original), skeletons, welded).unwrap();
+        let changed = companion(
+            &format!("> `{label}`"),
+            r"\begin{picture}(1,1)\put(0,0){@tag{c:1}}\end{picture}",
+        );
+        let side = |target, members| BodyAddressSide {
+            target,
+            language: "en".into(),
+            site: site(),
+            members,
+        };
+        let expected = [
+            (
+                AddressFamily::Tags,
+                side(DocumentTarget::Markdown, vec![]),
+                side(
+                    DocumentTarget::Latex,
+                    vec![BodyAddressMember {
+                        value: "c:1".into(),
+                        target: Some(NodeId::LangevinCoefficientOne),
+                        sites: vec![body_site(0, 30..39, Some(0))],
+                    }],
+                ),
+                vec![],
+                vec!["c:1".into()],
+            ),
+            (
+                AddressFamily::Citations,
+                side(
+                    DocumentTarget::Markdown,
+                    vec![BodyAddressMember {
+                        value: label.into(),
+                        target: None,
+                        sites: vec![body_site(0, 2..4 + label.len(), None)],
+                    }],
+                ),
+                side(DocumentTarget::Latex, vec![]),
+                vec![label.into()],
+                vec![],
+            ),
+        ]
+        .into_iter()
+        .map(
+            |(family, reference, actual, missing, unexpected)| AssemblyInputDiagnostic {
+                rule: RuleId::M059,
+                stage: AssemblyStage::DisplayEquality,
+                document: Some("main".into()),
+                unit: Some("sec:fixture:caption".into()),
+                language: Some("en".into()),
+                target: Some(DocumentTarget::Latex),
+                site: AssemblySite::Source(site()),
+                fault: AssemblyInputFault::DisplaySetMismatch {
+                    family,
+                    reference,
+                    actual,
+                    missing,
+                    unexpected,
+                },
+            },
+        )
+        .collect::<Vec<_>>();
+        let actual = check_displays(&[changed], skeletons, welded).unwrap_err();
+        assert_eq!(actual, expected);
+        for error in &actual {
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "M059 DisplayEquality document=Some(\"main\") unit=Some(\"sec:fixture:caption\") language=Some(\"en\") target=Some(Latex) at {}: {}",
+                    error.site, error.fault
+                )
+            );
+        }
+        assert_eq!(
+            check_displays(&[original], skeletons, welded)
+                .unwrap()
+                .bodies(),
+            baseline.bodies()
+        );
+    });
+}
+
+#[test]
 fn display_three_languages_resolve_each_site_and_use_the_smallest_reference_language() {
     let at = site();
     let located = |value: &str| LocatedString {
@@ -1708,4 +1804,115 @@ fn display_cross_unit_body_swaps_cannot_cancel_each_owners_mismatch() {
             .bodies(),
         baseline.bodies()
     );
+}
+
+fn with_documentary(
+    events: Vec<DocumentaryEventDraft>,
+    check: impl FnOnce(&CheckedSkeletons<'_>, &WeldedUnits<'_, '_, '_, '_, '_, '_>),
+) {
+    let corpus = corpus();
+    let markdown=check_markdown_sources(vec![MarkdownSource {file:"records.md".into(),bytes:"· `proposal:manifest:kernel-bite`\n· `proposal:manifest:addressing-lifecycle-bite`\n· `dec:fixture:source`\n· `rec:test:retirement`\n".as_bytes().to_vec()}]).unwrap();
+    let mints = collect_joint_mints(&corpus, &markdown).unwrap();
+    let graph = seed().unwrap();
+    let book = addressing(&graph)
+        .unwrap()
+        .with_documentary(&mints, events)
+        .unwrap();
+    let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+    let integrated = integrate_joint_labels(&resolved, &mints).unwrap();
+    let welded = weld_units(&integrated).unwrap();
+    let draft = SkeletonDraft {
+        document: source("main"),
+        sections_site: site(),
+        sections: vec![SkeletonSection {
+            heading: source("sec:fixture:heading"),
+            children: vec![SkeletonChild::Unit(source("sec:fixture:caption"))],
+        }],
+    };
+    let metadata = corpus
+        .units()
+        .iter()
+        .map(|u| (u.label().as_str().into(), site()))
+        .collect();
+    let skeletons = check_skeletons(
+        &corpus,
+        &[draft],
+        &metadata,
+        &metadata,
+        &BTreeMap::from([("main".into(), site())]),
+    )
+    .unwrap();
+    check(&skeletons, &welded);
+}
+
+#[test]
+fn documentary_display_tags_refuse_live_domain_and_retirement() {
+    let admit = DocumentaryEventDraft {
+        site: site(),
+        ordinal: source("1"),
+        handle: source("record"),
+        label: Some(source("dec:fixture:source")),
+        authority_record: source("dec:fixture:source"),
+        reason: source("Fixture admission."),
+    };
+    let retire = DocumentaryEventDraft {
+        site: site(),
+        ordinal: source("2"),
+        label: None,
+        reason: source("Fixture retirement."),
+        ..admit.clone()
+    };
+    for retired in [false, true] {
+        let events = if retired {
+            vec![admit.clone(), retire.clone()]
+        } else {
+            vec![admit.clone()]
+        };
+        with_documentary(events, |skeletons, welded| {
+            let original = companion("> A", r"\begin{picture}(1,1)\put(0,0){A}\end{picture}");
+            let baseline =
+                check_displays(std::slice::from_ref(&original), skeletons, welded).unwrap();
+            for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
+                let mut bad = original.clone();
+                let body = bad
+                    .bodies
+                    .get_mut(&target)
+                    .unwrap()
+                    .languages
+                    .get_mut("en")
+                    .unwrap();
+                let start = body.value.find('A').unwrap();
+                body.value = body.value.replacen('A', "@tag{record}", 1);
+                let fault = if retired {
+                    AssemblyInputFault::DisplayTag {
+                        cause: TagResolutionFault::RetiredDocumentaryTag {
+                            input: "record".into(),
+                            label: "dec:fixture:source".into(),
+                            event: DocumentaryRetirement {
+                                ordinal: 2,
+                                authority_record: "dec:fixture:source".into(),
+                                reason: "Fixture retirement.".into(),
+                                site: site(),
+                            },
+                        },
+                    }
+                } else {
+                    AssemblyInputFault::DocumentaryTagTarget {
+                        input: "record".into(),
+                        label: "dec:fixture:source".into(),
+                    }
+                };
+                let expected = diagnostic(target, body_site(0, start..start + 12, Some(0)), fault);
+                let actual = check_displays(&[bad], skeletons, welded).unwrap_err();
+                assert_eq!(actual, vec![expected.clone()]);
+                assert_eq!(actual[0].to_string(), expected.to_string());
+                assert_eq!(
+                    check_displays(std::slice::from_ref(&original), skeletons, welded)
+                        .unwrap()
+                        .bodies(),
+                    baseline.bodies()
+                );
+            }
+        });
+    }
 }

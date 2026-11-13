@@ -8,6 +8,9 @@ use ftoo_manifest::{
 };
 use std::collections::BTreeMap;
 #[cfg(test)]
+#[path = "tests/citations.rs"]
+pub(super) mod citation_tests;
+#[cfg(test)]
 #[path = "tests/reader.rs"]
 mod reader_tests;
 
@@ -29,6 +32,7 @@ pub(super) enum Inline {
         site: UnitSite,
     },
     Citation {
+        identity: super::CitationIdentity,
         text: String,
         site: UnitSite,
     },
@@ -47,7 +51,11 @@ enum Recovered {
         token: Option<String>,
     },
     Math(String),
-    Citation(String),
+    Citation {
+        handle: String,
+        label: String,
+        token: Option<String>,
+    },
     Mention(String),
 }
 
@@ -85,7 +93,11 @@ fn flush_text(output: &mut Vec<Recovered>, text: &mut String) {
 }
 fn inline_handle(run: &Inline) -> Option<&str> {
     match run {
-        Inline::Tag { handle, .. } => Some(handle),
+        Inline::Tag { handle, .. }
+        | Inline::Citation {
+            identity: super::CitationIdentity { handle, .. },
+            ..
+        } => Some(handle),
         _ => None,
     }
 }
@@ -99,7 +111,10 @@ fn recover_markdown<'a>(
     let mut at = 0;
     while at < body.len() {
         let tail = &body[at..];
-        if let Some(tail) = tail.strip_prefix("<!-- label ") {
+        if tail.starts_with("<!-- label ") || tail.starts_with("<!-- cite ") {
+            let citation = tail.starts_with("<!-- cite ");
+            let comment_prefix = if citation { 10 } else { 11 };
+            let tail = &tail[comment_prefix..];
             let end = tail.find(" -->")?;
             let label = &tail[..end];
             let handle = handles
@@ -110,27 +125,26 @@ fn recover_markdown<'a>(
             let prefix = text.strip_suffix(handle)?.to_owned();
             text = prefix;
             flush_text(&mut output, &mut text);
-            output.push(Recovered::Tag {
-                handle: handle.into(),
-                label: label.into(),
-                token: None,
+            output.push(if citation {
+                Recovered::Citation {
+                    handle: handle.into(),
+                    label: label.into(),
+                    token: None,
+                }
+            } else {
+                Recovered::Tag {
+                    handle: handle.into(),
+                    label: label.into(),
+                    token: None,
+                }
             });
-            at += 11 + end + 4;
+            at += comment_prefix + end + 4;
         } else if let Some(tail) = tail.strip_prefix("<code>") {
             flush_text(&mut output, &mut text);
             let end = tail.find("</code>")?;
             let value = decode_code(&tail[..end])?;
             at += 6 + end + 7;
-            if let Some(tail) = body[at..].strip_prefix("<!-- cite ") {
-                let end = tail.find(" -->")?;
-                if tail[..end] != value {
-                    return None;
-                }
-                at += 10 + end + 4;
-                output.push(Recovered::Citation(value));
-            } else {
-                output.push(Recovered::Mention(value));
-            }
+            output.push(Recovered::Mention(value));
         } else if let Some(tail) = tail.strip_prefix('$') {
             flush_text(&mut output, &mut text);
             let end = tail.find('$')?;
@@ -150,7 +164,10 @@ fn recover_markdown<'a>(
         }
     }
     flush_text(&mut output, &mut text);
-    Some(output)
+    (!output.iter().any(literal_recovered)).then_some(output)
+}
+fn literal_recovered(run: &Recovered) -> bool {
+    matches!(run,Recovered::Text(text)|Recovered::Mention(text) if !ftoo_manifest::reader_label_literals(text).is_empty())
 }
 fn tex_literal(tail: &str) -> Option<(char, usize)> {
     for (spelling, c) in [
@@ -317,18 +334,32 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
         let tail = &body[at..];
         if let Some(tail) = tail.strip_prefix(r"\FtdocTag{") {
             flush_text(&mut output, &mut text);
-            let end = tail.find('}')?;
-            let handle = &tail[..end];
-            let rest = tail[end + 1..].strip_prefix('{')?;
+            let (handle, end) = recover_handle(tail)?;
+            let rest = tail[end..].strip_prefix('{')?;
             let token_end = rest.find('}')?;
-            let comment = rest[token_end + 1..].strip_prefix("% label ")?;
+            let after = &rest[token_end + 1..];
+            let (citation, comment, prefix) = if let Some(comment) = after.strip_prefix("% cite ") {
+                (true, comment, 7)
+            } else {
+                (false, after.strip_prefix("% label ")?, 8)
+            };
             let comment_end = comment.find('\n')?;
-            output.push(Recovered::Tag {
-                handle: handle.into(),
-                label: comment[..comment_end].into(),
-                token: Some(rest[..token_end].into()),
+            let label = comment[..comment_end].into();
+            let token = Some(rest[..token_end].into());
+            output.push(if citation {
+                Recovered::Citation {
+                    handle,
+                    label,
+                    token,
+                }
+            } else {
+                Recovered::Tag {
+                    handle,
+                    label,
+                    token,
+                }
             });
-            at += 10 + end + 1 + 1 + token_end + 1 + 8 + comment_end + 1;
+            at += 10 + end + 1 + token_end + 1 + prefix + comment_end + 1;
             line = TexLine::NewLine;
         } else if let Some(tail) = tail.strip_prefix(r"\(") {
             flush_text(&mut output, &mut text);
@@ -355,22 +386,11 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
             }
             at += 8 + end + 1;
             let encoded = &tail[..end];
-            if let Some(tail) = body[at..].strip_prefix("% cite ") {
-                let value = recover_identity(encoded)?;
-                let end = tail.find('\n')?;
-                if tail[..end] != value {
-                    return None;
-                }
-                at += 7 + end + 1;
-                output.push(Recovered::Citation(value));
-                line = TexLine::NewLine;
-            } else {
-                if encoded.contains(r"\allowbreak{}") {
-                    return None;
-                }
-                output.push(Recovered::Mention(value));
-                line = TexLine::MidLine;
+            if encoded.contains(r"\allowbreak{}") {
+                return None;
             }
+            output.push(Recovered::Mention(value));
+            line = TexLine::MidLine;
         } else if tail.starts_with('\\') {
             let (c, n) = tex_literal(tail)?;
             text.push(c);
@@ -401,7 +421,7 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
         }
     }
     flush_text(&mut output, &mut text);
-    Some(output)
+    (!output.iter().any(literal_recovered)).then_some(output)
 }
 fn expected_runs(block: &Block, target: DocumentTarget) -> Vec<Recovered> {
     block
@@ -431,7 +451,11 @@ fn expected_runs(block: &Block, target: DocumentTarget) -> Vec<Recovered> {
                     }
                     .clone(),
                 ),
-                Inline::Citation { text, .. } => Recovered::Citation(text.clone()),
+                Inline::Citation { text, identity, .. } => Recovered::Citation {
+                    handle: identity.handle.clone(),
+                    label: text.clone(),
+                    token: (target == DocumentTarget::Latex).then(|| identity.token.clone()),
+                },
                 Inline::Mention { text, .. } => Recovered::Mention(text.clone()),
             })
         })
@@ -1103,7 +1127,15 @@ impl DocumentPlan {
                     Inline::Text(_) => continue,
                     Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                     Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
-                    Inline::Citation { text, site } => (EmissionKind::Citation, text, site),
+                    Inline::Citation {
+                        text,
+                        site,
+                        identity,
+                    } => (
+                        EmissionKind::Citation(Box::new(identity.clone())),
+                        text,
+                        site,
+                    ),
                     Inline::Mention { text, site } => (EmissionKind::Mention, text, site),
                 };
                 records.push(EmissionRecord {
@@ -1144,7 +1176,9 @@ impl DocumentPlan {
         self.records(target)
             .into_iter()
             .flat_map(|record| {
-                if let EmissionKind::PendingExplanation(entry) = record.kind {
+                if let EmissionKind::Citation(identity) = &record.kind {
+                    citation_origins(identity, &record.site, &record.unit, &record.language)
+                } else if let EmissionKind::PendingExplanation(entry) = record.kind {
                     entry
                         .occurrences
                         .into_iter()
@@ -1221,6 +1255,7 @@ pub(super) fn build(
                     .enumerate()
                     .find(|(_, u)| u.label().as_str() == position.unit())
                     .expect("checked skeleton unit");
+                check_reader_literals(unit, language, displays, &mut errors);
                 let runs = runs(index, unit, language, welded, &equations);
                 let bodies = display_plans(index, unit, language, welded, &equations, displays);
                 let mut block = Block {
@@ -1231,6 +1266,9 @@ pub(super) fn build(
                     site: metadata[position.unit()].clone(),
                     runs,
                 };
+                if let Err(error) = block.map_citations(book, document, language) {
+                    collect_reader_error(&mut errors, error);
+                }
                 if let Err(error) = block.map_pending(book, index, document, language) {
                     collect_reader_error(&mut errors, error);
                 }
@@ -1397,7 +1435,7 @@ fn runs(
             range,
             Inline::Tag {
                 handle: occurrence.input().into(),
-                label: target.semantic_name().into(),
+                label: target.label().into(),
                 token: format!(
                     "u{index}-t{}",
                     occurrence.site().occurrence.expect("insertion index")
@@ -1426,6 +1464,7 @@ fn runs(
         ));
     }
     spans(
+        index,
         unit.label().as_str(),
         language,
         text,
@@ -1451,6 +1490,7 @@ fn runs(
     runs
 }
 fn spans(
+    index: usize,
     unit: &str,
     language: &str,
     text: &ftoo_manifest::CheckedText,
@@ -1466,7 +1506,10 @@ fn spans(
         .iter()
         .find(|l| l.language() == language)
         .expect("same language");
-    for (value, site, citation) in ftoo_manifest::assembly_text_spans(text) {
+    for (span, (value, site, citation)) in ftoo_manifest::assembly_text_spans(text)
+        .into_iter()
+        .enumerate()
+    {
         assert!(if citation {
             welded_language
                 .citations()
@@ -1478,7 +1521,15 @@ fn spans(
         replacements.push((
             site.decoded.clone().expect("span range"),
             if citation {
-                Inline::Citation { text: value, site }
+                citation_run(
+                    value,
+                    site,
+                    format!("u{index}-c{span}"),
+                    unit,
+                    span,
+                    None,
+                    welded,
+                )
             } else {
                 Inline::Mention { text: value, site }
             },
@@ -1580,6 +1631,32 @@ fn recovered_tag_site(
         .copied()
         .cloned()
 }
+fn recovered_citation_site(
+    block: &Block,
+    run: &Recovered,
+    records: &[EmissionRecord],
+) -> Option<UnitSite> {
+    if matches!(run, Recovered::Citation { .. }) {
+        let sites = block
+            .runs
+            .iter()
+            .filter_map(|run| {
+                if let Inline::Citation { site, .. } = run {
+                    Some(site)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        let used = records
+            .iter()
+            .filter(|r| matches!(r.kind, EmissionKind::Citation(_)))
+            .count();
+        sites.get(used).or_else(|| sites.last()).copied().cloned()
+    } else {
+        None
+    }
+}
 fn recovered_records(
     block: &Block,
     recovered: &[Recovered],
@@ -1635,9 +1712,18 @@ fn recovered_records(
                 write!(body, "@math{{{key}}}").expect("string write");
                 (EmissionKind::Math, key)
             }
-            Recovered::Citation(text) => {
-                write!(body, "`{text}`").expect("string write");
-                (EmissionKind::Citation, text.clone())
+            Recovered::Citation {
+                handle,
+                label,
+                token,
+            } => {
+                write!(body, "`{label}`").expect("string write");
+                let index = records
+                    .iter()
+                    .filter(|record| matches!(record.kind, EmissionKind::Citation(_)))
+                    .count();
+                let identity = recovered_citation(block, index, handle, label, token.as_deref());
+                (EmissionKind::Citation(Box::new(identity)), label.clone())
             }
             Recovered::Mention(text) => {
                 write!(body, "``{text}``").expect("string write");
@@ -1653,14 +1739,17 @@ fn recovered_records(
             .iter()
             .filter(|r| r.kind == kind && r.value == value)
             .count();
-        let site = recovered_tag_site(block, run, &records).unwrap_or_else(|| {
-            matching
-                .get(repeated)
-                .or_else(|| matching.last())
-                .copied()
-                .or_else(|| expected.iter().filter(|r| r.kind == kind).nth(index))
-                .map_or_else(|| block.site.clone(), |r| r.site.clone())
-        });
+        let citation_site = recovered_citation_site(block, run, &records);
+        let site = citation_site
+            .or_else(|| recovered_tag_site(block, run, &records))
+            .unwrap_or_else(|| {
+                matching
+                    .get(repeated)
+                    .or_else(|| matching.last())
+                    .copied()
+                    .or_else(|| expected.iter().filter(|r| r.kind == kind).nth(index))
+                    .map_or_else(|| block.site.clone(), |r| r.site.clone())
+            });
         records.push(EmissionRecord {
             kind,
             unit: block.unit.clone(),
@@ -1728,7 +1817,15 @@ fn region_records(
                 Inline::Text(_) => return None,
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
-                Inline::Citation { text, site } => (EmissionKind::Citation, text, site),
+                Inline::Citation {
+                    text,
+                    site,
+                    identity,
+                } => (
+                    EmissionKind::Citation(Box::new(identity.clone())),
+                    text,
+                    site,
+                ),
                 Inline::Mention { text, site } => (EmissionKind::Mention, text, site),
             };
             Some(EmissionRecord {
@@ -1743,6 +1840,7 @@ fn region_records(
         })
         .collect()
 }
+#[allow(clippy::too_many_lines)] // One source-ordered walk retains whole-body insertion and citation coordinates.
 pub(super) fn display_plans(
     index: usize,
     unit: &ftoo_manifest::CheckedUnit,
@@ -1760,6 +1858,7 @@ pub(super) fn display_plans(
             continue;
         }
         let mut regions = Vec::new();
+        let mut span = 0;
         for region in body.regions() {
             let text = &region.source().value;
             let mut replacements = Vec::new();
@@ -1781,7 +1880,7 @@ pub(super) fn display_plans(
                     occurrence.site().decoded.clone().expect("insertion"),
                     Inline::Tag {
                         handle: occurrence.input().into(),
-                        label: target_id.semantic_name().into(),
+                        label: target_id.label().into(),
                         token: format!("u{index}-d{target_name}-{language}-o{insertion}"),
                         site,
                     },
@@ -1807,11 +1906,27 @@ pub(super) fn display_plans(
                 replacements.push((
                     local.decoded.expect("span"),
                     if citation {
-                        Inline::Citation { text: value, site }
+                        citation_run(
+                            value,
+                            site,
+                            format!(
+                                "u{index}-d{}-{language}-c{span}",
+                                if *target == DocumentTarget::Markdown {
+                                    "markdown"
+                                } else {
+                                    "latex"
+                                }
+                            ),
+                            unit.label().as_str(),
+                            span,
+                            Some(*target),
+                            welded,
+                        )
                     } else {
                         Inline::Mention { text: value, site }
                     },
                 ));
+                span += 1;
             }
             replacements.sort_by_key(|(r, _)| r.start);
             let mut runs = Vec::new();
@@ -2195,6 +2310,364 @@ fn recover_pending(
     }
     record.value = full;
     vec![record]
+}
+
+fn citation_run(
+    text: String,
+    site: UnitSite,
+    token: String,
+    unit: &str,
+    span: usize,
+    target: Option<DocumentTarget>,
+    welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
+) -> Inline {
+    let mint = welded.integrated().mints()[&text].clone();
+    let resolved = match mint.kind {
+        ftoo_manifest::MintKind::RustIdentity => {
+            let ftoo_manifest::LabelSite::RustIdentity { identity, .. } = &mint.site else {
+                unreachable!("checked Rust mint retains its identity site")
+            };
+            ftoo_manifest::AddressTarget::Theory(*identity)
+        }
+        ftoo_manifest::MintKind::Markdown | ftoo_manifest::MintKind::UnitMetadata => {
+            ftoo_manifest::AddressTarget::Documentary(text.clone())
+        }
+    };
+    Inline::Citation {
+        identity: super::CitationIdentity {
+            label: text.clone(),
+            resolved: Some(resolved),
+            handle: String::new(),
+            token,
+            position: ftoo_manifest::ReaderIdentityPosition::Citation {
+                unit: unit.into(),
+                span,
+                target,
+            },
+            mint: Some(mint),
+        },
+        text,
+        site,
+    }
+}
+impl Block {
+    fn map_citations(
+        &mut self,
+        book: &ftoo_manifest::AddressBook<'_>,
+        document: &str,
+        language: &str,
+    ) -> Result<(), DocumentError> {
+        let mut errors = vec![];
+        let unit = self.unit.clone();
+        for run in self.runs.iter_mut().chain(
+            self.displays
+                .values_mut()
+                .flat_map(|body| body.regions.iter_mut())
+                .flat_map(|region| region.runs.iter_mut()),
+        ) {
+            if let Inline::Citation { identity, site, .. } = run {
+                let target = match &identity.position {
+                    ftoo_manifest::ReaderIdentityPosition::Citation { target, .. } => *target,
+                    _ => unreachable!("citation position"),
+                };
+                match book
+                    .reader_identity(identity.resolved.clone().expect("checked citation target"))
+                {
+                    Ok(handle) => identity.handle = handle,
+                    Err(fault) => collect_reader_error(
+                        &mut errors,
+                        reader_failure(
+                            fault,
+                            document,
+                            language,
+                            Some(&unit),
+                            target,
+                            identity.position.clone(),
+                            citation_origins(identity, site, &unit, language),
+                        ),
+                    ),
+                }
+            }
+        }
+        AssemblyErrors::from_diagnostics(errors)
+            .map_or(Ok(()), |errors| Err(DocumentError::Assembly(errors)))
+    }
+}
+
+fn recover_handle(tail: &str) -> Option<(String, usize)> {
+    if let Some(encoded) = tail.strip_prefix(r"\FtdocHandle{") {
+        let end = encoded.find('}')?;
+        let mut value = String::new();
+        for scalar in encoded[..end].split(',') {
+            let n = scalar.parse::<u32>().ok()?;
+            if n.to_string() != scalar {
+                return None;
+            }
+            value.push(char::from_u32(n)?);
+        }
+        if value.is_empty()
+            || value
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b":-/.".contains(&b))
+        {
+            return None;
+        }
+        let used = r"\FtdocHandle{".len() + end + 1;
+        tail[used..].strip_prefix('}')?;
+        Some((value, used + 1))
+    } else {
+        let end = tail.find('}')?;
+        let value = &tail[..end];
+        if value.is_empty()
+            || !value
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b":-/.".contains(&b))
+        {
+            return None;
+        }
+        Some((value.into(), end + 1))
+    }
+}
+fn recovered_citation(
+    block: &Block,
+    index: usize,
+    handle: &str,
+    label: &str,
+    token: Option<&str>,
+) -> super::CitationIdentity {
+    let candidates = block
+        .runs
+        .iter()
+        .filter_map(|run| {
+            if let Inline::Citation { identity, .. } = run {
+                Some(identity)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    let candidate = candidates.get(index).or_else(|| candidates.last()).copied();
+    let mut identity = candidate
+        .cloned()
+        .unwrap_or_else(|| super::CitationIdentity {
+            label: String::new(),
+            resolved: None,
+            handle: String::new(),
+            token: String::new(),
+            position: ftoo_manifest::ReaderIdentityPosition::Citation {
+                unit: block.unit.clone(),
+                span: index,
+                target: None,
+            },
+            mint: None,
+        });
+    if identity.label != label {
+        identity.resolved = None;
+        identity.mint = None;
+    }
+    identity.label = label.into();
+    identity.handle = handle.into();
+    if let Some(token) = token {
+        identity.token = token.into();
+    }
+    identity
+}
+pub(super) fn citation_origins(
+    identity: &super::CitationIdentity,
+    site: &UnitSite,
+    unit: &str,
+    language: &str,
+) -> Vec<SourceOrigin> {
+    let target = match &identity.position {
+        ftoo_manifest::ReaderIdentityPosition::Citation { target, .. } => *target,
+        _ => unreachable!("citation position"),
+    };
+    let mut origins = vec![SourceOrigin {
+        unit: Some(unit.into()),
+        language: Some(language.into()),
+        target,
+        site: site.clone(),
+    }];
+    if let Some(mint) = &identity.mint {
+        let (unit, site) = match &mint.site {
+            ftoo_manifest::LabelSite::Unit { unit, site } => (Some(unit.clone()), site.clone()),
+            ftoo_manifest::LabelSite::Markdown { file, bytes } => (
+                None,
+                UnitSite {
+                    file: file.clone(),
+                    path: vec![],
+                    anchor: ftoo_manifest::SourceAnchor::Bytes(bytes.start, bytes.end),
+                    decoded: None,
+                    occurrence: None,
+                },
+            ),
+            ftoo_manifest::LabelSite::RustIdentity { file, .. } => (
+                None,
+                UnitSite {
+                    file: file.clone(),
+                    path: vec![],
+                    anchor: ftoo_manifest::SourceAnchor::Unavailable,
+                    decoded: None,
+                    occurrence: None,
+                },
+            ),
+            ftoo_manifest::LabelSite::RustHistory { .. }
+            | ftoo_manifest::LabelSite::MintContext => unreachable!("checked mint origin"),
+        };
+        origins.push(SourceOrigin {
+            unit,
+            language: None,
+            target: None,
+            site,
+        });
+    }
+    origins
+}
+
+fn check_reader_literals(
+    unit: &ftoo_manifest::CheckedUnit,
+    language: &str,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
+    errors: &mut Vec<AssemblyDiagnostic>,
+) {
+    let text = &unit.texts()[language];
+    let spans = ftoo_manifest::assembly_text_spans(text);
+    let protected = text
+        .tag_occurrences()
+        .iter()
+        .map(ftoo_manifest::TagOccurrence::site)
+        .chain(
+            text.occurrences()
+                .iter()
+                .map(ftoo_manifest::MathOccurrence::site),
+        )
+        .filter_map(|site| site.decoded.clone())
+        .chain(
+            spans
+                .iter()
+                .filter(|(_, _, citation)| *citation)
+                .filter_map(|(_, site, _)| site.decoded.clone()),
+        )
+        .collect::<Vec<_>>();
+    literal_region(
+        unit,
+        language,
+        None,
+        text.text(),
+        text.site(),
+        &spans,
+        &protected,
+        0,
+        errors,
+    );
+    if let Some(bodies) = displays.bodies().get(unit.label().as_str()) {
+        for ((target, body_language), body) in bodies {
+            if body_language != language {
+                continue;
+            }
+            for region in body.regions() {
+                let spans = region.spans();
+                let protected = region
+                    .tags()
+                    .iter()
+                    .map(ftoo_manifest::TagOccurrence::site)
+                    .chain(
+                        region
+                            .math()
+                            .iter()
+                            .map(ftoo_manifest::MathOccurrence::site),
+                    )
+                    .filter_map(|site| site.decoded.clone())
+                    .chain(
+                        spans
+                            .iter()
+                            .filter(|(_, _, citation)| *citation)
+                            .filter_map(|(_, site, _)| site.decoded.clone()),
+                    )
+                    .collect::<Vec<_>>();
+                literal_region(
+                    unit,
+                    language,
+                    Some(*target),
+                    &region.source().value,
+                    &region.source().site,
+                    &spans,
+                    &protected,
+                    region.bytes().start,
+                    errors,
+                );
+            }
+        }
+    }
+}
+#[allow(clippy::too_many_arguments)] // Preserve the source region and its original decoded coordinate system.
+fn literal_region(
+    unit: &ftoo_manifest::CheckedUnit,
+    language: &str,
+    target: Option<DocumentTarget>,
+    text: &str,
+    site: &UnitSite,
+    spans: &[(String, UnitSite, bool)],
+    protected: &[std::ops::Range<usize>],
+    offset: usize,
+    errors: &mut Vec<AssemblyDiagnostic>,
+) {
+    for bytes in ftoo_manifest::reader_label_literals(text) {
+        if protected
+            .iter()
+            .any(|range| range.start <= bytes.start && bytes.end <= range.end)
+        {
+            continue;
+        }
+        let mut site = spans
+            .iter()
+            .find(|(_, site, citation)| {
+                !citation
+                    && site
+                        .decoded
+                        .as_ref()
+                        .is_some_and(|range| range.start <= bytes.start && bytes.end <= range.end)
+            })
+            .map_or_else(|| site.clone(), |(_, site, _)| site.clone());
+        if let Some(range) = &mut site.decoded {
+            range.start += offset;
+            range.end += offset;
+        }
+        errors.push(AssemblyDiagnostic {
+            rule: RuleId::M055,
+            stage: AssemblyStage::Emission,
+            document: Some(unit.document().into()),
+            unit: Some(unit.label().as_str().into()),
+            language: Some(language.into()),
+            target,
+            site: AssemblySite::Source(site),
+            fault: AssemblyFault::ReaderLabelLiteral {
+                value: text[bytes.clone()].into(),
+                bytes: bytes.start + offset..bytes.end + offset,
+            },
+        });
+    }
+}
+
+#[cfg(test)]
+pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>) -> DocumentPlan {
+    let book = welded.integrated().resolved().book();
+    let unit = &welded.integrated().resolved().corpus().units()[0];
+    let mut block = Block {
+        unit: unit.label().as_str().into(),
+        depth: None,
+        site: super::input::site("fixture.toml"),
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        runs: runs(0, unit, "en", welded, &BTreeMap::new()),
+    };
+    block.map_citations(book, "fixture", "en").unwrap();
+    DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage.", "Slice."),
+        blocks: vec![block],
+    }
 }
 
 #[cfg(test)]

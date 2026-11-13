@@ -176,6 +176,7 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                 token,
                 ..
             } => {
+                let handle = handle_argument(handle);
                 writeln!(output, "\\FtdocTag{{{handle}}}{{{token}}}% label {label}")
                     .expect("string write");
                 commented = true;
@@ -183,11 +184,16 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             Inline::Math { latex, .. } => {
                 write!(output, "\\({latex}\\)").expect("string write");
             }
-            Inline::Citation { text: value, .. } => {
+            Inline::Citation {
+                text: label,
+                identity,
+                ..
+            } => {
                 writeln!(
                     output,
-                    "\\texttt{{{}}}% cite {value}",
-                    super::pending::identity_text(value)
+                    "\\FtdocTag{{{}}}{{{}}}% cite {label}",
+                    handle_argument(&identity.handle),
+                    identity.token
                 )
                 .expect("string write");
                 commented = true;
@@ -222,18 +228,35 @@ pub(super) fn inline_size(runs: &[Inline]) -> usize {
                 ..
             } => {
                 commented = true;
+                let handle = handle_argument(handle);
                 format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len()
             }
             Inline::Math { latex, .. } => latex.len().saturating_add(4),
-            Inline::Citation { text, .. } => {
+            Inline::Citation { text, identity, .. } => {
                 commented = true;
-                super::pending::identity_text(text)
+                handle_argument(&identity.handle)
                     .len()
-                    .saturating_add(format!("\\texttt{{}}% cite {text}\n").len())
+                    .saturating_add(identity.token.len())
+                    .saturating_add(format!("\\FtdocTag{{}}{{}}% cite {text}\n").len())
             }
             Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
         };
         size = size.saturating_add(count);
     }
     size
+}
+
+pub(super) fn handle_argument(handle: &str) -> String {
+    if handle
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b":-/.".contains(&b))
+    {
+        return handle.into();
+    }
+    let scalars = handle
+        .chars()
+        .map(|c| u32::from(c).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\\FtdocHandle{{{scalars}}}")
 }

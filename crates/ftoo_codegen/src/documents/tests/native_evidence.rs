@@ -59,6 +59,36 @@ pub(in crate::documents) fn raw_evidence(
         "negative/include/refusal" => (1, FORMAT_CHANNEL_37, FORMAT_CHANNEL_38, FORMAT_CHANNEL_22),
         "negative/stored/refusal" => (1, FORMAT_CHANNEL_31, FORMAT_CHANNEL_39, FORMAT_CHANNEL_24),
         "unknown/refusal" => (1, FORMAT_CHANNEL_40, FORMAT_CHANNEL_41, FORMAT_CHANNEL_27),
+        "citation/literal" => (
+            0,
+            include_str!("../../../tests/fixtures/native/citation-literal.stdout"),
+            include_str!("../../../tests/fixtures/native/citation-literal.stderr"),
+            include_str!("../../../tests/fixtures/native/citation-literal.log"),
+        ),
+        "citation/composed" => (
+            0,
+            include_str!("../../../tests/fixtures/native/citation-composed.stdout"),
+            include_str!("../../../tests/fixtures/native/citation-composed.stderr"),
+            include_str!("../../../tests/fixtures/native/citation-composed.log"),
+        ),
+        "citation/retired" => (
+            1,
+            include_str!("../../../tests/fixtures/native/citation-retired.stdout"),
+            include_str!("../../../tests/fixtures/native/citation-retired.stderr"),
+            include_str!("../../../tests/fixtures/native/citation-retired.log"),
+        ),
+        "citation/restored" => (
+            0,
+            include_str!("../../../tests/fixtures/native/citation-restored.stdout"),
+            include_str!("../../../tests/fixtures/native/citation-restored.stderr"),
+            include_str!("../../../tests/fixtures/native/citation-restored.log"),
+        ),
+        "citation/encoded" => (
+            0,
+            include_str!("../../../tests/fixtures/native/citation-encoded.stdout"),
+            include_str!("../../../tests/fixtures/native/citation-encoded.stderr"),
+            include_str!("../../../tests/fixtures/native/citation-encoded.log"),
+        ),
         _ => unreachable!("fixed format-mode inventory"),
     }
 }

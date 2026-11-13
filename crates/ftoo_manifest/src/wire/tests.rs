@@ -606,7 +606,10 @@ fn full_one_empty_and_absent_partitions_survive_bytes_and_resolver_refusals() {
                     )
                 );
             } else {
-                assert_eq!(book.resolve(d.spelling()), Ok(d.target()));
+                assert_eq!(
+                    book.resolve(d.spelling()),
+                    Ok(crate::AddressTarget::Theory(d.target()))
+                );
             }
         }
         for input in ["c:01", " c:1", "c:1 ", "C:1", "", "é", "e\u{301}"] {
@@ -619,7 +622,12 @@ fn full_one_empty_and_absent_partitions_survive_bytes_and_resolver_refusals() {
             );
             assert_eq!(error.to_string(), format!("tag {input:?}: unknown"));
             if mode != 2 {
-                assert_eq!(book.resolve("v:1"), Ok(NodeId::LangevinCoefficientOneValue));
+                assert_eq!(
+                    book.resolve("v:1"),
+                    Ok(crate::AddressTarget::Theory(
+                        NodeId::LangevinCoefficientOneValue
+                    ))
+                );
             }
         }
         values_restore_control();
@@ -711,7 +719,10 @@ fn private_retirement_round_trips_preserve_every_event_and_first_effective_cause
             error.to_string(),
             "tag \"c:3\": retired; label def:langevin:coefficient-three; event 9; authority rec:test:retirement; reason \"Withdrawn for correction.\""
         );
-        assert_eq!(book.resolve("c:1"), Ok(NodeId::LangevinCoefficientOne));
+        assert_eq!(
+            book.resolve("c:1"),
+            Ok(crate::AddressTarget::Theory(NodeId::LangevinCoefficientOne))
+        );
         // No public authority injection: production load rejects every extra act.
         let expected: Vec<_> = history
             .iter()

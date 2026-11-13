@@ -83,6 +83,11 @@ pub enum AssemblySite {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReaderIdentityPosition {
+    Citation {
+        unit: String,
+        span: usize,
+        target: Option<DocumentTarget>,
+    },
     Coverage {
         index: usize,
         object: crate::NodeId,
@@ -101,6 +106,10 @@ impl fmt::Display for AssemblySite {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // Keep the specified complete typed payloads.
 pub enum AssemblyInputFault {
+    DocumentaryTagTarget {
+        input: String,
+        label: String,
+    },
     Limit {
         resource: AssemblyResource,
         limit: usize,
@@ -291,6 +300,7 @@ pub(super) fn sort(diagnostics: &mut [AssemblyInputDiagnostic]) {
             AssemblyInputFault::DisplayInline { .. } => 26,
             AssemblyInputFault::DisplayMathReference { .. } => 27,
             AssemblyInputFault::DisplayTag { .. } => 28,
+            AssemblyInputFault::DocumentaryTagTarget { .. } => 35,
             AssemblyInputFault::DisplayCitation { .. } => 29,
             AssemblyInputFault::DisplaySetMismatch { .. } => 30,
         }

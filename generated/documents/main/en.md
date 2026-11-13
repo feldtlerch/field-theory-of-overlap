@@ -6,7 +6,7 @@ Declared slice: v:1<!-- label claim:langevin:coefficient-one-value -->, v:3<!-- 
 # Coefficient values
 
 <!-- unit sec:coefficients:value-context document main language en -->
-The value claim v:1<!-- label claim:langevin:coefficient-one-value --> concerns the coefficient c:1<!-- label def:langevin:coefficient-one -->. See <code>dec:weld:equal-address-sets</code><!-- cite dec:weld:equal-address-sets -->.
+The value claim v:1<!-- label claim:langevin:coefficient-one-value --> concerns the coefficient c:1<!-- label def:langevin:coefficient-one -->. See dec:weld<!-- cite dec:weld:equal-address-sets -->.
 
 <!-- unit sec:coefficients:first-value document main language en -->
 The first coefficient c:1<!-- label def:langevin:coefficient-one --> has the value $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$.

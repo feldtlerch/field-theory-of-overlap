@@ -66,6 +66,8 @@ const HELPERS: &str = r"\ExplSyntaxOn
   \tl_set:Nx \l_ftdoc_value_tl {tag~\char_generate:nn {34}{12}\l_ftdoc_message_str\char_generate:nn {34}{12}:~unknown}
   \ftdoc_reject:
  }
+\cs_new:Npn \ftdoc_handle_scalar:n #1 { \char_generate:nn {#1}{12} }
+\cs_new:Npn \FtdocHandle #1 { \clist_map_function:nN {#1} \ftdoc_handle_scalar:n }
 \cs_new_protected:Npn \FtdocTag #1#2
  {
   \tl_set:Nx \l_ftdoc_input_tl {#1}
@@ -95,36 +97,37 @@ pub(super) fn render(
 ) -> Result<String, super::DocumentError> {
     let mut output = String::new();
     append(&mut output, Piece::Raw(RawTex(HELPERS)));
-    let mut live: Vec<_> = book.live().map(ftoo_manifest::TagId::descriptor).collect();
-    live.sort_by_key(|t| t.spelling());
-    for tag in live {
-        let record = format!(
-            "\\prop_gput:Nxx \\g_ftdoc_live_prop {{{}}} {{{{{}}}{{{}}}}}\n",
-            inert(tag.spelling()),
-            inert(tag.spelling()),
-            inert(
-                book.resolve(tag.spelling())
-                    .expect("live store")
-                    .semantic_name()
-            )
-        );
-        push(&mut output, &record, plans)?;
-    }
-    let mut retired: Vec<_> = book.retired().map(|e| e.tag().descriptor()).collect();
-    retired.sort_by_key(|t| t.spelling());
-    let mut outside: Vec<_> = book.out_of_slice().map(|e| e.tag().descriptor()).collect();
-    outside.sort_by_key(|t| t.spelling());
-    for (store, tags) in [("retired", retired), ("outside", outside)] {
-        for tag in tags {
-            let message = book
-                .resolve(tag.spelling())
-                .expect_err("unavailable store")
-                .to_string();
-            let record = format!(
-                "\\prop_gput:Nxx \\g_ftdoc_{store}_prop {{{}}} {{{}}}\n",
-                inert(tag.spelling()),
-                inert(&message)
-            );
+    for store in ["live", "retired", "outside"] {
+        for descriptor in book.common_descriptors() {
+            let handle = descriptor.handle();
+            let outcome = book.resolve(handle);
+            let actual = match &outcome {
+                Ok(_) => "live",
+                Err(ftoo_manifest::TagResolutionFault::OutOfSliceTag { .. }) => "outside",
+                Err(
+                    ftoo_manifest::TagResolutionFault::RetiredTag { .. }
+                    | ftoo_manifest::TagResolutionFault::RetiredDocumentaryTag { .. },
+                ) => "retired",
+                Err(ftoo_manifest::TagResolutionFault::UnknownTag { .. }) => {
+                    unreachable!("checked descriptor has a common resolver entry")
+                }
+            };
+            if actual != store {
+                continue;
+            }
+            let record = match outcome {
+                Ok(target) => format!(
+                    "\\prop_gput:Nxx \\g_ftdoc_live_prop {{{}}} {{{{{}}}{{{}}}}}\n",
+                    inert(handle),
+                    inert(handle),
+                    inert(target.label())
+                ),
+                Err(cause) => format!(
+                    "\\prop_gput:Nxx \\g_ftdoc_{store}_prop {{{}}} {{{}}}\n",
+                    inert(handle),
+                    inert(&cause.to_string())
+                ),
+            };
             push(&mut output, &record, plans)?;
         }
     }
@@ -144,7 +147,12 @@ pub(super) fn render(
                 }
             }
             for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
-                if let Inline::Tag { token, .. } = run {
+                if let Inline::Tag { token, .. }
+                | Inline::Citation {
+                    identity: super::CitationIdentity { token, .. },
+                    ..
+                } = run
+                {
                     sites.push((
                         plan.document.as_str(),
                         plan.language.as_str(),
@@ -231,7 +239,7 @@ pub(super) fn check(
         expected.push(record(
             "live",
             handle,
-            format!("{handle}\n{}", target.semantic_name()),
+            format!("{handle}\n{}", target.label()),
         ));
     }
     for (store, tags) in [
@@ -259,6 +267,24 @@ pub(super) fn check(
             ));
         }
     }
+    for binding in book.documentary() {
+        let handle = binding.handle();
+        expected.push(match binding.state() {
+            ftoo_manifest::DocumentaryState::Live => {
+                record("live", handle, format!("{handle}\n{}", binding.label()))
+            }
+            ftoo_manifest::DocumentaryState::Retired(event) => record(
+                "retired",
+                handle,
+                ftoo_manifest::TagResolutionFault::RetiredDocumentaryTag {
+                    input: handle.into(),
+                    label: binding.label().into(),
+                    event: event.clone(),
+                }
+                .to_string(),
+            ),
+        });
+    }
     expected.sort_by(|a, b| {
         let rank = |store: &str| match store {
             "live" => 0,
@@ -278,7 +304,12 @@ pub(super) fn check(
                 }
             }
             for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
-                if let Inline::Tag { token, .. } = run {
+                if let Inline::Tag { token, .. }
+                | Inline::Citation {
+                    identity: super::CitationIdentity { token, .. },
+                    ..
+                } = run
+                {
                     sites.push((&plan.document, &plan.language, &block.unit, token));
                 }
             }

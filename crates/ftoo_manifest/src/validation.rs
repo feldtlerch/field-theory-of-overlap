@@ -70,6 +70,7 @@ pub enum RuleId {
     M057,
     M058,
     M059,
+    M060,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -90,7 +91,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 59] = [
+pub const RULES: [RuleSpec; 60] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -304,7 +305,7 @@ pub const RULES: [RuleSpec; 59] = [
     RuleSpec {
         number: RuleId::M031,
         statement: "Tag spellings are nonempty, contain no whitespace or control character, and are unique by exact UTF-8 bytes.",
-        scope: "CatalogAdmission over all descriptors including retired handles.",
+        scope: "CatalogAdmission over theory and documentary descriptors, including retired handles in both domains.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
@@ -338,8 +339,8 @@ pub const RULES: [RuleSpec; 59] = [
     },
     RuleSpec {
         number: RuleId::M036,
-        statement: "Every permanent identity has a tag, and resolution returns its bound NodeId only for a live exact handle, otherwise its exact named refusal.",
-        scope: "Completed catalog coverage and the resolution consumer.",
+        statement: "Every permanent theory identity has a tag, and the theory branch of resolution returns its bound NodeId in a Theory result only for a live exact handle, otherwise its exact named refusal.",
+        scope: "Completed theory catalog coverage and the theory branch of the common resolution consumer.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
@@ -471,7 +472,7 @@ pub const RULES: [RuleSpec; 59] = [
     },
     RuleSpec {
         number: RuleId::M055,
-        statement: "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag.",
+        statement: "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text.",
         scope: "Both document targets and their generated notation and addressing support.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -501,6 +502,13 @@ pub const RULES: [RuleSpec; 59] = [
         number: RuleId::M059,
         statement: "Within each display, addressed tag sets and cited label sets are separately equal across all target and language bodies, retaining every occurrence independently of order and multiplicity.",
         scope: "All display bodies after complete body reference resolution.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M060,
+        statement: "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle.",
+        scope: "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

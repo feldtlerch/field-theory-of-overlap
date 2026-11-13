@@ -12,6 +12,12 @@ fn site() -> UnitSite {
 fn insertion(citation: bool) -> plan::Inline {
     if citation {
         plan::Inline::Citation {
+            identity: synthetic_citation_identity(
+                "dec:fixture:source",
+                "sec:fixture:spacing",
+                "record",
+                "u0-c0",
+            ),
             text: "dec:fixture:source".into(),
             site: site(),
         }
@@ -137,26 +143,25 @@ fn extra_break_markers_and_ragged_groups_refuse_with_exact_faults_and_reread() {
 }
 
 #[test]
-fn citation_identity_breaks_refuse_missing_and_misplaced_markers_and_reread_restoration() {
+fn citation_refuses_discretionary_break_markers_and_rereads_restoration() {
     let directory = Directory::new();
     let path = directory.0.join("identity.tex");
     {
         let plan = fixture(true, None, " word");
         let correct = latex::render(&plan);
         assert_eq!(latex::size(&plan), correct.len());
-        let marker = r"dec:\allowbreak{}fixture:\allowbreak{}source";
+        let marker = r"\FtdocTag{record}{u0-c0}";
         assert!(correct.contains(marker));
         for replacement in [
-            r"dec:fixture:\allowbreak{}source",
-            r"de\allowbreak{}c:fixture:\allowbreak{}source",
+            r"\FtdocTag{re\allowbreak{}cord}{u0-c0}",
+            r"\allowbreak{}\FtdocTag{record}{u0-c0}",
         ] {
             let mutated = correct.replacen(marker, replacement, 1);
             fs::write(&path, &mutated).unwrap();
             let records = plan.records(DocumentTarget::Latex);
             let (range, fault) = {
                 let mut actual = records[0].clone();
-                actual.value =
-                    format!("\\texttt{{{replacement}}}% cite dec:fixture:source\n\\space{{}}word");
+                actual.value = format!("{replacement}% cite dec:fixture:source\n\\space{{}}word");
                 (
                     mutated.find("% unit ").unwrap()..mutated.len(),
                     AssemblyFault::EmissionMismatch {
@@ -251,15 +256,7 @@ fn token_spaces_refuse_old_comment_indentation_with_exact_m055_and_restore() {
                     let location = AssemblySite::Generated {
                         path: "generated/documents/fixture/en.tex".into(),
                         bytes: start..old.len(),
-                        origins: vec![
-                            SourceOrigin {
-                                unit: Some("sec:fixture:spacing".into()),
-                                language: Some("en".into()),
-                                target: Some(DocumentTarget::Latex),
-                                site: site()
-                            };
-                            2
-                        ],
+                        origins: spacing_origins(citation, 1),
                     };
                     let expected = failure(
                         RuleId::M055,
@@ -342,7 +339,7 @@ fn token_spaces_check_caption_cell_and_picture_regions_independently() {
                 Ok(())
             );
             let insertion = if citation {
-                "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n"
+                "\\FtdocTag{record}{u0-c0}% cite dec:fixture:source\n"
             } else {
                 "\\FtdocTag{c:1}{u0-t0}% label def:langevin:coefficient-one\n"
             };
@@ -386,15 +383,7 @@ fn token_spaces_check_caption_cell_and_picture_regions_independently() {
                 let location = AssemblySite::Generated {
                     path: "generated/documents/fixture/en.tex".into(),
                     bytes: old.find("% unit ").unwrap()..old.len(),
-                    origins: vec![
-                        SourceOrigin {
-                            unit: Some("sec:fixture:spacing".into()),
-                            language: Some("en".into()),
-                            target: Some(DocumentTarget::Latex),
-                            site: site()
-                        };
-                        4
-                    ],
+                    origins: spacing_origins(citation, 2),
                 };
                 let fault = AssemblyFault::EmissionMismatch {
                     missing: vec![],
@@ -435,13 +424,13 @@ fn support_required_native_comment_glue_matches_authored_controls()
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
     let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
     let graph = ftoo_manifest::seed()?;
-    let book = ftoo_manifest::addressing(&graph)?;
+    let book = reader_fixture_book(&graph);
     let addressing = runtime::render(&book, &[])?;
     let mut source = latex::start("fixture", "en");
     let mut count = 0;
     for citation in [false, true] {
         let control = if citation {
-            r"\texttt{dec:\allowbreak{}fixture:\allowbreak{}source}"
+            r"\FtdocTag{record}{u0-c0}"
         } else {
             r"\FtdocTag{c:1}{u0-t0}"
         };
@@ -508,4 +497,37 @@ fn support_required_native_comment_glue_matches_authored_controls()
             .collect::<Vec<_>>()
     );
     Ok(())
+}
+
+fn spacing_origins(citation: bool, regions: usize) -> Vec<SourceOrigin> {
+    let owner = SourceOrigin {
+        unit: Some("sec:fixture:spacing".into()),
+        language: Some("en".into()),
+        target: Some(DocumentTarget::Latex),
+        site: site(),
+    };
+    let pair = if citation {
+        vec![
+            owner.clone(),
+            SourceOrigin {
+                target: None,
+                ..owner
+            },
+            SourceOrigin {
+                unit: None,
+                language: None,
+                target: None,
+                site: UnitSite {
+                    file: "fixture.md".into(),
+                    path: vec![],
+                    anchor: SourceAnchor::Bytes(0, 18),
+                    decoded: None,
+                    occurrence: None,
+                },
+            },
+        ]
+    } else {
+        vec![owner; 2]
+    };
+    (0..regions).flat_map(|_| pair.clone()).collect()
 }

@@ -34,15 +34,18 @@ pub use notation::{
 pub use notation::{RenderOwner, RenderTarget};
 mod labels;
 pub use labels::{
-    CheckedMarkdown, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
+    CheckedMarkdown, JointMints, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
     LabelOccurrence, LabelSite, LabelSourceError, LabelSourceFault, LabelStage, MarkdownSource,
-    MintKind, MintOrigin, ReferenceDomain, check_markdown_sources, integrate_labels,
+    MintKind, MintOrigin, ReferenceDomain, check_markdown_sources, collect_joint_mints,
+    integrate_joint_labels, integrate_labels,
 };
+mod documentary;
 mod seed;
 mod status;
 mod tag_history;
 mod tag_validation;
 mod tags;
+pub use documentary::*;
 mod units;
 mod weld;
 pub use units::LabelSpanReason;
@@ -72,8 +75,9 @@ pub use tag_validation::{
     StoreState,
 };
 pub use tags::{
-    AddressBook, OutOfSliceCause, OutOfSliceEntry, ReaderIdentityFault, ReaderIdentityReason,
-    ReaderTagCandidate, RetiredEntry, TagDescriptor, TagId, TagResolutionFault, addressing,
+    AddressBook, AddressTarget, CommonDescriptor, CommonOrigin, OutOfSliceCause, OutOfSliceEntry,
+    ReaderIdentityFault, ReaderIdentityReason, ReaderTagCandidate, RetiredEntry, TagDescriptor,
+    TagId, TagResolutionFault, addressing,
 };
 
 #[cfg(test)]

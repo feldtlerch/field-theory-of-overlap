@@ -212,7 +212,7 @@
     RuleSpec {
         number: RuleId::M031,
         statement: "Tag spellings are nonempty, contain no whitespace or control character, and are unique by exact UTF-8 bytes.",
-        scope: "CatalogAdmission over all descriptors including retired handles.",
+        scope: "CatalogAdmission over theory and documentary descriptors, including retired handles in both domains.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
@@ -246,8 +246,8 @@
     },
     RuleSpec {
         number: RuleId::M036,
-        statement: "Every permanent identity has a tag, and resolution returns its bound NodeId only for a live exact handle, otherwise its exact named refusal.",
-        scope: "Completed catalog coverage and the resolution consumer.",
+        statement: "Every permanent theory identity has a tag, and the theory branch of resolution returns its bound NodeId in a Theory result only for a live exact handle, otherwise its exact named refusal.",
+        scope: "Completed theory catalog coverage and the theory branch of the common resolution consumer.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

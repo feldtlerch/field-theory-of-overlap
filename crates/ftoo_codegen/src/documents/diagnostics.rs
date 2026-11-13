@@ -12,8 +12,16 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    ReaderLabelLiteral {
+        value: String,
+        bytes: Range<usize>,
+    },
+    DocumentaryTagTarget {
+        input: String,
+        label: String,
+    },
     ReaderIdentity {
-        target: ftoo_manifest::NodeId,
+        target: ftoo_manifest::AddressTarget,
         reason: ftoo_manifest::ReaderIdentityReason,
         candidates: Vec<ftoo_manifest::ReaderTagCandidate>,
     },
@@ -182,7 +190,9 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::ReaderLabelLiteral { .. } => 34,
             Self::ReaderIdentity { .. } => 31,
+            Self::DocumentaryTagTarget { .. } => 33,
             Self::Limit { .. } => 0,
             Self::UnknownToken { .. } => 1,
             Self::EmptySkeleton { .. } => 2,
@@ -241,6 +251,7 @@ impl From<ftoo_manifest::AssemblyInputFault> for AssemblyFault {
     fn from(value: ftoo_manifest::AssemblyInputFault) -> Self {
         use ftoo_manifest::AssemblyInputFault as F;
         match value {
+            F::DocumentaryTagTarget { input, label } => Self::DocumentaryTagTarget { input, label },
             F::DisplayMultiplicity {
                 unit,
                 expected,
@@ -432,16 +443,36 @@ impl AssemblyErrors {
     #[must_use]
     pub fn from_diagnostics(mut diagnostics: Vec<AssemblyDiagnostic>) -> Option<Self> {
         diagnostics.sort_by(|a, b| {
-            (&a.stage, &a.rule, &a.document, &a.unit, &a.language)
-                .cmp(&(&b.stage, &b.rule, &b.document, &b.unit, &b.language))
+            (&a.stage, &a.rule, &a.document)
+                .cmp(&(&b.stage, &b.rule, &b.document))
+                .then_with(|| reader_family(&a.site).cmp(&reader_family(&b.site)))
+                .then_with(|| (&a.unit, &a.language).cmp(&(&b.unit, &b.language)))
                 .then_with(|| match (&a.site, &b.site) {
                     (
                         AssemblySite::ReaderIdentity { position: a, .. },
                         AssemblySite::ReaderIdentity { position: b, .. },
                     ) => {
-                        use ftoo_manifest::ReaderIdentityPosition::{Coverage, Pending};
+                        use ftoo_manifest::ReaderIdentityPosition::{Citation, Coverage, Pending};
                         match (a, b) {
                             (Coverage { index: a, .. }, Coverage { index: b, .. }) => a.cmp(b),
+                            (
+                                Citation {
+                                    span: a,
+                                    target: at,
+                                    ..
+                                },
+                                Citation {
+                                    span: b,
+                                    target: bt,
+                                    ..
+                                },
+                            ) => (a, at).cmp(&(b, bt)),
+                            (Coverage { .. } | Pending { .. }, Citation { .. }) => {
+                                std::cmp::Ordering::Less
+                            }
+                            (Citation { .. }, Coverage { .. } | Pending { .. }) => {
+                                std::cmp::Ordering::Greater
+                            }
                             (Coverage { .. }, Pending { .. }) => std::cmp::Ordering::Less,
                             (Pending { .. }, Coverage { .. }) => std::cmp::Ordering::Greater,
                             (
@@ -461,6 +492,21 @@ impl AssemblyErrors {
                     _ => std::cmp::Ordering::Equal,
                 })
                 .then_with(|| a.target.cmp(&b.target))
+                .then_with(|| match (&a.fault, &b.fault) {
+                    (
+                        AssemblyFault::ReaderIdentity {
+                            target: a,
+                            reason: ar,
+                            ..
+                        },
+                        AssemblyFault::ReaderIdentity {
+                            target: b,
+                            reason: br,
+                            ..
+                        },
+                    ) => (a, *ar as u8).cmp(&(b, *br as u8)),
+                    _ => std::cmp::Ordering::Equal,
+                })
                 .then_with(|| location(&a.site).cmp(&location(&b.site)))
                 .then_with(|| a.fault.rank().cmp(&b.fault.rank()))
         });
@@ -469,6 +515,17 @@ impl AssemblyErrors {
     #[must_use]
     pub fn diagnostics(&self) -> &[AssemblyDiagnostic] {
         &self.0
+    }
+}
+fn reader_family(site: &AssemblySite) -> Option<u8> {
+    use ftoo_manifest::ReaderIdentityPosition::{Citation, Coverage, Pending};
+    match site {
+        AssemblySite::ReaderIdentity { position, .. } => Some(match position {
+            Coverage { .. } => 0,
+            Pending { .. } => 1,
+            Citation { .. } => 2,
+        }),
+        _ => None,
     }
 }
 impl fmt::Display for AssemblyDiagnostic {
@@ -512,9 +569,18 @@ pub enum EmissionKind {
     Caption,
     Body,
     Tag,
-    Citation,
+    Citation(Box<CitationIdentity>),
     Mention,
     Math,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CitationIdentity {
+    pub label: String,
+    pub resolved: Option<ftoo_manifest::AddressTarget>,
+    pub handle: String,
+    pub token: String,
+    pub position: ftoo_manifest::ReaderIdentityPosition,
+    pub mint: Option<ftoo_manifest::MintOrigin>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EmissionRecord {
@@ -599,6 +665,7 @@ pub struct IoFailure {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentError {
+    DocumentaryRegistry(ftoo_manifest::RegistryErrors),
     Projection(ProjectionCheckError),
     ProjectionLoad(ProjectionError),
     Units(UnitLoadError),
@@ -621,6 +688,7 @@ pub enum DocumentError {
 impl fmt::Display for DocumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::DocumentaryRegistry(e) => e.fmt(f),
             Self::Projection(e) => e.fmt(f),
             Self::ProjectionLoad(e) => e.fmt(f),
             Self::Units(e) => e.fmt(f),

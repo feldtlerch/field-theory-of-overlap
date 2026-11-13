@@ -251,7 +251,7 @@ fn w04_private_duplicate_export_is_counted_before_indexing() {
     let resolved = crate::resolve_unit_tags(&corpus, &book).unwrap();
     let markdown = check_markdown_sources(vec![source("records.md", RECORDS)]).unwrap();
     let mints = joint_mints(
-        &resolved,
+        resolved.corpus(),
         &markdown,
         &[
             NodeId::LangevinCoefficientOne,

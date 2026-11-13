@@ -1,0 +1,6 @@
+error: document.tex:19: Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
+(ftdoc)                      unit sec:fixture:citation, language en, site
+(ftdoc)                      u0-c0.
+
+Type <return> to continue
+error: halted on potentially-recoverable error as specified

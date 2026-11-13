@@ -27,6 +27,12 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
         let insertion = || {
             if citation {
                 Inline::Citation {
+                    identity: synthetic_citation_identity(
+                        "dec:fixture:source",
+                        "sec:fixture:spacing",
+                        "record",
+                        "u0-c0",
+                    ),
                     text: "dec:fixture:source".into(),
                     site: site.clone(),
                 }
@@ -40,7 +46,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             }
         };
         let prefix = if citation {
-            "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n"
+            "\\FtdocTag{record}{u0-c0}% cite dec:fixture:source\n"
         } else {
             "\\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n"
         };
@@ -1841,6 +1847,12 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                 },
                 Inline::Text(". See ".into()),
                 Inline::Citation {
+                    identity: synthetic_citation_identity(
+                        "dec:weld:equal-address-sets",
+                        "sec:coefficients:overview",
+                        "dec:weld",
+                        "u0-c0",
+                    ),
                     text: "dec:weld:equal-address-sets".into(),
                     site: site.clone(),
                 },
@@ -1891,7 +1903,12 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                 site: site.clone(),
             },
             EmissionRecord {
-                kind: EmissionKind::Citation,
+                kind: EmissionKind::Citation(Box::new(synthetic_citation_identity(
+                    "dec:weld:equal-address-sets",
+                    "sec:coefficients:overview",
+                    "dec:weld",
+                    "u0-c0",
+                ))),
                 unit: "sec:coefficients:overview".into(),
                 language: "en".into(),
                 target,
@@ -1915,15 +1932,38 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                         }
                     ),
                     bytes: 0..0,
-                    origins: vec![
-                        SourceOrigin {
-                            unit: Some("sec:coefficients:overview".into()),
-                            language: Some("en".into()),
-                            target: Some(target),
-                            site: site.clone()
-                        };
-                        4
+                    origins: [
+                        vec![
+                            SourceOrigin {
+                                unit: Some("sec:coefficients:overview".into()),
+                                language: Some("en".into()),
+                                target: Some(target),
+                                site: site.clone()
+                            };
+                            3
+                        ],
+                        vec![
+                            SourceOrigin {
+                                unit: Some("sec:coefficients:overview".into()),
+                                language: Some("en".into()),
+                                target: None,
+                                site: site.clone()
+                            },
+                            SourceOrigin {
+                                unit: None,
+                                language: None,
+                                target: None,
+                                site: UnitSite {
+                                    file: "fixture.md".into(),
+                                    path: vec![],
+                                    anchor: SourceAnchor::Bytes(0, 27),
+                                    decoded: None,
+                                    occurrence: None
+                                }
+                            }
+                        ]
                     ]
+                    .concat()
                 },
                 AssemblyFault::EmissionMismatch {
                     missing: expected,
@@ -2702,3 +2742,268 @@ fn prose_escaping_has_independent_literal_goldens() {
 }
 
 const LOST_CHARACTER_LOG: &str = include_str!("../../tests/fixtures/native/lost-character.log");
+
+fn synthetic_citation_identity(
+    label: &str,
+    unit: &str,
+    handle: &str,
+    token: &str,
+) -> CitationIdentity {
+    CitationIdentity {
+        label: label.into(),
+        resolved: Some(ftoo_manifest::AddressTarget::Documentary(label.into())),
+        handle: handle.into(),
+        token: token.into(),
+        position: ftoo_manifest::ReaderIdentityPosition::Citation {
+            unit: unit.into(),
+            span: 0,
+            target: None,
+        },
+        mint: Some(ftoo_manifest::MintOrigin {
+            kind: ftoo_manifest::MintKind::Markdown,
+            site: ftoo_manifest::LabelSite::Markdown {
+                file: "fixture.md".into(),
+                bytes: 0..label.len(),
+            },
+        }),
+    }
+}
+
+fn reader_fixture_book(graph: &ftoo_manifest::ValidatedManifest) -> ftoo_manifest::AddressBook<'_> {
+    reader_fixture_book_state(graph, false)
+}
+fn reader_fixture_book_state(
+    graph: &ftoo_manifest::ValidatedManifest,
+    retired: bool,
+) -> ftoo_manifest::AddressBook<'_> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let corpus = reader_fixture_corpus("See `dec:weld:equal-address-sets`.");
+    let production = crate::load_markdown_files(&root).unwrap();
+    let mut sources = production.sources().to_vec();
+    sources.push(ftoo_manifest::MarkdownSource {
+        file: "fixture.md".into(),
+        bytes: "# Fixture · `dec:fixture:source`\n# Encoded · `dec:fixture:encoded`\n"
+            .as_bytes()
+            .to_vec(),
+    });
+    let markdown = ftoo_manifest::check_markdown_sources(sources).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let mut events = registry::load(&registry::read(&root).unwrap()).unwrap();
+    let located = |value: &str| ftoo_manifest::LocatedString {
+        value: value.into(),
+        site: input::site("fixture-registry.toml"),
+    };
+    events.push(ftoo_manifest::DocumentaryEventDraft {
+        site: input::site("fixture-registry.toml"),
+        ordinal: located("2"),
+        handle: located("record"),
+        label: Some(located("dec:fixture:source")),
+        authority_record: located("dec:tags:bound-to-labels"),
+        reason: located("Fixture citation."),
+    });
+    events.push(ftoo_manifest::DocumentaryEventDraft {
+        site: input::site("fixture-registry.toml"),
+        ordinal: located("3"),
+        handle: located("é_#$&^~"),
+        label: Some(located("dec:fixture:encoded")),
+        authority_record: located("dec:tags:bound-to-labels"),
+        reason: located("Encoded fixture citation."),
+    });
+    if retired {
+        events.push(ftoo_manifest::DocumentaryEventDraft {
+            site: input::site("fixture-registry.toml"),
+            ordinal: located("4"),
+            handle: located("dec:weld"),
+            label: None,
+            authority_record: located("dec:tags:bound-to-labels"),
+            reason: located("Fixture retirement."),
+        });
+    }
+    ftoo_manifest::addressing(graph)
+        .unwrap()
+        .with_documentary(&joint, events)
+        .unwrap()
+}
+
+fn support_required_native_citation_keys_and_retirement(
+    support: &NativeSupport,
+    lock: &native_support::Lock,
+    checks: &mut Vec<CaseEvidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let graph = ftoo_manifest::seed()?;
+    let book = reader_fixture_book(&graph);
+    let mut plan = reader_citation_plan(&book, "dec:weld:equal-address-sets");
+    let source = latex::render(&plan);
+    let addressing = runtime::render(&book, std::slice::from_ref(&plan))?;
+    checks.push(CaseEvidence::new(
+        "citation/literal",
+        native::consume_plan(support, lock, &source, "", &addressing, &plan),
+        Ok(()),
+    ));
+    let composed = source.replace(
+        "{dec:weld}",
+        r"{\FtdocHandle{100,101,99,58,119,101,108,100}}",
+    );
+    checks.push(CaseEvidence::new(
+        "citation/composed",
+        native::consume_plan(support, lock, &composed, "", &addressing, &plan),
+        Ok(()),
+    ));
+    let retired = reader_fixture_book_state(&graph, true);
+    let retired_addressing = runtime::render(&retired, std::slice::from_ref(&plan))?;
+    let site = vec![
+        SourceOrigin {
+            unit: Some("sec:fixture:citation".into()),
+            language: Some("en".into()),
+            target: None,
+            site: UnitSite {
+                decoded: Some(4..33),
+                ..input::site("fixture.toml")
+            },
+        },
+        SourceOrigin {
+            unit: None,
+            language: None,
+            target: None,
+            site: UnitSite {
+                file: "docs/adr/012-the-weld.md".into(),
+                path: vec![],
+                anchor: SourceAnchor::Bytes(117, 149),
+                decoded: None,
+                occurrence: None,
+            },
+        },
+    ];
+    let expected=DocumentError::Assembly(AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {rule:RuleId::M055,stage:AssemblyStage::Native,document:Some("fixture".into()),unit:Some("sec:fixture:citation".into()),language:Some("en".into()),target:Some(DocumentTarget::Latex),site:AssemblySite::Generated {path:"generated/documents/fixture/en.tex".into(),bytes:source.find(r"\FtdocTag").unwrap()..source.find("% cite").unwrap(),origins:site},fault:AssemblyFault::RuntimeTagRejected {input:"dec:weld".into(),site_token:"u0-c0".into(),message:"tag \"dec:weld\": retired; label dec:weld:equal-address-sets; event 4; authority dec:tags:bound-to-labels; reason \"Fixture retirement.\"".into()}}]).unwrap());
+    checks.push(CaseEvidence::new(
+        "citation/retired",
+        native::consume_plan(support, lock, &source, "", &retired_addressing, &plan),
+        Err(expected),
+    ));
+    checks.push(CaseEvidence::new(
+        "citation/restored",
+        native::consume_plan(support, lock, &source, "", &addressing, &plan),
+        Ok(()),
+    ));
+    plan = reader_citation_plan(&book, "dec:fixture:encoded");
+    let source = latex::render(&plan);
+    let addressing = runtime::render(&book, std::slice::from_ref(&plan))?;
+    checks.push(CaseEvidence::new(
+        "citation/encoded",
+        native::consume_plan(support, lock, &source, "", &addressing, &plan),
+        Ok(()),
+    ));
+    Ok(())
+}
+
+fn reader_fixture_corpus(text: &str) -> ftoo_manifest::LanguageCheckedUnits {
+    use ftoo_manifest::*;
+    let site = input::site("fixture.toml");
+    let value = |text: &str| LocatedString {
+        value: text.into(),
+        site: site.clone(),
+    };
+    admit_unit_drafts(
+        DocumentDraft {
+            documents_site: site.clone(),
+            documents: ["main", "fixture"]
+                .into_iter()
+                .map(|document| {
+                    (
+                        document.into(),
+                        DocumentEntryDraft {
+                            key_site: site.clone(),
+                            table_site: site.clone(),
+                            languages_site: site.clone(),
+                            required_languages: vec![value("en")],
+                        },
+                    )
+                })
+                .collect(),
+        },
+        vec![UnitDraft {
+            id: value("sec:fixture:citation"),
+            document: value("fixture"),
+            table_site: site.clone(),
+            math_site: site.clone(),
+            texts_site: site.clone(),
+            math: BTreeMap::new(),
+            texts: BTreeMap::from([(
+                "en".into(),
+                LocatedEntryDraft {
+                    key_site: site.clone(),
+                    value: value(text),
+                },
+            )]),
+        }],
+    )
+    .unwrap()
+}
+fn reader_citation_plan(book: &ftoo_manifest::AddressBook<'_>, label: &str) -> plan::DocumentPlan {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let corpus = reader_fixture_corpus(&format!("See `{label}`."));
+    let mut sources = crate::load_markdown_files(&root)
+        .unwrap()
+        .sources()
+        .to_vec();
+    sources.push(ftoo_manifest::MarkdownSource {
+        file: "fixture.md".into(),
+        bytes: "# Fixture · `dec:fixture:source`\n# Encoded · `dec:fixture:encoded`\n"
+            .as_bytes()
+            .to_vec(),
+    });
+    let markdown = ftoo_manifest::check_markdown_sources(sources).unwrap();
+    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, book).unwrap();
+    let integrated = ftoo_manifest::integrate_labels(&resolved, &markdown).unwrap();
+    let welded = ftoo_manifest::weld_units(&integrated).unwrap();
+    plan::fixture_citation_plan(&welded)
+}
+
+#[test]
+fn citation_fixture_plans_retain_real_checked_mint_origins() {
+    use ftoo_manifest::*;
+    let graph = seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let plan = reader_citation_plan(&book, "dec:weld:equal-address-sets");
+    let plan::Inline::Citation { identity, site, .. } = &plan.blocks[0].runs[1] else {
+        panic!("citation")
+    };
+    assert_eq!(
+        identity,
+        &CitationIdentity {
+            label: "dec:weld:equal-address-sets".into(),
+            resolved: Some(AddressTarget::Documentary(
+                "dec:weld:equal-address-sets".into()
+            )),
+            handle: "dec:weld".into(),
+            token: "u0-c0".into(),
+            position: ReaderIdentityPosition::Citation {
+                unit: "sec:fixture:citation".into(),
+                span: 0,
+                target: None
+            },
+            mint: Some(MintOrigin {
+                kind: MintKind::Markdown,
+                site: LabelSite::Markdown {
+                    file: "docs/adr/012-the-weld.md".into(),
+                    bytes: 117..149
+                }
+            })
+        }
+    );
+    assert_eq!(
+        site,
+        &UnitSite {
+            decoded: Some(4..33),
+            ..input::site("fixture.toml")
+        }
+    );
+    assert_eq!(
+        plan::check_emission(&plan, &latex::render(&plan), DocumentTarget::Latex),
+        Ok(())
+    );
+    assert_eq!(
+        plan::check_emission(&plan, &markdown::render(&plan), DocumentTarget::Markdown),
+        Ok(())
+    );
+}

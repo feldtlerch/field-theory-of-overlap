@@ -2,6 +2,7 @@ use ftoo_manifest::{Evidence, load_projection};
 use std::path::Path;
 
 #[test]
+#[allow(clippy::too_many_lines)] // Pin the complete projection and resolver contract together.
 fn committed_artifact_is_checked_by_the_ordinary_workspace_gate() {
     use ftoo_manifest::{HistoryChange as H, NodeId as N, TagId as T};
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -75,7 +76,10 @@ fn committed_artifact_is_checked_by_the_ordinary_workspace_gate() {
         ));
     }
     for (ordinal, (tag, handle, target)) in (5..=8).zip(tags) {
-        assert_eq!(book.resolve(handle), Ok(target));
+        assert_eq!(
+            book.resolve(handle),
+            Ok(ftoo_manifest::AddressTarget::Theory(target))
+        );
         events.push((
             ordinal,
             "proposal:manifest:addressing-lifecycle-bite",

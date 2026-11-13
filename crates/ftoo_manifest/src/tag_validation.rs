@@ -388,6 +388,10 @@ pub(super) fn construct_candidate(
     descriptors.sort_by_key(|d| d.spelling());
     history.sort_by_key(HistoryEvent::ordinal);
     let mut book = AddressBook {
+        documentary: vec![],
+        documentary_history: vec![],
+        joint_mints: None,
+        common: std::collections::BTreeMap::default(),
         graph,
         descriptors,
         history,
@@ -410,5 +414,6 @@ pub(super) fn construct_candidate(
             }
         }
     }
+    book.reindex();
     Ok(book)
 }

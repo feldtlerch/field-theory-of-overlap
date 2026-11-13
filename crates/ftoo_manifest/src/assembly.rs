@@ -17,6 +17,26 @@ pub use skeleton::{
     check_skeletons,
 };
 
+/// Locate complete semantic-label tokens in decoded reader prose.
+#[must_use]
+pub fn reader_label_literals(text: &str) -> Vec<std::ops::Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut start = None;
+    for (at, c) in text
+        .char_indices()
+        .chain(std::iter::once((text.len(), ' ')))
+    {
+        if c.is_alphanumeric() || matches!(c, ':' | '-' | '_') {
+            start.get_or_insert(at);
+        } else if let Some(begin) = start.take()
+            && crate::units::label_name(&text[begin..at])
+        {
+            ranges.push(begin..at);
+        }
+    }
+    ranges
+}
+
 /// Read admitted label spans through the same scanner used by unit admission.
 /// # Panics
 /// Panics only if the shared scanner disagrees with its own admission, which callers cannot arrange.

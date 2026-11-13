@@ -442,10 +442,21 @@ pub(super) fn reread(
 ) -> Result<(), DocumentError> {
     for (file, expected) in inventory {
         let path = root.join(file);
-        let actual = match fs::read(&path) {
-            Ok(bytes) => Some(bytes),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => None,
-            Err(e) => return Err(io_error(DocumentIoOperation::Read, &path, &e)),
+        let actual = if file == super::registry::FILE {
+            match super::registry::read(root) {
+                Ok(source) => Some(source.bytes),
+                Err(DocumentError::Io {
+                    kind: io::ErrorKind::NotFound,
+                    ..
+                }) => None,
+                Err(error) => return Err(error),
+            }
+        } else {
+            match fs::read(&path) {
+                Ok(bytes) => Some(bytes),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+                Err(e) => return Err(io_error(DocumentIoOperation::Read, &path, &e)),
+            }
         };
         if actual.as_ref() != Some(expected) {
             return Err(DocumentError::Input(DocumentInputFault::SourceChanged {

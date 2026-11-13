@@ -696,7 +696,7 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
                     tag.site().decoded.clone().unwrap(),
                     plan::Inline::Tag {
                         handle: tag.input().into(),
-                        label: book.resolve(tag.input()).unwrap().semantic_name().into(),
+                        label: book.resolve(tag.input()).unwrap().label().into(),
                         token,
                         site,
                     },
@@ -720,6 +720,12 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
                     site.decoded.clone().unwrap(),
                     if citation {
                         plan::Inline::Citation {
+                            identity: synthetic_citation_identity(
+                                &value,
+                                "sec:fixture:caption",
+                                "dec:weld",
+                                "u1-c0",
+                            ),
                             text: value,
                             site: region.site(&site),
                         }
@@ -1040,7 +1046,7 @@ pub(super) fn support_required_real_table_and_picture_consume_pending_math_and_l
 ) -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let graph = ftoo_manifest::seed()?;
-    let book = ftoo_manifest::addressing(&graph)?;
+    let book = reader_fixture_book(&graph);
     let notation = fs::read_to_string(root.join("generated/notation.tex"))?;
     for (index, (kind, md, tex)) in [
         (
@@ -1089,6 +1095,12 @@ fn relation_caption(plan: &mut plan::DocumentPlan) {
         },
         plan::Inline::Text("; see ".into()),
         plan::Inline::Citation {
+            identity: synthetic_citation_identity(
+                "dec:weld:equal-address-sets",
+                "sec:coefficients:relation",
+                "dec:weld",
+                "u1-c0",
+            ),
             text: "dec:weld:equal-address-sets".into(),
             site: input::site("units/statements/relation.toml"),
         },
@@ -1108,7 +1120,7 @@ fn complete_figure_caption_pending_math_and_citation_match_literal_blocks() {
     let markdown = concat!(
         "<!-- generated document main language en -->\nCoverage.\nSlice.\n\n",
         "<!-- unit sec:coefficients:relation document main language en -->\n",
-        r"Relation $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$; see <code>dec:weld:equal-address-sets</code><!-- cite dec:weld:equal-address-sets -->.",
+        r"Relation $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$; see dec:weld<!-- cite dec:weld:equal-address-sets -->.",
         "\n\n> c:1<!-- label def:langevin:coefficient-one --> → c:3<!-- label def:langevin:coefficient-three -->\n",
     );
     let latex = format!(
@@ -1121,7 +1133,7 @@ Coverage.
 Slice.
 
 % unit sec:coefficients:relation document main language en
-Relation \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\); see \texttt{dec:\allowbreak{}weld:\allowbreak{}equal-\allowbreak{}address-\allowbreak{}sets}% cite dec:weld:equal-address-sets
+Relation \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\); see \FtdocTag{dec:weld}{u1-c0}% cite dec:weld:equal-address-sets
 .
 
 \begingroup\setlength{\unitlength}{1pt}

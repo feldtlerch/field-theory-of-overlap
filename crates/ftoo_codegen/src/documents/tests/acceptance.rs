@@ -1370,6 +1370,12 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                 },
                 plan::Inline::Text(" ".into()),
                 plan::Inline::Citation {
+                    identity: synthetic_citation_identity(
+                        "dec:fixture:source",
+                        "sec:fixture:paragraph",
+                        "record",
+                        "u0-c0",
+                    ),
                     text: "dec:fixture:source".into(),
                     site: occurrence(2),
                 },
@@ -1398,19 +1404,28 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         );
         let tag = record(EmissionKind::Tag, Some(0), "def:fixture:one");
         let math = record(EmissionKind::Math, Some(1), "value");
-        let cite = record(EmissionKind::Citation, Some(2), "dec:fixture:source");
+        let cite = record(
+            EmissionKind::Citation(Box::new(synthetic_citation_identity(
+                "dec:fixture:source",
+                "sec:fixture:paragraph",
+                "record",
+                "u0-c0",
+            ))),
+            Some(2),
+            "dec:fixture:source",
+        );
         let (tag_source, math_source, cite_source, marker) = if target == DocumentTarget::Markdown {
             (
                 "c:1<!-- label def:fixture:one -->",
                 "$1$",
-                "<code>dec:fixture:source</code><!-- cite dec:fixture:source -->",
+                "record<!-- cite dec:fixture:source -->",
                 "<!-- unit ",
             )
         } else {
             (
                 "\\FtdocTag{c:1}{u0-t0}% label def:fixture:one\n",
                 "\\(1\\)",
-                "\\texttt{dec:\\allowbreak{}fixture:\\allowbreak{}source}% cite dec:fixture:source\n",
+                "\\FtdocTag{record}{u0-c0}% cite dec:fixture:source\n",
                 "% unit ",
             )
         };
@@ -1571,8 +1586,20 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                     SourceOrigin {
                         unit: Some("sec:fixture:paragraph".into()),
                         language: Some("en".into()),
-                        target: Some(target),
+                        target: None,
                         site: occurrence(2),
+                    },
+                    SourceOrigin {
+                        unit: None,
+                        language: None,
+                        target: None,
+                        site: UnitSite {
+                            file: "fixture.md".into(),
+                            path: vec![],
+                            anchor: SourceAnchor::Bytes(0, 18),
+                            decoded: None,
+                            occurrence: None,
+                        },
                     },
                 ],
             };
@@ -1669,7 +1696,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
-                        label: book.resolve(handle)?.semantic_name().into(),
+                        label: book.resolve(handle)?.label().into(),
                         token: "u0-t0".into(),
                         site: origin.clone(),
                     }],

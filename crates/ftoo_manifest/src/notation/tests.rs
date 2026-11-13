@@ -985,7 +985,7 @@ fn n07_addressing_independence_and_snapshot_preservation() -> TestResult {
                 "tag \"c:1\": out of slice; label def:langevin:coefficient-one; cause quantity-outside-support"
             );
         } else {
-            assert_eq!(book.resolve("c:1")?, One);
+            assert_eq!(book.resolve("c:1")?, crate::AddressTarget::Theory(One));
         }
         if slice.len() == 1 {
             let error = book.resolve("c:3").unwrap_err();
@@ -1278,7 +1278,7 @@ fn n16_renderer_register_has_no_existing_transitions() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (59, 50, 4, 5)
+        (60, 51, 4, 5)
     );
 }
 

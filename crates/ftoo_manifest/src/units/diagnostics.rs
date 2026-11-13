@@ -105,6 +105,14 @@ pub enum InsertionReason {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnitFault {
+    UnknownToken {
+        value: String,
+        expected: Vec<String>,
+    },
+    DocumentaryTagTarget {
+        input: String,
+        label: String,
+    },
     InvalidUtf8,
     Bom,
     TomlSyntax {
@@ -231,6 +239,8 @@ impl UnitFault {
             Self::UnknownMath { .. } => 24,
             Self::UnusedMath { .. } => 25,
             Self::ResolutionFault { .. } => 26,
+            Self::DocumentaryTagTarget { .. } => 50,
+            Self::UnknownToken { .. } => 51,
             Self::MalformedLabelSpan { .. } => 27,
             Self::TextMintForbidden { .. } => 28,
         }

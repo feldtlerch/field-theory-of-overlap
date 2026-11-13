@@ -1,0 +1,8 @@
+schema = 1
+[[events]]
+ordinal = 1
+change = "admit"
+handle = "dec:weld"
+label = "dec:weld:equal-address-sets"
+authority-record = "dec:tags:bound-to-labels"
+reason = "Addresses the weld decision."

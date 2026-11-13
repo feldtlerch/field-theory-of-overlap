@@ -326,7 +326,7 @@ impl<'r, 'm, 'u, 'b, 'g> LabelIntegratedUnits<'r, 'm, 'u, 'b, 'g> {
     }
 }
 fn joint_mints(
-    resolved: &ResolvedUnits<'_, '_, '_>,
+    corpus: &crate::LanguageCheckedUnits,
     markdown: &CheckedMarkdown,
     identities: &[NodeId],
 ) -> Mints {
@@ -355,7 +355,7 @@ fn joint_mints(
                 site: occurrence.site.clone(),
             });
     }
-    for unit in resolved.corpus().units() {
+    for unit in corpus.units() {
         if let Some(text) = unit.texts().values().next() {
             mints
                 .entry(unit.label().as_str().to_owned())
@@ -384,11 +384,35 @@ pub fn integrate_labels<'r, 'm, 'u, 'b, 'g>(
     resolved: &'r ResolvedUnits<'u, 'b, 'g>,
     markdown: &'m CheckedMarkdown,
 ) -> Result<LabelIntegratedUnits<'r, 'm, 'u, 'b, 'g>, LabelErrors> {
-    let mints = joint_mints(resolved, markdown, &NodeId::ALL);
-    let mut errors = duplicates(&mints, LabelStage::Namespace);
-    if !errors.is_empty() {
-        return Err(LabelErrors(errors));
+    let joint = collect_joint_mints(resolved.corpus(), markdown)?;
+    integrate_joint_labels(resolved, &joint)
+}
+/// Integrate references using the same admitted mint inventory as the registry.
+/// # Errors
+/// Refuses mismatched input contexts and unresolved history authority records.
+pub fn integrate_joint_labels<'r, 'm, 'u, 'b, 'g>(
+    resolved: &'r ResolvedUnits<'u, 'b, 'g>,
+    joint: &JointMints<'u, 'm>,
+) -> Result<LabelIntegratedUnits<'r, 'm, 'u, 'b, 'g>, LabelErrors> {
+    let markdown = joint.markdown;
+    if !std::ptr::eq(resolved.corpus(), joint.corpus)
+        || resolved
+            .book()
+            .joint_mints
+            .as_ref()
+            .is_some_and(|m| m != &joint.mints)
+    {
+        return Err(LabelErrors(vec![diagnostic(
+            RuleId::M060,
+            LabelStage::Namespace,
+            LabelSite::MintContext,
+            LabelFault::MintContextMismatch {
+                expected: resolved.book().joint_mints.clone().unwrap_or_default(),
+                actual: joint.mints.clone(),
+            },
+        )]));
     }
+    let mut errors = vec![];
     let mut rust_citations = Vec::new();
     let mut history: Vec<_> = resolved.book().history().collect();
     history.sort_by_key(|event| event.ordinal());
@@ -430,10 +454,45 @@ pub fn integrate_labels<'r, 'm, 'u, 'b, 'g>(
     Ok(LabelIntegratedUnits {
         resolved,
         markdown,
+        mints: joint.mints.clone(),
+        rust_citations,
+    })
+}
+
+/// Joint mint admission precedes authored tag resolution.
+/// ```compile_fail,E0616
+/// fn change(v: &mut ftoo_manifest::JointMints<'_, '_>) { v.mints.clear(); }
+/// ```
+#[derive(Debug)]
+pub struct JointMints<'u, 'm> {
+    corpus: &'u crate::LanguageCheckedUnits,
+    markdown: &'m CheckedMarkdown,
+    mints: BTreeMap<String, MintOrigin>,
+}
+impl JointMints<'_, '_> {
+    #[must_use]
+    pub fn mints(&self) -> &BTreeMap<String, MintOrigin> {
+        &self.mints
+    }
+}
+/// Admit one complete joint mint inventory without resolving authored tags.
+/// # Errors
+/// Refuses every duplicate in the joint permanent namespace.
+pub fn collect_joint_mints<'u, 'm>(
+    corpus: &'u crate::LanguageCheckedUnits,
+    markdown: &'m CheckedMarkdown,
+) -> Result<JointMints<'u, 'm>, LabelErrors> {
+    let mints = joint_mints(corpus, markdown, &NodeId::ALL);
+    let errors = duplicates(&mints, LabelStage::Namespace);
+    if !errors.is_empty() {
+        return Err(LabelErrors(errors));
+    }
+    Ok(JointMints {
+        corpus,
+        markdown,
         mints: mints
             .into_iter()
             .filter_map(|(label, origins)| origins.into_iter().next().map(|origin| (label, origin)))
             .collect(),
-        rust_citations,
     })
 }

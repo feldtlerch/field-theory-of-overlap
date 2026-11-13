@@ -64,6 +64,15 @@ pub(crate) fn encoding(source: &UnitSource) -> Result<&str, Box<UnitDiagnostic>>
     Ok(text)
 }
 pub(crate) fn parse(file: &str, text: &str) -> Result<Node, Box<UnitDiagnostic>> {
+    parse_array_bounded(file, text, "", usize::MAX).map(|result| result.expect("unbounded parse"))
+}
+/// Bound an authority array before allocating owned nodes or decoded event drafts.
+pub(crate) fn parse_array_bounded(
+    file: &str,
+    text: &str,
+    key: &str,
+    limit: usize,
+) -> Result<Result<Node, UnitSite>, Box<UnitDiagnostic>> {
     let document = ImDocument::parse(text).map_err(|e| {
         let mut location = site(file);
         location.anchor = e.span().map_or(SourceAnchor::Unavailable, |r| {
@@ -78,7 +87,19 @@ pub(crate) fn parse(file: &str, text: &str) -> Result<Node, Box<UnitDiagnostic>>
             },
         )
     })?;
-    Ok(table(document.as_table(), site(file)))
+    if let Some(item) = document.as_table().get(key) {
+        let count = match item {
+            Item::ArrayOfTables(values) => values.len(),
+            Item::Value(Value::Array(values)) => values.len(),
+            _ => 0,
+        };
+        if count > limit {
+            let mut location = site(file).child(key);
+            location.anchor = anchor(item.span());
+            return Ok(Err(location));
+        }
+    }
+    Ok(Ok(table(document.as_table(), site(file))))
 }
 fn table(table: &dyn TableLike, location: UnitSite) -> Node {
     let fields = table

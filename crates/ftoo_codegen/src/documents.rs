@@ -12,6 +12,7 @@ mod native_format;
 mod native_support;
 mod pending;
 mod plan;
+mod registry;
 mod runtime;
 #[cfg(test)]
 mod tests;
@@ -224,11 +225,19 @@ pub fn prepare_documents(
     let statements = input::sources(root, &statement_files)?;
     let corpus = crate::load_unit_sources(declaration.clone(), statements.clone())
         .map_err(DocumentError::Units)?;
-    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book)
-        .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;
     let markdown = crate::load_markdown_files(root).map_err(DocumentError::Labels)?;
     neutral(&markdown, true, AssemblyStage::Source)?;
-    let integrated = ftoo_manifest::integrate_labels(&resolved, &markdown)
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
+        .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
+    let source = registry::read(root)?;
+    let events = registry::load(&source)?;
+    inputs.insert(source.file, source.bytes);
+    let book = book
+        .with_documentary(&joint, events)
+        .map_err(DocumentError::DocumentaryRegistry)?;
+    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book)
+        .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;
+    let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint)
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let welded = ftoo_manifest::weld_units(&integrated).map_err(DocumentError::Weld)?;
     let skeleton_files = input::discover(root, "units/skeletons", false)?;

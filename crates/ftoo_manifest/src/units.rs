@@ -191,7 +191,7 @@ fn local_name(value: &str) -> bool {
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
     })
 }
-fn label_name(value: &str) -> bool {
+pub(crate) fn label_name(value: &str) -> bool {
     value.split(':').count() == 3
         && value.split(':').all(|p| {
             !p.is_empty()
@@ -689,12 +689,23 @@ pub fn resolve_unit_tags<'u, 'b, 'g>(
         for (language, text) in &unit.texts {
             for occurrence in &text.tags {
                 match book.resolve(&occurrence.input) {
-                    Ok(target) => tags.push(ResolvedUnitTag {
+                    Ok(crate::AddressTarget::Theory(target)) => tags.push(ResolvedUnitTag {
                         unit: &unit.label,
                         language,
                         occurrence,
                         target,
                     }),
+                    Ok(crate::AddressTarget::Documentary(label)) => errors.push(diagnostic(
+                        RuleId::M042,
+                        UnitStage::Resolution,
+                        Some(unit.label.as_str()),
+                        Some(language),
+                        &occurrence.site,
+                        UnitFault::DocumentaryTagTarget {
+                            input: occurrence.input.clone(),
+                            label,
+                        },
+                    )),
                     Err(cause) => errors.push(diagnostic(
                         RuleId::M042,
                         UnitStage::Resolution,

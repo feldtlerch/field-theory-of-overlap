@@ -133,8 +133,13 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             Inline::Math { markdown, .. } => {
                 write!(output, "${markdown}$").expect("string write");
             }
-            Inline::Citation { text, .. } => {
-                write!(output, "{}<!-- cite {text} -->", code(text)).expect("string write");
+            Inline::Citation {
+                text: label,
+                identity,
+                ..
+            } => {
+                write!(output, "{}<!-- cite {label} -->", text(&identity.handle))
+                    .expect("string write");
             }
             Inline::Mention { text, .. } => output.push_str(&code(text)),
         }
@@ -150,8 +155,8 @@ pub(super) fn inline_size(runs: &[Inline]) -> usize {
                 text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
             }
             Inline::Math { markdown, .. } => markdown.len().saturating_add(2),
-            Inline::Citation { text, .. } => {
-                code_size(text).saturating_add(format!("<!-- cite {text} -->").len())
+            Inline::Citation { text, identity, .. } => {
+                text_size(&identity.handle).saturating_add(format!("<!-- cite {text} -->").len())
             }
             Inline::Mention { text, .. } => code_size(text),
         };
