@@ -17,6 +17,110 @@ use TagId::{
 use std::{collections::BTreeSet, fmt::Write};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+#[test]
+fn reader_identity_selection_retains_complete_unavailable_evidence_and_restores() -> TestResult {
+    let graph = seed()?;
+    let live = addressing(&graph)?;
+    assert_eq!(live.descriptors(), descriptors());
+    assert_eq!(live.reader_identity(Three), Ok("c:3".into()));
+    let mut history = seed_history();
+    history.push(event(9, H::RetireTag { tag: C3 }));
+    let retired = construct(&graph, descriptors(), history)?;
+    let candidate = ReaderTagCandidate {
+        handle: "c:3".into(),
+        outcome: Err(TagResolutionFault::RetiredTag {
+            input: "c:3".into(),
+            tag: C3,
+            target: Three,
+            cause: RetirementCause::TagRetirement(event(9, H::RetireTag { tag: C3 })),
+        }),
+    };
+    let expected = ReaderIdentityFault {
+        target: Three,
+        reason: ReaderIdentityReason::NoLiveTag,
+        candidates: vec![candidate.clone()],
+    };
+    assert_eq!(retired.reader_identity(Three), Err(expected.clone()));
+    assert_eq!(
+        retired.reader_identity(Three).unwrap_err().to_string(),
+        format!("{expected:?}")
+    );
+    assert_eq!(addressing(&graph)?.reader_identity(Three), Ok("c:3".into()));
+    for (graph, object, tag, handle, cause) in [
+        (
+            slice(&[OneValue]),
+            Three,
+            C3,
+            "c:3",
+            O::QuantityOutsideSupport,
+        ),
+        (
+            slice(&[OneValue]),
+            ThreeValue,
+            V3,
+            "v:3",
+            O::ClaimNotSelected,
+        ),
+        (tombstone(), Three, C3, "c:3", O::TargetAbsent),
+    ] {
+        let expected = ReaderIdentityFault {
+            target: object,
+            reason: ReaderIdentityReason::NoLiveTag,
+            candidates: vec![ReaderTagCandidate {
+                handle: handle.into(),
+                outcome: Err(TagResolutionFault::OutOfSliceTag {
+                    input: handle.into(),
+                    tag,
+                    target: object,
+                    cause,
+                }),
+            }],
+        };
+        let actual = addressing(&graph)?.reader_identity(object).unwrap_err();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), format!("{expected:?}"));
+        assert_eq!(
+            addressing(&seed()?)?.reader_identity(object),
+            Ok(handle.into())
+        );
+    }
+    // These decision vectors are not claimed to be constructible closed books.
+    let selected = ReaderTagCandidate {
+        handle: "live".into(),
+        outcome: Ok(Three),
+    };
+    assert_eq!(
+        crate::tags::select_reader_identity(Three, vec![candidate, selected.clone()]),
+        Ok("live".into())
+    );
+    for (candidates, reason) in [
+        (vec![], ReaderIdentityReason::MissingTag),
+        (
+            vec![
+                selected.clone(),
+                ReaderTagCandidate {
+                    handle: "second".into(),
+                    outcome: Ok(Three),
+                },
+            ],
+            ReaderIdentityReason::AmbiguousLiveTags,
+        ),
+    ] {
+        let expected = ReaderIdentityFault {
+            target: Three,
+            reason,
+            candidates: candidates.clone(),
+        };
+        let actual = crate::tags::select_reader_identity(Three, candidates).unwrap_err();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), format!("{expected:?}"));
+    }
+    assert_eq!(
+        crate::tags::select_reader_identity(Three, vec![selected]),
+        Ok("live".into())
+    );
+    Ok(())
+}
 fn descriptors() -> Vec<TagDescriptor> {
     TagId::ALL.map(TagId::descriptor).to_vec()
 }

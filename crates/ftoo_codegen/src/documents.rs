@@ -478,7 +478,49 @@ fn consume_sweep(
     let mut rows = Vec::new();
     for row in notation.sweep_rows() {
         let mut origin = native::sweep_row(&mut sweep, row.owner(), row.case(), row.macro_source());
-        sweep.push_str(&pending::sweep(row.pending_entries()));
+        let explanation = pending::sweep(row.pending_entries());
+        if !plan::check_sweep_pending(&explanation, row.pending_entries()) {
+            let record = |value| EmissionRecord {
+                kind: EmissionKind::Paragraph,
+                unit: String::new(),
+                language: "en".into(),
+                target: DocumentTarget::Latex,
+                occurrence: None,
+                value,
+                site: origin.origin.site.clone(),
+            };
+            let expected = row
+                .pending_entries()
+                .iter()
+                .map(|entry| {
+                    record(format!(
+                        "{}: {}",
+                        entry.body_macro(),
+                        entry
+                            .reasons()
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    ))
+                })
+                .collect();
+            return Err(failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Generated {
+                    path: "assembly-sweep.tex".into(),
+                    bytes: sweep.len()..sweep.len() + explanation.len(),
+                    origins: vec![origin.origin.clone()],
+                },
+                AssemblyFault::EmissionMismatch {
+                    missing: expected,
+                    unexpected: vec![record(explanation)],
+                    changed: vec![],
+                },
+            ));
+        }
+        sweep.push_str(&explanation);
         origin.bytes.end = sweep.len();
         origin.origin.site.anchor = SourceAnchor::Bytes(origin.bytes.start, origin.bytes.end);
         rows.push(origin);

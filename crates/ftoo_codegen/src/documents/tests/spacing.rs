@@ -28,8 +28,9 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
     plan::DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![plan::Block {
+            pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
             unit: "sec:fixture:spacing".into(),
             depth,
@@ -44,10 +45,10 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
 }
 
 #[test]
-fn extra_break_markers_refuse_prose_heading_mention_and_coverage_with_reread() {
+fn extra_break_markers_and_ragged_groups_refuse_with_exact_faults_and_reread() {
     let directory = Directory::new();
     let path = directory.0.join("extra.tex");
-    for shape in 0..4 {
+    for shape in 0..5 {
         let mut plan = fixture(false, (shape == 1).then_some(1), "");
         plan.blocks[0].runs = if shape == 2 {
             vec![plan::Inline::Mention {
@@ -58,24 +59,39 @@ fn extra_break_markers_refuse_prose_heading_mention_and_coverage_with_reread() {
             vec![plan::Inline::Text("word".into())]
         };
         let correct = latex::render(&plan);
-        let mutated = if shape == 3 {
+        let mutated = if shape == 4 {
+            correct.replace("word", r"{\raggedright word\par}")
+        } else if shape == 3 {
             correct.replace("Coverage.", r"Cover\allowbreak{}age.")
         } else {
             correct.replace("word", r"wo\allowbreak{}rd")
         };
         let records = plan.records(DocumentTarget::Latex);
         let (range, fault) = if shape == 3 {
+            let expected = EmissionRecord {
+                kind: EmissionKind::CoverageDeclaration,
+                unit: String::new(),
+                language: "en".into(),
+                target: DocumentTarget::Latex,
+                occurrence: None,
+                value: "Coverage.".into(),
+                site: plan.coverage.site.clone(),
+            };
+            let mut actual = expected.clone();
+            actual.value = r"Cover\allowbreak{}age.".into();
             (
-                mutated.len()..mutated.len(),
+                mutated.find("Cover").unwrap()..mutated.find("Slice.").unwrap() + 6,
                 AssemblyFault::EmissionMismatch {
-                    missing: records,
+                    missing: vec![],
                     unexpected: vec![],
-                    changed: vec![],
+                    changed: vec![EmissionChange { expected, actual }],
                 },
             )
         } else {
             let mut actual = records[0].clone();
-            actual.value = if shape == 2 {
+            actual.value = if shape == 4 {
+                r"{\raggedright word\par}"
+            } else if shape == 2 {
                 r"\texttt{wo\allowbreak{}rd}"
             } else if shape == 1 {
                 r"\section*{wo\allowbreak{}rd}"
@@ -121,14 +137,11 @@ fn extra_break_markers_refuse_prose_heading_mention_and_coverage_with_reread() {
 }
 
 #[test]
-fn identity_breaks_refuse_missing_and_misplaced_markers_and_reread_restoration() {
+fn citation_identity_breaks_refuse_missing_and_misplaced_markers_and_reread_restoration() {
     let directory = Directory::new();
     let path = directory.0.join("identity.tex");
-    for coverage in [false, true] {
-        let mut plan = fixture(true, None, " word");
-        if coverage {
-            plan.coverage[1] = "Declared slice: dec:fixture:source.".into();
-        }
+    {
+        let plan = fixture(true, None, " word");
         let correct = latex::render(&plan);
         assert_eq!(latex::size(&plan), correct.len());
         let marker = r"dec:\allowbreak{}fixture:\allowbreak{}source";
@@ -140,16 +153,7 @@ fn identity_breaks_refuse_missing_and_misplaced_markers_and_reread_restoration()
             let mutated = correct.replacen(marker, replacement, 1);
             fs::write(&path, &mutated).unwrap();
             let records = plan.records(DocumentTarget::Latex);
-            let (range, fault) = if coverage {
-                (
-                    mutated.len()..mutated.len(),
-                    AssemblyFault::EmissionMismatch {
-                        missing: records,
-                        unexpected: vec![],
-                        changed: vec![],
-                    },
-                )
-            } else {
+            let (range, fault) = {
                 let mut actual = records[0].clone();
                 actual.value =
                     format!("\\texttt{{{replacement}}}% cite dec:fixture:source\n\\space{{}}word");
@@ -450,6 +454,7 @@ fn support_required_native_comment_glue_matches_authored_controls()
             let mut runs = vec![insertion(citation), plan::Inline::Text(suffix.into())];
             if suffix == " " {
                 runs.push(plan::Inline::Math {
+                    definition_site: super::super::input::site("fixture-math.toml"),
                     key: "x".into(),
                     markdown: "x".into(),
                     latex: "x".into(),

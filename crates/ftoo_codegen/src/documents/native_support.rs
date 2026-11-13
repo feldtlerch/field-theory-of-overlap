@@ -30,13 +30,15 @@ pub struct NativeSupport {
     pub(super) bootstrap_evidence: RefCell<Option<super::native::Evidence>>,
     #[cfg(test)]
     closing_hash: RefCell<Option<Result<()>>>,
+    #[cfg(test)]
+    pub(super) identity_observations: std::cell::Cell<usize>,
 }
 #[derive(Debug)]
 struct Active {
     snapshot: Option<crate::support_bracket::Snapshot>,
     poison: Option<NativeAdapterFault>,
     formats: Vec<super::native_format::Lease>,
-    observation_available: bool,
+    observation_available: Option<crate::support_bracket::Observation>,
 }
 struct Scope<'a>(&'a NativeSupport);
 impl Drop for Scope<'_> {
@@ -57,7 +59,7 @@ impl NativeSupport {
             .borrow_mut()
             .as_mut()
             .expect("open bracket")
-            .observation_available = false;
+            .observation_available = None;
     }
     pub(super) fn before_consumer(&self, lock: &Lock) -> Result<()> {
         self.ensure_open(lock)?;
@@ -67,21 +69,31 @@ impl NativeSupport {
             .as_ref()
             .expect("open bracket")
             .observation_available;
-        if !available {
+        if available.is_none() || available != crate::support_bracket::idle_observation(&self.root)
+        {
             self.observe(lock)?;
         }
         self.invalidate_observation();
         Ok(())
     }
     pub(super) fn after_consumer(&self, lock: &Lock) -> Result<()> {
+        self.after_consumer_observed(lock, || {})
+    }
+    pub(super) fn after_consumer_observed(
+        &self,
+        lock: &Lock,
+        observed: impl FnOnce(),
+    ) -> Result<()> {
+        let before = crate::support_bracket::idle_observation(&self.root);
         self.observe(lock)?;
-        // No consumer runs between this observation and the next ordinary
-        // invocation. Injection hooks invalidate it before making any writes.
+        observed();
+        let after = crate::support_bracket::idle_observation(&self.root);
+        // A consumer starting during the observation also prevents reuse.
         self.active
             .borrow_mut()
             .as_mut()
             .expect("open bracket")
-            .observation_available = true;
+            .observation_available = (before == after).then_some(after).flatten();
         Ok(())
     }
     pub(super) fn format_seed(
@@ -126,6 +138,8 @@ impl NativeSupport {
         active.poison.get_or_insert(fault).clone()
     }
     pub(super) fn at(root: PathBuf) -> Self {
+        #[cfg(test)]
+        crate::support_bracket::mutation::register(&root);
         Self {
             root,
             active: RefCell::new(None),
@@ -137,6 +151,8 @@ impl NativeSupport {
             bootstrap_evidence: RefCell::new(None),
             #[cfg(test)]
             closing_hash: RefCell::new(None),
+            #[cfg(test)]
+            identity_observations: std::cell::Cell::new(0),
         }
     }
     #[cfg(test)]
@@ -185,6 +201,9 @@ impl NativeSupport {
         }
     }
     pub(super) fn observe(&self, lock: &Lock) -> Result<()> {
+        #[cfg(test)]
+        self.identity_observations
+            .set(self.identity_observations.get() + 1);
         self.ensure_open(lock)?;
         let (phase, result) = {
             let active = self.active.borrow();
@@ -289,7 +308,7 @@ impl NativeSupport {
             snapshot: None,
             poison: None,
             formats: Vec::new(),
-            observation_available: false,
+            observation_available: None,
         });
         let guard = Scope(self);
         let result = run();

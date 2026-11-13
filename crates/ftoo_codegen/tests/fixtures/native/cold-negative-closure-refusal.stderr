@@ -1,0 +1,5 @@
+warning: open of input /dev/null failed
+caused by: access to the path `/dev/null` is forbidden
+error: !Emergency stop
+*** (job aborted, no legal \end found)
+error: *** (job aborted, no legal \end found)

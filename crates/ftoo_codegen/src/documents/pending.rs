@@ -12,7 +12,13 @@ pub(super) fn entries(
 ) -> Vec<PendingExplanation> {
     let mut entries: BTreeMap<usize, PendingExplanation> = BTreeMap::new();
     for run in block.target_runs(target) {
-        let Inline::Math { pending, site, .. } = run else {
+        let Inline::Math {
+            pending,
+            site,
+            definition_site,
+            ..
+        } = run
+        else {
             continue;
         };
         for entry in pending {
@@ -23,9 +29,16 @@ pub(super) fn entries(
                     body_macro: entry.body_macro().into(),
                     body_unicode: entry.body_unicode().into(),
                     reasons: entry.reasons().to_vec(),
+                    names: block.pending_names[&(target, entry.definition())].clone(),
                     occurrences: vec![],
                 });
             explanation.occurrences.push(PendingOccurrence {
+                definition: SourceOrigin {
+                    unit: Some(block.unit.clone()),
+                    language: Some(language.into()),
+                    target: None,
+                    site: definition_site.clone(),
+                },
                 source: SourceOrigin {
                     unit: Some(block.unit.clone()),
                     language: Some(language.into()),
@@ -101,25 +114,72 @@ fn render<'a>(
 
 pub(super) fn paragraph(block: &Block, language: &str, target: DocumentTarget) -> String {
     let entries = entries(block, language, target);
-    render(
-        entries.iter().map(|entry| {
-            let body = match target {
-                DocumentTarget::Markdown => &entry.body_unicode,
-                DocumentTarget::Latex => &entry.body_macro,
-            };
-            (body.as_str(), entry.reasons.as_slice())
-        }),
-        target,
-    )
+    let mut runs = vec![];
+    for (index, entry) in entries.iter().enumerate() {
+        debug_assert!(
+            !entry.reasons.is_empty(),
+            "pending tier requires at least one reason"
+        );
+        runs.push(Inline::Text(
+            if index == 0 {
+                "Pending notation: "
+            } else {
+                ". "
+            }
+            .into(),
+        ));
+        runs.push(Inline::Math {
+            definition_site: block.site.clone(),
+            key: String::new(),
+            markdown: entry.body_unicode.clone(),
+            latex: entry.body_macro.clone(),
+            pending: vec![],
+            site: block.site.clone(),
+        });
+        runs.push(Inline::Text(": ".into()));
+        for (reason, (value, name)) in entry.reasons.iter().zip(&entry.names).enumerate() {
+            let (before, _, after) = value.text_parts();
+            runs.push(Inline::Text(format!(
+                "{}{before}",
+                if reason == 0 { "" } else { "; " }
+            )));
+            runs.push(Inline::Tag {
+                handle: name.handle.clone(),
+                label: name.label.clone(),
+                token: name.token.clone(),
+                site: block.site.clone(),
+            });
+            runs.push(Inline::Text(after));
+        }
+    }
+    if runs.is_empty() {
+        return String::new();
+    }
+    runs.push(Inline::Text(".".into()));
+    let mut output = String::new();
+    match target {
+        DocumentTarget::Markdown => super::markdown::inline(&mut output, &runs),
+        DocumentTarget::Latex => super::latex::inline(&mut output, &runs),
+    }
+    output.push_str("\n\n");
+    output
 }
 
 pub(super) fn sweep(entries: &[crate::PendingEntry]) -> String {
-    render(
+    let paragraph = render(
         entries
             .iter()
             .map(|entry| (entry.body_macro(), entry.reasons())),
         DocumentTarget::Latex,
-    )
+    );
+    if paragraph.is_empty() {
+        paragraph
+    } else {
+        format!(
+            "{{\\raggedright\n{}\\par}}\n\n",
+            paragraph.trim_end_matches('\n')
+        )
+    }
 }
 
 #[cfg(test)]

@@ -12,6 +12,11 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    ReaderIdentity {
+        target: ftoo_manifest::NodeId,
+        reason: ftoo_manifest::ReaderIdentityReason,
+        candidates: Vec<ftoo_manifest::ReaderTagCandidate>,
+    },
     Limit {
         resource: AssemblyResource,
         limit: usize,
@@ -138,6 +143,12 @@ pub enum AssemblyFault {
         site_token: String,
         message: String,
     },
+    InvalidRuntimeRecord {
+        status: Option<i32>,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+        log: Vec<u8>,
+    },
     NativeInventory {
         missing: Vec<NativeCase>,
         repeated: Vec<(NativeCase, usize)>,
@@ -171,6 +182,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::ReaderIdentity { .. } => 31,
             Self::Limit { .. } => 0,
             Self::UnknownToken { .. } => 1,
             Self::EmptySkeleton { .. } => 2,
@@ -186,6 +198,7 @@ impl AssemblyFault {
             Self::EmissionMismatch { .. } => 12,
             Self::GeneratedAddressSyntax { .. } => 13,
             Self::RuntimeTagRejected { .. } => 14,
+            Self::InvalidRuntimeRecord { .. } => 32,
             Self::NativeInventory { .. } => 15,
             Self::NativeRejected { .. } => 16,
             Self::ArtifactInventory { .. } => 17,
@@ -206,6 +219,7 @@ impl AssemblyFault {
 }
 fn location(site: &AssemblySite) -> (&str, &[ftoo_manifest::PathPart], Option<usize>) {
     match site {
+        AssemblySite::ReaderIdentity { .. } => ("", &[], None),
         AssemblySite::Source(site) => (
             site.file.as_str(),
             &site.path,
@@ -418,22 +432,35 @@ impl AssemblyErrors {
     #[must_use]
     pub fn from_diagnostics(mut diagnostics: Vec<AssemblyDiagnostic>) -> Option<Self> {
         diagnostics.sort_by(|a, b| {
-            (
-                &a.stage,
-                &a.rule,
-                &a.document,
-                &a.unit,
-                &a.language,
-                &a.target,
-            )
-                .cmp(&(
-                    &b.stage,
-                    &b.rule,
-                    &b.document,
-                    &b.unit,
-                    &b.language,
-                    &b.target,
-                ))
+            (&a.stage, &a.rule, &a.document, &a.unit, &a.language)
+                .cmp(&(&b.stage, &b.rule, &b.document, &b.unit, &b.language))
+                .then_with(|| match (&a.site, &b.site) {
+                    (
+                        AssemblySite::ReaderIdentity { position: a, .. },
+                        AssemblySite::ReaderIdentity { position: b, .. },
+                    ) => {
+                        use ftoo_manifest::ReaderIdentityPosition::{Coverage, Pending};
+                        match (a, b) {
+                            (Coverage { index: a, .. }, Coverage { index: b, .. }) => a.cmp(b),
+                            (Coverage { .. }, Pending { .. }) => std::cmp::Ordering::Less,
+                            (Pending { .. }, Coverage { .. }) => std::cmp::Ordering::Greater,
+                            (
+                                Pending {
+                                    definition: a,
+                                    reason: ar,
+                                    ..
+                                },
+                                Pending {
+                                    definition: b,
+                                    reason: br,
+                                    ..
+                                },
+                            ) => (a, ar).cmp(&(b, br)),
+                        }
+                    }
+                    _ => std::cmp::Ordering::Equal,
+                })
+                .then_with(|| a.target.cmp(&b.target))
                 .then_with(|| location(&a.site).cmp(&location(&b.site)))
                 .then_with(|| a.fault.rank().cmp(&b.fault.rank()))
         });
@@ -471,6 +498,14 @@ impl fmt::Display for AssemblyErrors {
 impl std::error::Error for AssemblyErrors {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmissionKind {
+    CoverageDeclaration,
+    CoverageSlice,
+    ReaderIdentity {
+        position: Option<ftoo_manifest::ReaderIdentityPosition>,
+        object: Option<ftoo_manifest::NodeId>,
+        handle: String,
+        token: String,
+    },
     PendingExplanation(Box<PendingExplanation>),
     Heading,
     Paragraph,
@@ -750,10 +785,21 @@ pub struct PendingExplanation {
     pub body_macro: String,
     pub body_unicode: String,
     pub reasons: Vec<ftoo_manifest::PendingReason>,
+    pub names: Vec<PendingReaderName>,
     pub occurrences: Vec<PendingOccurrence>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingOccurrence {
+    pub definition: ftoo_manifest::SourceOrigin,
     pub source: ftoo_manifest::SourceOrigin,
     pub notation: Vec<ftoo_manifest::NotationOrigin>,
+}
+
+/// A checked object-name position in a generated pending explanation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingReaderName {
+    pub object: ftoo_manifest::NodeId,
+    pub handle: String,
+    pub label: String,
+    pub token: String,
 }

@@ -1,9 +1,12 @@
 // Full independent fault and byte oracles stay beside their restoration controls.
 #![allow(clippy::too_many_lines)]
+#[cfg(unix)]
+mod overfull;
 use super::*;
 mod acceptance;
 mod brackets;
 mod displays;
+mod historical;
 pub(super) mod native_evidence;
 mod pending;
 mod spacing;
@@ -61,6 +64,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             insertion(),
             Inline::Text(" ".into()),
             Inline::Math {
+                definition_site: input::site("fixture-math.toml"),
                 key: "x".into(),
                 markdown: "x".into(),
                 latex: "x".into(),
@@ -87,7 +91,7 @@ fn native_preparation_refuses_unsafe_archives_and_restores()
 -> Result<(), Box<dyn std::error::Error>> {
     let directory = Directory::new();
     let script = directory.0.join("preparation-fixtures.py");
-    fs::write(&script, PREPARATION_FIXTURES)?;
+    crate::support_bracket::mutation::write(&script, PREPARATION_FIXTURES)?;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = std::process::Command::new("python3")
         .args(["-I", "-B"])
@@ -1363,7 +1367,10 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
         let executable = support.directory().join("runtime/bin/tectonic");
         let permissions = fs::metadata(&executable)?.permissions();
         let bytes = fs::read(&executable)?;
-        fs::set_permissions(&executable, fs::Permissions::from_mode(0o644))?;
+        crate::support_bracket::mutation::set_permissions(
+            &executable,
+            fs::Permissions::from_mode(0o644),
+        )?;
         let fault = NativeAdapterFault::Io {
             operation: NativeOperation::Spawn,
             path: executable.clone(),
@@ -1383,7 +1390,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
         assert_eq!(actual.to_string(), format!("Native({fault:?})"));
         assert_eq!(fs::read(&executable)?, bytes);
         assert_eq!(fs::read_dir(support.directory().join("tmp"))?.count(), 0);
-        fs::set_permissions(&executable, permissions.clone())?;
+        crate::support_bracket::mutation::set_permissions(&executable, permissions.clone())?;
         assert_eq!(
             fs::metadata(&executable)?.permissions().mode(),
             permissions.mode()
@@ -1416,7 +1423,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
         },
         |_, result| {
             assert_eq!(result, &Ok(()));
-            fs::write(&path, b"b").unwrap();
+            crate::support_bracket::mutation::write(&path, b"b").unwrap();
         },
     );
     let fault = NativeAdapterFault::SupportChanged {
@@ -1434,7 +1441,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
     };
     assert_eq!(support.closing_hash(), Some(Err(expected_hash)));
     assert_eq!(fs::read(&path)?, b"b");
-    fs::write(&path, &saved)?;
+    crate::support_bracket::mutation::write(&path, &saved)?;
     assert_eq!(fs::read(&path)?, saved);
     assert_eq!(
         native::consume_with(
@@ -1463,7 +1470,8 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
                     let original = fs::read(support.directory().join("bundle").join(name)).unwrap();
                     let mut alternative = original.clone();
                     alternative.extend_from_slice(b"system-font-substitution-fixture");
-                    fs::write(fonts.join(name), &alternative).unwrap();
+                    crate::support_bracket::mutation::write(fonts.join(name), &alternative)
+                        .unwrap();
                     assert_eq!(fs::read(fonts.join(name)).unwrap(), alternative);
                     assert_ne!(alternative, original);
                 }
@@ -1503,7 +1511,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
     );
     let font = directory.0.join("bundle/lmroman10-regular.otf");
     let saved = fs::read(&font)?;
-    fs::remove_file(&font)?;
+    crate::support_bracket::mutation::remove_file(&font)?;
     let actual = native::consume(
         &support,
         &lock,
@@ -1521,7 +1529,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
             unexpected: Vec::new()
         }))
     );
-    fs::write(&font, &saved)?;
+    crate::support_bracket::mutation::write(&font, &saved)?;
     assert_eq!(fs::read(&font)?, saved);
     assert_eq!(
         native::consume(&support, &lock, &source, "", &addressing, case, Vec::new()),
@@ -1641,7 +1649,9 @@ fn support_required_actual_native_faces_framing_and_expanded_live_keys(
     let mut source = latex::start("fixture", "en");
     source.push_str(
         r"Upright \textbf{Bold} \textit{Italic} \textbf{\textit{Bold italic}}.
+
 \texttt{Mono \textbf{Bold} \textit{Italic} \textbf{\textit{Bold italic}}}.
+
 \def\example#1{#1}
 BODYTAIL
 % {#
@@ -1805,8 +1815,9 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
     let plan = DocumentPlan {
         document: "main".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![Block {
+            pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
             unit: "sec:coefficients:overview".into(),
             depth: Some(1),
@@ -1821,6 +1832,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                 },
                 Inline::Text("; ".into()),
                 Inline::Math {
+                    definition_site: input::site("fixture-math.toml"),
                     key: "value".into(),
                     markdown: "1".into(),
                     latex: "1".into(),
@@ -1985,11 +1997,13 @@ fn native_preflight_faults_restore_and_never_execute() {
     for path in ["runtime/bin", "bundle", "tmp", "downloads"] {
         fs::create_dir_all(directory.0.join(path)).unwrap();
     }
-    fs::write(directory.0.join("runtime/bin/tectonic"), b"a").unwrap();
+    crate::support_bracket::mutation::write(directory.0.join("runtime/bin/tectonic"), b"a")
+        .unwrap();
     for file in ["font.otf", "package.sty"] {
-        fs::write(directory.0.join("bundle").join(file), b"a").unwrap();
+        crate::support_bracket::mutation::write(directory.0.join("bundle").join(file), b"a")
+            .unwrap();
     }
-    fs::write(directory.0.join("bundle/SHA256SUM"), digest).unwrap();
+    crate::support_bracket::mutation::write(directory.0.join("bundle/SHA256SUM"), digest).unwrap();
     assert_eq!(native_support::verify(&support, &lock), Ok(()));
     for (relative, component, member, expected) in [
         (
@@ -2019,7 +2033,7 @@ fn native_preflight_faults_restore_and_never_execute() {
     ] {
         let path = directory.0.join(relative);
         let original = fs::read(&path).unwrap();
-        fs::write(&path, b"b").unwrap();
+        crate::support_bracket::mutation::write(&path, b"b").unwrap();
         let expected = DocumentError::Native(NativeAdapterFault::Integrity {
             component,
             member: member.into(),
@@ -2042,12 +2056,12 @@ fn native_preflight_faults_restore_and_never_execute() {
         assert_eq!(actual, expected);
         assert_eq!(fs::read_dir(directory.0.join("tmp")).unwrap().count(), 0);
         assert_eq!(fs::read(&path).unwrap(), b"b");
-        fs::write(&path, &original).unwrap();
+        crate::support_bracket::mutation::write(&path, &original).unwrap();
         assert_eq!(fs::read(&path).unwrap(), original);
         assert_eq!(native_support::verify(&support, &lock), Ok(()));
     }
     let path = directory.0.join("bundle/font.otf");
-    fs::remove_file(&path).unwrap();
+    crate::support_bracket::mutation::remove_file(&path).unwrap();
     assert_eq!(
         native_support::verify(&support, &lock),
         Err(NativeAdapterFault::Inventory {
@@ -2056,7 +2070,7 @@ fn native_preflight_faults_restore_and_never_execute() {
             unexpected: Vec::new()
         })
     );
-    fs::write(&path, b"a").unwrap();
+    crate::support_bracket::mutation::write(&path, b"a").unwrap();
     assert_eq!(fs::read(&path).unwrap(), b"a");
     assert_eq!(native_support::verify(&support, &lock), Ok(()));
     let refuse = |expected: NativeAdapterFault| {
@@ -2082,7 +2096,7 @@ fn native_preflight_faults_restore_and_never_execute() {
     ] {
         let path = directory.0.join(relative);
         let original = fs::read(&path).unwrap();
-        fs::remove_file(&path).unwrap();
+        crate::support_bracket::mutation::remove_file(&path).unwrap();
         let expected = if component == NativeComponent::Executable {
             NativeAdapterFault::Configuration {
                 component: Some(component),
@@ -2097,11 +2111,12 @@ fn native_preflight_faults_restore_and_never_execute() {
             }
         };
         refuse(expected);
-        fs::write(&path, &original).unwrap();
+        crate::support_bracket::mutation::write(&path, &original).unwrap();
         assert_eq!(fs::read(&path).unwrap(), original);
         assert_eq!(native_support::verify(&support, &lock), Ok(()));
-        fs::remove_file(&path).unwrap();
-        std::os::unix::fs::symlink(directory.0.join("bundle/package.sty"), &path).unwrap();
+        crate::support_bracket::mutation::remove_file(&path).unwrap();
+        crate::support_bracket::mutation::symlink(directory.0.join("bundle/package.sty"), &path)
+            .unwrap();
         refuse(NativeAdapterFault::Configuration {
             component: Some(component),
             path: Some(path.clone()),
@@ -2115,20 +2130,20 @@ fn native_preflight_faults_restore_and_never_execute() {
                 .file_type()
                 .is_symlink()
         );
-        fs::remove_file(&path).unwrap();
-        fs::write(&path, &original).unwrap();
+        crate::support_bracket::mutation::remove_file(&path).unwrap();
+        crate::support_bracket::mutation::write(&path, &original).unwrap();
         assert_eq!(fs::read(&path).unwrap(), original);
         assert_eq!(native_support::verify(&support, &lock), Ok(()));
     }
     let extra = directory.0.join("bundle/extra.sty");
-    fs::write(&extra, b"a").unwrap();
+    crate::support_bracket::mutation::write(&extra, b"a").unwrap();
     refuse(NativeAdapterFault::Inventory {
         component: NativeComponent::Bundle,
         missing: vec![],
         unexpected: vec!["extra.sty".into()],
     });
     assert_eq!(fs::read(&extra).unwrap(), b"a");
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     assert_eq!(native_support::verify(&support, &lock), Ok(()));
     let socket_parent = fs::File::open(extra.parent().unwrap()).unwrap();
     let socket_alias = format!(
@@ -2145,7 +2160,7 @@ fn native_preflight_faults_restore_and_never_execute() {
         },
     });
     drop(socket);
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     assert_eq!(native_support::verify(&support, &lock), Ok(()));
 }
 
@@ -2686,292 +2701,4 @@ fn prose_escaping_has_independent_literal_goldens() {
     );
 }
 
-const LOST_CHARACTER_LOG: &str = concat!(
-    "**\n",
-    "(document.tex\n",
-    "LaTeX2e <2021-11-15> patch level 1\n",
-    "L3 programming layer <2022-02-24> (article.cls\n",
-    "Document Class: article 2021/10/04 v1.4n Standard LaTeX document class\n",
-    "(size10.clo\n",
-    "File: size10.clo 2021/10/04 v1.4n Standard LaTeX file (size option)\n",
-    ")\n",
-    "\\c@part=\\count181\n",
-    "\\c@section=\\count182\n",
-    "\\c@subsection=\\count183\n",
-    "\\c@subsubsection=\\count184\n",
-    "\\c@paragraph=\\count185\n",
-    "\\c@subparagraph=\\count186\n",
-    "\\c@figure=\\count187\n",
-    "\\c@table=\\count188\n",
-    "\\abovecaptionskip=\\skip47\n",
-    "\\belowcaptionskip=\\skip48\n",
-    "\\bibindent=\\dimen138\n",
-    ") (amsmath.sty\n",
-    "Package: amsmath 2021/10/15 v2.17l AMS math features\n",
-    "\\@mathmargin=\\skip49\n",
-    "\n",
-    "For additional information on amsmath, use the `?' option.\n",
-    "(amstext.sty\n",
-    "Package: amstext 2021/08/26 v2.01 AMS text\n",
-    " (amsgen.sty\n",
-    "File: amsgen.sty 1999/11/30 v2.0 generic functions\n",
-    "\\@emptytoks=\\toks16\n",
-    "\\ex@=\\dimen139\n",
-    ")) (amsbsy.sty\n",
-    "Package: amsbsy 1999/11/29 v1.2d Bold Symbols\n",
-    "\\pmbraise@=\\dimen140\n",
-    ") (amsopn.sty\n",
-    "Package: amsopn 2021/08/26 v2.02 operator names\n",
-    ")\n",
-    "\\inf@bad=\\count189\n",
-    "LaTeX Info: Redefining \\frac on input line 234.\n",
-    "\\uproot@=\\count190\n",
-    "\\leftroot@=\\count191\n",
-    "LaTeX Info: Redefining \\overline on input line 399.\n",
-    "\\classnum@=\\count192\n",
-    "\\DOTSCASE@=\\count193\n",
-    "LaTeX Info: Redefining \\ldots on input line 496.\n",
-    "LaTeX Info: Redefining \\dots on input line 499.\n",
-    "LaTeX Info: Redefining \\cdots on input line 620.\n",
-    "\\Mathstrutbox@=\\box50\n",
-    "\\strutbox@=\\box51\n",
-    "\\big@size=\\dimen141\n",
-    "LaTeX Font Info:    Redeclaring font encoding OML on input line 743.\n",
-    "LaTeX Font Info:    Redeclaring font encoding OMS on input line 744.\n",
-    "\\macc@depth=\\count194\n",
-    "\\c@MaxMatrixCols=\\count195\n",
-    "\\dotsspace@=\\muskip16\n",
-    "\\c@parentequation=\\count196\n",
-    "\\dspbrk@lvl=\\count197\n",
-    "\\tag@help=\\toks17\n",
-    "\\row@=\\count198\n",
-    "\\column@=\\count199\n",
-    "\\maxfields@=\\count266\n",
-    "\\andhelp@=\\toks18\n",
-    "\\eqnshift@=\\dimen142\n",
-    "\\alignsep@=\\dimen143\n",
-    "\\tagshift@=\\dimen144\n",
-    "\\tagwidth@=\\dimen145\n",
-    "\\totwidth@=\\dimen146\n",
-    "\\lineht@=\\dimen147\n",
-    "\\@envbody=\\toks19\n",
-    "\\multlinegap=\\skip50\n",
-    "\\multlinetaggap=\\skip51\n",
-    "\\mathdisplay@stack=\\toks20\n",
-    "LaTeX Info: Redefining \\[ on input line 2938.\n",
-    "LaTeX Info: Redefining \\] on input line 2939.\n",
-    ") (amssymb.sty\n",
-    "Package: amssymb 2013/01/14 v3.01 AMS font symbols\n",
-    "\n",
-    "(amsfonts.sty\n",
-    "Package: amsfonts 2013/01/14 v3.01 Basic AMSFonts support\n",
-    "\\symAMSa=\\mathgroup4\n",
-    "\\symAMSb=\\mathgroup5\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\hbar on input line 98.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathfrak' in version `bold'\n",
-    "(Font)                  U/euf/m/n --> U/euf/b/n on input line 106.\n",
-    ")) (fontspec.sty (xparse.sty (expl3.sty\n",
-    "Package: expl3 2022-02-24 L3 programming layer (loader) \n",
-    " (l3backend-xetex.def\n",
-    "File: l3backend-xetex.def 2022-02-07 L3 backend support: XeTeX\n",
-    "\\c__kernel_sys_dvipdfmx_version_int=\\count267\n",
-    "\\l__color_backend_stack_int=\\count268\n",
-    "\\g__color_backend_stack_int=\\count269\n",
-    "\\g__graphics_track_int=\\count270\n",
-    "\\l__pdf_internal_box=\\box52\n",
-    "\\g__pdf_backend_object_int=\\count271\n",
-    "\\g__pdf_backend_annotation_int=\\count272\n",
-    "\\g__pdf_backend_link_int=\\count273\n",
-    "))\n",
-    "Package: xparse 2022-01-12 L3 Experimental document command parser\n",
-    ")\n",
-    "Package: fontspec 2022/01/15 v2.8a Font selection for XeLaTeX and LuaLaTeX\n",
-    "\n",
-    "(fontspec-xetex.sty\n",
-    "Package: fontspec-xetex 2022/01/15 v2.8a Font selection for XeLaTeX and LuaLaTe\n",
-    "X\n",
-    "\\l__fontspec_script_int=\\count274\n",
-    "\\l__fontspec_language_int=\\count275\n",
-    "\\l__fontspec_strnum_int=\\count276\n",
-    "\\l__fontspec_tmp_int=\\count277\n",
-    "\\l__fontspec_tmpa_int=\\count278\n",
-    "\\l__fontspec_tmpb_int=\\count279\n",
-    "\\l__fontspec_tmpc_int=\\count280\n",
-    "\\l__fontspec_em_int=\\count281\n",
-    "\\l__fontspec_emdef_int=\\count282\n",
-    "\\l__fontspec_strong_int=\\count283\n",
-    "\\l__fontspec_strongdef_int=\\count284\n",
-    "\\l__fontspec_tmpa_dim=\\dimen148\n",
-    "\\l__fontspec_tmpb_dim=\\dimen149\n",
-    "\\l__fontspec_tmpc_dim=\\dimen150\n",
-    " (fontenc.sty\n",
-    "Package: fontenc 2021/04/29 v2.0v Standard LaTeX package\n",
-    ") (fontspec.cfg)))\n",
-    "\n",
-    "Package fontspec Info: Font family 'lmroman10(0)' created for font 'lmroman10'\n",
-    "(fontspec)             with options\n",
-    "(fontspec)             [Ligatures=TeX,Extension=.otf,UprightFont=*-regular,Bold\n",
-    "Font=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic].\n",
-    "(fontspec)              \n",
-    "(fontspec)              This font family consists of the following NFSS\n",
-    "(fontspec)             series/shapes:\n",
-    "(fontspec)              \n",
-    "(fontspec)             - 'normal' (m/n) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmroman10-regular.otf]/OT:script=latn;language=dflt\n",
-    ";mapping=tex-text;\"\n",
-    "(fontspec)             - 'small caps'  (m/sc) with NFSS spec.: \n",
-    "(fontspec)             - 'bold' (b/n) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmroman10-bold.otf]/OT:script=latn;language=dflt;ma\n",
-    "pping=tex-text;\"\n",
-    "(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.: \n",
-    "(fontspec)             - 'italic' (m/it) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmroman10-italic.otf]/OT:script=latn;language=dflt;\n",
-    "mapping=tex-text;\"\n",
-    "(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.: \n",
-    "(fontspec)             - 'bold italic' (b/it) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmroman10-bolditalic.otf]/OT:script=latn;language=d\n",
-    "flt;mapping=tex-text;\"\n",
-    "(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.: \n",
-    "\n",
-    "\n",
-    "Package fontspec Info: Font family 'lmmono10(0)' created for font 'lmmono10'\n",
-    "(fontspec)             with options\n",
-    "(fontspec)             [WordSpace={1,0,0},HyphenChar=None,PunctuationSpace=Word\n",
-    "Space,Extension=.otf,UprightFont=*-regular,ItalicFont=*-italic,BoldFont=lmmonol\n",
-    "t10-bold,BoldItalicFont=lmmonolt10-boldoblique].\n",
-    "(fontspec)              \n",
-    "(fontspec)              This font family consists of the following NFSS\n",
-    "(fontspec)             series/shapes:\n",
-    "(fontspec)              \n",
-    "(fontspec)             - 'normal' (m/n) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmmono10-regular.otf]/OT:script=latn;language=dflt;\n",
-    "\"\n",
-    "(fontspec)             - 'small caps'  (m/sc) with NFSS spec.: \n",
-    "(fontspec)             and font adjustment code:\n",
-    "(fontspec)             \\fontdimen 2\\font =1\\fontdimen 2\\font \\fontdimen 3\\font\n",
-    "(fontspec)             =0\\fontdimen 3\\font \\fontdimen 4\\font =0\\fontdimen\n",
-    "(fontspec)             4\\font \\fontdimen 7\\font =0\\fontdimen 2\\font\n",
-    "(fontspec)             \\tex_hyphenchar:D \\font =-1\\scan_stop: \n",
-    "(fontspec)             - 'bold' (b/n) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmmonolt10-bold.otf]/OT:script=latn;language=dflt;\"\n",
-    "\n",
-    "(fontspec)             - 'bold small caps'  (b/sc) with NFSS spec.: \n",
-    "(fontspec)             and font adjustment code:\n",
-    "(fontspec)             \\fontdimen 2\\font =1\\fontdimen 2\\font \\fontdimen 3\\font\n",
-    "(fontspec)             =0\\fontdimen 3\\font \\fontdimen 4\\font =0\\fontdimen\n",
-    "(fontspec)             4\\font \\fontdimen 7\\font =0\\fontdimen 2\\font\n",
-    "(fontspec)             \\tex_hyphenchar:D \\font =-1\\scan_stop: \n",
-    "(fontspec)             - 'italic' (m/it) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmmono10-italic.otf]/OT:script=latn;language=dflt;\"\n",
-    "\n",
-    "(fontspec)             - 'italic small caps'  (m/scit) with NFSS spec.: \n",
-    "(fontspec)             and font adjustment code:\n",
-    "(fontspec)             \\fontdimen 2\\font =1\\fontdimen 2\\font \\fontdimen 3\\font\n",
-    "(fontspec)             =0\\fontdimen 3\\font \\fontdimen 4\\font =0\\fontdimen\n",
-    "(fontspec)             4\\font \\fontdimen 7\\font =0\\fontdimen 2\\font\n",
-    "(fontspec)             \\tex_hyphenchar:D \\font =-1\\scan_stop: \n",
-    "(fontspec)             - 'bold italic' (b/it) with NFSS spec.:\n",
-    "(fontspec)             <->\"[lmmonolt10-boldoblique.otf]/OT:script=latn;language\n",
-    "=dflt;\"\n",
-    "(fontspec)             - 'bold italic small caps'  (b/scit) with NFSS spec.: \n",
-    "(fontspec)             and font adjustment code:\n",
-    "(fontspec)             \\fontdimen 2\\font =1\\fontdimen 2\\font \\fontdimen 3\\font\n",
-    "(fontspec)             =0\\fontdimen 3\\font \\fontdimen 4\\font =0\\fontdimen\n",
-    "(fontspec)             4\\font \\fontdimen 7\\font =0\\fontdimen 2\\font\n",
-    "(fontspec)             \\tex_hyphenchar:D \\font =-1\\scan_stop: \n",
-    "\n",
-    " (notation.tex)\n",
-    "(addressing.tex\n",
-    "\\l_ftdoc_chunks_int=\\count285\n",
-    ")\n",
-    "No file document.aux.\n",
-    "\\openout1 = `document.aux'.\n",
-    "\n",
-    "LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 11.\n",
-    "LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 1\n",
-    "1.\n",
-    "(ts1cmr.fd\n",
-    "File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions\n",
-    ")\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 11.\n",
-    "LaTeX Font Info:    ... okay on input line 11.\n",
-    "\n",
-    "Package fontspec Info: Adjusting the maths setup (use [no-math] to avoid\n",
-    "(fontspec)             this).\n",
-    "\n",
-    "\\symlegacymaths=\\mathgroup6\n",
-    "LaTeX Font Info:    Overwriting symbol font `legacymaths' in version `bold'\n",
-    "(Font)                  OT1/cmr/m/n --> OT1/cmr/bx/n on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\acute on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\grave on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\ddot on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\tilde on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\bar on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\breve on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\check on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\hat on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\dot on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math accent \\mathring on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Gamma on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Delta on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Theta on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Lambda on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Xi on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Pi on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Sigma on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Upsilon on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Phi on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Psi on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\Omega on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring math symbol \\mathdollar on input line 11.\n",
-    "LaTeX Font Info:    Redeclaring symbol font `operators' on input line 11.\n",
-    "LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font\n",
-    "(Font)              `operators' in the math version `normal' on input line 11.\n",
-    "LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'\n",
-    "(Font)                  OT1/cmr/m/n --> TU/lmroman10(0)/m/n on input line 11.\n",
-    "LaTeX Font Info:    Encoding `OT1' has changed to `TU' for symbol font\n",
-    "(Font)              `operators' in the math version `bold' on input line 11.\n",
-    "LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'\n",
-    "(Font)                  OT1/cmr/bx/n --> TU/lmroman10(0)/m/n on input line 11.\n",
-    "LaTeX Font Info:    Overwriting symbol font `operators' in version `normal'\n",
-    "(Font)                  TU/lmroman10(0)/m/n --> TU/lmroman10(0)/m/n on input li\n",
-    "ne 11.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathit' in version `normal'\n",
-    "(Font)                  OT1/cmr/m/it --> TU/lmroman10(0)/m/it on input line 11.\n",
-    "\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathbf' in version `normal'\n",
-    "(Font)                  OT1/cmr/bx/n --> TU/lmroman10(0)/b/n on input line 11.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathsf' in version `normal'\n",
-    "(Font)                  OT1/cmss/m/n --> TU/lmss/m/n on input line 11.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathtt' in version `normal'\n",
-    "(Font)                  OT1/cmtt/m/n --> TU/lmmono10(0)/m/n on input line 11.\n",
-    "LaTeX Font Info:    Overwriting symbol font `operators' in version `bold'\n",
-    "(Font)                  TU/lmroman10(0)/m/n --> TU/lmroman10(0)/b/n on input li\n",
-    "ne 11.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathit' in version `bold'\n",
-    "(Font)                  OT1/cmr/bx/it --> TU/lmroman10(0)/b/it on input line 11\n",
-    ".\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathsf' in version `bold'\n",
-    "(Font)                  OT1/cmss/bx/n --> TU/lmss/b/n on input line 11.\n",
-    "LaTeX Font Info:    Overwriting math alphabet `\\mathtt' in version `bold'\n",
-    "(Font)                  OT1/cmtt/m/n --> TU/lmmono10(0)/b/n on input line 11.\n",
-    "\n",
-    "! Missing character: There is no \u{10ffff} (U+10FFFF) in font [lmroman10-regular.otf]/O\n",
-    "T:script=latn;language=dflt;mapping=tex-text;.\n",
-    "l.12 \u{ffff}\n",
-    "      \n",
-    "No pages of output.\n",
-);
+const LOST_CHARACTER_LOG: &str = include_str!("../../tests/fixtures/native/lost-character.log");

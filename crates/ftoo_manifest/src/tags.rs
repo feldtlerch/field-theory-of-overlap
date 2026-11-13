@@ -168,6 +168,31 @@ pub struct AddressBook<'a> {
     pub(super) out_of_slice: Vec<OutOfSliceEntry>,
 }
 impl AddressBook<'_> {
+    /// The admitted immutable catalogue, including unavailable handles.
+    #[must_use]
+    pub fn descriptors(&self) -> &[TagDescriptor] {
+        &self.descriptors
+    }
+
+    /// Select the sole live reader name for an exact semantic object.
+    /// # Errors
+    /// Retains every candidate and its exact resolution when no unique name exists.
+    pub fn reader_identity(&self, target: NodeId) -> Result<String, ReaderIdentityFault> {
+        let mut descriptors: Vec<_> = self
+            .descriptors()
+            .iter()
+            .filter(|descriptor| descriptor.target() == target)
+            .collect();
+        descriptors.sort_by_key(|descriptor| descriptor.spelling());
+        let candidates = descriptors
+            .into_iter()
+            .map(|descriptor| ReaderTagCandidate {
+                handle: descriptor.spelling().into(),
+                outcome: self.resolve(descriptor.spelling()),
+            })
+            .collect();
+        select_reader_identity(target, candidates)
+    }
     #[must_use]
     pub const fn graph(&self) -> &ValidatedManifest {
         self.graph
@@ -286,3 +311,51 @@ impl fmt::Display for TagResolutionFault {
     }
 }
 impl Error for TagResolutionFault {}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReaderTagCandidate {
+    pub handle: String,
+    pub outcome: Result<NodeId, TagResolutionFault>,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReaderIdentityReason {
+    MissingTag,
+    NoLiveTag,
+    AmbiguousLiveTags,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReaderIdentityFault {
+    pub target: NodeId,
+    pub reason: ReaderIdentityReason,
+    pub candidates: Vec<ReaderTagCandidate>,
+}
+impl fmt::Display for ReaderIdentityFault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl Error for ReaderIdentityFault {}
+pub(super) fn select_reader_identity(
+    target: NodeId,
+    candidates: Vec<ReaderTagCandidate>,
+) -> Result<String, ReaderIdentityFault> {
+    let live: Vec<_> = candidates
+        .iter()
+        .filter(|candidate| candidate.outcome == Ok(target))
+        .collect();
+    if let [candidate] = live.as_slice() {
+        return Ok(candidate.handle.clone());
+    }
+    let reason = if candidates.is_empty() {
+        ReaderIdentityReason::MissingTag
+    } else if live.is_empty() {
+        ReaderIdentityReason::NoLiveTag
+    } else {
+        ReaderIdentityReason::AmbiguousLiveTags
+    };
+    Err(ReaderIdentityFault {
+        target,
+        reason,
+        candidates,
+    })
+}

@@ -46,25 +46,28 @@ impl PendingReason {
         }
     }
 }
-impl fmt::Display for PendingReason {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl PendingReason {
+    /// Fixed prose around the permanent object identity, shared by diagnostics and presentation.
+    #[must_use]
+    pub fn text_parts(&self) -> (&'static str, NodeId, String) {
         match *self {
-            Self::BackingUnbound { object } => {
-                write!(f, "backing object {} is unbound", object.semantic_name())
-            }
-            Self::BackingAbsent { object } => {
-                write!(f, "backing object {} is absent", object.semantic_name())
-            }
+            Self::BackingUnbound { object } => ("backing object ", object, " is unbound".into()),
+            Self::BackingAbsent { object } => ("backing object ", object, " is absent".into()),
             Self::FormulationProposed { object } => {
-                write!(f, "retained formulation {}", object.semantic_name())
+                ("retained formulation ", object, String::new())
             }
-            Self::ClaimDeferred { object, blocker } => write!(
-                f,
-                "claim evidence {} awaits {}",
-                object.semantic_name(),
-                blocker_text(blocker)
+            Self::ClaimDeferred { object, blocker } => (
+                "claim evidence ",
+                object,
+                format!(" awaits {}", blocker_text(blocker)),
             ),
         }
+    }
+}
+impl fmt::Display for PendingReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (before, object, after) = self.text_parts();
+        write!(f, "{before}{}{after}", object.semantic_name())
     }
 }
 

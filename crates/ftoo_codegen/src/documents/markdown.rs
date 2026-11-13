@@ -2,10 +2,12 @@ use super::plan::{DocumentPlan, Inline};
 use std::fmt::Write;
 pub(super) fn size(plan: &DocumentPlan) -> usize {
     let mut size = format!(
-        "<!-- generated document {} language {} -->\n{}\n{}\n\n",
-        plan.document, plan.language, plan.coverage[0], plan.coverage[1]
+        "<!-- generated document {} language {} -->\n{}\n",
+        plan.document, plan.language, plan.coverage.declaration
     )
-    .len();
+    .len()
+    .saturating_add(inline_size(&plan.coverage.runs))
+    .saturating_add(2);
     for block in &plan.blocks {
         size = size.saturating_add(
             format!(
@@ -87,9 +89,11 @@ fn code(source: &str) -> String {
 }
 pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = format!(
-        "<!-- generated document {} language {} -->\n{}\n{}\n\n",
-        plan.document, plan.language, plan.coverage[0], plan.coverage[1]
+        "<!-- generated document {} language {} -->\n{}\n",
+        plan.document, plan.language, plan.coverage.declaration
     );
+    inline(&mut output, &plan.coverage.runs);
+    output.push_str("\n\n");
     for block in &plan.blocks {
         writeln!(
             output,

@@ -72,8 +72,8 @@ pub use tag_validation::{
     StoreState,
 };
 pub use tags::{
-    AddressBook, OutOfSliceCause, OutOfSliceEntry, RetiredEntry, TagDescriptor, TagId,
-    TagResolutionFault, addressing,
+    AddressBook, OutOfSliceCause, OutOfSliceEntry, ReaderIdentityFault, ReaderIdentityReason,
+    ReaderTagCandidate, RetiredEntry, TagDescriptor, TagId, TagResolutionFault, addressing,
 };
 
 #[cfg(test)]

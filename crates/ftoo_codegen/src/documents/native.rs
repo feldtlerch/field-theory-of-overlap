@@ -110,17 +110,30 @@ pub(super) fn sweep_origin(
         .iter()
         .cloned()
         .map(|mut diagnostic| {
-            if let AssemblyFault::NativeRejected { case, stderr, .. } = &mut diagnostic.fault
+            if let AssemblyFault::NativeRejected {
+                case, stderr, log, ..
+            } = &mut diagnostic.fault
                 && matches!(case, NativeCase::Sweep { .. })
-                && let Some(offset) = failure_offset(source, stderr)
-                && let Some(row) = rows.iter().find(|row| row.bytes.contains(&offset))
+                && let Some(range) = if has_overfull(log, stderr) {
+                    overfull_range(source, log, stderr)
+                } else {
+                    failure_offset(source, stderr).map(|offset| offset..offset + 1)
+                }
             {
-                *case = row.case.clone();
-                diagnostic.site = AssemblySite::Generated {
-                    path: "assembly-sweep.tex".into(),
-                    bytes: row.bytes.clone(),
-                    origins: vec![row.origin.clone()],
-                };
+                let selected: Vec<_> = rows
+                    .iter()
+                    .filter(|row| row.bytes.start < range.end && range.start < row.bytes.end)
+                    .collect();
+                if let (Some(first), Some(last)) = (selected.first(), selected.last()) {
+                    if selected.len() == 1 {
+                        *case = first.case.clone();
+                    }
+                    diagnostic.site = AssemblySite::Generated {
+                        path: "assembly-sweep.tex".into(),
+                        bytes: first.bytes.start..last.bytes.end,
+                        origins: selected.iter().map(|row| row.origin.clone()).collect(),
+                    };
+                }
             }
             diagnostic
         })
@@ -168,7 +181,59 @@ pub(super) fn consume_plan(
         },
         plan.origins(ftoo_manifest::DocumentTarget::Latex),
     )
-    .map_err(|error| runtime_origin(error, plan))
+    .map_err(|error| overfull_origin(runtime_origin(error, plan), source, plan))
+}
+fn overfull_origin(
+    error: DocumentError,
+    source: &str,
+    plan: &super::plan::DocumentPlan,
+) -> DocumentError {
+    let DocumentError::Assembly(errors) = error else {
+        return error;
+    };
+    let diagnostics = errors
+        .diagnostics()
+        .iter()
+        .cloned()
+        .map(|mut diagnostic| {
+            if let AssemblyFault::NativeRejected { stderr, log, .. } = &diagnostic.fault
+                && let Some(range) = overfull_range(source, log, stderr)
+            {
+                let blocks: Vec<_> = plan
+                    .blocks
+                    .iter()
+                    .filter(|block| {
+                        let marker = format!(
+                            "% unit {} document {} language {}\n",
+                            block.unit, plan.document, plan.language
+                        );
+                        source.find(&marker).is_some_and(|start| {
+                            let end = source[start + marker.len()..]
+                                .find("% unit ")
+                                .map_or(source.len(), |n| start + marker.len() + n);
+                            start < range.end && range.start < end
+                        })
+                    })
+                    .collect();
+                if !blocks.is_empty()
+                    && let AssemblySite::Generated { origins, .. } = &mut diagnostic.site
+                {
+                    origins.retain(|origin| {
+                        blocks
+                            .iter()
+                            .any(|block| origin.unit.as_ref() == Some(&block.unit))
+                    });
+                    if blocks.len() == 1 {
+                        diagnostic.unit = Some(blocks[0].unit.clone());
+                    }
+                }
+            }
+            diagnostic
+        })
+        .collect();
+    DocumentError::Assembly(
+        super::AssemblyErrors::from_diagnostics(diagnostics).expect("nonempty diagnostics"),
+    )
 }
 pub(super) fn runtime_origin(
     error: DocumentError,
@@ -183,7 +248,34 @@ pub(super) fn runtime_origin(
         .cloned()
         .map(|mut diagnostic| {
             if let AssemblyFault::RuntimeTagRejected { site_token, .. } = &diagnostic.fault {
+                for run in &plan.coverage.runs {
+                    if let super::plan::Inline::Tag { token, site, .. } = run
+                        && token == site_token
+                    {
+                        diagnostic.unit = None;
+                        if let AssemblySite::Generated { origins, .. } = &mut diagnostic.site {
+                            *origins = vec![SourceOrigin {
+                                unit: None,
+                                language: Some(plan.language.clone()),
+                                target: Some(ftoo_manifest::DocumentTarget::Latex),
+                                site: site.clone(),
+                            }];
+                        }
+                    }
+                }
                 for block in &plan.blocks {
+                    for ((target, definition), names) in &block.pending_names {
+                        if *target != ftoo_manifest::DocumentTarget::Latex
+                            || !names.iter().any(|name| name.token == *site_token)
+                        {
+                            continue;
+                        }
+                        diagnostic.unit = Some(block.unit.clone());
+                        if let AssemblySite::Generated { origins, .. } = &mut diagnostic.site {
+                            *origins =
+                                block.pending_origins(*definition, &plan.language, Some(*target));
+                        }
+                    }
                     for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                         if let super::plan::Inline::Tag { token, site, .. } = run
                             && token == site_token
@@ -482,9 +574,12 @@ fn invoke(
         NativeCase::Sweep { .. } => "assembly-sweep.tex".into(),
         NativeCase::Runtime { .. } | NativeCase::Collision { .. } => "document.tex".into(),
     };
-    let bytes = decode(&log)
-        .and_then(|(_, token, _)| tag_range(source, &token))
-        .unwrap_or(0..source.len());
+    let bytes = if has_overfull(&log, &output.stderr) {
+        overfull_range(source, &log, &output.stderr)
+    } else {
+        decode(&log).and_then(|(_, token, _)| tag_range(source, &token))
+    }
+    .unwrap_or(0..source.len());
     let site = AssemblySite::Generated {
         path,
         bytes,
@@ -500,6 +595,36 @@ fn invoke(
         site,
         case,
         scratch.join("output/document.pdf").is_file(),
+    )
+    .map_err(|error| runtime_ranges(error, source))
+}
+
+fn runtime_ranges(error: DocumentError, source: &str) -> DocumentError {
+    let DocumentError::Assembly(errors) = error else {
+        return error;
+    };
+    let diagnostics = errors
+        .diagnostics()
+        .iter()
+        .cloned()
+        .map(|mut diagnostic| {
+            let range = match &diagnostic.fault {
+                AssemblyFault::RuntimeTagRejected { site_token, .. } => {
+                    Some(tag_range(source, site_token).unwrap_or(0..source.len()))
+                }
+                AssemblyFault::InvalidRuntimeRecord { .. } => Some(0..source.len()),
+                _ => None,
+            };
+            if let (Some(range), AssemblySite::Generated { bytes, .. }) =
+                (range, &mut diagnostic.site)
+            {
+                *bytes = range;
+            }
+            diagnostic
+        })
+        .collect();
+    DocumentError::Assembly(
+        super::AssemblyErrors::from_diagnostics(diagnostics).expect("native diagnostics"),
     )
 }
 
@@ -576,9 +701,10 @@ pub(super) fn bootstrap(
     result
 }
 
-fn measured_output(command: &mut Command) -> std::io::Result<std::process::Output> {
+pub(super) fn measured_output(command: &mut Command) -> std::io::Result<std::process::Output> {
     use std::io::{BufRead, BufReader, Read};
     use std::process::Stdio;
+    let _consumer = crate::support_bracket::consumer_started();
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -629,36 +755,61 @@ pub(super) fn classify(
     case: NativeCase,
     pdf_exists: bool,
 ) -> Result<(), DocumentError> {
+    let overfull = has_overfull(&log, &output.stderr);
+    let mut diagnostics = Vec::new();
+    let mut append = |error| {
+        let DocumentError::Assembly(errors) = error else {
+            unreachable!("located assembly fault")
+        };
+        diagnostics.extend_from_slice(errors.diagnostics());
+    };
     if log
         .split(|byte| *byte == b'\n')
         .any(|line| line.starts_with(b"FTDOC-"))
         || (matches!(&case, NativeCase::Runtime { .. }) && !output.status.success())
     {
-        let record = decode(&log);
-        if let Some((input, site_token, message)) = record {
-            return Err(located_failure(
+        if let Some((input, site_token, message)) = decode(&log) {
+            let error = located_failure(
                 RuleId::M055,
-                site,
+                site.clone(),
                 &case,
                 AssemblyFault::RuntimeTagRejected {
                     input,
                     site_token,
                     message,
                 },
+            );
+            if !overfull {
+                return Err(error);
+            }
+            append(error);
+        } else {
+            if !overfull {
+                return Err(DocumentError::Native(NativeAdapterFault::Protocol {
+                    reason: NativeProtocolReason::InvalidRuntimeRecord,
+                    status: output.status.code(),
+                    stdout: output.stdout,
+                    stderr: output.stderr,
+                    log,
+                }));
+            }
+            append(located_failure(
+                RuleId::M055,
+                site.clone(),
+                &case,
+                AssemblyFault::InvalidRuntimeRecord {
+                    status: output.status.code(),
+                    stdout: output.stdout.clone(),
+                    stderr: output.stderr.clone(),
+                    log: log.clone(),
+                },
             ));
         }
-        return Err(DocumentError::Native(NativeAdapterFault::Protocol {
-            reason: NativeProtocolReason::InvalidRuntimeRecord,
-            status: output.status.code(),
-            stdout: output.stdout,
-            stderr: output.stderr,
-            log,
-        }));
     }
     let lost = log.split(|b| *b == b'\n').any(lost_character);
-    if !output.status.success() || lost {
+    if !output.status.success() || lost || overfull {
         let context = case.clone();
-        return Err(located_failure(
+        append(located_failure(
             RuleId::M056,
             site,
             &context,
@@ -669,6 +820,9 @@ pub(super) fn classify(
                 stderr: output.stderr,
                 log,
             },
+        ));
+        return Err(DocumentError::Assembly(
+            super::AssemblyErrors::from_diagnostics(diagnostics).expect("native refusal"),
         ));
     }
     if !pdf_exists {
@@ -713,6 +867,103 @@ fn located_failure(
 pub(super) fn lost_character(line: &[u8]) -> bool {
     line.starts_with(b"Missing character:") || line.starts_with(b"! Missing character:")
 }
+fn box_prefix(line: &[u8]) -> bool {
+    line.starts_with(b"Overfull \\hbox (") || line.starts_with(b"Overfull \\vbox (")
+}
+type BoxWarning<'a> = (&'a [u8], Option<(&'a str, usize)>);
+fn box_warning(line: &[u8]) -> Option<BoxWarning<'_>> {
+    let line = line.strip_suffix(b"\r").unwrap_or(line);
+    let warning = line.strip_prefix(b"warning: ")?;
+    if box_prefix(warning) {
+        return Some((warning, None));
+    }
+    let split = warning.windows(2).position(|pair| pair == b": ")?;
+    let location = std::str::from_utf8(&warning[..split]).ok()?;
+    let (file, line) = location.rsplit_once(':')?;
+    if line.is_empty() || !line.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let diagnostic = &warning[split + 2..];
+    (!file.is_empty() && box_prefix(diagnostic))
+        .then_some((diagnostic, line.parse().ok().map(|line| (file, line))))
+}
+pub(super) fn has_overfull(log: &[u8], stderr: &[u8]) -> bool {
+    log.split(|b| *b == b'\n').any(box_prefix)
+        || stderr
+            .split(|b| *b == b'\n')
+            .any(|line| box_warning(line).is_some())
+}
+pub(super) fn overfull_range(
+    source: &str,
+    log: &[u8],
+    stderr: &[u8],
+) -> Option<std::ops::Range<usize>> {
+    let warnings: Vec<_> = stderr
+        .split(|byte| *byte == b'\n')
+        .filter_map(box_warning)
+        .collect();
+    // A log-only box has no reliable input-file attribution. Do not borrow the
+    // location of a different box merely because both occur in one invocation.
+    let mut lines = log
+        .split(|byte| *byte == b'\n')
+        .map(|line| line.strip_suffix(b"\r").unwrap_or(line));
+    while let Some(line) = lines.next() {
+        if !box_prefix(line) {
+            continue;
+        }
+        let mut diagnostic = line.to_vec();
+        let mut width = line.len();
+        // The pinned engine wraps its log at 79 columns. Evidence is retained
+        // verbatim; only matching a located mirror joins these display lines.
+        while width == 79 {
+            let Some(continuation) = lines.next() else {
+                break;
+            };
+            diagnostic.extend_from_slice(continuation);
+            width = continuation.len();
+        }
+        if !warnings
+            .iter()
+            .any(|(warning, location)| *warning == diagnostic.as_slice() && location.is_some())
+        {
+            return None;
+        }
+    }
+    let mut result: Option<std::ops::Range<usize>> = None;
+    for (diagnostic, location) in warnings {
+        let Some(("document.tex", line)) = location else {
+            return None;
+        };
+        let paragraph = std::str::from_utf8(diagnostic)
+            .ok()
+            .and_then(|s| s.split_once(" at lines "))
+            .and_then(|(_, s)| s.split_once("--"))
+            .and_then(|(a, b)| Some((decimal(a)?, decimal(b)?)));
+        let (first, last) = paragraph.unwrap_or((line, line));
+        if first == 0 || first > last {
+            return None;
+        }
+        let mut offset = 0;
+        let mut start = None;
+        let mut end = None;
+        for (index, text) in source.split_inclusive('\n').enumerate() {
+            if index + 1 == first {
+                start = Some(offset);
+            }
+            offset += text.len();
+            if index + 1 == last {
+                end = Some(offset);
+                break;
+            }
+        }
+        let (Some(start), Some(end)) = (start, end) else {
+            return None;
+        };
+        result = Some(result.map_or(start..end, |old| old.start.min(start)..old.end.max(end)));
+    }
+    result
+}
+
 fn decimal(value: &str) -> Option<usize> {
     let n = value.parse::<usize>().ok()?;
     (n.to_string() == value).then_some(n)

@@ -213,7 +213,7 @@ pub(super) fn support_required_native_sweep_row_has_complete_evidence_and_restor
         "../../../tests/fixtures/assembly/sweep-rejection.json"
     ))?;
     assert_eq!(
-        &source[513..574],
+        &source[535..596],
         "% sweep Definition(CoefficientOne) base\n\\(\\FtdocStored\\)\\par\n"
     );
     let expected = failure(
@@ -221,8 +221,8 @@ pub(super) fn support_required_native_sweep_row_has_complete_evidence_and_restor
         AssemblyStage::Native,
         AssemblySite::Generated {
             path: "assembly-sweep.tex".into(),
-            bytes: 513..574,
-            origins: vec![origin("coefficient-one", "base", 513..574)],
+            bytes: 535..596,
+            origins: vec![origin("coefficient-one", "base", 535..596)],
         },
         AssemblyFault::NativeRejected {
             case: NativeCase::Sweep {

@@ -471,7 +471,7 @@ pub const RULES: [RuleSpec; 59] = [
     },
     RuleSpec {
         number: RuleId::M055,
-        statement: "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation.",
+        statement: "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag.",
         scope: "Both document targets and their generated notation and addressing support.",
         state: RuleState::Enforced,
         deferred_reason: None,

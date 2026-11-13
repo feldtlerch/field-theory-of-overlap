@@ -187,6 +187,7 @@ fn batch_transport(
     let mut stderr_spool = Spool::new(support)?;
     let mut stderr_file = stderr_spool.file.try_clone().map_err(batch_io)?;
     let startup = crate::telemetry::Phase::new("notation.process_start");
+    let _consumer = crate::support_bracket::consumer_started();
     let child = Command::new(&support.runtime)
         .arg(adapter_path)
         .arg("--batch")
@@ -518,6 +519,7 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
     });
     let adapter = support::repository().join("tools/notation/check.cjs");
     let startup = crate::telemetry::Phase::new("notation.process_start");
+    let _consumer = crate::support_bracket::consumer_started();
     let child = Command::new(&support.runtime)
         .arg(adapter)
         .arg(if source.is_some() {

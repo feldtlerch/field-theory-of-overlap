@@ -19,6 +19,8 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 \usepackage{amssymb}
 \usepackage{fontspec}
 \tracinglostchars=3
+\hfuzz=0pt
+\vfuzz=0pt
 \setmainfont{lmroman10}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
 \setmonofont{lmmono10}[Extension=.otf,UprightFont=*-regular,ItalicFont=*-italic,BoldFont=lmmonolt10-bold,BoldItalicFont=lmmonolt10-boldoblique]
 \input{notation.tex}
@@ -26,11 +28,11 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 ";
 pub(super) fn size(plan: &DocumentPlan) -> usize {
     let mut size = start(&plan.document, &plan.language).len();
-    for paragraph in &plan.coverage {
-        size = size
-            .saturating_add(coverage(paragraph).len())
-            .saturating_add(2);
-    }
+    size = size
+        .saturating_add(text(&plan.coverage.declaration).len())
+        .saturating_add(2)
+        .saturating_add(inline_size(&plan.coverage.runs))
+        .saturating_add(2);
     for block in &plan.blocks {
         size = size.saturating_add(
             format!(
@@ -100,22 +102,6 @@ pub(super) fn text(source: &str) -> String {
     }
     output
 }
-fn coverage(paragraph: &str) -> String {
-    let Some(slice) = paragraph
-        .strip_prefix("Declared slice: ")
-        .and_then(|s| s.strip_suffix('.'))
-    else {
-        return text(paragraph);
-    };
-    format!(
-        "Declared slice: {}.",
-        slice
-            .split(", ")
-            .map(super::pending::identity_text)
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
-}
 pub(super) fn start(document: &str, language: &str) -> String {
     let mut output = String::new();
     append(&mut output, Piece::Raw(RawTex(PREAMBLE)));
@@ -125,9 +111,9 @@ pub(super) fn start(document: &str, language: &str) -> String {
 }
 pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = start(&plan.document, &plan.language);
-    for paragraph in &plan.coverage {
-        writeln!(output, "{}\n", coverage(paragraph)).expect("string write");
-    }
+    writeln!(output, "{}\n", text(&plan.coverage.declaration)).expect("string write");
+    inline(&mut output, &plan.coverage.runs);
+    output.push_str("\n\n");
     for block in &plan.blocks {
         writeln!(
             output,

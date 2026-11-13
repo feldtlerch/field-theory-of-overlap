@@ -337,7 +337,7 @@ fn assembly_register_is_exactly_five_appended_enforced_rules() {
             ),
             (
                 RuleId::M055,
-                "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation.",
+                "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag.",
                 "Both document targets and their generated notation and addressing support.",
                 RuleState::Enforced,
                 None

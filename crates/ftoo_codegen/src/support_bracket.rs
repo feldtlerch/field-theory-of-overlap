@@ -15,6 +15,157 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+// Read the epoch and in-flight gauge atomically with respect to each other.
+static CONSUMERS: std::sync::Mutex<(u64, usize)> = std::sync::Mutex::new((0, 0));
+#[cfg(test)]
+pub(crate) fn consumer_epoch() -> u64 {
+    CONSUMERS.lock().unwrap().0
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Observation {
+    consumer: u64,
+    #[cfg(test)]
+    mutation: u64,
+}
+pub(crate) fn idle_observation(root: &Path) -> Option<Observation> {
+    #[cfg(not(test))]
+    let _ = root;
+    let state = CONSUMERS.lock().unwrap();
+    if state.1 != 0 {
+        return None;
+    }
+    #[cfg(test)]
+    let mutation = mutation::idle_epoch(root)?;
+    Some(Observation {
+        consumer: state.0,
+        #[cfg(test)]
+        mutation,
+    })
+}
+pub(crate) struct Consumer;
+impl Drop for Consumer {
+    fn drop(&mut self) {
+        CONSUMERS.lock().unwrap().1 -= 1;
+    }
+}
+pub(crate) fn consumer_started() -> Consumer {
+    let mut state = CONSUMERS.lock().unwrap();
+    state.0 += 1;
+    state.1 += 1;
+    Consumer
+}
+
+#[cfg(test)]
+pub(crate) mod mutation {
+    use std::{
+        collections::BTreeMap,
+        fs, io,
+        os::fd::AsRawFd,
+        path::{Path, PathBuf},
+        sync::{LazyLock, Mutex},
+    };
+    static ROOTS: LazyLock<Mutex<BTreeMap<PathBuf, (u64, usize)>>> =
+        LazyLock::new(|| Mutex::new(BTreeMap::new()));
+    fn normalized(path: &Path) -> PathBuf {
+        path.canonicalize().unwrap_or_else(|_| path.to_owned())
+    }
+    pub fn register(root: &Path) {
+        ROOTS.lock().unwrap().entry(normalized(root)).or_default();
+    }
+    pub(super) fn idle_epoch(root: &Path) -> Option<u64> {
+        let roots = ROOTS.lock().unwrap();
+        let state = roots.get(&normalized(root)).copied().unwrap_or_default();
+        (state.1 == 0).then_some(state.0)
+    }
+    // The most specific registered fixture owns its writes. Rename and link
+    // operations name directory entries; ordinary writes resolve the target.
+    // Unknown roots conservatively invalidate the global observation.
+    struct Mutation {
+        roots: Vec<PathBuf>,
+        _global: Option<super::Consumer>,
+    }
+    impl Drop for Mutation {
+        fn drop(&mut self) {
+            let mut roots = ROOTS.lock().unwrap();
+            for root in &self.roots {
+                roots.get_mut(root).unwrap().1 -= 1;
+            }
+        }
+    }
+    fn begin(paths: &[&Path], follow: bool) -> Mutation {
+        let mut states = ROOTS.lock().unwrap();
+        let mut selected = vec![];
+        let mut unknown = false;
+        for path in paths {
+            let path = if follow {
+                normalized(path)
+            } else {
+                path.parent().zip(path.file_name()).map_or_else(
+                    || normalized(path),
+                    |(parent, name)| normalized(parent).join(name),
+                )
+            };
+            if let Some(root) = states
+                .keys()
+                .filter(|root| path.starts_with(root))
+                .max_by_key(|root| root.components().count())
+            {
+                selected.push(root.clone());
+            } else {
+                unknown = true;
+            }
+            selected.extend(
+                states
+                    .keys()
+                    .filter(|root| root.starts_with(&path))
+                    .cloned(),
+            );
+        }
+        selected.sort();
+        selected.dedup();
+        for root in &selected {
+            let state = states.get_mut(root).unwrap();
+            state.0 += 1;
+            state.1 += 1;
+        }
+        drop(states);
+        Mutation {
+            roots: selected,
+            _global: unknown.then(super::consumer_started),
+        }
+    }
+    pub trait FileMutation {
+        fn set_support_times(&self, times: fs::FileTimes) -> io::Result<()>;
+    }
+    impl FileMutation for fs::File {
+        fn set_support_times(&self, times: fs::FileTimes) -> io::Result<()> {
+            let path = PathBuf::from(format!("/proc/self/fd/{}", self.as_raw_fd()));
+            let _mutation = begin(&[&path], true);
+            self.set_times(times)
+        }
+    }
+    pub fn set_permissions(path: impl AsRef<Path>, permissions: fs::Permissions) -> io::Result<()> {
+        let _mutation = begin(&[path.as_ref()], true);
+        fs::set_permissions(path, permissions)
+    }
+    pub fn symlink(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+        let _mutation = begin(&[to.as_ref()], false);
+        std::os::unix::fs::symlink(from, to)
+    }
+    pub fn write(path: impl AsRef<Path>, bytes: impl AsRef<[u8]>) -> io::Result<()> {
+        let _mutation = begin(&[path.as_ref()], true);
+        fs::write(path, bytes)
+    }
+    pub fn remove_file(path: impl AsRef<Path>) -> io::Result<()> {
+        let _mutation = begin(&[path.as_ref()], false);
+        fs::remove_file(path)
+    }
+    pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
+        let _mutation = begin(&[from.as_ref(), to.as_ref()], false);
+        fs::rename(from, to)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SupportIdentity {
     pub device: u64,

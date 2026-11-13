@@ -7,7 +7,11 @@ use ftoo_manifest::{
     RuleId, SourceOrigin, UnitSite, WeldedUnits,
 };
 use std::collections::BTreeMap;
+#[cfg(test)]
+#[path = "tests/reader.rs"]
+mod reader_tests;
 
+#[derive(Clone)]
 pub(super) enum Inline {
     Text(String),
     Tag {
@@ -17,6 +21,7 @@ pub(super) enum Inline {
         site: UnitSite,
     },
     Math {
+        definition_site: UnitSite,
         key: String,
         markdown: String,
         latex: String,
@@ -78,7 +83,17 @@ fn flush_text(output: &mut Vec<Recovered>, text: &mut String) {
         output.push(Recovered::Text(std::mem::take(text)));
     }
 }
-fn recover_markdown(body: &str, block: &Block) -> Option<Vec<Recovered>> {
+fn inline_handle(run: &Inline) -> Option<&str> {
+    match run {
+        Inline::Tag { handle, .. } => Some(handle),
+        _ => None,
+    }
+}
+fn recover_markdown<'a>(
+    body: &str,
+    handles: impl Iterator<Item = &'a str>,
+) -> Option<Vec<Recovered>> {
+    let handles: Vec<_> = handles.collect();
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
@@ -87,19 +102,16 @@ fn recover_markdown(body: &str, block: &Block) -> Option<Vec<Recovered>> {
         if let Some(tail) = tail.strip_prefix("<!-- label ") {
             let end = tail.find(" -->")?;
             let label = &tail[..end];
-            let handle = block
-                .runs
+            let handle = handles
                 .iter()
-                .filter_map(|run| match run {
-                    Inline::Tag { handle, .. } if text.ends_with(handle) => Some(handle),
-                    _ => None,
-                })
+                .copied()
+                .filter(|handle| text.ends_with(handle))
                 .max_by_key(|handle| handle.len())?;
             let prefix = text.strip_suffix(handle)?.to_owned();
             text = prefix;
             flush_text(&mut output, &mut text);
             output.push(Recovered::Tag {
-                handle: handle.clone(),
+                handle: handle.into(),
                 label: label.into(),
                 token: None,
             });
@@ -235,13 +247,68 @@ fn recover_identity(source: &str) -> Option<String> {
         .collect();
     (boundaries == expected).then_some(value)
 }
+
+// Diagnostic inventories retain semantic names. Check their paragraph framing
+// independently of the sweep writer, including the scope of paragraph layout.
+pub(super) fn check_sweep_pending(source: &str, entries: &[crate::PendingEntry]) -> bool {
+    if entries.is_empty() {
+        return source.is_empty();
+    }
+    let Some(mut rest) = source
+        .strip_prefix("{\\raggedright\nPending notation: ")
+        .and_then(|body| body.strip_suffix(".\\par}\n\n"))
+    else {
+        return false;
+    };
+    for (index, entry) in entries.iter().enumerate() {
+        if index != 0 {
+            let Some(tail) = rest.strip_prefix(". ") else {
+                return false;
+            };
+            rest = tail;
+        }
+        let Some(tail) = rest
+            .strip_prefix("\\(")
+            .and_then(|tail| tail.strip_prefix(entry.body_macro()))
+            .and_then(|tail| tail.strip_prefix("\\): "))
+        else {
+            return false;
+        };
+        rest = tail;
+        for (reason_index, reason) in entry.reasons().iter().enumerate() {
+            if reason_index != 0 {
+                let Some(tail) = rest.strip_prefix("; ") else {
+                    return false;
+                };
+                rest = tail;
+            }
+            let expected = reason.to_string();
+            for (word_index, word) in expected.split(' ').enumerate() {
+                if word_index != 0 {
+                    let Some(tail) = rest.strip_prefix(' ') else {
+                        return false;
+                    };
+                    rest = tail;
+                }
+                // Consume exactly one encoded token by trying UTF-8 boundaries;
+                // the decoder also verifies every discretionary break position.
+                let Some(end) = rest
+                    .char_indices()
+                    .map(|(at, scalar)| at + scalar.len_utf8())
+                    .find(|&end| recover_identity(&rest[..end]).as_deref() == Some(word))
+                else {
+                    return false;
+                };
+                rest = &rest[end..];
+            }
+        }
+    }
+    rest.is_empty()
+}
 // TeX's input processor precedes the closed-grammar recognizer. Opaque inline
 // commands emit a nonblank token; comments discard their endline. Explicit
 // control spaces expand independently of the input processor's blank state.
 fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
-    recover_latex_with_pending_breaks(body, false)
-}
-fn recover_latex_with_pending_breaks(body: &str, pending: bool) -> Option<Vec<Recovered>> {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
@@ -304,8 +371,6 @@ fn recover_latex_with_pending_breaks(body: &str, pending: bool) -> Option<Vec<Re
                 output.push(Recovered::Mention(value));
                 line = TexLine::MidLine;
             }
-        } else if pending && tail.starts_with(r"\allowbreak{}") {
-            at += r"\allowbreak{}".len();
         } else if tail.starts_with('\\') {
             let (c, n) = tex_literal(tail)?;
             text.push(c);
@@ -378,6 +443,7 @@ pub(super) fn check_emission(
     source: &str,
     target: DocumentTarget,
 ) -> Result<(), DocumentError> {
+    check_coverage(plan, source, target)?;
     let marker = if target == DocumentTarget::Markdown {
         "<!-- unit "
     } else {
@@ -591,53 +657,14 @@ fn block_metadata(plan: &DocumentPlan, block: &Block, target: DocumentTarget) ->
     }
 }
 fn envelope(plan: &DocumentPlan, source: &str, target: DocumentTarget) -> bool {
-    let prefix = if target == DocumentTarget::Markdown {
-        format!(
-            "<!-- generated document {} language {} -->\n{}\n{}\n\n",
-            plan.document, plan.language, plan.coverage[0], plan.coverage[1]
-        )
-    } else {
-        let start = format!(
-            "{}\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}\n",
-            super::latex::PREAMBLE,
-            plan.document,
-            plan.language,
-        );
-        let Some(mut rest) = source.strip_prefix(&start) else {
-            return false;
-        };
-        for expected in &plan.coverage {
-            let Some((paragraph, tail)) = rest.split_once("\n\n") else {
-                return false;
-            };
-            if let Some(slice) = paragraph
-                .strip_prefix("Declared slice: ")
-                .and_then(|s| s.strip_suffix('.'))
-            {
-                let Some(identities) = slice
-                    .split(", ")
-                    .map(recover_identity)
-                    .collect::<Option<Vec<_>>>()
-                else {
-                    return false;
-                };
-                if format!("Declared slice: {}.", identities.join(", ")) != *expected {
-                    return false;
-                }
-            } else if !exact_literal(paragraph, expected) {
-                return false;
-            }
-            rest = tail;
-        }
-        return source.ends_with("\\end{document}\n");
-    };
-    source.starts_with(&prefix)
+    source.starts_with(&coverage_prefix(plan, target))
         && if target == DocumentTarget::Markdown {
             source.ends_with('\n') && !source.ends_with("\n\n")
         } else {
             source.ends_with("\\end{document}\n")
         }
 }
+
 pub(super) struct DisplayBody {
     pub source: String,
     pub layout: ftoo_manifest::DisplayLayout,
@@ -645,6 +672,8 @@ pub(super) struct DisplayBody {
     pub site: UnitSite,
 }
 pub(super) struct Block {
+    pub pending_names:
+        BTreeMap<(DocumentTarget, ftoo_manifest::DefinitionId), Vec<super::PendingReaderName>>,
     pub displays: BTreeMap<DocumentTarget, DisplayBody>,
     pub unit: String,
     pub depth: Option<usize>,
@@ -652,6 +681,116 @@ pub(super) struct Block {
     pub runs: Vec<Inline>,
 }
 impl Block {
+    pub fn map_pending(
+        &mut self,
+        book: &ftoo_manifest::AddressBook<'_>,
+        index: usize,
+        document: &str,
+        language: &str,
+    ) -> Result<(), DocumentError> {
+        let mut mapped = BTreeMap::new();
+        let mut errors = vec![];
+        for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
+            let mut entries = BTreeMap::new();
+            for run in self.target_runs(target) {
+                if let Inline::Math { pending, .. } = run {
+                    for entry in pending {
+                        entries.entry(entry.order()).or_insert(entry);
+                    }
+                }
+            }
+            for (order, entry) in entries {
+                let shared = self.runs.iter().any(|run| matches!(run, Inline::Math { pending, .. } if pending.iter().any(|e| e.definition() == entry.definition())));
+                let selected_target = (!shared).then_some(target);
+                let origins = self.pending_origins(entry.definition(), language, selected_target);
+                let mut names = vec![];
+                for (reason, value) in entry.reasons().iter().enumerate() {
+                    let (_, object, _) = value.text_parts();
+                    let handle = match book.reader_identity(object) {
+                        Ok(handle) => handle,
+                        Err(fault) => {
+                            collect_reader_error(
+                                &mut errors,
+                                reader_failure(
+                                    fault,
+                                    document,
+                                    language,
+                                    Some(&self.unit),
+                                    selected_target,
+                                    ftoo_manifest::ReaderIdentityPosition::Pending {
+                                        unit: self.unit.clone(),
+                                        definition: entry.definition(),
+                                        reason,
+                                    },
+                                    origins.clone(),
+                                ),
+                            );
+                            continue;
+                        }
+                    };
+                    names.push(super::PendingReaderName {
+                        object,
+                        handle,
+                        label: object.semantic_name().into(),
+                        token: format!("u{index}-p{order}-r{reason}"),
+                    });
+                }
+                mapped.insert((target, entry.definition()), names);
+            }
+        }
+        if let Some(errors) = AssemblyErrors::from_diagnostics(errors) {
+            return Err(DocumentError::Assembly(errors));
+        }
+        self.pending_names = mapped;
+        Ok(())
+    }
+    pub(super) fn pending_origins(
+        &self,
+        definition: ftoo_manifest::DefinitionId,
+        language: &str,
+        target: Option<DocumentTarget>,
+    ) -> Vec<SourceOrigin> {
+        let mut regions = vec![(None, self.runs.as_slice())];
+        for (&format, display) in &self.displays {
+            if target.is_none_or(|target| target == format) {
+                regions.extend(
+                    display
+                        .regions
+                        .iter()
+                        .map(|region| (Some(format), region.runs.as_slice())),
+                );
+            }
+        }
+        let mut origins = vec![];
+        for (target, runs) in regions {
+            for run in runs {
+                if let Inline::Math {
+                    pending,
+                    site,
+                    definition_site,
+                    ..
+                } = run
+                    && pending.iter().any(|entry| entry.definition() == definition)
+                {
+                    origins.extend([
+                        SourceOrigin {
+                            unit: Some(self.unit.clone()),
+                            language: Some(language.into()),
+                            target: None,
+                            site: definition_site.clone(),
+                        },
+                        SourceOrigin {
+                            unit: Some(self.unit.clone()),
+                            language: Some(language.into()),
+                            target,
+                            site: site.clone(),
+                        },
+                    ]);
+                }
+            }
+        }
+        origins
+    }
     pub fn target_runs(&self, target: DocumentTarget) -> impl Iterator<Item = &Inline> {
         self.runs.iter().chain(
             self.displays
@@ -662,10 +801,282 @@ impl Block {
         )
     }
 }
+#[derive(Clone)]
+pub(super) struct Coverage {
+    pub declaration: String,
+    pub runs: Vec<Inline>,
+    pub objects: Vec<ftoo_manifest::NodeId>,
+    pub site: UnitSite,
+}
+impl Coverage {
+    #[cfg(test)]
+    pub fn fixture(declaration: &str, slice: &str) -> Self {
+        Self {
+            declaration: declaration.into(),
+            runs: vec![Inline::Text(slice.into())],
+            objects: vec![],
+            site: coverage_site(None),
+        }
+    }
+    fn build(
+        book: &ftoo_manifest::AddressBook<'_>,
+        declaration: &str,
+        document: &str,
+        language: &str,
+    ) -> Result<Self, DocumentError> {
+        let mut objects = book.graph().coverage().slice.clone();
+        objects.sort_by_key(|object| object.semantic_name());
+        let mut errors = vec![];
+        let mut runs = vec![Inline::Text("Declared slice: ".into())];
+        if objects.is_empty() {
+            runs.push(Inline::Text("(empty)".into()));
+        }
+        for (index, &object) in objects.iter().enumerate() {
+            if index > 0 {
+                runs.push(Inline::Text(", ".into()));
+            }
+            let site = coverage_site(Some(index));
+            let handle = match book.reader_identity(object) {
+                Ok(handle) => handle,
+                Err(fault) => {
+                    collect_reader_error(
+                        &mut errors,
+                        reader_failure(
+                            fault,
+                            document,
+                            language,
+                            None,
+                            None,
+                            ftoo_manifest::ReaderIdentityPosition::Coverage { index, object },
+                            vec![SourceOrigin {
+                                unit: None,
+                                language: Some(language.into()),
+                                target: None,
+                                site: site.clone(),
+                            }],
+                        ),
+                    );
+                    continue;
+                }
+            };
+            runs.push(Inline::Tag {
+                handle,
+                label: object.semantic_name().into(),
+                token: format!("g-slice-{index}"),
+                site,
+            });
+        }
+        runs.push(Inline::Text(".".into()));
+        if let Some(errors) = AssemblyErrors::from_diagnostics(errors) {
+            return Err(DocumentError::Assembly(errors));
+        }
+        Ok(Self {
+            declaration: declaration.into(),
+            runs,
+            objects,
+            site: coverage_site(None),
+        })
+    }
+    fn block(&self) -> Block {
+        Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: String::new(),
+            depth: None,
+            site: self.site.clone(),
+            runs: self.runs.clone(),
+        }
+    }
+}
+fn coverage_site(index: Option<usize>) -> UnitSite {
+    let mut site = super::input::site("generated/manifest.json");
+    site.anchor = ftoo_manifest::SourceAnchor::Unavailable;
+    site.path = vec![
+        ftoo_manifest::PathPart::Key("coverage".into()),
+        ftoo_manifest::PathPart::Key("slice".into()),
+    ];
+    if let Some(index) = index {
+        site.path.push(ftoo_manifest::PathPart::Index(index));
+    }
+    site
+}
+#[allow(clippy::too_many_arguments)] // Complete generated position and context are retained together.
+fn reader_failure(
+    fault: ftoo_manifest::ReaderIdentityFault,
+    document: &str,
+    language: &str,
+    unit: Option<&str>,
+    target: Option<DocumentTarget>,
+    position: ftoo_manifest::ReaderIdentityPosition,
+    origins: Vec<SourceOrigin>,
+) -> DocumentError {
+    DocumentError::Assembly(
+        AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+            rule: RuleId::M055,
+            stage: AssemblyStage::Emission,
+            document: Some(document.into()),
+            language: Some(language.into()),
+            unit: unit.map(Into::into),
+            target,
+            site: AssemblySite::ReaderIdentity { position, origins },
+            fault: AssemblyFault::ReaderIdentity {
+                target: fault.target,
+                reason: fault.reason,
+                candidates: fault.candidates,
+            },
+        }])
+        .expect("one reader diagnostic"),
+    )
+}
+fn coverage_prefix(plan: &DocumentPlan, target: DocumentTarget) -> String {
+    if target == DocumentTarget::Markdown {
+        format!(
+            "<!-- generated document {} language {} -->\n",
+            plan.document, plan.language
+        )
+    } else {
+        format!(
+            "{}\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}\n",
+            super::latex::PREAMBLE,
+            plan.document,
+            plan.language
+        )
+    }
+}
+fn coverage_records(
+    plan: &DocumentPlan,
+    target: DocumentTarget,
+    declaration: String,
+    recovered: Option<&[Recovered]>,
+    raw: &str,
+) -> Vec<EmissionRecord> {
+    let record = |kind, value, site| EmissionRecord {
+        kind,
+        unit: String::new(),
+        language: plan.language.clone(),
+        target,
+        occurrence: None,
+        value,
+        site,
+    };
+    let mut records = vec![record(
+        EmissionKind::CoverageDeclaration,
+        declaration,
+        plan.coverage.site.clone(),
+    )];
+    let mut text = String::new();
+    let mut tags = Vec::new();
+    if let Some(recovered) = recovered {
+        for run in recovered {
+            match run {
+                Recovered::Text(value) => text.push_str(value),
+                Recovered::Tag {
+                    handle,
+                    label,
+                    token,
+                } => {
+                    use std::fmt::Write;
+                    write!(text, "@tag{{{handle}}}").expect("string write");
+                    let index = tags.len();
+                    let object = plan
+                        .coverage
+                        .objects
+                        .iter()
+                        .copied()
+                        .find(|object| object.semantic_name() == label);
+                    let position = plan.coverage.objects.get(index).map(|&object| {
+                        ftoo_manifest::ReaderIdentityPosition::Coverage { index, object }
+                    });
+                    tags.push(record(
+                        EmissionKind::ReaderIdentity {
+                            position,
+                            object,
+                            handle: handle.clone(),
+                            token: token.clone().unwrap_or_else(|| format!("g-slice-{index}")),
+                        },
+                        label.clone(),
+                        coverage_site(Some(index)),
+                    ));
+                }
+                _ => text.push_str(raw),
+            }
+        }
+    } else {
+        text = raw.into();
+    }
+    records.push(record(
+        EmissionKind::CoverageSlice,
+        text,
+        plan.coverage.site.clone(),
+    ));
+    records.extend(tags);
+    records
+}
+fn check_coverage(
+    plan: &DocumentPlan,
+    source: &str,
+    target: DocumentTarget,
+) -> Result<(), DocumentError> {
+    let prefix = coverage_prefix(plan, target);
+    // Envelope failures retain the existing whole-document inventory refusal.
+    let Some(rest) = source.strip_prefix(&prefix) else {
+        return Ok(());
+    };
+    let separator = if target == DocumentTarget::Latex {
+        "\n\n"
+    } else {
+        "\n"
+    };
+    let (declaration, rest) = rest.split_once(separator).unwrap_or(("", rest));
+    let (slice, _) = rest.split_once("\n\n").unwrap_or((rest, ""));
+    let block = plan.coverage.block();
+    let expected_runs = expected_runs(&block, target);
+    let expected = coverage_records(
+        plan,
+        target,
+        plan.coverage.declaration.clone(),
+        Some(&expected_runs),
+        "",
+    );
+    let recovered = if target == DocumentTarget::Latex {
+        recover_latex(slice)
+    } else {
+        recover_markdown(slice, block.runs.iter().filter_map(inline_handle))
+    };
+    let declaration = if target == DocumentTarget::Latex
+        && exact_literal(declaration, &plan.coverage.declaration)
+    {
+        plan.coverage.declaration.clone()
+    } else {
+        declaration.into()
+    };
+    let actual = coverage_records(plan, target, declaration, recovered.as_deref(), slice);
+    let (mut missing, mut unexpected, mut changed) = (vec![], vec![], vec![]);
+    difference(
+        &expected,
+        &actual,
+        &mut missing,
+        &mut unexpected,
+        &mut changed,
+    );
+    if missing.is_empty() && unexpected.is_empty() && changed.is_empty() {
+        return Ok(());
+    }
+    Err(emission_failure(
+        plan,
+        target,
+        prefix.len()..source.len() - rest.len() + slice.len(),
+        AssemblyFault::EmissionMismatch {
+            missing,
+            unexpected,
+            changed,
+        },
+    ))
+}
 pub(super) struct DocumentPlan {
     pub document: String,
     pub language: String,
-    pub coverage: [String; 2],
+    pub coverage: Coverage,
     pub blocks: Vec<Block>,
 }
 impl DocumentPlan {
@@ -732,13 +1143,43 @@ impl DocumentPlan {
     pub fn origins(&self, target: DocumentTarget) -> Vec<SourceOrigin> {
         self.records(target)
             .into_iter()
-            .map(|record| SourceOrigin {
-                unit: Some(record.unit),
-                language: Some(record.language),
-                target: Some(target),
-                site: record.site,
+            .flat_map(|record| {
+                if let EmissionKind::PendingExplanation(entry) = record.kind {
+                    entry
+                        .occurrences
+                        .into_iter()
+                        .flat_map(|occurrence| [occurrence.definition, occurrence.source])
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![SourceOrigin {
+                        unit: Some(record.unit),
+                        language: Some(record.language),
+                        target: Some(target),
+                        site: record.site,
+                    }]
+                }
             })
+            .chain(self.coverage.runs.iter().filter_map(|run| match run {
+                Inline::Tag { site, .. } => Some(SourceOrigin {
+                    unit: None,
+                    language: Some(self.language.clone()),
+                    target: Some(target),
+                    site: site.clone(),
+                }),
+                _ => None,
+            }))
             .collect()
+    }
+}
+fn collect_reader_error(errors: &mut Vec<AssemblyDiagnostic>, error: DocumentError) {
+    let DocumentError::Assembly(found) = error else {
+        unreachable!("reader identity fault")
+    };
+    for diagnostic in found.diagnostics() {
+        // Shared statement runs are mapped for both targets, but have one site.
+        if !errors.contains(diagnostic) {
+            errors.push(diagnostic.clone());
+        }
     }
 }
 pub(super) fn build(
@@ -761,19 +1202,17 @@ pub(super) fn build(
         "Coverage declaration: {gate}. Closed world: referents={}; relations={}; audit={}. Evidence context: unaudited base graph.",
         closed.referents, closed.relations, closed.audit
     );
-    let mut slice: Vec<_> = coverage.slice.iter().map(|id| id.semantic_name()).collect();
-    slice.sort_unstable();
-    let second = format!(
-        "Declared slice: {}.",
-        if slice.is_empty() {
-            "(empty)".into()
-        } else {
-            slice.join(", ")
-        }
-    );
     let mut plans = Vec::new();
+    let mut errors = vec![];
     for (document, positions) in skeletons.documents() {
         for language in &corpus.documents()[document] {
+            let coverage = match Coverage::build(book, &first, document, language) {
+                Ok(coverage) => Some(coverage),
+                Err(error) => {
+                    collect_reader_error(&mut errors, error);
+                    None
+                }
+            };
             let mut blocks = Vec::new();
             for position in positions {
                 let (index, unit) = corpus
@@ -784,21 +1223,31 @@ pub(super) fn build(
                     .expect("checked skeleton unit");
                 let runs = runs(index, unit, language, welded, &equations);
                 let bodies = display_plans(index, unit, language, welded, &equations, displays);
-                blocks.push(Block {
+                let mut block = Block {
+                    pending_names: BTreeMap::new(),
                     displays: bodies,
                     unit: position.unit().into(),
                     depth: position.depth(),
                     site: metadata[position.unit()].clone(),
                     runs,
+                };
+                if let Err(error) = block.map_pending(book, index, document, language) {
+                    collect_reader_error(&mut errors, error);
+                }
+                blocks.push(block);
+            }
+            if let Some(coverage) = coverage {
+                plans.push(DocumentPlan {
+                    document: document.clone(),
+                    language: language.clone(),
+                    coverage,
+                    blocks,
                 });
             }
-            plans.push(DocumentPlan {
-                document: document.clone(),
-                language: language.clone(),
-                coverage: [first.clone(), second.clone()],
-                blocks,
-            });
         }
+    }
+    if let Some(errors) = AssemblyErrors::from_diagnostics(errors) {
+        return Err(DocumentError::Assembly(errors));
     }
     Ok(plans)
 }
@@ -967,6 +1416,7 @@ fn runs(
                 .clone()
                 .expect("admitted occurrence"),
             Inline::Math {
+                definition_site: unit.math()[occurrence.name()].site.clone(),
                 key: occurrence.name().into(),
                 markdown: markdown.clone(),
                 latex: latex.clone(),
@@ -1070,7 +1520,7 @@ fn recover_block(body: &str, block: &Block, target: DocumentTarget) -> Option<Ve
             .depth
             .map_or_else(String::new, |d| format!("{} ", "#".repeat(d)));
         body.strip_prefix(&heading)
-            .and_then(|body| recover_markdown(body, block))
+            .and_then(|body| recover_markdown(body, block.runs.iter().filter_map(inline_handle)))
     } else {
         let framed = if let Some(depth) = block.depth {
             let prefix = match depth {
@@ -1343,6 +1793,7 @@ pub(super) fn display_plans(
                 replacements.push((
                     occurrence.site().decoded.clone().expect("insertion"),
                     Inline::Math {
+                        definition_site: unit.math()[occurrence.name()].site.clone(),
                         key: occurrence.name().into(),
                         markdown: markdown.clone(),
                         latex: latex.clone(),
@@ -1377,6 +1828,7 @@ pub(super) fn display_plans(
             }
             normalize(&mut runs);
             regions.push(Block {
+                pending_names: BTreeMap::new(),
                 unit: unit.label().as_str().into(),
                 depth: None,
                 site: region.site(&region.source().site),
@@ -1580,7 +2032,13 @@ fn pending_records(
     }
     for runs in regions {
         for run in runs {
-            if let Inline::Math { pending, site, .. } = run {
+            if let Inline::Math {
+                pending,
+                site,
+                definition_site,
+                ..
+            } = run
+            {
                 for entry in pending {
                     let (_, explanation) =
                         collected.entry(entry.definition()).or_insert_with(|| {
@@ -1591,11 +2049,19 @@ fn pending_records(
                                     body_macro: entry.body_macro().into(),
                                     body_unicode: entry.body_unicode().into(),
                                     reasons: entry.reasons().to_vec(),
+                                    names: block.pending_names[&(target, entry.definition())]
+                                        .clone(),
                                     occurrences: vec![],
                                 },
                             )
                         });
                     explanation.occurrences.push(super::PendingOccurrence {
+                        definition: SourceOrigin {
+                            unit: Some(block.unit.clone()),
+                            language: Some(plan.language.clone()),
+                            target: None,
+                            site: definition_site.clone(),
+                        },
                         source: SourceOrigin {
                             unit: Some(block.unit.clone()),
                             language: Some(plan.language.clone()),
@@ -1648,34 +2114,50 @@ fn recover_pending(
     expected: &[EmissionRecord],
 ) -> Vec<EmissionRecord> {
     let Some(source) = source else { return vec![] };
-    let mut wanted = vec![Recovered::Text("Pending notation: ".into())];
+    let mut wanted = vec![];
+    let mut prose = String::from("Pending notation: ");
     for (index, record) in expected.iter().enumerate() {
         let EmissionKind::PendingExplanation(entry) = &record.kind else {
             unreachable!("pending record")
         };
+        flush_text(&mut wanted, &mut prose);
         wanted.push(Recovered::Math(if target == DocumentTarget::Latex {
             entry.body_macro.clone()
         } else {
             entry.body_unicode.clone()
         }));
-        wanted.push(Recovered::Text(format!(
-            ": {}.{}",
-            entry
-                .reasons
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("; "),
-            if index + 1 == expected.len() { "" } else { " " }
-        )));
+        prose.push_str(": ");
+        for (reason, (value, name)) in entry.reasons.iter().zip(&entry.names).enumerate() {
+            if reason != 0 {
+                prose.push_str("; ");
+            }
+            let (before, _, after) = value.text_parts();
+            prose.push_str(before);
+            flush_text(&mut wanted, &mut prose);
+            wanted.push(Recovered::Tag {
+                handle: name.handle.clone(),
+                label: name.label.clone(),
+                token: (target == DocumentTarget::Latex).then(|| name.token.clone()),
+            });
+            prose.push_str(&after);
+        }
+        prose.push_str(if index + 1 == expected.len() {
+            "."
+        } else {
+            ". "
+        });
     }
+    flush_text(&mut wanted, &mut prose);
     let full = format!("Pending notation: {source}");
     let recovered = match target {
-        DocumentTarget::Markdown => recover_markdown(&full, block),
-        DocumentTarget::Latex if pending_breaks(&full) => {
-            recover_latex_with_pending_breaks(&full, true)
-        }
-        DocumentTarget::Latex => None,
+        DocumentTarget::Markdown => recover_markdown(
+            &full,
+            wanted.iter().filter_map(|run| match run {
+                Recovered::Tag { handle, .. } => Some(handle.as_str()),
+                _ => None,
+            }),
+        ),
+        DocumentTarget::Latex => recover_latex(&full),
     };
     if recovered == Some(wanted) {
         return expected.to_vec();
@@ -1689,25 +2171,30 @@ fn recover_pending(
         value: String::new(),
         site: block.site.clone(),
     });
+    if let (Some(recovered), EmissionKind::PendingExplanation(entry)) =
+        (recovered, &mut record.kind)
+    {
+        let tags: Vec<_> = recovered
+            .into_iter()
+            .filter_map(|run| match run {
+                Recovered::Tag {
+                    handle,
+                    label,
+                    token,
+                } => Some((handle, label, token)),
+                _ => None,
+            })
+            .collect();
+        for (name, (handle, label, token)) in entry.names.iter_mut().zip(tags) {
+            name.handle = handle;
+            name.label = label;
+            if let Some(token) = token {
+                name.token = token;
+            }
+        }
+    }
     record.value = full;
     vec![record]
-}
-
-fn pending_breaks(mut source: &str) -> bool {
-    let prose = |text: &str| {
-        text.split_ascii_whitespace()
-            .all(|token| recover_identity(token).is_some())
-    };
-    while let Some((before, math)) = source.split_once(r"\(") {
-        if !prose(before) {
-            return false;
-        }
-        let Some((_, rest)) = math.split_once(r"\)") else {
-            return false;
-        };
-        source = rest;
-    }
-    prose(source)
 }
 
 #[cfg(test)]

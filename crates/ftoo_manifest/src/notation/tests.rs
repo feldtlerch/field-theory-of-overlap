@@ -1820,3 +1820,66 @@ fn exact_fraction_arity_and_display() {
     )
     .unwrap();
 }
+
+#[test]
+fn pending_text_parts_keep_every_template_and_blocker_spelling() {
+    use crate::{Awaiting, Blocker, CapabilityId, NodeId, PendingReason};
+    let object = NodeId::LangevinCoefficientOne;
+    let mut cases = vec![
+        (
+            PendingReason::BackingUnbound { object },
+            "backing object ",
+            " is unbound",
+        ),
+        (
+            PendingReason::BackingAbsent { object },
+            "backing object ",
+            " is absent",
+        ),
+        (
+            PendingReason::FormulationProposed { object },
+            "retained formulation ",
+            "",
+        ),
+    ];
+    for (blocker, after) in [
+        (Blocker::AuditRunRequired, " awaits audit-run-required"),
+        (
+            Blocker::Awaiting(Awaiting::AuditBinding),
+            " awaits audit-binding",
+        ),
+        (
+            Blocker::Awaiting(Awaiting::Capability(
+                CapabilityId::ExactRationalLinearEquivalence,
+            )),
+            " awaits capability exact-rational-linear-equivalence",
+        ),
+        (
+            Blocker::Awaiting(Awaiting::Capability(
+                CapabilityId::FormalTruncatedPowerSeries,
+            )),
+            " awaits capability formal-truncated-power-series",
+        ),
+        (
+            Blocker::Awaiting(Awaiting::Capability(CapabilityId::SymbolicTrigonometry)),
+            " awaits capability symbolic-trigonometry",
+        ),
+        (
+            Blocker::Awaiting(Awaiting::Capability(CapabilityId::TrigonometricIntegration)),
+            " awaits capability trigonometric-integration",
+        ),
+    ] {
+        cases.push((
+            PendingReason::ClaimDeferred { object, blocker },
+            "claim evidence ",
+            after,
+        ));
+    }
+    for (reason, before, after) in cases {
+        assert_eq!(reason.text_parts(), (before, object, after.into()));
+        assert_eq!(
+            reason.to_string(),
+            format!("{before}def:langevin:coefficient-one{after}")
+        );
+    }
+}

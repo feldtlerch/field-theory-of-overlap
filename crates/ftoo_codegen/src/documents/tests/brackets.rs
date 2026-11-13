@@ -1,4 +1,119 @@
 use super::*;
+use crate::support_bracket::mutation::FileMutation as _;
+use sha2::{Digest, Sha256};
+use std::os::unix::fs::PermissionsExt;
+
+#[test]
+fn intervening_and_inflight_consumers_invalidate_shared_observation()
+-> Result<(), Box<dyn std::error::Error>> {
+    // Isolate the process-wide clock from other concurrently running tests.
+    const CHILD: &str = "FTOO_OBSERVATION_CONTROL_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args(["--exact", "documents::tests::brackets::intervening_and_inflight_consumers_invalidate_shared_observation", "--nocapture"])
+            .env(CHILD, "1").output()?;
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Ok(());
+    }
+    // The general temporary root changes during parallel tests. Keep the tiny
+    // fixture beneath the stable checkout so its ancestor identities are real.
+    let directory = Directory(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!(".counter-fixture-{}", std::process::id())),
+    );
+    for name in ["runtime/bin", "bundle", "tmp", "downloads"] {
+        fs::create_dir_all(directory.0.join(name))?;
+    }
+    let engine = b"#!/bin/sh\nif [ \"$1\" = wait ]; then read ignored; fi\nexit 0\n";
+    let executable = directory.0.join("runtime/bin/tectonic");
+    fs::write(&executable, engine)?;
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))?;
+    let digest = "d".repeat(64);
+    fs::write(directory.0.join("bundle/SHA256SUM"), &digest)?;
+    let lock = native_support::Lock {
+        source: None,
+        engine: format!("{:x}", Sha256::digest(engine)),
+        files: BTreeMap::from([(
+            "SHA256SUM".into(),
+            format!("{:x}", Sha256::digest(digest.as_bytes())),
+        )]),
+        bundle_digest: digest,
+    };
+    let support = NativeSupport::at(directory.0.clone());
+    let probe = directory.0.join("tmp/mutation");
+    let other = directory.0.join("other-private-root");
+    fs::create_dir_all(other.join("tmp"))?;
+    crate::support_bracket::mutation::register(&other);
+    support.scope(&lock, || -> Result<(), DocumentError> {
+        support.after_consumer(&lock)?;
+        let count = support.identity_observations.get();
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count);
+
+        support.after_consumer(&lock)?;
+        let count = support.identity_observations.get();
+        let epoch = crate::support_bracket::consumer_epoch();
+        let output = native::measured_output(
+            std::process::Command::new(support.directory().join("runtime/bin/tectonic"))
+                .arg("--version"),
+        )
+        .unwrap();
+        assert!(output.status.success());
+        assert_eq!(crate::support_bracket::consumer_epoch(), epoch + 1);
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count + 1);
+
+        support.after_consumer_observed(&lock, || {
+            let output =
+                native::measured_output(std::process::Command::new(&executable).arg("--version"))
+                    .unwrap();
+            assert!(output.status.success());
+        })?;
+        let count = support.identity_observations.get();
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count + 1);
+
+        let flight = crate::support_bracket::consumer_started();
+        let mut child = std::process::Command::new(&executable)
+            .arg("wait")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        assert_eq!(child.try_wait().unwrap(), None);
+        support.after_consumer(&lock)?;
+        let count = support.identity_observations.get();
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count + 1);
+        drop(child.stdin.take());
+        assert!(child.wait().unwrap().success());
+        drop(flight);
+        // An observation made while a consumer ran stays unavailable after wait.
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count + 2);
+
+        support.after_consumer(&lock)?;
+        let count = support.identity_observations.get();
+        crate::support_bracket::mutation::write(other.join("tmp/control"), b"unrelated").unwrap();
+        assert_eq!(fs::read(other.join("tmp/control")).unwrap(), b"unrelated");
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count);
+
+        support.after_consumer(&lock)?;
+        let count = support.identity_observations.get();
+        crate::support_bracket::mutation::write(&probe, b"control").unwrap();
+        assert_eq!(fs::read(&probe).unwrap(), b"control");
+        support.before_consumer(&lock)?;
+        assert_eq!(support.identity_observations.get(), count + 1);
+        Ok(())
+    })?;
+    assert_eq!(support.closing_hash(), Some(Ok(())));
+    Ok(())
+}
 
 pub(super) struct CaseEvidence {
     name: String,
@@ -94,6 +209,7 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
             acceptance::support_required_native_unknown_unicode_quotes_backslashes_and_controls_keep_complete_records(&support, &lock, checks)?;
             sweep::support_required_native_sweep_row_has_complete_evidence_and_restores(&support, &lock, checks)?;
             displays::support_required_real_table_and_picture_consume_pending_math_and_literal_spans(&support, &lock, checks)?;
+            overfull::support_required_overfull_boxes_refuse_complete_frames_and_restore_at_boundary(&support, &lock, checks)?;
             Ok(())
         };
         // A pure fixture failure unwinds the owning scope and discards evidence.
@@ -200,6 +316,10 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
         .map(str::to_owned),
     );
     assert_eq!(expected.len(), 87);
+    for index in 0..2 {
+        expected.push(format!("overfull/{index}/refusal"));
+        expected.push(format!("overfull/{index}/restored"));
+    }
     let mut cold = vec![
         "cold/faces/accepted".into(),
         "cold/unknown/refusal".into(),
@@ -258,8 +378,8 @@ fn support_required_held_directory_replacement_is_observed_and_restores()
     let saved = directory.0.join("saved");
     fs::create_dir_all(&selected)?;
     fs::create_dir(&replacement)?;
-    fs::write(selected.join("member"), b"same bytes")?;
-    fs::write(replacement.join("member"), b"same bytes")?;
+    crate::support_bracket::mutation::write(selected.join("member"), b"same bytes")?;
+    crate::support_bracket::mutation::write(replacement.join("member"), b"same bytes")?;
     let roots = vec![selected.clone()];
     let before = identity(&selected.join("member"));
     let snapshot =
@@ -267,8 +387,8 @@ fn support_required_held_directory_replacement_is_observed_and_restores()
     assert_eq!(snapshot.check().unwrap(), snapshot.member_count());
     // The retained descriptor still reaches the original directory. Its parent
     // entry must nevertheless detect that the selected path now reaches another.
-    fs::rename(&selected, &saved)?;
-    fs::rename(&replacement, &selected)?;
+    crate::support_bracket::mutation::rename(&selected, &saved)?;
+    crate::support_bracket::mutation::rename(&replacement, &selected)?;
     let fault = crate::support_bracket::Fault::Changed {
         path: selected.join("member"),
         expected: before,
@@ -279,8 +399,8 @@ fn support_required_held_directory_replacement_is_observed_and_restores()
         format!("{fault:?}")
     );
     drop(snapshot);
-    fs::rename(&selected, &replacement)?;
-    fs::rename(&saved, &selected)?;
+    crate::support_bracket::mutation::rename(&selected, &replacement)?;
+    crate::support_bracket::mutation::rename(&saved, &selected)?;
     assert_eq!(fs::read(selected.join("member"))?, b"same bytes");
     let restored =
         crate::support_bracket::Snapshot::capture(&roots).map_err(|e| format!("{e:?}"))?;
@@ -338,11 +458,11 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
     for name in ["runtime/bin", "bundle", "tmp", "downloads"] {
         fs::create_dir_all(directory.0.join(name))?;
     }
-    fs::write(directory.0.join("runtime/bin/tectonic"), b"a")?;
+    crate::support_bracket::mutation::write(directory.0.join("runtime/bin/tectonic"), b"a")?;
     let digest = "d".repeat(64);
-    fs::write(directory.0.join("bundle/SHA256SUM"), &digest)?;
+    crate::support_bracket::mutation::write(directory.0.join("bundle/SHA256SUM"), &digest)?;
     let path = directory.0.join("bundle/member");
-    fs::write(&path, b"a")?;
+    crate::support_bracket::mutation::write(&path, b"a")?;
     let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
     let lock = native_support::Lock {
         source: None,
@@ -360,7 +480,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
         let probe = directory.0.join("tmp/quantum");
         let start = std::time::Instant::now();
         loop {
-            fs::write(&probe, b"probe")?;
+            crate::support_bracket::mutation::write(&probe, b"probe")?;
             let now = identity(&probe);
             if (now.ctime_seconds, now.ctime_nanoseconds)
                 != (before.ctime_seconds, before.ctime_nanoseconds)
@@ -374,27 +494,27 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
             support.observe(&lock)?;
             match mutation {
                 "identical" => {
-                    fs::write(&path, b"a").unwrap();
+                    crate::support_bracket::mutation::write(&path, b"a").unwrap();
                     fs::File::options()
                         .write(true)
                         .open(&path)
                         .unwrap()
-                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .set_support_times(fs::FileTimes::new().set_modified(modified))
                         .unwrap();
                 }
                 "mtime" => {
-                    fs::write(&path, b"b").unwrap();
+                    crate::support_bracket::mutation::write(&path, b"b").unwrap();
                     fs::File::options()
                         .write(true)
                         .open(&path)
                         .unwrap()
-                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .set_support_times(fs::FileTimes::new().set_modified(modified))
                         .unwrap();
                 }
                 "rename" => {
                     let replacement = directory.0.join("tmp/replacement");
-                    fs::write(&replacement, b"a").unwrap();
-                    fs::rename(replacement, &path).unwrap();
+                    crate::support_bracket::mutation::write(&replacement, b"a").unwrap();
+                    crate::support_bracket::mutation::rename(replacement, &path).unwrap();
                 }
                 _ => unreachable!(),
             }
@@ -418,7 +538,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
             };
             expected = Some(fault.clone());
             assert_eq!(support.observe(&lock), Err(fault.clone()));
-            fs::write(&path, b"a").unwrap();
+            crate::support_bracket::mutation::write(&path, b"a").unwrap();
             assert_eq!(fs::read(&path).unwrap(), b"a");
             assert_eq!(support.observe(&lock), Err(fault.clone()));
             let started = std::cell::Cell::new(false);
@@ -461,7 +581,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
         support.observe(&lock)?;
         fs::File::open(ancestor)
             .unwrap()
-            .set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
+            .set_support_times(fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
             .unwrap();
         support.observe(&lock)
     });
@@ -476,13 +596,13 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
         format!("Native({changed:?})")
     );
     assert_eq!(support.closing_hash(), Some(Ok(())));
-    fs::File::open(ancestor)?.set_times(fs::FileTimes::new().set_modified(modified))?;
+    fs::File::open(ancestor)?.set_support_times(fs::FileTimes::new().set_modified(modified))?;
     assert_eq!(fs::metadata(ancestor)?.modified()?, modified);
     assert_eq!(fs::read(&path)?, b"a");
     assert_eq!(support.scope(&lock, || support.observe(&lock)), Ok(()));
     let result = support.scope(&lock, || -> Result<_, NativeAdapterFault> {
         support.observe(&lock)?;
-        fs::write(&path, b"b").unwrap();
+        crate::support_bracket::mutation::write(&path, b"b").unwrap();
         Ok(vec!["first provisional", "second provisional"])
     });
     let fault = NativeAdapterFault::Integrity {
@@ -498,7 +618,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
         format!("Native({fault:?})")
     );
     assert_eq!(fs::read(&path)?, b"b");
-    fs::write(&path, b"a")?;
+    crate::support_bracket::mutation::write(&path, b"a")?;
     assert_eq!(fs::read(&path)?, b"a");
     assert_eq!(
         support.scope(&lock, || -> Result<_, NativeAdapterFault> {
@@ -521,7 +641,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
             language: "en".into(),
         },
         vec![],
-        |_| fs::write(&path, b"b").unwrap(),
+        |_| crate::support_bracket::mutation::write(&path, b"b").unwrap(),
         |_, _| {},
     );
     let changed = NativeAdapterFault::SupportChanged {
@@ -536,7 +656,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
     );
     assert_eq!(support.closing_hash(), Some(Err(fault)));
     assert_eq!(fs::read(&path)?, b"b");
-    fs::write(&path, b"a")?;
+    crate::support_bracket::mutation::write(&path, b"a")?;
     assert_eq!(fs::read(&path)?, b"a");
     assert_eq!(
         support.scope(&lock, || -> Result<_, NativeAdapterFault> {
@@ -592,9 +712,10 @@ fn support_required_format_state_fault_poison_discards_provisional_results_and_n
     for name in ["runtime/bin", "bundle", "downloads", "tmp/case/cache"] {
         fs::create_dir_all(directory.0.join(name)).unwrap();
     }
-    fs::write(directory.0.join("runtime/bin/tectonic"), b"engine").unwrap();
+    crate::support_bracket::mutation::write(directory.0.join("runtime/bin/tectonic"), b"engine")
+        .unwrap();
     let digest = "d".repeat(64);
-    fs::write(directory.0.join("bundle/SHA256SUM"), &digest).unwrap();
+    crate::support_bracket::mutation::write(directory.0.join("bundle/SHA256SUM"), &digest).unwrap();
     let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
     let lock = Lock {
         source: None,
@@ -621,7 +742,11 @@ fn support_required_format_state_fault_poison_discards_provisional_results_and_n
         let result = support.scope(&lock, || -> Result<Vec<&str>, NativeAdapterFault> {
             support.observe(&lock)?;
             seed.copy(&cache)?;
-            fs::write(cache.join("Tectonic/formats/a.fmt"), b"mutation").unwrap();
+            crate::support_bracket::mutation::write(
+                cache.join("Tectonic/formats/a.fmt"),
+                b"mutation",
+            )
+            .unwrap();
             assert_eq!(
                 seed.check(&cache, phase)
                     .map_err(|fault| support.poison(fault)),

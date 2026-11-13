@@ -1,0 +1,8 @@
+warning: open of input /dev/null failed
+caused by: access to the path `/dev/null` is forbidden
+error: notation.tex:1: LaTeX Error: Command \FtooQCoefficientOne already defined.
+               Or name \end... illegal, see p.192 of the manual.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help
+error: halted on potentially-recoverable error as specified

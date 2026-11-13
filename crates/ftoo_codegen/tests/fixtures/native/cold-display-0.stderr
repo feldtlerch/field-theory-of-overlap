@@ -1,0 +1,2 @@
+warning: open of input /dev/null failed
+caused by: access to the path `/dev/null` is forbidden

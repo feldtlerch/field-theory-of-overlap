@@ -61,6 +61,10 @@ pub struct SourceOrigin {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AssemblySite {
+    ReaderIdentity {
+        position: ReaderIdentityPosition,
+        origins: Vec<SourceOrigin>,
+    },
     Source(UnitSite),
     Math {
         definition: UnitSite,
@@ -75,6 +79,18 @@ pub enum AssemblySite {
     },
     Inventory {
         path: String,
+    },
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReaderIdentityPosition {
+    Coverage {
+        index: usize,
+        object: crate::NodeId,
+    },
+    Pending {
+        unit: String,
+        definition: crate::DefinitionId,
+        reason: usize,
     },
 }
 impl fmt::Display for AssemblySite {
@@ -235,6 +251,7 @@ impl fmt::Display for AssemblyInputDiagnostic {
 pub(super) fn sort(diagnostics: &mut [AssemblyInputDiagnostic]) {
     fn location(site: &AssemblySite) -> (&str, &[crate::PathPart], Option<usize>) {
         match site {
+            AssemblySite::ReaderIdentity { .. } => ("", &[], None),
             AssemblySite::Source(s) => (
                 s.file.as_str(),
                 &s.path,

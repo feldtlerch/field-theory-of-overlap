@@ -706,6 +706,7 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
                 replacements.push((
                     math.site().decoded.clone().unwrap(),
                     plan::Inline::Math {
+                        definition_site: super::super::input::site("fixture-math.toml"),
                         key: math.name().into(),
                         markdown: r"\underbrace{{c}_{1}}_{\text{pending}}".into(),
                         latex: r"\FtooQCoefficientOne{}".into(),
@@ -750,6 +751,7 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
                 *text = text.trim_end().into();
             }
             regions.push(plan::Block {
+                pending_names: BTreeMap::new(),
                 unit: "sec:fixture:caption".into(),
                 depth: None,
                 site: region.site(&region.source().site),
@@ -770,8 +772,9 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
     plan::DocumentPlan {
         document: "main".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![plan::Block {
+            pending_names: BTreeMap::new(),
             unit: "sec:fixture:caption".into(),
             depth: None,
             site: input::site("units/statements/caption.toml"),
@@ -1077,6 +1080,7 @@ fn relation_caption(plan: &mut plan::DocumentPlan) {
     block.runs = vec![
         plan::Inline::Text("Relation ".into()),
         plan::Inline::Math {
+            definition_site: super::super::input::site("fixture-math.toml"),
             key: "value".into(),
             markdown: r"({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})".into(),
             latex: r"({\FtooQCoefficientOne{}}={\frac{1}{3}})".into(),

@@ -859,6 +859,8 @@ pub(super) fn resolve(value: Option<&Path>) -> std::result::Result<Support, Nota
             }
         }
     }
+    #[cfg(test)]
+    crate::support_bracket::mutation::register(&root);
     Ok(Support {
         root,
         runtime,

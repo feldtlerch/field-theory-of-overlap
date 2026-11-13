@@ -1,0 +1,7 @@
+warning: open of input /dev/null failed
+caused by: access to the path `/dev/null` is forbidden
+error: document.tex:14: Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
+(ftdoc)                      unit , language en, site u0-t0.
+
+Type <return> to continue
+error: halted on potentially-recoverable error as specified

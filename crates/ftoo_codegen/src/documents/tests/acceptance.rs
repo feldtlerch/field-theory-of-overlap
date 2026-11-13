@@ -1098,8 +1098,9 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
     let plan = plan::DocumentPlan {
         document: "main".into(),
         language: "en".into(),
-        coverage: ["a".into(), "b".into()],
+        coverage: plan::Coverage::fixture("a", "b"),
         blocks: vec![plan::Block {
+            pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
             unit: "sec:fixture:heading".into(),
             depth: Some(1),
@@ -1179,9 +1180,10 @@ fn independent_emission_compares_complete_ordered_blocks() {
     let plan = plan::DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: ["a", "b", "c"]
             .map(|name| plan::Block {
+                pending_names: BTreeMap::new(),
                 displays: BTreeMap::new(),
                 unit: format!("sec:fixture:{name}"),
                 depth: (name == "a").then_some(1),
@@ -1299,8 +1301,9 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
     let plan = plan::DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![plan::Block {
+            pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
             unit: "sec:fixture:unit".into(),
             depth: None,
@@ -1309,6 +1312,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
                 .into_iter()
                 .enumerate()
                 .map(|(index, key)| plan::Inline::Math {
+                    definition_site: super::super::input::site("fixture-math.toml"),
                     key: key.into(),
                     markdown: "1".into(),
                     latex: "1".into(),
@@ -1341,8 +1345,9 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
     let plan = plan::DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
-        coverage: ["Coverage.".into(), "Slice.".into()],
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![plan::Block {
+            pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
             unit: "sec:fixture:paragraph".into(),
             depth: None,
@@ -1356,6 +1361,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                 },
                 plan::Inline::Text(" ".into()),
                 plan::Inline::Math {
+                    definition_site: super::super::input::site("fixture-math.toml"),
                     key: "value".into(),
                     markdown: "1".into(),
                     latex: "1".into(),
@@ -1654,8 +1660,9 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
             let mut plan = plan::DocumentPlan {
                 document: "fixture".into(),
                 language: "en".into(),
-                coverage: ["Coverage.".into(), "Slice.".into()],
+                coverage: plan::Coverage::fixture("Coverage.", "Slice."),
                 blocks: vec![plan::Block {
+                    pending_names: BTreeMap::new(),
                     displays: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth,
@@ -1670,6 +1677,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
             };
             if position >= 2 {
                 let tag_region = plan::Block {
+                    pending_names: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth: None,
                     site: origin.clone(),
@@ -1678,6 +1686,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                 };
                 plan.blocks[0].runs = vec![plan::Inline::Text("Caption.".into())];
                 let other_cell = plan::Block {
+                    pending_names: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth: None,
                     site: input::site("units/displays/fixture.toml"),

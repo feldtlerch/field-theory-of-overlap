@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_lines)]
 use super::*;
+use crate::support_bracket::mutation::FileMutation as _;
 use ftoo_manifest::{Callee, ExprDraft, PrimitiveId};
 use ftoo_manifest::{DefinitionId, NotationResource};
 use std::{
@@ -91,27 +92,27 @@ fn support_required_bracket_identity_mutations_poison_and_restore() {
             assert_eq!(provisional, vec![Ok(())]); // Private raw evidence, never returned yet.
             match mutation {
                 "identical" => {
-                    fs::write(&path, &bytes).unwrap();
+                    crate::support_bracket::mutation::write(&path, &bytes).unwrap();
                     fs::File::options()
                         .write(true)
                         .open(&path)
                         .unwrap()
-                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .set_support_times(fs::FileTimes::new().set_modified(modified))
                         .unwrap();
                 }
                 "mtime" => {
-                    fs::write(&path, &changed).unwrap();
+                    crate::support_bracket::mutation::write(&path, &changed).unwrap();
                     fs::File::options()
                         .write(true)
                         .open(&path)
                         .unwrap()
-                        .set_times(fs::FileTimes::new().set_modified(modified))
+                        .set_support_times(fs::FileTimes::new().set_modified(modified))
                         .unwrap();
                 }
                 "rename" => {
                     let replacement = support.root.join("tmp/replacement");
-                    fs::write(&replacement, &bytes).unwrap();
-                    fs::rename(replacement, &path).unwrap();
+                    crate::support_bracket::mutation::write(&replacement, &bytes).unwrap();
+                    crate::support_bracket::mutation::rename(replacement, &path).unwrap();
                 }
                 _ => unreachable!(),
             }
@@ -163,7 +164,7 @@ fn support_required_bracket_identity_mutations_poison_and_restore() {
         } else {
             assert_eq!(support.closing_hash(), Some(Ok(())));
         }
-        fs::write(&path, &bytes).unwrap();
+        crate::support_bracket::mutation::write(&path, &bytes).unwrap();
         assert_eq!(fs::read(&path).unwrap(), bytes);
         assert_eq!(
             katex::batch(&support, &["x".into()], |_, _| {}).unwrap(),
@@ -184,7 +185,7 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
         .join("packages/node_modules/.package-lock.json");
     let mut hidden_bytes = fs::read(&hidden).unwrap();
     hidden_bytes.extend_from_slice(b"\n \t \t \t\n");
-    fs::write(&hidden, hidden_bytes).unwrap();
+    crate::support_bracket::mutation::write(&hidden, hidden_bytes).unwrap();
     let path = support.root.join("packages/node_modules/katex/README.md");
     let bytes = fs::read(&path).unwrap();
     let graph = ftoo_manifest::seed().unwrap();
@@ -206,7 +207,7 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
             assert_eq!(support.submitted(), submissions);
             support.after_close(move || publish.set(true));
             assert!(!published.get());
-            fs::write(&path, b"changed after final request").unwrap();
+            crate::support_bracket::mutation::write(&path, b"changed after final request").unwrap();
             Ok(provisional)
         },
     );
@@ -221,7 +222,7 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
     };
     exact_adapter(error, expected);
     assert!(!published.get());
-    fs::write(&path, &bytes).unwrap();
+    crate::support_bracket::mutation::write(&path, &bytes).unwrap();
     assert_eq!(fs::read(&path).unwrap(), bytes);
     let before = support.submitted();
     sweep::prepared(&catalogue, &support, &records, false).unwrap();
@@ -315,6 +316,7 @@ process.stdout.write('values and original errors preserved\n');
                 for mode in ["stat", "not-directory", "open", "write", "zero", "close"] {
                     for mode in [mode, "control"] {
                         support.observe()?;
+                        let _consumer = crate::support_bracket::consumer_started();
                         let output = std::process::Command::new(&support.runtime)
                             .arg("-e")
                             .arg(script)
@@ -440,6 +442,7 @@ process.stdout.write(String(render(realm(distribution), 'x')[0]) + '\n');
             &support::repository().join("tools/notation/check.cjs"),
             || {
                 support.observe()?;
+                let _consumer = crate::support_bracket::consumer_started();
                 let output = std::process::Command::new(&support.runtime)
                     .arg("-e")
                     .arg(script)
@@ -479,7 +482,7 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
         expected: format!("{:x}", Sha256::digest(&bytes)),
         actual: format!("{:x}", Sha256::digest(&altered)),
     });
-    fs::write(&path, &altered).unwrap();
+    crate::support_bracket::mutation::write(&path, &altered).unwrap();
     assert_eq!(fs::read(&path).unwrap(), altered);
     let error = sweep::prepared(&catalogue, &support, &records, false).unwrap_err();
     assert_eq!(error, NotationRenderError::Adapter(expected.clone()));
@@ -487,7 +490,7 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
         error.to_string(),
         format!("{:?}", NotationRenderError::Adapter(expected))
     );
-    fs::write(&path, &bytes).unwrap();
+    crate::support_bracket::mutation::write(&path, &bytes).unwrap();
     assert_eq!(fs::read(&path).unwrap(), bytes);
     support.check().unwrap();
     let restored = sweep::prepared(&catalogue, &support, &records, false).unwrap();
@@ -512,7 +515,7 @@ fn support_required_batch_protocol_post_request_full_hash_refuses_mutation_and_r
     let mut after = None;
     let result = katex::batch(&support, &["x".into(), "y".into()], |index, _| {
         assert_eq!(index, 0);
-        fs::write(&support.entry, &changed).unwrap();
+        crate::support_bracket::mutation::write(&support.entry, &changed).unwrap();
         assert_eq!(fs::read(&support.entry).unwrap(), changed);
         after = Some(observed_identity(&support.entry));
     });
@@ -525,7 +528,7 @@ fn support_required_batch_protocol_post_request_full_hash_refuses_mutation_and_r
         },
     );
     assert_eq!(support.closing_hash(), Some(Err(expected)));
-    fs::write(&support.entry, &bytes).unwrap();
+    crate::support_bracket::mutation::write(&support.entry, &bytes).unwrap();
     assert_eq!(fs::read(&support.entry).unwrap(), bytes);
     support.check().unwrap();
     assert_eq!(
@@ -637,7 +640,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
         },
     ));
     for (raw, reason) in cases {
-        fs::write(
+        crate::support_bracket::mutation::write(
             &adapter,
             script(&raw, b"").replace("() => clearInterval(timer)", "() => {}"),
         )
@@ -652,7 +655,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
             },
         );
         let restored = script(&valid, b"");
-        fs::write(&adapter, &restored).unwrap();
+        crate::support_bracket::mutation::write(&adapter, &restored).unwrap();
         assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
         assert_eq!(
             katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
@@ -660,7 +663,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
         );
     }
     let stderr = vec![b'e'; 131_072];
-    fs::write(&adapter, script(&valid, &stderr)).unwrap();
+    crate::support_bracket::mutation::write(&adapter, script(&valid, &stderr)).unwrap();
     exact_adapter(
         katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap_err(),
         NotationAdapterFault::Protocol {
@@ -671,7 +674,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
         },
     );
     let restored = script(&valid, b"");
-    fs::write(&adapter, &restored).unwrap();
+    crate::support_bracket::mutation::write(&adapter, &restored).unwrap();
     assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
     assert_eq!(
         katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
@@ -679,7 +682,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
     );
     let large = format!("<math>{}</math>", "x".repeat(1_048_576));
     let framed = [handshake.as_slice(), &frame(0, 0, large.as_bytes())].concat();
-    fs::write(&adapter, script(&framed, b"")).unwrap();
+    crate::support_bracket::mutation::write(&adapter, script(&framed, b"")).unwrap();
     let mut observed = vec![];
     assert_eq!(
         katex::batch_with_adapter(&support, &adapter, &["x".into()], |index, result| {
@@ -689,7 +692,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
         vec![Ok(())]
     );
     assert_eq!(observed, vec![(0, Ok(large))]);
-    fs::write(&adapter, &restored).unwrap();
+    crate::support_bracket::mutation::write(&adapter, &restored).unwrap();
     assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
     assert_eq!(
         katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
@@ -700,11 +703,11 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
         .into_bytes();
     let mut after = before.clone();
     after.push(b'\n');
-    fs::write(&adapter, &before).unwrap();
+    crate::support_bracket::mutation::write(&adapter, &before).unwrap();
     let before_identity = observed_identity(&adapter);
     let mut after_identity = None;
     let result = katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {
-        fs::write(&adapter, &after).unwrap();
+        crate::support_bracket::mutation::write(&adapter, &after).unwrap();
         assert_eq!(fs::read(&adapter).unwrap(), after);
         after_identity = Some(observed_identity(&adapter));
     });
@@ -716,7 +719,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
             actual: after_identity,
         },
     );
-    fs::write(&adapter, &restored).unwrap();
+    crate::support_bracket::mutation::write(&adapter, &restored).unwrap();
     assert_eq!(fs::read(&adapter).unwrap(), restored.as_bytes());
     assert_eq!(
         katex::batch_with_adapter(&support, &adapter, &["x".into()], |_, _| {}).unwrap(),
@@ -737,6 +740,7 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
         evidence: &mut Evidence,
     ) -> Result<(katex::ChildGuard, ChildStdout), NotationAdapterFault> {
         support.observe()?;
+        let _consumer = crate::support_bracket::consumer_started();
         let mut child = katex::ChildGuard(
             Command::new(&support.runtime)
                 .arg(support::repository().join("tools/notation/check.cjs"))
@@ -827,7 +831,7 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
     let fixture = Fixture::new();
     let support = fixture.support();
     let entry = support.root.join("tmp/distribution.js");
-    fs::write(&entry, "module.exports = { version: '0.16.22', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
+    crate::support_bracket::mutation::write(&entry, "module.exports = { version: '0.16.22', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
     let (evidence, statuses) = support
         .scope_with_inputs(
             &support::repository().join("tools/notation/check.cjs"),
@@ -1476,11 +1480,11 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
         assert_eq!(original.len(), length);
         let mut changed = original.clone();
         changed[0] ^= 1;
-        fs::write(&file, &changed).unwrap();
+        crate::support_bracket::mutation::write(&file, &changed).unwrap();
         let actual = katex::invoke_with(&support, true, || {
             panic!("copy refusal must precede subprocess")
         });
-        fs::write(&file, &original).unwrap();
+        crate::support_bracket::mutation::write(&file, &original).unwrap();
         exact_adapter(
             actual.unwrap_err(),
             NotationAdapterFault::Integrity(SupportIntegrityFault::CopyMismatch {
@@ -1495,9 +1499,9 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
         support.check().unwrap();
         let mut changed = original.clone();
         changed.push(b' ');
-        fs::write(&file, &changed).unwrap();
+        crate::support_bracket::mutation::write(&file, &changed).unwrap();
         let actual = support.check();
-        fs::write(&file, &original).unwrap();
+        crate::support_bracket::mutation::write(&file, &original).unwrap();
         exact_adapter(
             actual.unwrap_err(),
             NotationAdapterFault::Integrity(SupportIntegrityFault::CopyMismatch {
@@ -1538,11 +1542,11 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
         let original = fs::read(&file).unwrap();
         let mut changed = original.clone();
         changed[0] ^= 1;
-        fs::write(&file, &changed).unwrap();
+        crate::support_bracket::mutation::write(&file, &changed).unwrap();
         let result = katex::invoke_with(&support, true, || {
             panic!("digest refusal must precede subprocess")
         });
-        fs::write(&file, &original).unwrap();
+        crate::support_bracket::mutation::write(&file, &original).unwrap();
         let fault = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
             file: file.clone(),
             expected: expected.into(),
@@ -1561,11 +1565,11 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
         let before = observed_identity(&file);
         let mut after = None;
         let result = katex::invoke_with(&support, false, || {
-            fs::write(&file, &changed).unwrap();
+            crate::support_bracket::mutation::write(&file, &changed).unwrap();
             after = Some(observed_identity(&file));
             Ok(output(0, b"<math>untrusted result</math>", &[]))
         });
-        fs::write(&file, &original).unwrap();
+        crate::support_bracket::mutation::write(&file, &original).unwrap();
         exact_adapter(
             result.unwrap_err(),
             NotationAdapterFault::SupportChanged {
@@ -1647,11 +1651,12 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     let commander = r#"{"engines":{"node":">= 12"},"integrity":"sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==","license":"MIT","resolved":"https://registry.npmjs.org/commander/-/commander-8.3.0.tgz","version":"8.3.0"}"#;
     let mut changed = value.clone();
     changed["packages"]["node_modules/commander"]["version"] = "8.3.1".into();
-    fs::write(&hidden, serde_json::to_vec(&changed).unwrap()).unwrap();
+    crate::support_bracket::mutation::write(&hidden, serde_json::to_vec(&changed).unwrap())
+        .unwrap();
     let result = katex::invoke_with(&support, true, || {
         panic!("installed record must precede subprocess")
     });
-    fs::write(&hidden, &original).unwrap();
+    crate::support_bracket::mutation::write(&hidden, &original).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::InstalledTreeMismatch {
@@ -1711,9 +1716,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
             },
         },
     );
-    fs::remove_file(&hidden).unwrap();
+    crate::support_bracket::mutation::remove_file(&hidden).unwrap();
     let result = support.check();
-    fs::write(&hidden, &original).unwrap();
+    crate::support_bracket::mutation::write(&hidden, &original).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::SupportIo {
@@ -1728,11 +1733,11 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     let original = fs::read(&missing).unwrap();
     let extra_name = "node_modules/commander/unexpected.js";
     let extra = packages.join(extra_name);
-    fs::remove_file(&missing).unwrap();
-    fs::write(&extra, b"extra").unwrap();
+    crate::support_bracket::mutation::remove_file(&missing).unwrap();
+    crate::support_bracket::mutation::write(&extra, b"extra").unwrap();
     let result = support.check();
-    fs::write(&missing, &original).unwrap();
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::write(&missing, &original).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::FileInventoryMismatch {
@@ -1742,9 +1747,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
         }),
     );
     support.check().unwrap();
-    fs::remove_file(&missing).unwrap();
+    crate::support_bracket::mutation::remove_file(&missing).unwrap();
     let result = support.check();
-    fs::write(&missing, &original).unwrap();
+    crate::support_bracket::mutation::write(&missing, &original).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::FileInventoryMismatch {
@@ -1754,9 +1759,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
         }),
     );
     support.check().unwrap();
-    fs::write(&extra, b"extra").unwrap();
+    crate::support_bracket::mutation::write(&extra, b"extra").unwrap();
     let result = support.check();
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::FileInventoryMismatch {
@@ -1766,9 +1771,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
         }),
     );
     support.check().unwrap();
-    symlink(&missing, &extra).unwrap();
+    crate::support_bracket::mutation::symlink(&missing, &extra).unwrap();
     let result = support.check();
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::UnexpectedSupportEntry {
@@ -1786,7 +1791,7 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     let socket = std::os::unix::net::UnixListener::bind(socket_alias).unwrap();
     let result = support.check();
     drop(socket);
-    fs::remove_file(&extra).unwrap();
+    crate::support_bracket::mutation::remove_file(&extra).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::UnexpectedSupportEntry {
@@ -1809,11 +1814,11 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     }
     let entry = packages.join("node_modules/katex/dist/katex.js");
     let bytes = fs::read(&entry).unwrap();
-    fs::remove_file(&entry).unwrap();
+    crate::support_bracket::mutation::remove_file(&entry).unwrap();
     let result = katex::invoke_with(&support, true, || {
         panic!("a missing entry cannot fall back to another package")
     });
-    fs::write(&entry, bytes).unwrap();
+    crate::support_bracket::mutation::write(&entry, bytes).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::Integrity(SupportIntegrityFault::FileInventoryMismatch {
@@ -1843,12 +1848,12 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     );
     support.check().unwrap();
     let known = fixture.root.join("known-answer");
-    fs::write(&known, b"abc").unwrap();
+    crate::support_bracket::mutation::write(&known, b"abc").unwrap();
     assert_eq!(
         support::hash(&known).unwrap(),
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
-    fs::write(&known, b"").unwrap();
+    crate::support_bracket::mutation::write(&known, b"").unwrap();
     assert_eq!(
         support::hash(&known).unwrap(),
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -1864,12 +1869,12 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     );
     let runtime = fixture.root.join("runtime/bin/node");
     let saved = fixture.root.join("saved-node");
-    fs::rename(&runtime, &saved).unwrap();
+    crate::support_bracket::mutation::rename(&runtime, &saved).unwrap();
     let escaped = prepared().runtime.canonicalize().unwrap();
-    symlink(&escaped, &runtime).unwrap();
+    crate::support_bracket::mutation::symlink(&escaped, &runtime).unwrap();
     let result = support::resolve(Some(&fixture.root));
-    fs::remove_file(&runtime).unwrap();
-    fs::rename(&saved, &runtime).unwrap();
+    crate::support_bracket::mutation::remove_file(&runtime).unwrap();
+    crate::support_bracket::mutation::rename(&saved, &runtime).unwrap();
     exact_adapter(
         result.unwrap_err(),
         NotationAdapterFault::SupportConfiguration {
@@ -2806,7 +2811,7 @@ fn support_required_external_markdown_and_links_do_not_change_either_source_inve
     let before = crate::load_markdown_files(&root).unwrap();
     let py_before = python();
     let external = fixture.root.join("external.md");
-    fs::write(&external, b"unrelated external prose\n").unwrap();
+    crate::support_bracket::mutation::write(&external, b"unrelated external prose\n").unwrap();
     symlink(&external, fixture.root.join("external-link.md")).unwrap();
     let after = crate::load_markdown_files(&root).unwrap();
     assert_eq!(after.sources(), before.sources());

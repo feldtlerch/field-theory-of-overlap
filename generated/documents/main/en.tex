@@ -3,6 +3,8 @@
 \usepackage{amssymb}
 \usepackage{fontspec}
 \tracinglostchars=3
+\hfuzz=0pt
+\vfuzz=0pt
 \setmainfont{lmroman10}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
 \setmonofont{lmmono10}[Extension=.otf,UprightFont=*-regular,ItalicFont=*-italic,BoldFont=lmmonolt10-bold,BoldItalicFont=lmmonolt10-boldoblique]
 \input{notation.tex}
@@ -11,7 +13,9 @@
 \begin{document}
 Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: unaudited base graph.
 
-Declared slice: claim:\allowbreak{}langevin:\allowbreak{}coefficient-\allowbreak{}one-\allowbreak{}value, claim:\allowbreak{}langevin:\allowbreak{}coefficient-\allowbreak{}three-\allowbreak{}value.
+Declared slice: \FtdocTag{v:1}{g-slice-0}% label claim:langevin:coefficient-one-value
+, \FtdocTag{v:3}{g-slice-1}% label claim:langevin:coefficient-three-value
+.
 
 % unit sec:coefficients:overview document main language en
 \section*{Coefficient values}
@@ -26,7 +30,8 @@ The value claim \FtdocTag{v:1}{u2-t0}% label claim:langevin:coefficient-one-valu
 The first coefficient \FtdocTag{c:1}{u0-t0}% label def:langevin:coefficient-one
 \space{}has the value \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\).
 
-Pending notation: \({c}_{1}\): retained formulation def:\allowbreak{}langevin:\allowbreak{}coefficient-\allowbreak{}one.
+Pending notation: \({c}_{1}\): retained formulation \FtdocTag{c:1}{u0-p0-r0}% label def:langevin:coefficient-one
+.
 
 % unit sec:coefficients:value-table document main language en
 Registered coefficient value claims.

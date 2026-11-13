@@ -131,6 +131,18 @@ pub(super) fn render(
     let mut sites = Vec::new();
     for plan in plans {
         for block in &plan.blocks {
+            for ((target, _), names) in &block.pending_names {
+                if *target == ftoo_manifest::DocumentTarget::Latex {
+                    for name in names {
+                        sites.push((
+                            plan.document.as_str(),
+                            plan.language.as_str(),
+                            block.unit.as_str(),
+                            name.token.as_str(),
+                        ));
+                    }
+                }
+            }
             for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                 if let Inline::Tag { token, .. } = run {
                     sites.push((
@@ -258,6 +270,13 @@ pub(super) fn check(
     let mut sites = Vec::new();
     for plan in plans {
         for block in &plan.blocks {
+            for ((target, _), names) in &block.pending_names {
+                if *target == ftoo_manifest::DocumentTarget::Latex {
+                    for name in names {
+                        sites.push((&plan.document, &plan.language, &block.unit, &name.token));
+                    }
+                }
+            }
             for run in block.target_runs(ftoo_manifest::DocumentTarget::Latex) {
                 if let Inline::Tag { token, .. } = run {
                     sites.push((&plan.document, &plan.language, &block.unit, token));
