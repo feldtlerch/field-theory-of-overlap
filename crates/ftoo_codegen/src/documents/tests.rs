@@ -1999,20 +1999,50 @@ impl Drop for Directory {
     }
 }
 
+struct NativeFixture {
+    directory: Directory,
+    _lock: fs::File,
+}
+fn native_fixture() -> NativeFixture {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let target = std::env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(|| repository.join("target"), PathBuf::from);
+    fs::create_dir_all(&target).unwrap();
+    let root = target.canonicalize().unwrap().join("ftoo-native-fixtures");
+    fs::create_dir_all(&root).unwrap();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(root.join("lock"))
+        .unwrap();
+    lock.lock().unwrap();
+    // Brackets observe every ancestor through the target and this stable root.
+    // Both controls hold this per-checkout lock while changing its case entry;
+    // the directory drops before the lock, including in the isolated child.
+    let path = root.join("case");
+    if path.exists() {
+        fs::remove_dir_all(&path).unwrap();
+    }
+    fs::create_dir(&path).unwrap();
+    NativeFixture {
+        directory: Directory(path),
+        _lock: lock,
+    }
+}
+
 #[test]
 #[allow(clippy::too_many_lines)] // One mutation matrix shares its restoration control.
 fn native_preflight_faults_restore_and_never_execute() {
     use sha2::{Digest, Sha256};
     const A: &str = "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb";
     const B: &str = "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d";
-    // The shared temporary directory has concurrent creators. This fixture
-    // needs stable ancestors so its deliberate member faults stay primary.
-    let directory = Directory(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join(format!("native-preflight-{}", std::process::id())),
-    );
-    fs::create_dir(&directory.0).unwrap();
+    let fixture = native_fixture();
+    let directory = &fixture.directory;
     let support = NativeSupport::at(directory.0.clone());
     let missing = NativeAdapterFault::Configuration {
         component: None,

@@ -20,12 +20,8 @@ fn intervening_and_inflight_consumers_invalidate_shared_observation()
         );
         return Ok(());
     }
-    // The general temporary root changes during parallel tests. Keep the tiny
-    // fixture beneath the stable checkout so its ancestor identities are real.
-    let directory = Directory(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!(".counter-fixture-{}", std::process::id())),
-    );
+    let fixture = native_fixture();
+    let directory = &fixture.directory;
     for name in ["runtime/bin", "bundle", "tmp", "downloads"] {
         fs::create_dir_all(directory.0.join(name))?;
     }
