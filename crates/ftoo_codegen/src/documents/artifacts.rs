@@ -4,7 +4,7 @@ use super::{
         AssemblyFault, DocumentEntryKind, DocumentError, DocumentInputFault, DocumentIoOperation,
         IoFailure,
     },
-    failure, input, prepare_documents,
+    failure, input,
 };
 use ftoo_manifest::{AssemblySite, AssemblyStage, RuleId};
 use std::{
@@ -97,16 +97,21 @@ fn inventory(root: &Path) -> Result<Vec<String>, DocumentError> {
     files.sort();
     Ok(files)
 }
-fn token(value: Option<&u8>) -> String {
-    match value {
-        None => "EOF".into(),
-        Some(10) => "LF".into(),
-        Some(13) => "CR".into(),
-        Some(9) => "TAB".into(),
-        Some(b) => format!("0x{b:02X}"),
+fn window(bytes: &[u8], offset: usize) -> String {
+    use std::fmt::Write as _;
+    let start = offset.saturating_sub(64).min(bytes.len());
+    let end = offset.saturating_add(257).min(bytes.len());
+    let mut hex = String::new();
+    for byte in &bytes[start..end] {
+        write!(hex, "{byte:02x}").expect("string write");
     }
+    format!(
+        "length={} window@{start}={hex}{}",
+        bytes.len(),
+        if end == bytes.len() { " EOF" } else { "" }
+    )
 }
-pub(super) fn verify(root: &Path, prepared: &PreparedDocuments) -> Result<(), DocumentError> {
+pub(crate) fn verify(root: &Path, prepared: &PreparedDocuments) -> Result<(), DocumentError> {
     let actual = inventory(root)?;
     let mut expected: Vec<_> = prepared.artifacts.iter().map(|a| a.path.clone()).collect();
     expected.sort();
@@ -154,8 +159,8 @@ pub(super) fn verify(root: &Path, prepared: &PreparedDocuments) -> Result<(), Do
                     offset,
                     diff: format!(
                         "byte {offset}: expected {}; actual {}\n",
-                        token(artifact.bytes.get(offset)),
-                        token(actual.get(offset))
+                        window(&artifact.bytes, offset),
+                        window(&actual, offset)
                     ),
                 },
             ));
@@ -170,8 +175,10 @@ pub fn check_documents(
     root: &Path,
     support: &NativeSupport,
 ) -> Result<PreparedDocuments, DocumentError> {
-    let prepared = prepare_documents(root, support)?;
+    let prepared = crate::retention::prepare_retained_documents(root, support)
+        .map_err(|error| DocumentError::Retention(Box::new(error)))?;
     verify(root, &prepared)?;
+    recheck(root, &prepared)?;
     Ok(prepared)
 }
 /// Replace each artifact only after all candidates pass preparation.
@@ -181,11 +188,84 @@ pub fn generate_documents(
     root: &Path,
     support: &NativeSupport,
 ) -> Result<PreparedDocuments, DocumentError> {
-    let prepared = prepare_documents(root, support)?;
+    let prepared = crate::retention::prepare_retained_documents(root, support)
+        .map_err(|error| DocumentError::Retention(Box::new(error)))?;
+    recheck(root, &prepared)?;
     publish(root, &prepared, |_, _| Ok(()))?;
+    recheck(root, &prepared).map_err(|error| {
+        DocumentError::Retention(Box::new(
+            crate::retention::RetentionCheckError::AfterReplacement {
+                error: Box::new(crate::retention::RetentionCheckError::Documents(Box::new(
+                    error,
+                ))),
+                replaced: prepared
+                    .artifacts
+                    .iter()
+                    .map(|artifact| artifact.path.clone())
+                    .collect(),
+            },
+        ))
+    })?;
     Ok(prepared)
 }
-pub(super) fn publish(
+pub(crate) fn recheck(root: &Path, prepared: &PreparedDocuments) -> Result<(), DocumentError> {
+    input::reread(root, prepared.inputs())?;
+    if let Some(snapshot) = &prepared.snapshot {
+        snapshot
+            .recheck(root)
+            .map_err(|error| DocumentError::Retention(Box::new(error)))?;
+    }
+    for directory in ["units/statements", "units/skeletons", "units/displays"] {
+        let prefix = format!("{directory}/");
+        compare_inventory(
+            &prepared
+                .inputs
+                .keys()
+                .filter(|path| path.starts_with(&prefix))
+                .cloned()
+                .collect::<Vec<_>>(),
+            &input::discover(root, directory, true)?,
+        )?;
+    }
+    let markdown = crate::load_markdown_files(root).map_err(DocumentError::Labels)?;
+    compare_inventory(
+        &prepared
+            .inputs
+            .keys()
+            .filter(|path| path.as_bytes().ends_with(b".md"))
+            .cloned()
+            .collect::<Vec<_>>(),
+        &markdown
+            .sources()
+            .iter()
+            .filter(|source| !source.file.starts_with("generated/documents/"))
+            .map(|source| source.file.clone())
+            .collect::<Vec<_>>(),
+    )?;
+    Ok(())
+}
+fn compare_inventory(expected: &[String], actual: &[String]) -> Result<(), DocumentError> {
+    let missing = expected
+        .iter()
+        .filter(|path| !actual.contains(path))
+        .cloned()
+        .collect::<Vec<_>>();
+    let unexpected = actual
+        .iter()
+        .filter(|path| !expected.contains(path))
+        .cloned()
+        .collect::<Vec<_>>();
+    if missing.is_empty() && unexpected.is_empty() {
+        return Ok(());
+    }
+    Err(DocumentError::Input(
+        DocumentInputFault::SourceInventoryChanged {
+            missing,
+            unexpected,
+        },
+    ))
+}
+pub(crate) fn publish(
     root: &Path,
     prepared: &PreparedDocuments,
     mut before: impl FnMut(DocumentIoOperation, &Path) -> std::io::Result<()>,
@@ -236,6 +316,18 @@ pub(super) fn publish(
                     cleanup: Vec::new(),
                 })?;
             removed.push(file);
+            let parent = root.join(&removed[removed.len() - 1]);
+            let parent = parent.parent().unwrap_or(root);
+            before(DocumentIoOperation::SyncDirectory, parent)
+                .and_then(|()| fs::File::open(parent)?.sync_all())
+                .map_err(|error| DocumentError::Io {
+                    operation: DocumentIoOperation::SyncDirectory,
+                    path: parent.into(),
+                    kind: error.kind(),
+                    replaced: replaced.clone(),
+                    removed: removed.clone(),
+                    cleanup: Vec::new(),
+                })?;
         }
     }
     for artifact in &prepared.artifacts {
@@ -303,6 +395,12 @@ fn replace_artifact(
         before(DocumentIoOperation::Write, &temporary)
             .and_then(|()| file.write_all(&artifact.bytes))
             .map_err(|e| (DocumentIoOperation::Write, temporary.clone(), e))?;
+        before(DocumentIoOperation::Flush, &temporary)
+            .and_then(|()| file.flush())
+            .map_err(|e| (DocumentIoOperation::Flush, temporary.clone(), e))?;
+        before(DocumentIoOperation::SyncFile, &temporary)
+            .and_then(|()| file.sync_all())
+            .map_err(|e| (DocumentIoOperation::SyncFile, temporary.clone(), e))?;
         drop(file);
         before(DocumentIoOperation::Rename, &path)
             .and_then(|()| fs::rename(&temporary, &path))
@@ -328,5 +426,20 @@ fn replace_artifact(
             cleanup,
         });
     }
+    // Rename has completed: a directory-sync refusal must report this replacement too.
+    before(DocumentIoOperation::SyncDirectory, parent)
+        .and_then(|()| fs::File::open(parent)?.sync_all())
+        .map_err(|error| DocumentError::Io {
+            operation: DocumentIoOperation::SyncDirectory,
+            path: parent.into(),
+            kind: error.kind(),
+            replaced: replaced
+                .iter()
+                .cloned()
+                .chain([artifact.path.clone()])
+                .collect(),
+            removed: removed.to_vec(),
+            cleanup: Vec::new(),
+        })?;
     Ok(())
 }

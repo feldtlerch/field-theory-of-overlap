@@ -432,8 +432,8 @@ pub const RULES: [RuleSpec; 62] = [
     },
     RuleSpec {
         number: RuleId::M049,
-        statement: "Symbol tiers are derived from the supplied graph and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
-        scope: "Checked notation catalogues and all exposed symbol-status values.",
+        statement: "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
+        scope: "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values.",
         state: RuleState::Structural,
         deferred_reason: None,
     },

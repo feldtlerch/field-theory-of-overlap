@@ -57,6 +57,10 @@ pub enum StatusAxis {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RetentionError {
+    ContextMismatch {
+        path: String,
+        difference: Box<Difference>,
+    },
     UnsupportedComponent {
         component: &'static str,
     },
@@ -125,6 +129,10 @@ pub struct AcceptedRetention {
     bytes: Vec<u8>,
 }
 impl AcceptedRetention {
+    #[must_use]
+    pub fn projection(&self) -> &[u8] {
+        self.production.key.projection.as_slice()
+    }
     #[must_use]
     pub fn information(&self) -> &InfoRecord {
         &self.production.info
@@ -664,6 +672,7 @@ pub fn check_current_engine(lock: &str, manifest: &str) -> Result<(), RetentionE
     )
 }
 impl std::fmt::Display for RetentionError {
+    #[allow(clippy::too_many_lines)] // Keep the closed fault rendering exhaustive in one match.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let q = |value: &str| serde_json::to_string(value).expect("strings serialize");
         match self {
@@ -675,6 +684,14 @@ impl std::fmt::Display for RetentionError {
                     diagnostic.fmt(f)?;
                 }
                 Ok(())
+            }
+            Self::ContextMismatch { path, difference } => {
+                write!(
+                    f,
+                    "retention provenance M061 at file {}: context-mismatch ",
+                    q(path)
+                )?;
+                difference.fmt_labels(f, "accepted", "current")
             }
             Self::UnsupportedComponent { component } => write!(
                 f,

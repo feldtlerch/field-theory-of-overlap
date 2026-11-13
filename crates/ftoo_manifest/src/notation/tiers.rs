@@ -12,10 +12,31 @@ pub enum SymbolTier {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PendingReason {
-    BackingUnbound { object: NodeId },
-    BackingAbsent { object: NodeId },
-    FormulationProposed { object: NodeId },
-    ClaimDeferred { object: NodeId, blocker: Blocker },
+    BackingUnbound {
+        object: NodeId,
+    },
+    BackingAbsent {
+        object: NodeId,
+    },
+    FormulationProposed {
+        object: NodeId,
+    },
+    ClaimDeferred {
+        object: NodeId,
+        blocker: Blocker,
+    },
+    ClaimRefuted {
+        object: NodeId,
+    },
+    ClaimUndecided {
+        object: NodeId,
+        stage: super::EvidenceStage,
+        exhaustion: super::EvidenceExhaustion,
+    },
+    ClaimAuditDeferred {
+        object: NodeId,
+        reason: crate::DeferredReason,
+    },
 }
 fn blocker_text(blocker: Blocker) -> String {
     match blocker {
@@ -35,13 +56,38 @@ fn blocker_text(blocker: Blocker) -> String {
     }
 }
 impl PendingReason {
+    #[must_use]
+    pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
+        self.key()
+            .cmp(&other.key())
+            .then_with(|| match (self, other) {
+                (
+                    Self::ClaimUndecided {
+                        stage: a,
+                        exhaustion: x,
+                        ..
+                    },
+                    Self::ClaimUndecided {
+                        stage: b,
+                        exhaustion: y,
+                        ..
+                    },
+                ) => (a, x).cmp(&(b, y)),
+                _ => std::cmp::Ordering::Equal,
+            })
+    }
     fn key(&self) -> (u8, &'static str, String) {
-        match *self {
+        match self {
             Self::BackingUnbound { object } => (0, object.semantic_name(), String::new()),
             Self::BackingAbsent { object } => (1, object.semantic_name(), String::new()),
             Self::FormulationProposed { object } => (2, object.semantic_name(), String::new()),
             Self::ClaimDeferred { object, blocker } => {
-                (3, object.semantic_name(), blocker_text(blocker))
+                (3, object.semantic_name(), blocker_text(*blocker))
+            }
+            Self::ClaimRefuted { object } => (4, object.semantic_name(), String::new()),
+            Self::ClaimUndecided { object, .. } => (5, object.semantic_name(), String::new()),
+            Self::ClaimAuditDeferred { object, .. } => {
+                (6, object.semantic_name(), self.to_string())
             }
         }
     }
@@ -49,25 +95,70 @@ impl PendingReason {
 impl PendingReason {
     /// Fixed prose around the permanent object identity, shared by diagnostics and presentation.
     #[must_use]
-    pub fn text_parts(&self) -> (&'static str, NodeId, String) {
-        match *self {
-            Self::BackingUnbound { object } => ("backing object ", object, " is unbound".into()),
-            Self::BackingAbsent { object } => ("backing object ", object, " is absent".into()),
+    pub fn text_parts(&self) -> Vec<super::ReasonPart> {
+        use super::{
+            ReasonPart::{Object, Text},
+            ReasonRole,
+        };
+        let (before, object, after) = match self {
+            Self::BackingUnbound { object } => ("backing object ", *object, " is unbound".into()),
+            Self::BackingAbsent { object } => ("backing object ", *object, " is absent".into()),
             Self::FormulationProposed { object } => {
-                ("retained formulation ", object, String::new())
+                ("retained formulation ", *object, String::new())
             }
             Self::ClaimDeferred { object, blocker } => (
                 "claim evidence ",
-                object,
-                format!(" awaits {}", blocker_text(blocker)),
+                *object,
+                format!(" awaits {}", blocker_text(*blocker)),
             ),
-        }
+            Self::ClaimRefuted { object } => ("claim evidence ", *object, " is refuted".into()),
+            Self::ClaimUndecided {
+                object,
+                stage,
+                exhaustion,
+            } => (
+                "claim evidence ",
+                *object,
+                format!(" is undecided: {}", exhaustion.description(*stage)),
+            ),
+            Self::ClaimAuditDeferred { object, reason } => {
+                let mut parts = vec![
+                    Text("claim evidence ".into()),
+                    Object {
+                        role: ReasonRole::Subject,
+                        id: *object,
+                    },
+                    Text(" awaits ".into()),
+                ];
+                for part in super::deferred_parts(*reason) {
+                    if let (Some(Text(before)), Text(after)) = (parts.last_mut(), &part) {
+                        before.push_str(after);
+                    } else {
+                        parts.push(part);
+                    }
+                }
+                return parts;
+            }
+        };
+        vec![
+            Text(before.into()),
+            Object {
+                role: ReasonRole::Subject,
+                id: object,
+            },
+            Text(after),
+        ]
     }
 }
 impl fmt::Display for PendingReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (before, object, after) = self.text_parts();
-        write!(f, "{before}{}{after}", object.semantic_name())
+        for part in self.text_parts() {
+            match part {
+                super::ReasonPart::Text(text) => f.write_str(&text)?,
+                super::ReasonPart::Object { id, .. } => f.write_str(id.semantic_name())?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -177,7 +268,7 @@ pub(super) fn derive(
 ) -> SymbolStatus {
     let mut reasons = vec![];
     collect(id, book, definitions, edges, &mut reasons);
-    reasons.sort_by_key(PendingReason::key);
+    reasons.sort_by(PendingReason::compare);
     reasons.dedup();
     SymbolStatus {
         tier: if reasons.is_empty() {

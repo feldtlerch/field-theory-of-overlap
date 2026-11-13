@@ -3,7 +3,11 @@ mod acceptance;
 mod diagnostic;
 mod difference;
 mod info;
+mod notation;
+#[cfg(test)]
+mod notation_tests;
 mod production;
+pub use notation::{EffectiveSymbolStatus, RetainedNotation, exhaustion_record, stage_record};
 mod revision;
 mod syntax;
 mod wire;

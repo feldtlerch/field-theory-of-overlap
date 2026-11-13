@@ -33,6 +33,9 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
         .saturating_add(2)
         .saturating_add(inline_size(&plan.coverage.runs))
         .saturating_add(2);
+    for runs in &plan.coverage.audit {
+        size = size.saturating_add(inline_size(runs)).saturating_add(2);
+    }
     for block in &plan.blocks {
         size = size.saturating_add(
             format!(
@@ -113,6 +116,10 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = start(&plan.document, &plan.language);
     writeln!(output, "{}\n", text(&plan.coverage.declaration)).expect("string write");
     inline(&mut output, &plan.coverage.runs);
+    for runs in &plan.coverage.audit {
+        output.push_str("\n\n");
+        inline(&mut output, runs);
+    }
     output.push_str("\n\n");
     for block in &plan.blocks {
         writeln!(

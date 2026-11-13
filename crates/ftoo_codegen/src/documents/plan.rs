@@ -13,6 +13,9 @@ pub(super) mod citation_tests;
 #[cfg(test)]
 #[path = "tests/reader.rs"]
 mod reader_tests;
+#[cfg(test)]
+#[path = "tests/retained.rs"]
+mod retained_tests;
 
 #[derive(Clone)]
 pub(super) enum Inline {
@@ -729,35 +732,48 @@ impl Block {
                 let origins = self.pending_origins(entry.definition(), language, selected_target);
                 let mut names = vec![];
                 for (reason, value) in entry.reasons().iter().enumerate() {
-                    let (_, object, _) = value.text_parts();
-                    let handle = match book.reader_identity(object) {
-                        Ok(handle) => handle,
-                        Err(fault) => {
-                            collect_reader_error(
-                                &mut errors,
-                                reader_failure(
-                                    fault,
-                                    document,
-                                    language,
-                                    Some(&self.unit),
-                                    selected_target,
-                                    ftoo_manifest::ReaderIdentityPosition::Pending {
-                                        unit: self.unit.clone(),
-                                        definition: entry.definition(),
-                                        reason,
-                                    },
-                                    origins.clone(),
-                                ),
-                            );
+                    for part in value.text_parts() {
+                        let ftoo_manifest::ReasonPart::Object { role, id: object } = part else {
                             continue;
-                        }
-                    };
-                    names.push(super::PendingReaderName {
-                        object,
-                        handle,
-                        label: object.semantic_name().into(),
-                        token: format!("u{index}-p{order}-r{reason}"),
-                    });
+                        };
+                        let handle = match book.reader_identity(object) {
+                            Ok(handle) => handle,
+                            Err(fault) => {
+                                collect_reader_error(
+                                    &mut errors,
+                                    reader_failure(
+                                        fault,
+                                        document,
+                                        language,
+                                        Some(&self.unit),
+                                        selected_target,
+                                        ftoo_manifest::ReaderIdentityPosition::Pending {
+                                            unit: self.unit.clone(),
+                                            definition: entry.definition(),
+                                            reason,
+                                        },
+                                        origins.clone(),
+                                    ),
+                                );
+                                continue;
+                            }
+                        };
+                        names.push(super::PendingReaderName {
+                            reason,
+                            role,
+                            object,
+                            handle,
+                            label: object.semantic_name().into(),
+                            token: format!(
+                                "u{index}-p{order}-r{reason}{}",
+                                if role == ftoo_manifest::ReasonRole::Premise {
+                                    "-premise"
+                                } else {
+                                    ""
+                                }
+                            ),
+                        });
+                    }
                 }
                 mapped.insert((target, entry.definition()), names);
             }
@@ -828,15 +844,20 @@ impl Block {
 #[derive(Clone)]
 pub(super) struct Coverage {
     pub declaration: String,
+    pub audit: Vec<Vec<Inline>>,
     pub runs: Vec<Inline>,
     pub objects: Vec<ftoo_manifest::NodeId>,
     pub site: UnitSite,
 }
 impl Coverage {
+    pub(super) fn all_runs(&self) -> impl Iterator<Item = &Inline> {
+        self.runs.iter().chain(self.audit.iter().flatten())
+    }
     #[cfg(test)]
     pub fn fixture(declaration: &str, slice: &str) -> Self {
         Self {
             declaration: declaration.into(),
+            audit: vec![],
             runs: vec![Inline::Text(slice.into())],
             objects: vec![],
             site: coverage_site(None),
@@ -896,6 +917,7 @@ impl Coverage {
         }
         Ok(Self {
             declaration: declaration.into(),
+            audit: vec![],
             runs,
             objects,
             site: coverage_site(None),
@@ -912,7 +934,7 @@ impl Coverage {
         }
     }
 }
-fn coverage_site(index: Option<usize>) -> UnitSite {
+pub(super) fn coverage_site(index: Option<usize>) -> UnitSite {
     let mut site = super::input::site("generated/manifest.json");
     site.anchor = ftoo_manifest::SourceAnchor::Unavailable;
     site.path = vec![
@@ -925,7 +947,7 @@ fn coverage_site(index: Option<usize>) -> UnitSite {
     site
 }
 #[allow(clippy::too_many_arguments)] // Complete generated position and context are retained together.
-fn reader_failure(
+pub(super) fn reader_failure(
     fault: ftoo_manifest::ReaderIdentityFault,
     document: &str,
     language: &str,
@@ -1052,7 +1074,14 @@ fn check_coverage(
         "\n"
     };
     let (declaration, rest) = rest.split_once(separator).unwrap_or(("", rest));
-    let (slice, _) = rest.split_once("\n\n").unwrap_or((rest, ""));
+    let (slice, audit_rest) = rest
+        .split_once(if plan.coverage.audit.is_empty() {
+            "\n\n"
+        } else {
+            separator
+        })
+        .unwrap_or((rest, ""));
+    check_audit_paragraphs(plan, target, audit_rest, separator)?;
     let block = plan.coverage.block();
     let expected_runs = expected_runs(&block, target);
     let expected = coverage_records(
@@ -1096,6 +1125,97 @@ fn check_coverage(
             changed,
         },
     ))
+}
+fn check_audit_paragraphs(
+    plan: &DocumentPlan,
+    target: DocumentTarget,
+    mut rest: &str,
+    separator: &str,
+) -> Result<(), DocumentError> {
+    for runs in &plan.coverage.audit {
+        let (source, next) = rest.split_once(separator).unwrap_or((rest, ""));
+        rest = next;
+        let mut block = plan.coverage.block();
+        block.runs.clone_from(runs);
+        let expected = expected_runs(&block, target);
+        let actual = if target == DocumentTarget::Latex {
+            recover_latex(source)
+        } else {
+            recover_markdown(source, runs.iter().filter_map(inline_handle))
+        };
+        {
+            let records = |recovered: Option<&[Recovered]>, raw: &str| {
+                let mut records = coverage_records(plan, target, String::new(), recovered, raw);
+                let tags: Vec<_> = runs
+                    .iter()
+                    .filter(|run| matches!(run, Inline::Tag { .. }))
+                    .collect();
+                for (index, record) in records.iter_mut().skip(2).enumerate() {
+                    if let EmissionKind::ReaderIdentity {
+                        position,
+                        object,
+                        token,
+                        ..
+                    } = &mut record.kind
+                    {
+                        *object = ftoo_manifest::NodeId::ALL
+                            .into_iter()
+                            .find(|id| id.semantic_name() == record.value);
+                        if let Some(Inline::Tag {
+                            token: expected_token,
+                            label,
+                            site,
+                            ..
+                        }) = tags.get(index).copied()
+                        {
+                            if target == DocumentTarget::Markdown {
+                                token.clone_from(expected_token);
+                            }
+                            record.site.clone_from(site);
+                            let outcome_index = site
+                                .path
+                                .iter()
+                                .find_map(|part| match part {
+                                    ftoo_manifest::PathPart::Index(value) => Some(*value),
+                                    ftoo_manifest::PathPart::Key(_) => None,
+                                })
+                                .unwrap_or(index);
+                            *position = ftoo_manifest::NodeId::ALL
+                                .into_iter()
+                                .find(|id| id.semantic_name() == label)
+                                .map(|object| ftoo_manifest::ReaderIdentityPosition::Coverage {
+                                    index: outcome_index,
+                                    object,
+                                });
+                        }
+                    }
+                }
+                records
+            };
+            let (mut missing, mut unexpected, mut changed) = (vec![], vec![], vec![]);
+            difference(
+                &records(Some(&expected), ""),
+                &records(actual.as_deref(), source),
+                &mut missing,
+                &mut unexpected,
+                &mut changed,
+            );
+            if missing.is_empty() && unexpected.is_empty() && changed.is_empty() {
+                continue;
+            }
+            return Err(emission_failure(
+                plan,
+                target,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing,
+                    unexpected,
+                    changed,
+                },
+            ));
+        }
+    }
+    Ok(())
 }
 pub(super) struct DocumentPlan {
     pub document: String,
@@ -1193,7 +1313,7 @@ impl DocumentPlan {
                     }]
                 }
             })
-            .chain(self.coverage.runs.iter().filter_map(|run| match run {
+            .chain(self.coverage.all_runs().filter_map(|run| match run {
                 Inline::Tag { site, .. } => Some(SourceOrigin {
                     unit: None,
                     language: Some(self.language.clone()),
@@ -1233,8 +1353,15 @@ pub(super) fn build(
     };
     let closed = coverage.closed_world;
     let first = format!(
-        "Coverage declaration: {gate}. Closed world: referents={}; relations={}; audit={}. Evidence context: unaudited base graph.",
-        closed.referents, closed.relations, closed.audit
+        "Coverage declaration: {gate}. Closed world: referents={}; relations={}; audit={}. Evidence context: {}.",
+        closed.referents,
+        closed.relations,
+        closed.audit,
+        if notation.retained().is_some() {
+            "retained audit accepted"
+        } else {
+            "unaudited base graph"
+        }
     );
     let mut plans = Vec::new();
     let mut errors = vec![];
@@ -1274,7 +1401,11 @@ pub(super) fn build(
                 }
                 blocks.push(block);
             }
-            if let Some(coverage) = coverage {
+            if let Some(mut coverage) = coverage {
+                if let Some(view) = notation.retained() {
+                    coverage.audit =
+                        super::retained::coverage(book, view, &blocks, document, language)?;
+                }
                 plans.push(DocumentPlan {
                     document: document.clone(),
                     language: language.clone(),
@@ -2221,6 +2352,7 @@ fn pending_records(
         })
         .collect()
 }
+
 fn recover_pending(
     plan: &DocumentPlan,
     block: &Block,
@@ -2242,19 +2374,25 @@ fn recover_pending(
             entry.body_unicode.clone()
         }));
         prose.push_str(": ");
-        for (reason, (value, name)) in entry.reasons.iter().zip(&entry.names).enumerate() {
+        let mut names = entry.names.iter();
+        for (reason, value) in entry.reasons.iter().enumerate() {
             if reason != 0 {
                 prose.push_str("; ");
             }
-            let (before, _, after) = value.text_parts();
-            prose.push_str(before);
-            flush_text(&mut wanted, &mut prose);
-            wanted.push(Recovered::Tag {
-                handle: name.handle.clone(),
-                label: name.label.clone(),
-                token: (target == DocumentTarget::Latex).then(|| name.token.clone()),
-            });
-            prose.push_str(&after);
+            for part in value.text_parts() {
+                match part {
+                    ftoo_manifest::ReasonPart::Text(text) => prose.push_str(&text),
+                    ftoo_manifest::ReasonPart::Object { .. } => {
+                        let name = names.next().expect("every reason object resolved");
+                        flush_text(&mut wanted, &mut prose);
+                        wanted.push(Recovered::Tag {
+                            handle: name.handle.clone(),
+                            label: name.label.clone(),
+                            token: (target == DocumentTarget::Latex).then(|| name.token.clone()),
+                        });
+                    }
+                }
+            }
         }
         prose.push_str(if index + 1 == expected.len() {
             "."

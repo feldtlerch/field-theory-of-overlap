@@ -248,7 +248,7 @@ pub(super) fn runtime_origin(
         .cloned()
         .map(|mut diagnostic| {
             if let AssemblyFault::RuntimeTagRejected { site_token, .. } = &diagnostic.fault {
-                for run in &plan.coverage.runs {
+                for run in plan.coverage.all_runs() {
                     if let super::plan::Inline::Tag { token, site, .. } = run
                         && token == site_token
                     {

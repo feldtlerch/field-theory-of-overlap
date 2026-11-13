@@ -1971,7 +1971,7 @@ fn projection_with_authority(
     write_projection(&book)
 }
 
-fn write_projection(book: &AddressBook<'_>) -> Result<Vec<u8>, ProjectionError> {
+pub(crate) fn write_projection(book: &AddressBook<'_>) -> Result<Vec<u8>, ProjectionError> {
     let graph = book.graph();
     let mut nodes: Vec<_> = graph.nodes().iter().collect();
     nodes.sort_by_key(|n| n.id);

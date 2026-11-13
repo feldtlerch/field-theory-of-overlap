@@ -849,7 +849,13 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             ftoo_manifest::Evidence::Deferred
         );
     }
-    let coverage = "Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: unaudited base graph.";
+    for artifact in &prepared.artifacts()[..2] {
+        retained_seed_header(
+            std::str::from_utf8(artifact.bytes())?,
+            artifact.path().as_bytes().ends_with(b".tex"),
+        );
+    }
+    let coverage = "Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: retained audit accepted.";
     for artifact in &prepared.artifacts()[..2] {
         let text = std::str::from_utf8(artifact.bytes())?;
         assert_eq!(
@@ -875,12 +881,19 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
         }
     };
     restore();
-    let token = |byte: Option<&u8>| match byte {
-        None => "EOF".into(),
-        Some(10) => "LF".into(),
-        Some(13) => "CR".into(),
-        Some(9) => "TAB".into(),
-        Some(byte) => format!("0x{byte:02X}"),
+    let token = |bytes: &[u8], offset: usize| {
+        use std::fmt::Write as _;
+        let start = offset.saturating_sub(64).min(bytes.len());
+        let end = (offset + 257).min(bytes.len());
+        let mut hex = String::new();
+        for byte in &bytes[start..end] {
+            write!(hex, "{byte:02x}").unwrap();
+        }
+        format!(
+            "length={} window@{start}={hex}{}",
+            bytes.len(),
+            if end == bytes.len() { " EOF" } else { "" }
+        )
     };
     for artifact in prepared.artifacts() {
         let original = artifact.bytes();
@@ -897,6 +910,12 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             (crlf, newline),
         ];
         for needle in [
+            "retained audit accepted",
+            "Audit outcomes:",
+            "certified",
+            "Audit scope:",
+            "Certification concerns",
+            "g-audit-0",
             "pending",
             "label def:",
             "\\providecommand",
@@ -922,8 +941,8 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                 offset,
                 diff: format!(
                     "byte {offset}: expected {}; actual {}\n",
-                    token(original.get(offset)),
-                    token(changed.get(offset))
+                    token(original, offset),
+                    token(&changed, offset)
                 ),
             };
             let actual = artifacts::verify(&directory.0, &prepared).unwrap_err();
@@ -1978,4 +1997,39 @@ pub(super) fn support_required_native_unknown_unicode_quotes_backslashes_and_con
         assert_eq!(runtime::render(&book, &[])?, addressing);
     }
     Ok(())
+}
+
+fn retained_seed_header(source: &str, latex: bool) {
+    let declaration = "Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: retained audit accepted.";
+    let scope = "Audit scope: finite source jet of order 5, residual order 4 and derivative order 1; analytic identification is not certified.";
+    let axis = "Certification concerns the finite coefficient claim; pending notation concerns a proposed formulation.";
+    let expected = if latex {
+        format!(
+            r"{declaration}
+
+Declared slice: \FtdocTag{{v:1}}{{g-slice-0}}% label claim:langevin:coefficient-one-value
+, \FtdocTag{{v:3}}{{g-slice-1}}% label claim:langevin:coefficient-three-value
+.
+
+Audit outcomes: \FtdocTag{{v:1}}{{g-audit-0}}% label claim:langevin:coefficient-one-value
+: certified; \FtdocTag{{v:3}}{{g-audit-1}}% label claim:langevin:coefficient-three-value
+: certified.
+
+{scope}
+
+{axis}
+
+"
+        )
+    } else {
+        format!(
+            "{declaration}\nDeclared slice: v:1<!-- label claim:langevin:coefficient-one-value -->, v:3<!-- label claim:langevin:coefficient-three-value -->.\nAudit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certified; v:3<!-- label claim:langevin:coefficient-three-value -->: certified.\n{scope}\n{axis}\n\n"
+        )
+    };
+    let start = source.find("Coverage declaration:").unwrap();
+    let end = source[start..]
+        .find(if latex { "% unit " } else { "<!-- unit " })
+        .unwrap()
+        + start;
+    assert_eq!(&source[start..end], expected);
 }

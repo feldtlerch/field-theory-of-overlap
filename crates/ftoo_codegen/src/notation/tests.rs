@@ -191,17 +191,17 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&catalogue).unwrap();
+    let records = render::declarations(None, &catalogue).unwrap();
     let published = Rc::new(Cell::new(false));
     let publish = Rc::clone(&published);
     let result: Result<_> = support.scope(
         &support::repository().join("tools/notation/check.cjs"),
         || {
-            let provisional = sweep::prepared(&catalogue, &support, &records, false)?;
+            let provisional = sweep::prepared(None, &catalogue, &support, &records, false)?;
             let submissions = support.submitted();
             assert!(submissions > 0);
             assert_eq!(
-                sweep::prepared(&catalogue, &support, &records, false)?,
+                sweep::prepared(None, &catalogue, &support, &records, false)?,
                 provisional
             );
             assert_eq!(support.submitted(), submissions);
@@ -225,13 +225,13 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
     crate::support_bracket::mutation::write(&path, &bytes).unwrap();
     assert_eq!(fs::read(&path).unwrap(), bytes);
     let before = support.submitted();
-    sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
     assert!(
         support.submitted() > before,
         "failed close published memo evidence"
     );
     let before = support.submitted();
-    sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
     assert_eq!(support.submitted(), before);
 }
 
@@ -348,7 +348,7 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&catalogue).unwrap();
+    let records = render::declarations(None, &catalogue).unwrap();
     let declarations: String = records.iter().map(|r| r.source.as_str()).collect();
     let mut sources: Vec<String> = vec![
         "x".into(),
@@ -369,6 +369,7 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
         .scope(
             &support::repository().join("tools/notation/check.cjs"),
             || {
+                retained_sweep_controls(&support);
                 let controls = sources
                     .iter()
                     .map(|source| katex::invoke(&support, Some(source)))
@@ -395,8 +396,8 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
     );
     assert_eq!(restored, vec![Ok(())]);
 
-    let first = sweep::prepared(&catalogue, &support, &records, false).unwrap();
-    let warm = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    let first = sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
+    let warm = sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
     assert_eq!(first.0, declarations);
     assert_eq!(warm.0, declarations);
     {
@@ -471,8 +472,8 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&catalogue).unwrap();
-    let original = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    let records = render::declarations(None, &catalogue).unwrap();
+    let original = sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
     let path = support.entry.clone();
     let bytes = fs::read(&path).unwrap();
     let mut altered = bytes.clone();
@@ -484,7 +485,7 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
     });
     crate::support_bracket::mutation::write(&path, &altered).unwrap();
     assert_eq!(fs::read(&path).unwrap(), altered);
-    let error = sweep::prepared(&catalogue, &support, &records, false).unwrap_err();
+    let error = sweep::prepared(None, &catalogue, &support, &records, false).unwrap_err();
     assert_eq!(error, NotationRenderError::Adapter(expected.clone()));
     assert_eq!(
         error.to_string(),
@@ -493,7 +494,7 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
     crate::support_bracket::mutation::write(&path, &bytes).unwrap();
     assert_eq!(fs::read(&path).unwrap(), bytes);
     support.check().unwrap();
-    let restored = sweep::prepared(&catalogue, &support, &records, false).unwrap();
+    let restored = sweep::prepared(None, &catalogue, &support, &records, false).unwrap();
     assert_eq!(original, restored);
 }
 
@@ -1960,7 +1961,7 @@ fn declarations_claims_aliases_and_nested_grouping_goldens() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let n = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&n).unwrap();
+    let records = render::declarations(None, &n).unwrap();
     assert_eq!(
         records
             .iter()
@@ -2025,6 +2026,7 @@ fn declarations_claims_aliases_and_nested_grouping_goldens() {
         ] {
             assert_eq!(
                 render::expression(
+                    None,
                     &n,
                     checked.draft(),
                     target,
@@ -2067,7 +2069,7 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let n = ftoo_manifest::notation(&book).unwrap();
-    let original = render::declarations(&n).unwrap();
+    let original = render::declarations(None, &n).unwrap();
     let catalogue = NotationSite::Catalogue {
         file: "crates/ftoo_manifest/src/notation/catalogue.rs".into(),
     };
@@ -2445,7 +2447,7 @@ fn complete_row_key_invocation_and_both_form_inventory() {
         let checked = ftoo_manifest::check_expression(&n, expr).unwrap();
         for target in [RenderTarget::Macro, RenderTarget::Unicode] {
             assert_eq!(
-                render::expression(&n, checked.draft(), target, owner, &case)
+                render::expression(None, &n, checked.draft(), target, owner, &case)
                     .unwrap()
                     .source,
                 oracle(checked.draft(), target == RenderTarget::Unicode),
@@ -2481,9 +2483,16 @@ fn nullary_boundaries_operators_and_nested_contexts() {
             let expr = primitive(PrimitiveId::Juxtapose, vec![operand.clone(), suffix]);
             for target in [RenderTarget::Macro, RenderTarget::Unicode] {
                 assert_eq!(
-                    render::expression(&n, &expr, target, RenderOwner::Expression, "boundary")
-                        .unwrap()
-                        .source,
+                    render::expression(
+                        None,
+                        &n,
+                        &expr,
+                        target,
+                        RenderOwner::Expression,
+                        "boundary"
+                    )
+                    .unwrap()
+                    .source,
                     oracle(&expr, target == RenderTarget::Unicode)
                 );
             }
@@ -2497,9 +2506,16 @@ fn nullary_boundaries_operators_and_nested_contexts() {
             let expr = primitive(id, args);
             for target in [RenderTarget::Macro, RenderTarget::Unicode] {
                 assert_eq!(
-                    render::expression(&n, &expr, target, RenderOwner::Expression, "operator")
-                        .unwrap()
-                        .source,
+                    render::expression(
+                        None,
+                        &n,
+                        &expr,
+                        target,
+                        RenderOwner::Expression,
+                        "operator"
+                    )
+                    .unwrap()
+                    .source,
                     oracle(&expr, target == RenderTarget::Unicode)
                 );
             }
@@ -2549,7 +2565,7 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
     let graph = ftoo_manifest::validate(draft).unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let n = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&n).unwrap();
+    let records = render::declarations(None, &n).unwrap();
     for (id, source) in [
         (
             DefinitionId::CoefficientOne,
@@ -2644,7 +2660,7 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
             (RenderTarget::Unicode, unicode),
         ] {
             assert_eq!(
-                render::expression(&n, &expr, target, RenderOwner::Expression, "example")
+                render::expression(None, &n, &expr, target, RenderOwner::Expression, "example")
                     .unwrap()
                     .source,
                 expected
@@ -2655,7 +2671,7 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
     let seed = ftoo_manifest::seed().unwrap();
     let seed_book = ftoo_manifest::addressing(&seed).unwrap();
     let n = ftoo_manifest::notation(&seed_book).unwrap();
-    let declarations = render::declarations(&n)
+    let declarations = render::declarations(None, &n)
         .unwrap()
         .iter()
         .map(|r| r.source.as_str())
@@ -2680,6 +2696,7 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
                     for atom in &atoms {
                         for suffix in ["x", "1", r"\beta{}", "^2", "{x}"] {
                             let actual = render::expression(
+                                None,
                                 &n,
                                 atom,
                                 target,
@@ -2764,6 +2781,7 @@ fn pending_annotations_keep_compact_markers_in_both_targets() {
         let n = ftoo_manifest::notation(&book).unwrap();
         let reason = format!("claim evidence claim:langevin:coefficient-one-value awaits {text}");
         let source = render::expression(
+            None,
             &n,
             &definition(DefinitionId::CoefficientOneValue, vec![]),
             RenderTarget::Unicode,
@@ -2773,7 +2791,7 @@ fn pending_annotations_keep_compact_markers_in_both_targets() {
         .unwrap()
         .source;
         assert_eq!(source, pending(r"({{c}_{1}}={\frac{1}{3}})"));
-        let declarations = render::declarations(&n).unwrap();
+        let declarations = render::declarations(None, &n).unwrap();
         assert_eq!(
             declarations
                 .iter()
@@ -2864,7 +2882,7 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let n = ftoo_manifest::notation(&book).unwrap();
-    let records = render::declarations(&n).unwrap();
+    let records = render::declarations(None, &n).unwrap();
     let origin = NotationOrigin {
         definition: None,
         path: vec![],
@@ -2900,7 +2918,7 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
         };
         let alpha = primitive(PrimitiveId::Alpha, vec![]);
         let mut emitted =
-            render::expression(&n, &alpha, target, RenderOwner::Expression, "grammar").unwrap();
+            render::expression(None, &n, &alpha, target, RenderOwner::Expression, "grammar").unwrap();
         let restored = if target == RenderTarget::Macro {
             assert_eq!(emitted.source, r"\alpha{}");
             let adjacent = format!("{}x", emitted.source);
@@ -3056,6 +3074,7 @@ fn expanded_origins_retain_constructor_argument_and_definition_paths() {
         vec![definition(DefinitionId::CoefficientOne, vec![])],
     );
     let expanded = render::expression(
+        None,
         &n,
         &expr,
         RenderTarget::Unicode,
@@ -3133,7 +3152,7 @@ fn primitive_goldens_are_independent() {
             (RenderTarget::Unicode, unicode),
         ] {
             assert_eq!(
-                render::expression(&n, &expr, target, RenderOwner::Expression, "golden")
+                render::expression(None, &n, &expr, target, RenderOwner::Expression, "golden")
                     .unwrap()
                     .source,
                 expected
@@ -3147,7 +3166,7 @@ fn support_required_pending_entries_preserve_order_reasons_and_transitive_origin
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
-    super::with_preparation(&catalogue, |prepared| -> Result<()> {
+    super::with_preparation(None, &catalogue, |prepared| -> Result<()> {
         let expression = prepared.check_expression(primitive(
             PrimitiveId::Add,
             vec![
@@ -3206,4 +3225,64 @@ fn support_required_pending_entries_preserve_order_reasons_and_transitive_origin
         Ok(())
     })
     .unwrap();
+}
+
+fn retained_sweep_controls(support: &support::Support) {
+    for maturity in [
+        ftoo_manifest::Maturity::Proposed,
+        ftoo_manifest::Maturity::Retained,
+    ] {
+        let mut draft = ftoo_manifest::seed_draft();
+        for node in &mut draft.nodes {
+            node.maturity = maturity;
+        }
+        let graph = ftoo_manifest::validate(draft).unwrap();
+        let bytes = ftoo_manifest::projection_bytes(&graph).unwrap();
+        let production = ftoo_audit::retention::produce(bytes.clone()).unwrap();
+        let accepted = ftoo_audit::retention::accept(bytes, production.bytes().to_vec()).unwrap();
+        let book = ftoo_manifest::addressing(&graph).unwrap();
+        let catalogue = ftoo_manifest::notation(&book).unwrap();
+        let view = ftoo_audit::retention::RetainedNotation::new(&catalogue, &accepted).unwrap();
+        let records = render::declarations(Some(&view), &catalogue).unwrap();
+        let (declarations, rows, pending) =
+            sweep::prepared(Some(&view), &catalogue, support, &records, false).unwrap();
+        let restored = sweep::prepared(Some(&view), &catalogue, support, &records, false).unwrap();
+        assert_eq!(restored, (declarations.clone(), rows, pending.clone()));
+        if maturity == ftoo_manifest::Maturity::Proposed {
+            assert_eq!(
+                declarations,
+                render::declarations(None, &catalogue)
+                    .unwrap()
+                    .iter()
+                    .map(|row| row.source.as_str())
+                    .collect::<String>()
+            );
+            assert_eq!(pending.len(), 5);
+        } else {
+            assert_eq!(pending, []);
+            let expression = ftoo_manifest::check_expression(
+                &catalogue,
+                ftoo_manifest::ExprDraft::Call {
+                    callee: ftoo_manifest::Callee::Definition(
+                        ftoo_manifest::DefinitionId::CoefficientOneValue,
+                    ),
+                    arguments: vec![],
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                render::expression(
+                    Some(&view),
+                    &catalogue,
+                    expression.draft(),
+                    RenderTarget::Unicode,
+                    RenderOwner::Expression,
+                    "retained"
+                )
+                .unwrap()
+                .source,
+                "({{c}_{1}}={\\frac{1}{3}})"
+            );
+        }
+    }
 }

@@ -475,6 +475,7 @@ fn reader_fault_mapping_retains_context_candidates_and_projection_origin() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // One bracket carries coverage and both pending-object controls.
 fn support_required_reader_coverage_runtime_has_empty_unit_and_exact_origin()
 -> Result<(), Box<dyn std::error::Error>> {
     use super::super::{NativeSupport, native, native_support, runtime};
@@ -499,7 +500,8 @@ fn support_required_reader_coverage_runtime_has_empty_unit_and_exact_origin()
         assert_eq!(restored, source);
         let restored = native::consume_plan(&support, &lock, &restored, "", &addressing, &plan);
         let pending = pending_runtime_control(&support, &lock)?;
-        Ok(([good, bad, restored], pending))
+        let retained = retained_premise_native_controls(&support, &lock)?;
+        Ok(([good, bad, restored], pending, retained))
     })?;
     assert_eq!(support.closing_hash(), Some(Ok(())));
     std::fs::remove_file(file)?;
@@ -530,7 +532,13 @@ fn support_required_reader_coverage_runtime_has_empty_unit_and_exact_origin()
         }])
         .unwrap(),
     );
-    let (results, (pending_results, pending_expected)) = results;
+    let (results, (pending_results, pending_expected), retained_results) = results;
+    for (actual, expected, display) in retained_results {
+        assert_eq!(actual, expected);
+        if let Err(error) = actual {
+            assert_eq!(error.to_string(), display);
+        }
+    }
     assert_eq!(
         pending_results,
         [Ok(()), Err(pending_expected.clone()), Ok(())]
@@ -545,7 +553,7 @@ fn support_required_reader_coverage_runtime_has_empty_unit_and_exact_origin()
         expected.to_string()
     );
     let evidence = support.evidence.borrow_mut().take().unwrap();
-    assert_eq!(evidence.len(), 6);
+    assert_eq!(evidence.len(), 15);
     let pending = &evidence[4];
     assert_eq!(pending.status, Some(1));
     assert_eq!(
@@ -756,6 +764,8 @@ fn reader_pending_templates_keep_all_blockers_and_actual_targets() {
             assert_eq!(
                 entry.names,
                 vec![super::super::PendingReaderName {
+                    reason: 0,
+                    role: ftoo_manifest::ReasonRole::Subject,
                     object,
                     handle: "v:1".into(),
                     label: "claim:langevin:coefficient-one-value".into(),
@@ -1047,6 +1057,8 @@ fn markdown_handles_are_local_to_the_recovered_region() {
             ftoo_manifest::DefinitionId::CoefficientOne,
         ),
         vec![super::super::PendingReaderName {
+            reason: 0,
+            role: ftoo_manifest::ReasonRole::Subject,
             object: NodeId::LangevinCoefficientOneValue,
             handle: "prefixv:1".into(),
             label: "claim:langevin:coefficient-one-value".into(),
@@ -1058,4 +1070,296 @@ fn markdown_handles_are_local_to_the_recovered_region() {
         check_emission(&plan, &source, DocumentTarget::Markdown),
         Ok(())
     );
+}
+
+fn premise_plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {
+    let mut plan = plan(book);
+    let block = &mut plan.blocks[0];
+    block.runs = vec![Inline::Math {
+        definition_site: block.site.clone(),
+        site: block.site.clone(),
+        key: "value".into(),
+        markdown: "x".into(),
+        latex: "x".into(),
+        pending: vec![crate::PendingEntry::fixture(
+            ftoo_manifest::DefinitionId::CoefficientThreeValue,
+            0,
+            "x",
+            vec![ftoo_manifest::PendingReason::ClaimAuditDeferred {
+                object: NodeId::LangevinCoefficientThreeValue,
+                reason: ftoo_manifest::DeferredReason::Premise {
+                    claim: NodeId::LangevinCoefficientOneValue,
+                    evidence: ftoo_manifest::VerdictClass::Undecided,
+                },
+            }],
+            vec![],
+        )],
+    }];
+    block.map_pending(book, 0, "fixture", "en").unwrap();
+    plan
+}
+
+#[test]
+fn retained_premise_selectors_refuse_each_missing_object_and_restore() {
+    use NodeId::{LangevinCoefficientOneValue as One, LangevinCoefficientThreeValue as Three};
+    use ftoo_manifest::{
+        AddressTarget, DeferredReason, DefinitionId, OutOfSliceCause, PendingReason,
+        ReaderIdentityReason, ReaderTagCandidate, TagId, TagResolutionFault, VerdictClass,
+    };
+    let graph = ftoo_manifest::seed().unwrap();
+    let full = ftoo_manifest::addressing(&graph).unwrap();
+    let mut draft = ftoo_manifest::seed_draft();
+    draft.coverage.slice = vec![One];
+    let partial = ftoo_manifest::validate(draft).unwrap();
+    let partial = ftoo_manifest::addressing(&partial).unwrap();
+    for (subject, premise) in [(Three, One), (One, Three)] {
+        let mut plan = premise_plan(&full);
+        let block = &mut plan.blocks[0];
+        let Inline::Math { pending, .. } = &mut block.runs[0] else {
+            panic!("math")
+        };
+        *pending = vec![crate::PendingEntry::fixture(
+            DefinitionId::CoefficientThreeValue,
+            0,
+            "x",
+            vec![PendingReason::ClaimAuditDeferred {
+                object: subject,
+                reason: DeferredReason::Premise {
+                    claim: premise,
+                    evidence: VerdictClass::Undecided,
+                },
+            }],
+            vec![],
+        )];
+        block.pending_names.clear();
+        let site = AssemblySite::ReaderIdentity {
+            position: ReaderIdentityPosition::Pending {
+                unit: block.unit.clone(),
+                definition: DefinitionId::CoefficientThreeValue,
+                reason: 0,
+            },
+            origins: vec![
+                SourceOrigin {
+                    unit: Some(block.unit.clone()),
+                    language: Some("en".into()),
+                    target: None,
+                    site: block.site.clone()
+                };
+                2
+            ],
+        };
+        let fault = AssemblyFault::ReaderIdentity {
+            target: AddressTarget::Theory(Three),
+            reason: ReaderIdentityReason::NoLiveTag,
+            candidates: vec![ReaderTagCandidate {
+                handle: "v:3".into(),
+                outcome: Err(TagResolutionFault::OutOfSliceTag {
+                    input: "v:3".into(),
+                    tag: TagId::LangevinCoefficientThreeValue,
+                    target: Three,
+                    cause: OutOfSliceCause::ClaimNotSelected,
+                }),
+            }],
+        };
+        let expected = DocumentError::Assembly(
+            AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+                rule: RuleId::M055,
+                stage: AssemblyStage::Emission,
+                document: Some("fixture".into()),
+                unit: Some(block.unit.clone()),
+                language: Some("en".into()),
+                target: None,
+                site: site.clone(),
+                fault: fault.clone(),
+            }])
+            .unwrap(),
+        );
+        let actual = block.map_pending(&partial, 0, "fixture", "en").unwrap_err();
+        assert_eq!(actual, expected);
+        assert_eq!(
+            actual.to_string(),
+            format!(
+                "M055 Emission document=Some(\"fixture\") unit=Some(\"sec:fixture:reader\") language=Some(\"en\") target=None at {site:?}: {fault:?}\n"
+            )
+        );
+        assert_eq!(block.map_pending(&full, 0, "fixture", "en"), Ok(()));
+        for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
+            assert_eq!(
+                check_emission(&plan, &render(&plan, target), target),
+                Ok(())
+            );
+        }
+    }
+}
+
+#[test]
+fn retained_premise_reason_has_two_independent_names_and_exact_fragments() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let plan = premise_plan(&book);
+    for (target, expected) in [
+        (
+            DocumentTarget::Markdown,
+            "Pending notation: $x$: claim evidence v:3<!-- label claim:langevin:coefficient-three-value --> awaits premise v:1<!-- label claim:langevin:coefficient-one-value --> with evidence undecided.\n\n",
+        ),
+        (
+            DocumentTarget::Latex,
+            "Pending notation: \\(x\\): claim evidence \\FtdocTag{v:3}{u0-p0-r0}% label claim:langevin:coefficient-three-value\n\\space{}awaits premise \\FtdocTag{v:1}{u0-p0-r0-premise}% label claim:langevin:coefficient-one-value\n\\space{}with evidence undecided.\n\n",
+        ),
+    ] {
+        assert_eq!(
+            super::super::pending::paragraph(&plan.blocks[0], "en", target),
+            expected
+        );
+        let records = pending_records(&plan, &plan.blocks[0], target);
+        let EmissionKind::PendingExplanation(entry) = &records[0].kind else {
+            panic!("pending explanation");
+        };
+        assert_eq!(
+            entry.names,
+            vec![
+                super::super::PendingReaderName {
+                    reason: 0,
+                    role: ftoo_manifest::ReasonRole::Subject,
+                    object: NodeId::LangevinCoefficientThreeValue,
+                    handle: "v:3".into(),
+                    label: "claim:langevin:coefficient-three-value".into(),
+                    token: "u0-p0-r0".into()
+                },
+                super::super::PendingReaderName {
+                    reason: 0,
+                    role: ftoo_manifest::ReasonRole::Premise,
+                    object: NodeId::LangevinCoefficientOneValue,
+                    handle: "v:1".into(),
+                    label: "claim:langevin:coefficient-one-value".into(),
+                    token: "u0-p0-r0-premise".into()
+                },
+            ]
+        );
+        let source = render(&plan, target);
+        assert_eq!(check_emission(&plan, &source, target), Ok(()));
+        assert_eq!(
+            if target == DocumentTarget::Markdown {
+                super::super::markdown::size(&plan)
+            } else {
+                super::super::latex::size(&plan)
+            },
+            source.len()
+        );
+    }
+}
+
+type RetainedNativeCase = (Result<(), DocumentError>, Result<(), DocumentError>, String);
+
+#[allow(clippy::too_many_lines)] // One bracket table preserves all subject, premise and audit origins.
+fn retained_premise_native_controls(
+    support: &super::super::NativeSupport,
+    lock: &super::super::native_support::Lock,
+) -> Result<Vec<RetainedNativeCase>, DocumentError> {
+    use super::super::{native, runtime};
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let verdict = ftoo_audit::Verdict::Deferred(ftoo_manifest::DeferredReason::Premise {
+        claim: NodeId::LangevinCoefficientOneValue,
+        evidence: ftoo_manifest::VerdictClass::Undecided,
+    });
+    let directory = super::super::tests::Directory::new();
+    let path = directory.0.join("premise.tex");
+    let mut results = vec![];
+    for (plan, handle, token) in [
+        (premise_plan(&book), "v:3", "u0-p0-r0"),
+        (premise_plan(&book), "v:1", "u0-p0-r0-premise"),
+        (
+            super::retained_tests::outcome_plan(&book, &verdict),
+            "v:1",
+            "g-audit-0-premise",
+        ),
+    ] {
+        let addressing = runtime::render(&book, std::slice::from_ref(&plan))?;
+        let source = render(&plan, DocumentTarget::Latex);
+        let unit = plan.blocks.first().map(|block| block.unit.clone());
+        std::fs::write(&path, &source).unwrap();
+        let reread = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(reread, source);
+        results.push((
+            native::consume_plan(support, lock, &reread, "", &addressing, &plan),
+            Ok(()),
+            String::new(),
+        ));
+        let bad = source.replace(
+            &format!("{{{handle}}}{{{token}}}"),
+            &format!("{{c:01}}{{{token}}}"),
+        );
+        std::fs::write(&path, &bad).unwrap();
+        let reread = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(reread, bad);
+        let invocation = format!("\\FtdocTag{{c:01}}{{{token}}}");
+        let begin = bad.find(&invocation).unwrap();
+        let site = AssemblySite::Generated {
+            path: "generated/documents/fixture/en.tex".into(),
+            bytes: begin..begin + invocation.len(),
+            origins: if let Some(block) = plan.blocks.first() {
+                vec![
+                    SourceOrigin {
+                        unit: unit.clone(),
+                        language: Some("en".into()),
+                        target: None,
+                        site: block.site.clone()
+                    };
+                    2
+                ]
+            } else {
+                vec![SourceOrigin {
+                    unit: None,
+                    language: Some("en".into()),
+                    target: Some(DocumentTarget::Latex),
+                    site: UnitSite {
+                        file: "generated/audit-report.json".into(),
+                        path: vec![
+                            ftoo_manifest::PathPart::Key("outcomes".into()),
+                            ftoo_manifest::PathPart::Index(1),
+                        ],
+                        anchor: ftoo_manifest::SourceAnchor::Unavailable,
+                        decoded: None,
+                        occurrence: None,
+                    },
+                }]
+            },
+        };
+        let fault = AssemblyFault::RuntimeTagRejected {
+            input: "c:01".into(),
+            site_token: token.into(),
+            message: "tag \"c:01\": unknown".into(),
+        };
+        let display = format!(
+            "M055 Native document=Some(\"fixture\") unit={unit:?} language=Some(\"en\") target=Some(Latex) at {site:?}: {fault:?}\n"
+        );
+        let expected = DocumentError::Assembly(
+            AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+                rule: RuleId::M055,
+                stage: AssemblyStage::Native,
+                document: Some("fixture".into()),
+                unit: unit.clone(),
+                language: Some("en".into()),
+                target: Some(DocumentTarget::Latex),
+                site,
+                fault,
+            }])
+            .unwrap(),
+        );
+        results.push((
+            native::consume_plan(support, lock, &reread, "", &addressing, &plan),
+            Err(expected),
+            display,
+        ));
+        std::fs::write(&path, &source).unwrap();
+        let reread = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(reread, source);
+        results.push((
+            native::consume_plan(support, lock, &reread, "", &addressing, &plan),
+            Ok(()),
+            String::new(),
+        ));
+    }
+    Ok(results)
 }

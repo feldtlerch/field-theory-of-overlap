@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::typeset;
 use super::{
-    NotationRenderError, PendingEntry, Result, SymbolTier, admission, katex,
+    NotationRenderError, PendingEntry, Result, admission, katex,
     render::{self, Declaration},
     rendered_site,
     support::Support,
@@ -124,7 +124,11 @@ struct Candidates {
 
 /// Derive all owned evidence anew; the memo retains only successful consumption.
 #[allow(clippy::too_many_lines)] // The ordered inventory and both emitted targets are derived together.
-fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Candidates> {
+fn candidates(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
+    n: &CheckedNotation<'_, '_>,
+    records: &[Declaration],
+) -> Result<Candidates> {
     let admission_phase = crate::telemetry::Phase::new("notation.source_admission");
     inventory(n, records)?;
     let mut requests = vec![];
@@ -165,13 +169,21 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
     }
     let mut pending = vec![];
     for (order, definition) in n.definitions().iter().enumerate() {
-        let Some(status) = definition
-            .status()
-            .filter(|s| s.tier() == SymbolTier::Pending)
-        else {
+        let id = definition.spec().id();
+        let reasons = effective.map_or_else(
+            || {
+                definition
+                    .status()
+                    .map(ftoo_manifest::SymbolStatus::reasons)
+            },
+            |view| {
+                view.effective_status(id)
+                    .map(ftoo_audit::retention::EffectiveSymbolStatus::reasons)
+            },
+        );
+        let Some(reasons) = reasons.filter(|reasons| !reasons.is_empty()) else {
             continue;
         };
-        let id = definition.spec().id();
         let macro_body = render::pending_body(n, id, RenderTarget::Macro)?;
         let unicode_body = render::pending_body(n, id, RenderTarget::Unicode)?;
         for (target, body) in [
@@ -185,10 +197,12 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
                 collision: None,
             });
         }
-        let reasons = status.reasons().to_vec();
+        let reasons = reasons.to_vec();
         key.push(id.token().as_bytes().to_vec());
         for reason in &reasons {
-            key.push(reason.to_string().into_bytes());
+            // The memo keeps the complete structured reason, including exhaustion
+            // fields that the reader sentence does not print.
+            key.push(format!("{reason:?}").into_bytes());
         }
         pending.push(PendingEntry {
             definition: id,
@@ -201,8 +215,22 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
     }
     for (owner, case, draft) in cases(n) {
         let checked = ftoo_manifest::check_expression(n, draft)?;
-        let macro_form = render::expression(n, checked.draft(), RenderTarget::Macro, owner, &case)?;
-        let unicode = render::expression(n, checked.draft(), RenderTarget::Unicode, owner, &case)?;
+        let macro_form = render::expression(
+            effective,
+            n,
+            checked.draft(),
+            RenderTarget::Macro,
+            owner,
+            &case,
+        )?;
+        let unicode = render::expression(
+            effective,
+            n,
+            checked.draft(),
+            RenderTarget::Unicode,
+            owner,
+            &case,
+        )?;
         let combined = render::combine(
             &declarations,
             &macro_form.source,
@@ -248,15 +276,17 @@ fn candidates(n: &CheckedNotation<'_, '_>, records: &[Declaration]) -> Result<Ca
 
 #[allow(clippy::too_many_lines)] // Keep the complete key and publication boundary together.
 pub(super) fn prepared(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &CheckedNotation<'_, '_>,
     support: &Support,
     records: &[Declaration],
     bypass: bool,
 ) -> Result<(String, Vec<SweepRow>, Vec<PendingEntry>)> {
-    with_prepared(n, support, records, bypass, Ok)
+    with_prepared(effective, n, support, records, bypass, Ok)
 }
 
 pub(super) fn with_prepared<T, E>(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &CheckedNotation<'_, '_>,
     support: &Support,
     records: &[Declaration],
@@ -266,7 +296,7 @@ pub(super) fn with_prepared<T, E>(
 where
     E: From<super::NotationRenderError> + From<super::NotationAdapterFault>,
 {
-    let candidates = candidates(n, records)?;
+    let candidates = candidates(effective, n, records)?;
     support.scope(
         &super::support::repository().join("tools/notation/check.cjs"),
         || run(prepared_inner(support, records, bypass, candidates)?),
@@ -604,11 +634,12 @@ pub(super) fn row(
     case: &str,
     draft: ExprDraft,
 ) -> Result<SweepRow> {
-    let pending = prepared(n, support, &render::declarations(n)?, false)?.2;
+    let pending = prepared(None, n, support, &render::declarations(None, n)?, false)?.2;
     let mut errors = vec![];
     let checked = ftoo_manifest::check_expression(n, draft)?;
-    let macro_form = render::expression(n, checked.draft(), RenderTarget::Macro, owner, case)?;
-    let unicode = render::expression(n, checked.draft(), RenderTarget::Unicode, owner, case)?;
+    let macro_form =
+        render::expression(None, n, checked.draft(), RenderTarget::Macro, owner, case)?;
+    let unicode = render::expression(None, n, checked.draft(), RenderTarget::Unicode, owner, case)?;
     let combined = render::combine(
         declarations,
         &macro_form.source,
@@ -723,8 +754,10 @@ mod memo_tests {
         for graph in [&seed, &retained, &seed] {
             let book = ftoo_manifest::addressing(graph).unwrap();
             let catalogue = ftoo_manifest::notation(&book).unwrap();
-            let declarations = render::declarations(&catalogue).unwrap();
-            keys.push(MemoKey(candidates(&catalogue, &declarations).unwrap().key));
+            let declarations = render::declarations(None, &catalogue).unwrap();
+            keys.push(MemoKey(
+                candidates(None, &catalogue, &declarations).unwrap().key,
+            ));
         }
         assert_eq!(keys[0], keys[2]);
         assert_ne!(keys[0], keys[1]);

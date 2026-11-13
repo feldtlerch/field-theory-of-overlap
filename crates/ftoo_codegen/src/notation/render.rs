@@ -158,7 +158,16 @@ pub(super) fn append(
     }
     Ok(())
 }
-fn pending(n: &CheckedNotation<'_, '_>, id: DefinitionId) -> bool {
+fn pending(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
+    n: &CheckedNotation<'_, '_>,
+    id: DefinitionId,
+) -> bool {
+    if let Some(view) = effective {
+        return view
+            .effective_status(id)
+            .is_some_and(|s| s.tier() == SymbolTier::Pending);
+    }
     n.definition(id)
         .status()
         .is_some_and(|s| s.tier() == SymbolTier::Pending)
@@ -170,6 +179,7 @@ enum Mode {
     PendingBody,
 }
 fn definition<'a>(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &'a CheckedNotation<'_, '_>,
     id: DefinitionId,
     environment: Rc<Vec<Frame<'a>>>,
@@ -177,7 +187,7 @@ fn definition<'a>(
     stack: &mut Vec<Action<'a>>,
     unmarked: bool,
 ) {
-    if !unmarked && pending(n, id) {
+    if !unmarked && pending(effective, n, id) {
         stack.push(Action::Text("}_{\\text{pending}}".into(), origins.clone()));
     }
     match n.definition(id).spec().kind() {
@@ -186,7 +196,15 @@ fn definition<'a>(
                 definition: Some(id),
                 path: vec![NotationPathPart::Field("target".into())],
             });
-            definition(n, *target, environment, origins.clone(), stack, unmarked);
+            definition(
+                effective,
+                n,
+                *target,
+                environment,
+                origins.clone(),
+                stack,
+                unmarked,
+            );
         }
         DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => stack
             .push(Action::Visit(Frame {
@@ -197,11 +215,12 @@ fn definition<'a>(
                 origins: origins.clone(),
             })),
     }
-    if !unmarked && pending(n, id) {
+    if !unmarked && pending(effective, n, id) {
         stack.push(Action::Text("\\underbrace{".into(), origins));
     }
 }
 fn emit<'a>(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &'a CheckedNotation<'_, '_>,
     mut stack: Vec<Action<'a>>,
     target: RenderTarget,
@@ -278,7 +297,15 @@ fn emit<'a>(
                                 .map(|(i, arg)| frame.child(arg, i))
                                 .collect(),
                         );
-                        definition(n, *id, environment, origins, &mut stack, unmarked);
+                        definition(
+                            effective,
+                            n,
+                            *id,
+                            environment,
+                            origins,
+                            &mut stack,
+                            unmarked,
+                        );
                     }
                 }
             }
@@ -313,6 +340,7 @@ pub(super) fn complete(output: &Candidate, owner: RenderOwner, case: &str) -> Re
     Ok(())
 }
 pub(super) fn expression(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &CheckedNotation<'_, '_>,
     expr: &ExprDraft,
     target: RenderTarget,
@@ -320,6 +348,7 @@ pub(super) fn expression(
     case: &str,
 ) -> Result<Candidate> {
     emit(
+        effective,
         n,
         vec![Action::Visit(Frame {
             expr,
@@ -340,6 +369,7 @@ pub(super) fn fixture_body(
     body: &ExprDraft,
     arguments: &[ExprDraft],
 ) -> Result<Candidate> {
+    let effective = None;
     let environment = Rc::new(
         arguments
             .iter()
@@ -357,6 +387,7 @@ pub(super) fn fixture_body(
             .collect(),
     );
     emit(
+        effective,
         n,
         vec![Action::Visit(Frame {
             expr: body,
@@ -405,7 +436,10 @@ fn dependencies(kind: &DefinitionKind) -> BTreeSet<DefinitionId> {
     }
     dependencies
 }
-pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaration>> {
+pub(super) fn declarations(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
+    n: &CheckedNotation<'_, '_>,
+) -> Result<Vec<Declaration>> {
     let mut remaining: Vec<_> = n.definitions().iter().collect();
     remaining.sort_by_key(|d| d.spec().token());
     let mut emitted = BTreeSet::new();
@@ -435,6 +469,7 @@ pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaratio
             "body"
         };
         let mut body = emit(
+            effective,
             n,
             vec![Action::Visit(Frame {
                 expr: body,
@@ -448,7 +483,7 @@ pub(super) fn declarations(n: &CheckedNotation<'_, '_>) -> Result<Vec<Declaratio
             "declaration",
             Mode::Declaration,
         )?;
-        if pending(n, id) {
+        if pending(effective, n, id) {
             body.source = combine(
                 "\\underbrace{",
                 &body.source,
@@ -503,9 +538,11 @@ pub(super) fn pending_body(
     id: DefinitionId,
     target: RenderTarget,
 ) -> Result<Candidate> {
+    let effective = None;
     let mut stack = vec![];
-    definition(n, id, Rc::new(vec![]), vec![], &mut stack, true);
+    definition(effective, n, id, Rc::new(vec![]), vec![], &mut stack, true);
     emit(
+        effective,
         n,
         stack,
         target,

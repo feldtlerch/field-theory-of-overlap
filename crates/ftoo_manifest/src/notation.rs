@@ -21,6 +21,8 @@ pub use diagnostics::{
 };
 pub use diagnostics::{RenderOwner, RenderTarget};
 pub use primitives::{PrimitiveId, PrimitiveOperation, PrimitiveSpec};
+mod evidence;
+pub use evidence::*;
 pub use tiers::{PendingReason, SymbolStatus, SymbolTier};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -95,6 +97,12 @@ pub struct CheckedNotation<'book, 'graph> {
     definitions: Vec<CheckedDefinition>,
 }
 impl CheckedNotation<'_, '_> {
+    /// Exact graph and addressing bytes underlying this catalogue.
+    /// # Errors
+    /// Preserves projection and addressing validation faults.
+    pub fn projection_bytes(&self) -> Result<Vec<u8>, crate::ProjectionError> {
+        crate::wire::write_projection(self.book)
+    }
     #[must_use]
     pub fn primitives(&self) -> &[PrimitiveSpec] {
         &self.primitives

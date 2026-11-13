@@ -110,6 +110,9 @@ impl RetentionError {
                 Stage::Reproduction,
                 Site::File("generated/audit-report.json".into()),
             ),
+            Self::ContextMismatch { path, .. } => {
+                (RuleId::M061, Stage::Provenance, Site::File(path.clone()))
+            }
             Self::UnsupportedComponent { .. }
             | Self::NonReproducibility { .. }
             | Self::DiagnosticRerunFailed { .. } => (

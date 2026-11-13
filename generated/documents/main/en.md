@@ -1,6 +1,9 @@
 <!-- generated document main language en -->
-Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: unaudited base graph.
+Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: retained audit accepted.
 Declared slice: v:1<!-- label claim:langevin:coefficient-one-value -->, v:3<!-- label claim:langevin:coefficient-three-value -->.
+Audit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certified; v:3<!-- label claim:langevin:coefficient-three-value -->: certified.
+Audit scope: finite source jet of order 5, residual order 4 and derivative order 1; analytic identification is not certified.
+Certification concerns the finite coefficient claim; pending notation concerns a proposed formulation.
 
 <!-- unit sec:coefficients:overview document main language en -->
 # Coefficient values

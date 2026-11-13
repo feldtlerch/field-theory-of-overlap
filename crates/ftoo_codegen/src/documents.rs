@@ -1,6 +1,6 @@
 //! Complete statement-document preparation against one retained source snapshot.
 #![allow(clippy::result_large_err)]
-mod artifacts;
+pub(crate) mod artifacts;
 mod diagnostics;
 mod display;
 mod input;
@@ -13,6 +13,7 @@ mod native_support;
 mod pending;
 mod plan;
 mod registry;
+mod retained;
 mod runtime;
 #[cfg(test)]
 mod tests;
@@ -53,6 +54,7 @@ impl DocumentArtifact {
 /// ```compile_fail,E0451
 /// let value = ftoo_codegen::PreparedDocuments {
 ///     artifacts: Vec::new(), inputs: Default::default(), observed_outputs: Default::default(),
+///     snapshot: None,
 /// };
 /// ```
 /// ```compile_fail,E0277
@@ -97,6 +99,7 @@ impl DocumentArtifact {
 /// ```
 #[derive(Debug)]
 pub struct PreparedDocuments {
+    snapshot: Option<crate::retention::DocumentSnapshot>,
     artifacts: Vec<DocumentArtifact>,
     inputs: BTreeMap<String, Vec<u8>>,
     observed_outputs: BTreeMap<String, Vec<u8>>,
@@ -193,6 +196,14 @@ pub fn prepare_documents(
     root: &Path,
     support: &NativeSupport,
 ) -> Result<PreparedDocuments, DocumentError> {
+    prepare_context(root, support, None)
+}
+#[allow(clippy::too_many_lines)] // Admission and the final source snapshot form one preparation boundary.
+pub(crate) fn prepare_context(
+    root: &Path,
+    support: &NativeSupport,
+    accepted: Option<&ftoo_audit::retention::AcceptedRetention>,
+) -> Result<PreparedDocuments, DocumentError> {
     let _preparation = crate::telemetry::Phase::new("documents.preparation");
     let admission = crate::telemetry::Phase::new("documents.source_admission");
     let support = NativeSupport::resolve(root, Some(support.directory()))?;
@@ -264,25 +275,66 @@ pub fn prepare_documents(
         })?;
     let catalogue = ftoo_manifest::notation(&book)
         .map_err(|e| DocumentError::Notation(crate::NotationRenderError::Admission(e)))?;
+    let effective = accepted
+        .map(|accepted| ftoo_audit::retention::RetainedNotation::new(&catalogue, accepted))
+        .transpose()
+        .map_err(|error| DocumentError::Retention(Box::new(error.into())))?;
+    if let Some(accepted) = accepted {
+        inputs.insert(
+            "generated/audit-report.json".into(),
+            accepted.bytes().to_vec(),
+        );
+    }
+    let sources: Vec<_> = std::iter::once(declaration)
+        .chain(statements)
+        .chain(sources)
+        .chain(display_sources)
+        .collect();
+    let snapshot = accepted
+        .map(|_| {
+            crate::retention::DocumentSnapshot::capture(
+                root,
+                inputs
+                    .iter()
+                    .map(|(path, bytes)| (path.as_str(), bytes.as_slice()))
+                    .chain(
+                        markdown
+                            .sources()
+                            .iter()
+                            .map(|source| (source.file.as_str(), source.bytes.as_slice())),
+                    )
+                    .chain(
+                        sources
+                            .iter()
+                            .map(|source| (source.file.as_str(), source.bytes.as_slice())),
+                    ),
+            )
+        })
+        .transpose()
+        .map_err(|error| DocumentError::Retention(Box::new(error)))?;
     drop(admission);
-    crate::notation::with_preparation(&catalogue, |notation| {
+    crate::notation::with_preparation(effective.as_ref(), &catalogue, |notation| {
         let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
         let artifacts = render_artifacts(root, &support, &book, &plans, notation)?;
-        finish_snapshot(
+        let mut prepared = finish_snapshot(
             root,
             inputs,
             &markdown,
-            std::iter::once(declaration)
-                .chain(statements)
-                .chain(sources)
-                .chain(display_sources),
+            sources.into_iter(),
             [
                 ("units/statements", statement_files, false),
                 ("units/skeletons", skeleton_files, false),
                 ("units/displays", display_files, true),
             ],
             artifacts,
-        )
+        )?;
+        if let Some(snapshot) = snapshot {
+            snapshot
+                .recheck(root)
+                .map_err(|error| DocumentError::Retention(Box::new(error)))?;
+            prepared.snapshot = Some(snapshot.without_outputs());
+        }
+        Ok(prepared)
     })
 }
 fn finish_snapshot(
@@ -346,6 +398,7 @@ fn finish_snapshot(
         }
     }
     Ok(PreparedDocuments {
+        snapshot: None,
         artifacts,
         inputs,
         observed_outputs,

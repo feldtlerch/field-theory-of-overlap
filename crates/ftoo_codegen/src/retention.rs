@@ -87,6 +87,36 @@ struct Snapshot {
     identity: FileIdentity,
     bytes: Vec<u8>,
 }
+// The document consumer reuses the report's regular-file identity and byte recheck.
+#[derive(Debug)]
+pub(crate) struct DocumentSnapshot(BTreeMap<String, Snapshot>);
+impl DocumentSnapshot {
+    pub(crate) fn capture<'a>(
+        root: &Path,
+        files: impl Iterator<Item = (&'a str, &'a [u8])>,
+    ) -> Result<Self, RetentionCheckError> {
+        let mut snapshots = BTreeMap::new();
+        for (path, bytes) in files {
+            let mut snapshot = read(root, path, MAX_REPORT, true)?;
+            snapshot.bytes = bytes.to_vec();
+            reread(root, path, &snapshot)?;
+            snapshots.insert(path.into(), snapshot);
+        }
+        Ok(Self(snapshots))
+    }
+    pub(crate) fn recheck(&self, root: &Path) -> Result<(), RetentionCheckError> {
+        for (path, snapshot) in &self.0 {
+            reread(root, path, snapshot)?;
+        }
+        engine(&engine_sources(root)?)?;
+        Ok(())
+    }
+    pub(crate) fn without_outputs(mut self) -> Self {
+        self.0
+            .retain(|path, _| !path.starts_with("generated/documents/"));
+        self
+    }
+}
 /// A checked report bound to one stable repository source snapshot.
 /// ```compile_fail
 /// use ftoo_codegen::retention::PreparedRetention;
@@ -529,7 +559,10 @@ pub(crate) fn check_release_with_documents(
 ) -> Result<(PreparedRetention, crate::PreparedDocuments), RetentionCheckError> {
     let prepared = check_retention(root)?;
     release_assessment(prepared.report().assessment())?;
-    let documents = crate::check_documents(root, support)
+    let documents = prepare_bound_documents(root, support, &prepared)?;
+    crate::documents::artifacts::verify(root, &documents)
+        .map_err(|error| RetentionCheckError::Documents(Box::new(error)))?;
+    crate::documents::artifacts::recheck(root, &documents)
         .map_err(|error| RetentionCheckError::Documents(Box::new(error)))?;
     recheck(root, &prepared.sources)?;
     reread(
@@ -548,4 +581,31 @@ fn release_assessment(assessment: &ReleaseAssessment) -> Result<(), RetentionChe
     } else {
         Err(RetentionCheckError::ReleaseRejected(assessment.clone()))
     }
+}
+
+/// Prepare reader artifacts from an accepted, stable retained report.
+/// # Errors
+/// Refuses retained inputs, source changes, rendering or typesetting failures.
+pub fn prepare_retained_documents(
+    root: &Path,
+    support: &crate::NativeSupport,
+) -> Result<crate::PreparedDocuments, RetentionCheckError> {
+    let retained = check_retention(root)?;
+    prepare_bound_documents(root, support, &retained)
+}
+fn prepare_bound_documents(
+    root: &Path,
+    support: &crate::NativeSupport,
+    retained: &PreparedRetention,
+) -> Result<crate::PreparedDocuments, RetentionCheckError> {
+    recheck(root, &retained.sources)?;
+    let snapshot = Snapshot {
+        identity: retained.report_identity.clone(),
+        bytes: retained.bytes().to_vec(),
+    };
+    reread(root, REPORT, &snapshot)?;
+    let result = crate::documents::prepare_context(root, support, Some(&retained.accepted));
+    recheck(root, &retained.sources)?;
+    reread(root, REPORT, &snapshot)?;
+    result.map_err(|error| RetentionCheckError::Documents(Box::new(error)))
 }

@@ -1191,8 +1191,8 @@ fn n16_exact_appended_register() {
             ),
             (
                 RuleId::M049,
-                "Symbol tiers are derived from the supplied graph and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
-                "Checked notation catalogues and all exposed symbol-status values.",
+                "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
+                "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values.",
                 RuleState::Structural,
                 None
             ),
@@ -1876,7 +1876,17 @@ fn pending_text_parts_keep_every_template_and_blocker_spelling() {
         ));
     }
     for (reason, before, after) in cases {
-        assert_eq!(reason.text_parts(), (before, object, after.into()));
+        assert_eq!(
+            reason.text_parts(),
+            vec![
+                crate::ReasonPart::Text(before.into()),
+                crate::ReasonPart::Object {
+                    role: crate::ReasonRole::Subject,
+                    id: object
+                },
+                crate::ReasonPart::Text(after.into())
+            ]
+        );
         assert_eq!(
             reason.to_string(),
             format!("{before}def:langevin:coefficient-one{after}")

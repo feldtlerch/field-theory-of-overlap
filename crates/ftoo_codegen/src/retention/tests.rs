@@ -37,6 +37,65 @@ struct Fixture {
     root: std::path::PathBuf,
     bytes: Vec<u8>,
 }
+
+#[test]
+fn retained_document_snapshot_rechecks_sources_and_accepted_report_before_emission() {
+    let fixture = Fixture::new();
+    let support_directory = Fixture::new();
+    let support =
+        crate::NativeSupport::resolve(&fixture.root, Some(&support_directory.root)).unwrap();
+    let file = "units/fixture.toml";
+    fs::create_dir(fixture.root.join("units")).unwrap();
+    fs::write(fixture.root.join(file), b"source").unwrap();
+    for path in [file, REPORT] {
+        let original = fs::read(fixture.root.join(path)).unwrap();
+        for remove in [false, true] {
+            let accepted = check_retention(&fixture.root).unwrap();
+            let snapshot =
+                DocumentSnapshot::capture(&fixture.root, [(path, original.as_slice())].into_iter())
+                    .unwrap();
+            let expected_identity = identity(&fs::metadata(fixture.root.join(path)).unwrap());
+            if remove {
+                fs::remove_file(fixture.root.join(path)).unwrap();
+            } else {
+                fs::write(fixture.root.join(path), b"changed").unwrap();
+            }
+            let actual_identity = fs::metadata(fixture.root.join(path))
+                .ok()
+                .map(|metadata| Box::new(identity(&metadata)));
+            let expected = RetentionCheckError::InputChanged {
+                path: path.into(),
+                expected: Box::new(expected_identity.clone()),
+                actual: actual_identity.clone(),
+            };
+            let actual = snapshot.recheck(&fixture.root).unwrap_err();
+            assert_eq!(actual, expected);
+            assert_eq!(
+                actual.to_string(),
+                format!(
+                    "retention stability M062 at file \"{path}\": input-changed expected={expected_identity} actual={}",
+                    actual_identity
+                        .as_ref()
+                        .map_or_else(|| "missing".into(), std::string::ToString::to_string)
+                )
+            );
+            if path == REPORT {
+                assert_eq!(
+                    prepare_bound_documents(&fixture.root, &support, &accepted).unwrap_err(),
+                    expected
+                );
+            }
+            fs::write(fixture.root.join(path), &original).unwrap();
+            assert_eq!(fs::read(fixture.root.join(path)).unwrap(), original);
+            assert_eq!(
+                DocumentSnapshot::capture(&fixture.root, [(path, original.as_slice())].into_iter())
+                    .unwrap()
+                    .recheck(&fixture.root),
+                Ok(())
+            );
+        }
+    }
+}
 impl Fixture {
     fn new() -> Self {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -104,17 +163,27 @@ fn committed_report_is_fresh_byte_equal_without_support() {
 fn regeneration_rereads_one_production_and_check_never_rewrites() {
     let fixture = Fixture::new();
     let started = std::time::Instant::now();
-    let regenerated = regenerate_retention(&fixture.root).unwrap();
+    let captured = sources(&fixture.root).unwrap();
+    let production = retention::produce(captured[PROJECTION].bytes.clone()).unwrap();
+    let regenerated = publish(&fixture.root, &captured, &production, &mut |_, _| Ok(())).unwrap();
+    assert_eq!(
+        regenerated.report().measurements(),
+        production.report().measurements()
+    );
     let regeneration_time = started.elapsed();
     assert_eq!(regenerated.bytes(), fixture.bytes);
+    let regenerated = regenerate_retention(&fixture.root).unwrap();
+    assert_eq!(regenerated.bytes(), fixture.bytes);
+    assert_eq!(
+        fs::read(fixture.root.join(REPORT)).unwrap(),
+        production.bytes()
+    );
+    assert_eq!(regenerated.report().gated(), production.report().gated());
     let before = identity(&fs::metadata(fixture.root.join(REPORT)).unwrap());
     let started = std::time::Instant::now();
     let checked = check_retention(&fixture.root).unwrap();
     assert_eq!(checked.bytes(), fixture.bytes);
-    assert_eq!(
-        checked.report().measurements(),
-        regenerated.report().measurements()
-    );
+    assert_eq!(checked.report().gated(), regenerated.report().gated());
     let check_time = started.elapsed();
     assert_eq!(
         identity(&fs::metadata(fixture.root.join(REPORT)).unwrap()),

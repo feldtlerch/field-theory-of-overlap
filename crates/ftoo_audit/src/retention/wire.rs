@@ -764,6 +764,57 @@ fn limit_fields() -> [&'static str; 71] {
         .fields()
         .map(|(name, _)| name)
 }
+
+#[test]
+fn reader_tokens_agree_with_report_wire() {
+    use crate::RunStage::*;
+    use ftoo_manifest::{CapabilityId, DeferredReason, ReasonPart, VerdictClass};
+    for stage in [
+        Capability,
+        Premise,
+        Setup,
+        Candidate,
+        Definedness,
+        Source,
+        ResidualMember,
+        Export,
+        Expectation,
+        Replay,
+        Projection,
+    ] {
+        assert_eq!(s(super::stage_record(stage).token()), stage.value());
+    }
+    for resource in BUDGET_KINDS {
+        let fault =
+            nrz_cas::Fault::exhausted(*resource, 7, 8, nrz_cas::Location::new("reader token"));
+        assert_eq!(
+            s(super::exhaustion_record(&fault).unwrap().resource.token()),
+            resource.value()
+        );
+    }
+    for capability in [
+        CapabilityId::ExactRationalLinearEquivalence,
+        CapabilityId::FormalTruncatedPowerSeries,
+        CapabilityId::SymbolicTrigonometry,
+        CapabilityId::TrigonometricIntegration,
+    ] {
+        let Value::String(token) = capability.value() else {
+            panic!("capability token");
+        };
+        assert_eq!(
+            ftoo_manifest::deferred_parts(DeferredReason::Capability(capability)),
+            vec![ReasonPart::Text(format!("capability {token}"))]
+        );
+    }
+    for verdict in [
+        VerdictClass::Certified,
+        VerdictClass::Refuted,
+        VerdictClass::Undecided,
+        VerdictClass::Deferred,
+    ] {
+        assert_eq!(s(ftoo_manifest::verdict_word(verdict)), verdict.value());
+    }
+}
 macro_rules! engine_limits {
     ($($variant:ident => $field:ident),+ $(,)?) => {
         #[cfg(test)]

@@ -19,3 +19,6 @@ serde_json = { version = "=1.0.154", features = ["raw_value"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "=0.2.191"
+
+[dev-dependencies]
+nrz-cas = { git = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum", rev = "598ff683a57caca07cf9d44e3fd28c716afb81ef" }

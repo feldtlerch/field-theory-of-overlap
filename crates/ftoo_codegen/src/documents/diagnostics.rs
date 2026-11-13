@@ -654,6 +654,9 @@ pub enum DocumentIoOperation {
     CreateDirectory,
     CreateTemporary,
     Write,
+    Flush,
+    SyncFile,
+    SyncDirectory,
     Rename,
     Remove,
 }
@@ -665,6 +668,7 @@ pub struct IoFailure {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentError {
+    Retention(Box<crate::retention::RetentionCheckError>),
     DocumentaryRegistry(ftoo_manifest::RegistryErrors),
     Projection(ProjectionCheckError),
     ProjectionLoad(ProjectionError),
@@ -688,6 +692,7 @@ pub enum DocumentError {
 impl fmt::Display for DocumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Retention(e) => e.fmt(f),
             Self::DocumentaryRegistry(e) => e.fmt(f),
             Self::Projection(e) => e.fmt(f),
             Self::ProjectionLoad(e) => e.fmt(f),
@@ -866,6 +871,8 @@ pub struct PendingOccurrence {
 /// A checked object-name position in a generated pending explanation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingReaderName {
+    pub reason: usize,
+    pub role: ftoo_manifest::ReasonRole,
     pub object: ftoo_manifest::NodeId,
     pub handle: String,
     pub label: String,

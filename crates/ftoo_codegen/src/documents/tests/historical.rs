@@ -42,7 +42,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     let catalogue = ftoo_manifest::notation(&book).unwrap();
     let directory = Directory::new();
     let path = directory.0.join("historical.tex");
-    crate::notation::with_preparation(&catalogue, |notation| -> Result<(), DocumentError> {
+    crate::notation::with_preparation(None, &catalogue, |notation| -> Result<(), DocumentError> {
         plan::citation_tests::support_required_literal_build_controls(notation);
         super::pending::support_required_pending_paragraphs_are_complete_label_neutral_and_independently_consumed(&book, notation)?;
         let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;

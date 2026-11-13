@@ -25,11 +25,12 @@ mod notation;
 pub use notation::{
     AliasTargetReason, Callee, CheckedDefinition, CheckedExpression, CheckedNotation,
     DefinitionCategory, DefinitionId, DefinitionKind, DefinitionShapeReason, DefinitionSpec,
-    ExprDraft, LiteralReason, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES,
-    MathSort, NotationDiagnostic, NotationErrors, NotationFault, NotationOrigin, NotationPathPart,
+    EvidenceExhaustion, EvidenceResource, EvidenceStage, ExhaustionReason, ExprDraft,
+    LiteralReason, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES, MathSort,
+    NotationDiagnostic, NotationErrors, NotationFault, NotationOrigin, NotationPathPart,
     NotationResource, NotationSite, NotationStage, PendingReason, PrimitiveId, PrimitiveOperation,
-    PrimitiveSpec, RegistryEntry, Signature, SymbolLookupFault, SymbolStatus, SymbolTier,
-    SymbolUse, check_expression, notation,
+    PrimitiveSpec, ReasonPart, ReasonRole, RegistryEntry, Signature, SymbolLookupFault,
+    SymbolStatus, SymbolTier, SymbolUse, check_expression, deferred_parts, notation, verdict_word,
 };
 pub use notation::{RenderOwner, RenderTarget};
 mod labels;

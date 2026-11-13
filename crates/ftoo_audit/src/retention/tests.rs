@@ -44,6 +44,7 @@ pub(crate) fn assert_fixture(
         })
         .unwrap();
     assert_eq!(accepted.bytes(), bytes);
+    super::notation_tests::genuine_fixture(graph, &accepted);
     super::matrix_tests::proof_matrix(&production);
     super::verdict_tests::matrix(&production);
     super::wire_tests::alternative_shapes(&production);

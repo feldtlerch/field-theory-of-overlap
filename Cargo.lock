@@ -89,6 +89,7 @@ dependencies = [
  "ftoo_audit",
  "ftoo_manifest",
  "libc",
+ "nrz-cas",
  "serde",
  "serde_json",
  "sha2",

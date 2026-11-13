@@ -11,7 +11,7 @@ mod tests;
 use ftoo_manifest::{
     CheckedExpression, CheckedNotation, DefinitionId, NotationDiagnostic, NotationErrors,
     NotationFault, NotationOrigin, NotationSite, NotationStage, PendingReason, RenderOwner,
-    RenderTarget, RuleId, SymbolLookupFault, SymbolTier, SymbolUse,
+    RenderTarget, RuleId, SymbolLookupFault, SymbolUse,
 };
 use std::{fmt, io, path::PathBuf};
 pub use support::{
@@ -202,6 +202,7 @@ fn typeset(
 #[derive(Debug)]
 pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     catalogue: &'catalogue CheckedNotation<'book, 'graph>,
+    effective: Option<ftoo_audit::retention::RetainedNotation<'catalogue, 'book, 'graph>>,
     support: std::rc::Rc<support::Support>,
     declarations: String,
     rows: Vec<SweepRow>,
@@ -211,6 +212,10 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     #[must_use]
     pub fn declarations(&self) -> &str {
         &self.declarations
+    }
+    #[must_use]
+    pub(crate) fn retained(&self) -> Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>> {
+        self.effective.as_ref()
     }
     #[must_use]
     pub fn sweep_rows(&self) -> &[SweepRow] {
@@ -253,6 +258,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
         target: RenderTarget,
     ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
         let expanded = render::expression(
+            self.effective.as_ref(),
             self.catalogue,
             expression.draft(),
             RenderTarget::Unicode,
@@ -269,6 +275,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
             RenderTarget::Unicode => expanded.source,
             RenderTarget::Macro => {
                 let result = render::expression(
+                    self.effective.as_ref(),
                     self.catalogue,
                     expression.draft(),
                     target,
@@ -378,10 +385,12 @@ pub fn prepare_notation<'catalogue, 'book, 'graph>(
     let _phase = crate::telemetry::Phase::new("notation.preparation");
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
     let support = std::rc::Rc::new(support::resolve(location.as_deref())?);
-    let records = render::declarations(catalogue)?;
-    let (declarations, rows, pending) = sweep::prepared(catalogue, &support, &records, false)?;
+    let records = render::declarations(None, catalogue)?;
+    let (declarations, rows, pending) =
+        sweep::prepared(None, catalogue, &support, &records, false)?;
     Ok(RenderableNotation {
         catalogue,
+        effective: None,
         support,
         declarations,
         rows,
@@ -389,8 +398,9 @@ pub fn prepare_notation<'catalogue, 'book, 'graph>(
     })
 }
 
-pub(crate) fn with_preparation<T, E>(
-    catalogue: &CheckedNotation<'_, '_>,
+pub(crate) fn with_preparation<'c, 'b, 'g, T, E>(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'c, 'b, 'g>>,
+    catalogue: &'c CheckedNotation<'b, 'g>,
     run: impl FnOnce(&RenderableNotation<'_, '_, '_>) -> std::result::Result<T, E>,
 ) -> std::result::Result<T, E>
 where
@@ -398,8 +408,9 @@ where
 {
     let location = std::env::var_os("FTOO_NOTATION_SUPPORT").map(PathBuf::from);
     let support = std::rc::Rc::new(support::resolve(location.as_deref())?);
-    let records = render::declarations(catalogue)?;
+    let records = render::declarations(effective, catalogue)?;
     sweep::with_prepared(
+        effective,
         catalogue,
         &support,
         &records,
@@ -407,6 +418,7 @@ where
         |(declarations, rows, pending)| {
             let notation = RenderableNotation {
                 catalogue,
+                effective: effective.cloned(),
                 support: std::rc::Rc::clone(&support),
                 declarations,
                 rows,

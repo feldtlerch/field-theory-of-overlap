@@ -2314,7 +2314,10 @@ fn notation_refusal_uses_the_authored_ast_range_and_restores()
 
 #[test]
 fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
-    use DocumentIoOperation::{CreateDirectory, CreateTemporary, Read, Remove, Rename, Write};
+    use DocumentIoOperation::{
+        CreateDirectory, CreateTemporary, Flush, Read, Remove, Rename, SyncDirectory, SyncFile,
+        Write,
+    };
     use std::io::{Error, ErrorKind};
     let directory = Directory::new();
     let paths = [
@@ -2328,6 +2331,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
         "generated/documents/main/fr.tex",
     ];
     let prepared = PreparedDocuments {
+        snapshot: None,
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -2367,6 +2371,9 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
         CreateDirectory,
         CreateTemporary,
         Write,
+        Flush,
+        SyncFile,
+        SyncDirectory,
         Rename,
         Remove,
         Read,
@@ -2388,6 +2395,8 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
             });
             let replaced_count = if matches!(operation, Remove | Read) {
                 paths.len()
+            } else if operation == SyncDirectory {
+                failure_index + 1
             } else {
                 failure_index
             };
@@ -2492,6 +2501,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
         "generated/addressing.tex",
     ];
     let prepared = PreparedDocuments {
+        snapshot: None,
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -2515,14 +2525,19 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
                 b"b\n".as_slice(),
                 0,
                 1,
-                "byte 0: expected 0x61; actual 0x62\n",
+                "byte 0: expected length=2 window@0=610a EOF; actual length=2 window@0=620a EOF\n",
             ),
-            (b"a".as_slice(), 1, 1, "byte 1: expected LF; actual EOF\n"),
+            (
+                b"a".as_slice(),
+                1,
+                1,
+                "byte 1: expected length=2 window@0=610a EOF; actual length=1 window@0=61 EOF\n",
+            ),
             (
                 b"a\r\n".as_slice(),
                 1,
                 2,
-                "byte 1: expected LF; actual CR\n",
+                "byte 1: expected length=2 window@0=610a EOF; actual length=3 window@0=610d0a EOF\n",
             ),
         ] {
             fs::write(directory.0.join(path), actual).unwrap();

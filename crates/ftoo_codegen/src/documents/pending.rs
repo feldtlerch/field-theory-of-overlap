@@ -137,19 +137,25 @@ pub(super) fn paragraph(block: &Block, language: &str, target: DocumentTarget) -
             site: block.site.clone(),
         });
         runs.push(Inline::Text(": ".into()));
-        for (reason, (value, name)) in entry.reasons.iter().zip(&entry.names).enumerate() {
-            let (before, _, after) = value.text_parts();
-            runs.push(Inline::Text(format!(
-                "{}{before}",
-                if reason == 0 { "" } else { "; " }
-            )));
-            runs.push(Inline::Tag {
-                handle: name.handle.clone(),
-                label: name.label.clone(),
-                token: name.token.clone(),
-                site: block.site.clone(),
-            });
-            runs.push(Inline::Text(after));
+        let mut names = entry.names.iter();
+        for (reason, value) in entry.reasons.iter().enumerate() {
+            if reason != 0 {
+                runs.push(Inline::Text("; ".into()));
+            }
+            for part in value.text_parts() {
+                match part {
+                    ftoo_manifest::ReasonPart::Text(text) => runs.push(Inline::Text(text)),
+                    ftoo_manifest::ReasonPart::Object { .. } => {
+                        let name = names.next().expect("every reason object resolved");
+                        runs.push(Inline::Tag {
+                            handle: name.handle.clone(),
+                            label: name.label.clone(),
+                            token: name.token.clone(),
+                            site: block.site.clone(),
+                        });
+                    }
+                }
+            }
         }
     }
     if runs.is_empty() {
