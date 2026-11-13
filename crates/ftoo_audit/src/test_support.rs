@@ -502,7 +502,7 @@ mod tests {
     use std::fmt::Write;
 
     use nrz_cas::{
-        Fault, FaultKind, InvalidCode, Rational,
+        Fault, InvalidCode, Location, Rational,
         limits::{Budget, Limits},
     };
 
@@ -651,9 +651,12 @@ mod tests {
                 .iter()
                 .all(|submission| submission.verdict.is_ok())
         );
-        assert!(
-            matches!(&trial.submissions[8].verdict, Err(fault) if fault.kind == FaultKind::Invalid(InvalidCode::Rule))
+        let fault = trial.submissions[8].verdict.as_ref().unwrap_err();
+        assert_eq!(
+            fault,
+            &Fault::invalid(InvalidCode::Rule, Location::new("elementary solving"))
         );
+        assert_eq!(fault.to_string(), "Invalid(Rule) at elementary solving");
         for submission in &trial.submissions[..8] {
             if let Ok(witness) = &submission.verdict {
                 assert_ne!(witness.as_slice(), [0u8; 0]);
@@ -670,7 +673,7 @@ mod tests {
             ),
             Err(fault) => println!("joint replay: refused {fault}"),
         }
-        assert!(replay.is_ok(), "joint replay: {replay:?}");
+        assert_eq!(replay, Ok(()));
         println!(
             "oracle: exact cosh/sinh series division agrees with {}",
             row_text(&oracle, &mut budget)?

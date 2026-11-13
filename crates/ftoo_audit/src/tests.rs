@@ -754,22 +754,31 @@ fn m024_unsupported_dispatch_and_m022_missing_receipt_allocate_nothing() {
     let before = counts();
     let mut d = ProducerId::LangevinCoefficientOneValue.descriptor();
     d.capabilities = &[ftoo_manifest::CapabilityId::ExactRationalLinearEquivalence];
-    assert!(matches!(
-        crate::runner::ready(d, &[]),
-        Err(RunError::Execution {
-            stage: RunStage::Capability,
-            cause: RunCause::CapabilityUnavailable(_),
-            ..
-        })
-    ));
-    assert!(matches!(
-        crate::runner::ready(ProducerId::LangevinCoefficientThreeValue.descriptor(), &[]),
-        Err(RunError::Execution {
-            stage: RunStage::Premise,
-            cause: RunCause::MissingAcceptedPremise(OneValue),
-            ..
-        })
-    ));
+    let expected = RunError::Execution {
+        claim: OneValue,
+        stage: RunStage::Capability,
+        cause: RunCause::CapabilityUnavailable(
+            ftoo_manifest::CapabilityId::ExactRationalLinearEquivalence,
+        ),
+    };
+    let fault = crate::runner::ready(d, &[]).unwrap_err();
+    assert_eq!(fault, expected);
+    assert_eq!(
+        fault.to_string(),
+        "Execution { claim: LangevinCoefficientOneValue, stage: Capability, cause: CapabilityUnavailable(ExactRationalLinearEquivalence) }"
+    );
+    let expected = RunError::Execution {
+        claim: ThreeValue,
+        stage: RunStage::Premise,
+        cause: RunCause::MissingAcceptedPremise(OneValue),
+    };
+    let fault = crate::runner::ready(ProducerId::LangevinCoefficientThreeValue.descriptor(), &[])
+        .unwrap_err();
+    assert_eq!(fault, expected);
+    assert_eq!(
+        fault.to_string(),
+        "Execution { claim: LangevinCoefficientThreeValue, stage: Premise, cause: MissingAcceptedPremise(LangevinCoefficientOneValue) }"
+    );
     assert_eq!(before, counts());
 }
 fn failed_first() -> Result<(crate::Receipt, crate::Measurement), RunError> {
@@ -787,13 +796,19 @@ fn m022_failed_premise_stops_before_dependent() -> TestResult {
     let mut entries = crate::registry::REGISTRY;
     entries[0].produce = failed_first;
     entries[1].produce = must_not_execute;
-    assert!(matches!(
-        crate::runner::execute(&seed()?, &entries),
-        Err(RunError::Execution {
+    let fault = crate::runner::execute(&seed()?, &entries).unwrap_err();
+    assert_eq!(
+        fault,
+        RunError::Execution {
             claim: OneValue,
-            ..
-        })
-    ));
+            stage: RunStage::Projection,
+            cause: RunCause::ProjectionMismatch,
+        }
+    );
+    assert_eq!(
+        fault.to_string(),
+        "Execution { claim: LangevinCoefficientOneValue, stage: Projection, cause: ProjectionMismatch }"
+    );
     Ok(())
 }
 #[test]
