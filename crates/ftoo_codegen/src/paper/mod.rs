@@ -1,6 +1,8 @@
 //! Whole-pair fixed point and exact delivered-byte gate for the paper and explainer.
 mod registry;
+mod release;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fmt::Write as _;
@@ -13,6 +15,16 @@ use std::time::{Duration, Instant};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PaperFault {
     Input(String),
+    ReadingAcceptance {
+        passage: u64,
+    },
+    PassageSet {
+        ids: Vec<u64>,
+    },
+    Release {
+        part: &'static str,
+        reason: String,
+    },
     PdfMismatch(Vec<ByteDifference>),
     CycleCap {
         cycles: u64,
@@ -48,6 +60,17 @@ impl std::fmt::Display for PaperFault {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Input(message) => f.write_str(message),
+            Self::Release { part, reason } => {
+                write!(f, "Paper release M065 refused at {part}: {reason}")
+            }
+            Self::ReadingAcceptance { passage } => write!(
+                f,
+                "Paper passage {passage}: accepted bytes must occur exactly once with the recorded hash and a filled reading acceptance"
+            ),
+            Self::PassageSet { ids } => write!(
+                f,
+                "Paper acceptance requires exactly passage ids 1 through 19; found {ids:?}"
+            ),
             Self::PdfMismatch(rows) => {
                 f.write_str("Paper byte gate failed")?;
                 for row in rows {
@@ -163,6 +186,7 @@ fn command_output(command: &mut Command) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 fn inputs(root: &Path, support_work: Option<(&Path, &Path)>) -> Result<Value> {
+    check_reading_acceptance(root)?;
     let mut command = Command::new("python3");
     command
         .args(["-B", "tools/paper/inputs.py"])
@@ -177,6 +201,44 @@ fn inputs(root: &Path, support_work: Option<(&Path, &Path)>) -> Result<Value> {
     }
     serde_json::from_slice(&command_output(&mut command)?)
         .map_err(|e| PaperFault::Input(e.to_string()))
+}
+fn check_reading_acceptance(root: &Path) -> Result<()> {
+    let record: Value = serde_json::from_slice(&bytes(
+        &root.join("documents/paper-build/self-description.json"),
+    )?)
+    .map_err(|e| e.to_string())?;
+    let rows = record["passages"].as_array().ok_or("Missing passages")?;
+    let mut ids = rows
+        .iter()
+        .map(|row| number(row, "id"))
+        .collect::<Result<Vec<_>>>()?;
+    ids.sort_unstable();
+    if ids != (1..=19).collect::<Vec<_>>() {
+        return Err(PaperFault::PassageSet { ids });
+    }
+    for row in rows {
+        let fault = PaperFault::ReadingAcceptance {
+            passage: number(row, "id")?,
+        };
+        let data = bytes(&root.join(text(row, "file")?))?;
+        let anchor = text(row, "anchor")?.as_bytes();
+        let length = usize::try_from(number(row, "end")?.saturating_sub(number(row, "start")?))
+            .map_err(|_| fault.clone())?;
+        let matches = data
+            .windows(anchor.len().max(1))
+            .enumerate()
+            .filter(|(i, b)| {
+                *b == anchor
+                    && data.get(*i..i.saturating_add(length)).is_some_and(|span| {
+                        hex(&Sha256::digest(span)) == row["sha256"].as_str().unwrap_or("")
+                    })
+            })
+            .count();
+        if length == 0 || matches != 1 || text(row, "reading_acceptance")?.trim().is_empty() {
+            return Err(fault);
+        }
+    }
+    Ok(())
 }
 fn byte_difference(path: &str, expected: &[u8], actual: &[u8]) -> ByteDifference {
     let offset = expected
@@ -467,6 +529,7 @@ struct Request {
     operation: String,
     root: PathBuf,
     values: BTreeMap<String, OsString>,
+    release: bool,
 }
 fn request(args: &[OsString]) -> Result<Request> {
     let mut iter = args.iter();
@@ -480,7 +543,12 @@ fn request(args: &[OsString]) -> Result<Request> {
         return Err("Unknown paper command".into());
     }
     let mut values = BTreeMap::new();
+    let mut release = false;
     while let Some(arg) = iter.next() {
+        if arg == "--release" {
+            release = true;
+            continue;
+        }
         let key = arg.to_str().ok_or("Non-UTF8 option")?;
         if !["--repository", "--support", "--work"].contains(&key) {
             return Err(format!("Unknown option {key}").into());
@@ -503,6 +571,7 @@ fn request(args: &[OsString]) -> Result<Request> {
         operation,
         root: root.canonicalize().map_err(|e| e.to_string())?,
         values,
+        release,
     })
 }
 /// Run the explicit whole-paper command and support-required byte gate.
@@ -511,6 +580,19 @@ fn request(args: &[OsString]) -> Result<Request> {
 /// Returns a located input, subprocess, fixed-point or byte-comparison failure.
 pub fn run(args: &[OsString]) -> Result<()> {
     let req = request(args)?;
+    if req.release {
+        release::inputs(&req.root)?;
+        release::part(
+            "printed identities",
+            command_output(
+                Command::new("python3")
+                    .current_dir(&req.root)
+                    .args(["-B", "tools/paper/identities.py"])
+                    .arg(&req.root)
+                    .arg("--release"),
+            ),
+        )?;
+    }
     let work = PathBuf::from(req.values.get("--work").ok_or("Clean work area required")?);
     if !work.is_absolute() {
         return Err("Work area must be absolute".into());
@@ -521,7 +603,15 @@ pub fn run(args: &[OsString]) -> Result<()> {
         .cloned()
         .or_else(|| std::env::var_os("FTOO_ASSEMBLY_SUPPORT"))
         .ok_or("Pinned support required")?;
-    let receipt = build(&req.root, &PathBuf::from(support), &work)?;
+    let built = build(&req.root, &PathBuf::from(support), &work);
+    let receipt = if req.release {
+        release::part("paper byte gate", built)?
+    } else {
+        built?
+    };
+    if req.release {
+        return release::check(&req.root, &work, &receipt);
+    }
     if req.operation == "generate" {
         fs::create_dir_all(req.root.join("generated/paper")).map_err(|e| e.to_string())?;
         for name in ["paper.pdf", "explainer.pdf", "inputs.json"] {

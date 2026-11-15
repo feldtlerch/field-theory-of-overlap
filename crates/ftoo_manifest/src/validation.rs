@@ -75,6 +75,7 @@ pub enum RuleId {
     M062,
     M063,
     M064,
+    M065,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -95,7 +96,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 64] = [
+pub const RULES: [RuleSpec; 65] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -541,6 +542,13 @@ pub const RULES: [RuleSpec; 64] = [
         number: RuleId::M064,
         statement: "Every rendered object identity resolves through an admitted, paper-scoped or explicit provisional binding to a two-part spelling; missing bindings refuse every build, and provisional bindings refuse release.",
         scope: "Expanded paper identity output, shipped occurrence ledgers and rendered-text leak checking; enforced by reader-hooks.tex, tools/paper/identities.py and tools/paper/ledger.py through the support-required paper gate. Number-only and family locators do not mint identities.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M065,
+        statement: "Paper release requires no provisional printed identity, acceptance matching all nineteen final self-description passages, an equal PDF pair and input receipt, and layout pins that cover exactly the line-addressed hooks with matching target hashes.",
+        scope: "The paper check --release consumer conjoins existing identity, acceptance, byte and layout checks and names the failing part in one release refusal. Page acceptance and publication permission remain separate.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

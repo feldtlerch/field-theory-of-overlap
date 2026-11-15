@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "hash": "sha256",
+  "selection": "UTF-8 source bytes located by anchor and SHA256; zero-based start and exclusive end record offsets and length",
+  "invalidation": "Any later change to the identified passage bytes invalidates its reading acceptance. Unrelated changes do not.",
+  "passages": [
+    {
+      "id": 1,
+      "file": "documents/paper/parts/front.tex",
+      "start": 5034,
+      "end": 5121,
+      "sha256": "6b210cd9230c08a2fe79c439eef23e9822c186b465c1b152632117448ecbb011",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "A grading is type-checked like a dimension but carries no independent weight in a norm."
+    },
+    {
+      "id": 2,
+      "file": "documents/paper/parts/front.tex",
+      "start": 15371,
+      "end": 15581,
+      "sha256": "0a13b3add8e8ebe297ee169a623cccc1982fa7a49cc797229491010251916023",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "are two gradings, not one (\\ftag{mod:facets}): what a claim is built on is the compiler's"
+    },
+    {
+      "id": 3,
+      "file": "documents/paper/parts/partA.tex",
+      "start": 10008,
+      "end": 10041,
+      "sha256": "3a9c3b780dd766bf80e1f1e6552591513f9bba903c0a4eb742c1493c009d7bc2",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "spend set: the compiler's column)"
+    },
+    {
+      "id": 4,
+      "file": "documents/paper/parts/partE.tex",
+      "start": 3620,
+      "end": 3709,
+      "sha256": "44eafcc9ddbb09891a8c396613dad05e47519499e80cde0772f7859a8123510c",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "scale-type results --- what is run here as a type-check stands there as theorems, and the"
+    },
+    {
+      "id": 5,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 24687,
+      "end": 24709,
+      "sha256": "145a2e13eca53116c1249de6353385709663d2a30f2c8ab85b30f3410e4a4d52",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "Registers, generated &"
+    },
+    {
+      "id": 6,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 24795,
+      "end": 24874,
+      "sha256": "44385627ac903443a9d4973d1ddd43125e5db0f55730bc17c43b7dfaa9638b83",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "projections of the one registry: constants, rulings, branch prices, identities,"
+    },
+    {
+      "id": 7,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 43254,
+      "end": 43564,
+      "sha256": "88aa1815fa133ae6db78c2691da53d260caab4106bd561dcc90f76ba19acbd3d",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "The dimensioned constants the framework posts, one per scalarization --- none a fact, each a"
+    },
+    {
+      "id": 8,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 44022,
+      "end": 44102,
+      "sha256": "6e66ec5a74bc24705dca1f14cecd27ac3502cbe07719e456e819c34f61e6822e",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "The type-check keeps the price from passing as a measurement. The held weighting"
+    },
+    {
+      "id": 9,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 44374,
+      "end": 44684,
+      "sha256": "9730be4ac76fa7cdc887bb06bf55da91da665f69290a0e5a5e7c2412cdcd9c4f",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "A type system that must decide must show its decisions; a checker that smuggles theses is"
+    },
+    {
+      "id": 10,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 44771,
+      "end": 47190,
+      "sha256": "c317c9efcc6041144c80a32030b0037172f9be56f3b5bd921a0485af18074f86",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
+    },
+    {
+      "id": 11,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 52649,
+      "end": 52765,
+      "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
+    },
+    {
+      "id": 12,
+      "file": "documents/paper/parts/appendices.tex",
+      "start": 52791,
+      "end": 52879,
+      "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
+    },
+    {
+      "id": 13,
+      "file": "documents/paper/explainer/explainer.tex",
+      "start": 10283,
+      "end": 10609,
+      "sha256": "284d376bca3767ddf1fc44fb4515b26d883f65f9bcc8e1604888cf0b6f9e5900",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "takes its own medicine here: every exchange rate it uses is declared on a public"
+    },
+    {
+      "id": 14,
+      "file": "documents/paper/explainer/explainer.tex",
+      "start": 53428,
+      "end": 56121,
+      "sha256": "002068089d36e3135d0e0926bb745dcb8708930db2ef87de3ce24c476d2ba453",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "\\section{The Paper and Its Checks}"
+    },
+    {
+      "id": 15,
+      "file": "documents/paper/ftoo_typed_tools.tex",
+      "start": 38615,
+      "end": 38664,
+      "sha256": "51cab5aefcfaee849a7b9d6cf3caf1f32e5be40c2ae3aaaf23b4c7666bfbac83",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "The~constants~ledger,~generated~from~the~registry"
+    },
+    {
+      "id": 16,
+      "file": "documents/paper/ftoo_typed_tools.tex",
+      "start": 40071,
+      "end": 40151,
+      "sha256": "0b4f62fb0a03f1b225f60356c18d0e016367a8e544db913d20614bf6891fbf5e",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "The~rulings~register:~decisions~the~checker~forced,~shown,~"
+    },
+    {
+      "id": 17,
+      "file": "documents/paper/ftoo_typed_tools.tex",
+      "start": 43297,
+      "end": 43474,
+      "sha256": "7bab328a313470c51c011c4cb054e801b8fcf83d0561cccf4fb9d9dc835449ad",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "The~back-edge~and~warrant~force~are~GENERATED~from~the~recorded~"
+    },
+    {
+      "id": 18,
+      "file": "documents/paper/data/ftoo_index.tex",
+      "start": 762,
+      "end": 1180,
+      "sha256": "aea707a7c559f4e5b3548fb70866516265d93027f3a4f96c70ede948ef4752c9",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "\\noindent The paper's public vocabulary, grouped by register: 329 tags across 29"
+    },
+    {
+      "id": 19,
+      "file": "documents/paper/data/ftoo_registers.tex",
+      "start": 2269,
+      "end": 2335,
+      "sha256": "f03250258fb8c650a98c13a2c75aeff5d78229322a83f9c25bd3c8a655edfb19",
+      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "anchor": "CALIBRATION,~which~is~a~different~axis~and~is~recorded~separately."
+    }
+  ]
+}

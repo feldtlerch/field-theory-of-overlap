@@ -1,5 +1,140 @@
 use super::*;
 
+#[test]
+fn reading_acceptance_locates_bytes_and_reports_complete_faults() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    check_reading_acceptance(&root).unwrap();
+    let scratch = Scratch::new();
+    fs::create_dir_all(scratch.0.join("documents/paper-build")).unwrap();
+    let mut record = json!({"passages": (1..=19).map(|id| {
+        let (file, data) = if id == 7 { ("text.tex", "abcd") } else { ("other.tex", "safe") };
+        json!({"id":id,"file":file,"start":0,"end":4,
+            "anchor": &data[..2],"sha256":hex(&Sha256::digest(data.as_bytes())),"reading_acceptance":"accepted"})
+    }).collect::<Vec<_>>()});
+    fs::write(scratch.0.join("other.tex"), b"safe").unwrap();
+    let path = scratch
+        .0
+        .join("documents/paper-build/self-description.json");
+    save(&path, &record).unwrap();
+    fs::write(scratch.0.join("text.tex"), b"unrelated prefix abcd").unwrap();
+    check_reading_acceptance(&scratch.0).unwrap();
+    for data in [b"abXd".as_slice(), b"abcd abcd"] {
+        fs::write(scratch.0.join("text.tex"), data).unwrap();
+        let fault = check_reading_acceptance(&scratch.0).unwrap_err();
+        assert_eq!(fault, PaperFault::ReadingAcceptance { passage: 7 });
+        assert_eq!(
+            fault.to_string(),
+            "Paper passage 7: accepted bytes must occur exactly once with the recorded hash and a filled reading acceptance"
+        );
+    }
+    fs::write(scratch.0.join("text.tex"), b"abcd").unwrap();
+    record["passages"][6]["reading_acceptance"] = json!("");
+    save(&path, &record).unwrap();
+    assert_eq!(
+        check_reading_acceptance(&scratch.0),
+        Err(PaperFault::ReadingAcceptance { passage: 7 })
+    );
+    record["passages"].as_array_mut().unwrap().remove(6);
+    save(&path, &record).unwrap();
+    let fault = check_reading_acceptance(&scratch.0).unwrap_err();
+    assert_eq!(
+        fault,
+        PaperFault::PassageSet {
+            ids: (1..=19).filter(|id| *id != 7).collect()
+        }
+    );
+    assert_eq!(
+        fault.to_string(),
+        "Paper acceptance requires exactly passage ids 1 through 19; found [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]"
+    );
+}
+
+#[test]
+fn release_conjunction_refuses_each_failed_condition() {
+    let scratch = Scratch::new();
+    let root = scratch.0.join("repo");
+    let work = scratch.0.join("work");
+    fs::create_dir_all(root.join("documents/paper-build")).unwrap();
+    fs::create_dir_all(root.join("documents/paper")).unwrap();
+    fs::create_dir_all(root.join("generated/paper")).unwrap();
+    fs::create_dir_all(root.join("tools/paper")).unwrap();
+    fs::create_dir_all(&work).unwrap();
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/paper");
+    for name in ["prepare.py", "bibroute.py", "identities.py", "common.py"] {
+        fs::copy(source.join(name), root.join("tools/paper").join(name)).unwrap();
+    }
+    let record = json!({"passages": (1..=19).map(|id| json!({"id":id,"file":"text.tex",
+        "start":0,"end":4,"anchor":"ab","sha256":hex(&Sha256::digest(b"abcd")),
+        "reading_acceptance":"accepted"})).collect::<Vec<_>>()});
+    save(
+        &root.join("documents/paper-build/self-description.json"),
+        &record,
+    )
+    .unwrap();
+    fs::write(root.join("text.tex"), b"abcd").unwrap();
+    let target = root.join("documents/paper/target.tex");
+    fs::write(&target, b"target\n").unwrap();
+    fs::write(
+        root.join("documents/paper-build/reader-hooks.tex"),
+        b"{target.tex}{\\paper_rebreak:nn{1}{1}}\n",
+    )
+    .unwrap();
+    fs::write(root.join("documents/paper-build/layout-pins.toml"), format!(
+        "[[pin]]\nsite = \"fixture\"\ntarget = \"documents/paper/target.tex\"\nlines = [1, 1]\nsha256 = \"{}\"\n",
+        hex(&Sha256::digest(b"target\n")))).unwrap();
+    let ledger = json!([{"key":"e:test","spelling":"E:TEST","status":"paper"}]);
+    save(&work.join("identity-ledger.json"), &ledger).unwrap();
+    let receipt = json!({"inputs": {}});
+    save(&root.join(RECEIPT), &receipt).unwrap();
+    for (_, name) in OUTPUTS {
+        fs::write(root.join("generated/paper").join(name), b"abcd").unwrap();
+        fs::write(work.join(name), b"abcd").unwrap();
+    }
+    release::check(&root, &work, &receipt).unwrap();
+    for (part, reason) in [
+        (
+            "self-description acceptance",
+            "Paper passage 1: accepted bytes must occur exactly once with the recorded hash and a filled reading acceptance",
+        ),
+        (
+            "layout targets",
+            "command failed exit status: 1: Layout hook target differs: fixture (documents/paper/target.tex)\n",
+        ),
+        ("printed identities", "Provisional printed identity: e:test"),
+        (
+            "paper byte gate",
+            "Paper byte gate failed; generated/paper/paper.pdf: offset 2, lengths 4 / 4, window 0: expected 61626364 (\"abcd\"), actual 61625864 (\"abXd\")",
+        ),
+    ] {
+        match part {
+            "self-description acceptance" => fs::write(root.join("text.tex"), b"abXd").unwrap(),
+            "layout targets" => fs::write(&target, b"\ntarget\n").unwrap(),
+            "printed identities" => {
+                let mut changed = ledger.clone();
+                changed[0]["status"] = json!("provisional");
+                save(&work.join("identity-ledger.json"), &changed).unwrap();
+            }
+            _ => fs::write(work.join("paper.pdf"), b"abXd").unwrap(),
+        }
+        let fault = release::check(&root, &work, &receipt).unwrap_err();
+        assert_eq!(
+            fault,
+            PaperFault::Release {
+                part,
+                reason: reason.into()
+            }
+        );
+        assert_eq!(
+            fault.to_string(),
+            format!("Paper release M065 refused at {part}: {reason}")
+        );
+        fs::write(root.join("text.tex"), b"abcd").unwrap();
+        fs::write(&target, b"target\n").unwrap();
+        save(&work.join("identity-ledger.json"), &ledger).unwrap();
+        fs::write(work.join("paper.pdf"), b"abcd").unwrap();
+    }
+}
+
 struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
