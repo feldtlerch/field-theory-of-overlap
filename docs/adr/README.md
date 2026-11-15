@@ -16,7 +16,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |002|Four-axis status and declared coverage|accepted|
 |003|Tags: human-facing handles bound to labels|accepted|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
-|005|Statement units: one text per language, per-target displays|accepted|
+|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
@@ -25,3 +25,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |011|Serialization is strict everywhere|accepted|
 |012|The weld: equal address sets across a unit's texts|accepted|
 |013|Workspace norms: edition, lints, toolchain|accepted|
+|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted|
