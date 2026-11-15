@@ -116,7 +116,7 @@ fn malformed_lock_keeps_the_complete_parser_message_and_span() {
         revision::resolved(lock, EngineRevisionSource::CurrentLock),
         Ok(ftoo_manifest::ENGINE_PIN.0.into())
     );
-    let message = "TOML parse error at line 1, column 1\n  |\n1 | [\n  | ^\ninvalid table header\n";
+    let message = "TOML parse error at line 1, column 2\n  |\n1 | [\n  |  ^\nunquoted keys cannot be empty, expected letters, numbers, `-`, `_`\n";
     let actual = revision::resolved("[", EngineRevisionSource::CurrentLock).unwrap_err();
     assert_eq!(
         actual,
@@ -126,14 +126,14 @@ fn malformed_lock_keeps_the_complete_parser_message_and_span() {
             package: "nrz-cas",
             reason: EngineRevisionReason::Malformed {
                 message: message.into(),
-                span: Some(0..1)
+                span: Some(1..1)
             }
         }
     );
     assert_eq!(
         actual.to_string(),
         format!(
-            "retention provenance M061 at file \"Cargo.lock\": engine-revision-unavailable source=current-lock package=\"nrz-cas\" reason=malformed message={} span=0..1",
+            "retention provenance M061 at file \"Cargo.lock\": engine-revision-unavailable source=current-lock package=\"nrz-cas\" reason=malformed message={} span=1..1",
             serde_json::to_string(message).unwrap()
         )
     );

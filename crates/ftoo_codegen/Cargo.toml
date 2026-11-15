@@ -12,8 +12,8 @@ workspace = true
 [dependencies]
 ftoo_manifest = { path = "../ftoo_manifest" }
 ftoo_audit = { path = "../ftoo_audit" }
-toml_edit = { version = "=0.22.27", default-features = false, features = ["parse"] }
-sha2 = { version = "=0.10.9", default-features = false }
+toml_edit = { version = "=0.25.19", default-features = false, features = ["parse"] }
+sha2 = { version = "=0.11.1", default-features = false }
 serde = "=1.0.229"
 serde_json = { version = "=1.0.154", features = ["raw_value"] }
 

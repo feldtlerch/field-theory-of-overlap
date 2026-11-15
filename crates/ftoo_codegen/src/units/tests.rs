@@ -427,51 +427,31 @@ fn u02_duplicate_and_syntax_oracles() {
     let mut actual_errors = Vec::new();
     let mut expected_errors = Vec::new();
     for (text, message, range) in [
+        ("schema=1\nschema=1\n", "duplicate key", 9..15),
+        ("schema=1\n\"sche\\u006da\"=1\n", "duplicate key", 9..22),
+        ("[unit]\nid='x'\nid='y'\n", "duplicate key", 14..16),
+        ("[unit.texts]\nen='x'\nen='y'\n", "duplicate key", 20..22),
+        ("[unit]\n[unit]\n", "duplicate key", 8..12),
+        ("[unit.texts]\n[unit.texts]\n", "duplicate key", 19..24),
+        ("x={a=1,a=2}\n", "duplicate key", 7..8),
+        ("x=[{a=1,a=2}]\n", "duplicate key", 8..9),
         (
-            "schema=1\nschema=1\n",
-            "duplicate key `schema` in document root",
-            9..10,
+            "schema=1\ntrailing",
+            "key with no value, expected `=`",
+            17..17,
         ),
+        ("{} {}", "invalid key-value pair, expected key", 0..0),
         (
-            "schema=1\n\"sche\\u006da\"=1\n",
-            "duplicate key `schema` in document root",
-            9..10,
+            "x='unfinished",
+            "invalid literal string, expected `'`",
+            13..13,
         ),
-        (
-            "[unit]\nid='x'\nid='y'\n",
-            "duplicate key `id` in table `unit`",
-            14..15,
-        ),
-        (
-            "[unit.texts]\nen='x'\nen='y'\n",
-            "duplicate key `en` in table `unit.texts`",
-            20..21,
-        ),
-        (
-            "[unit]\n[unit]\n",
-            "invalid table header\nduplicate key `\"unit\"` in document root",
-            7..8,
-        ),
-        (
-            "[unit.texts]\n[unit.texts]\n",
-            "invalid table header\nduplicate key `\"texts\"` in table `unit`",
-            13..14,
-        ),
-        ("x={a=1,a=2}\n", "duplicate key `a`", 3..4),
-        ("x=[{a=1,a=2}]\n", "duplicate key `a`", 4..5),
-        ("schema=1\ntrailing", "expected `.`, `=`", 17..17),
-        ("{} {}", "invalid key", 0..1),
-        ("x='unfinished", "invalid literal string", 13..13),
         (
             "x=\"\\q\"",
-            "invalid escape sequence\nexpected `b`, `f`, `n`, `r`, `t`, `u`, `U`, `\\`, `\"`",
-            5..6,
+            "missing escaped value, expected `b`, `e`, `f`, `n`, `r`, `\\`, `\"`, `x`, `u`, `U`",
+            4..4,
         ),
-        (
-            "x=9223372036854775808",
-            "number too large to fit in target type",
-            2..3,
-        ),
+        ("x=9223372036854775808", "integer number overflowed", 2..21),
     ] {
         actual_errors.push(load(DECLARATION, text));
         expected_errors.push(Err(errors(vec![diagnostic(
@@ -744,27 +724,15 @@ fn u04_dynamic_tables_arrays_and_every_wrong_kind() {
 }
 #[test]
 fn u02_more_duplicates_and_numeric_phase_precedence() {
-    for (text, message, offset) in [
+    for (text, message, range) in [
         (
             "[unit.texts]\nen='x'\n\"\\u0065n\"='y'",
-            "duplicate key `en` in table `unit.texts`",
-            20,
+            "duplicate key",
+            20..29,
         ),
-        (
-            "unit.id='x'\n[unit]\nid='y'",
-            "invalid table header\nduplicate key `\"unit\"` in document root",
-            12,
-        ),
-        (
-            "[unknown]\nx=1\nx=2",
-            "duplicate key `x` in table `unknown`",
-            14,
-        ),
-        (
-            "schema=1.0\nschema=1",
-            "duplicate key `schema` in document root",
-            11,
-        ),
+        ("unit.id='x'\n[unit]\nid='y'", "duplicate key", 13..17),
+        ("[unknown]\nx=1\nx=2", "duplicate key", 14..15),
+        ("schema=1.0\nschema=1", "duplicate key", 11..17),
     ] {
         assert_fault(
             DECLARATION,
@@ -777,7 +745,7 @@ fn u02_more_duplicates_and_numeric_phase_precedence() {
                 location(
                     "units/statements/one.toml",
                     &[],
-                    SourceAnchor::Bytes(offset, offset + 1),
+                    SourceAnchor::Bytes(range.start, range.end),
                 ),
                 UnitFault::TomlSyntax {
                     message: message.to_owned(),
@@ -861,7 +829,7 @@ fn u09_empty_literals_implicit_tables_and_decoded_unicode() {
             location(
                 "units/statements/one.toml",
                 &["unit"],
-                SourceAnchor::WholeFile,
+                SourceAnchor::Parent(9, 13),
             ),
             UnitFault::MissingField {
                 name: "id".to_owned(),
@@ -1006,7 +974,8 @@ fn u15_actual_missing_language_unknown_field_duplicate_and_float() {
         )],
     );
     let text = INLINE.replace("en='Text.'", "en='Text.',\"\\u0065n\"='Again.'");
-    let start = text.find("en=").unwrap();
+    let duplicate = "\"\\u0065n\"";
+    let start = text.find(duplicate).unwrap();
     fixture.tamper(
         &text,
         vec![diagnostic(
@@ -1017,10 +986,10 @@ fn u15_actual_missing_language_unknown_field_duplicate_and_float() {
             location(
                 "units/statements/one.toml",
                 &[],
-                SourceAnchor::Bytes(start, start + 1),
+                SourceAnchor::Bytes(start, start + duplicate.len()),
             ),
             UnitFault::TomlSyntax {
-                message: "duplicate key `en`".to_owned(),
+                message: "duplicate key".to_owned(),
             },
         )],
     );
@@ -1212,7 +1181,7 @@ fn u15_actual_duplicate_unit_and_two_missing_translations() {
 }
 #[test]
 fn u02_bounded_recursion_and_quote_aware_control() {
-    let text = format!("x={}0{}", "[".repeat(80), "]".repeat(80));
+    let text = format!("x={}0{}", "[".repeat(81), "]".repeat(81));
     assert_fault(
         DECLARATION,
         &text,
@@ -1224,14 +1193,14 @@ fn u02_bounded_recursion_and_quote_aware_control() {
             location(
                 "units/statements/one.toml",
                 &[],
-                SourceAnchor::Bytes(81, 82),
+                SourceAnchor::Bytes(82, 83),
             ),
             UnitFault::TomlSyntax {
-                message: "recursion limit exceeded".to_owned(),
+                message: "cannot recurse further; max recursion depth met".to_owned(),
             },
         ),
     );
-    let text = format!("x={}0{}", "[".repeat(79), "]".repeat(79));
+    let text = format!("x={}0{}", "[".repeat(80), "]".repeat(80));
     assert_fault(
         DECLARATION,
         &text,
@@ -1628,9 +1597,9 @@ fn u09_global_phase_order_and_reordered_source_names() {
         UnitStage::Syntax,
         None,
         None,
-        location("z.toml", &[], SourceAnchor::Bytes(0, 1)),
+        location("z.toml", &[], SourceAnchor::Bytes(0, 0)),
         UnitFault::TomlSyntax {
-            message: "invalid key".to_owned(),
+            message: "invalid key-value pair, expected key".to_owned(),
         },
     );
     assert_eq!(

@@ -1313,7 +1313,7 @@ fn retired_documentary_citation_keeps_the_complete_event_and_restores() {
                 site: UnitSite {
                     file: "fixture-registry.toml".into(),
                     path: vec![PathPart::Key("events".into()), PathPart::Index(1)],
-                    anchor: SourceAnchor::Bytes(live.len(), retired.len() - 1),
+                    anchor: SourceAnchor::Bytes(live.len(), live.len() + "[[events]]".len()),
                     decoded: None,
                     occurrence: None,
                 },

@@ -2056,7 +2056,7 @@ fn native_preflight_faults_restore_and_never_execute() {
         files: BTreeMap::from([
             (
                 "SHA256SUM".into(),
-                format!("{:x}", Sha256::digest(digest.as_bytes())),
+                crate::hex(&Sha256::digest(digest.as_bytes())),
             ),
             ("font.otf".into(), A.into()),
             ("package.sty".into(), A.into()),

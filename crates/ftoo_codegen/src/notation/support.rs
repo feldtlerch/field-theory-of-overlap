@@ -759,7 +759,7 @@ pub(super) fn hash(file: &Path) -> Result<String> {
             &io::ErrorKind::InvalidData.into(),
         ));
     }
-    Ok(format!("{:x}", sha.finalize()))
+    Ok(crate::hex(&sha.finalize()))
 }
 fn check_hash(file: &Path, expected: &str) -> Result<()> {
     let actual = hash(file)?;

@@ -33,10 +33,10 @@ fn intervening_and_inflight_consumers_invalidate_shared_observation()
     fs::write(directory.0.join("bundle/SHA256SUM"), &digest)?;
     let lock = native_support::Lock {
         source: None,
-        engine: format!("{:x}", Sha256::digest(engine)),
+        engine: crate::hex(&Sha256::digest(engine)),
         files: BTreeMap::from([(
             "SHA256SUM".into(),
-            format!("{:x}", Sha256::digest(digest.as_bytes())),
+            crate::hex(&Sha256::digest(digest.as_bytes())),
         )]),
         bundle_digest: digest,
     };
@@ -475,7 +475,7 @@ fn support_required_native_identity_mutations_poison_and_close_discards_results(
     crate::support_bracket::mutation::write(directory.0.join("bundle/SHA256SUM"), &digest)?;
     let path = directory.0.join("bundle/member");
     crate::support_bracket::mutation::write(&path, b"a")?;
-    let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    let hash = |bytes: &[u8]| crate::hex(&Sha256::digest(bytes));
     let lock = native_support::Lock {
         source: None,
         engine: hash(b"a"),
@@ -728,7 +728,7 @@ fn support_required_format_state_fault_poison_discards_provisional_results_and_n
         .unwrap();
     let digest = "d".repeat(64);
     crate::support_bracket::mutation::write(directory.0.join("bundle/SHA256SUM"), &digest).unwrap();
-    let hash = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    let hash = |bytes: &[u8]| crate::hex(&Sha256::digest(bytes));
     let lock = Lock {
         source: None,
         engine: hash(b"engine"),

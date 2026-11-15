@@ -1,11 +1,11 @@
 //! Whole-pair fixed point and exact delivered-byte gate for the paper and explainer.
 mod registry;
 mod release;
+use crate::hex;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
-use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -137,13 +137,6 @@ fn save(path: &Path, data: &Value) -> Result<()> {
     let mut output = serde_json::to_vec_pretty(data).map_err(|e| e.to_string())?;
     output.push(b'\n');
     fs::write(path, output).map_err(|e| PaperFault::Input(format!("{}: {e}", path.display())))
-}
-fn hex(data: &[u8]) -> String {
-    let mut out = String::new();
-    for byte in data {
-        let _ = write!(out, "{byte:02x}");
-    }
-    out
 }
 fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
     value[key]

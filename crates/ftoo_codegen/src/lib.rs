@@ -34,3 +34,13 @@ mod tests;
 pub use artifact::{
     ByteGateFault, IoOperation, ProjectionCheckError, check_projection, generate_projection,
 };
+
+/// Lower-case hexadecimal spelling of a byte string, as digests are recorded.
+pub(crate) fn hex(data: &[u8]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::with_capacity(data.len() * 2);
+    for byte in data {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}

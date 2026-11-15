@@ -156,8 +156,8 @@ fn support_required_bracket_identity_mutations_poison_and_restore() {
                 Some(Err(NotationAdapterFault::Integrity(
                     SupportIntegrityFault::DigestMismatch {
                         file: path.clone(),
-                        expected: format!("{:x}", Sha256::digest(&bytes)),
-                        actual: format!("{:x}", Sha256::digest(&changed)),
+                        expected: crate::hex(&Sha256::digest(&bytes)),
+                        actual: crate::hex(&Sha256::digest(&changed)),
                     }
                 )))
             );
@@ -213,8 +213,8 @@ fn support_required_bracket_failed_close_discards_results_and_memo() {
     );
     let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
         file: path.clone(),
-        expected: format!("{:x}", Sha256::digest(&bytes)),
-        actual: format!("{:x}", Sha256::digest(b"changed after final request")),
+        expected: crate::hex(&Sha256::digest(&bytes)),
+        actual: crate::hex(&Sha256::digest(b"changed after final request")),
     });
     assert_eq!(support.closing_hash(), Some(Err(expected.clone())));
     let NotationRenderError::Adapter(error) = result.unwrap_err() else {
@@ -480,8 +480,8 @@ fn support_required_warm_sweep_still_checks_changed_and_restored_package_bytes()
     altered.push(b'\n');
     let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
         file: path.clone(),
-        expected: format!("{:x}", Sha256::digest(&bytes)),
-        actual: format!("{:x}", Sha256::digest(&altered)),
+        expected: crate::hex(&Sha256::digest(&bytes)),
+        actual: crate::hex(&Sha256::digest(&altered)),
     });
     crate::support_bracket::mutation::write(&path, &altered).unwrap();
     assert_eq!(fs::read(&path).unwrap(), altered);
@@ -509,8 +509,8 @@ fn support_required_batch_protocol_post_request_full_hash_refuses_mutation_and_r
     changed.push(b'\n');
     let expected = NotationAdapterFault::Integrity(SupportIntegrityFault::DigestMismatch {
         file: support.entry.clone(),
-        expected: format!("{:x}", Sha256::digest(&bytes)),
-        actual: format!("{:x}", Sha256::digest(&changed)),
+        expected: crate::hex(&Sha256::digest(&bytes)),
+        actual: crate::hex(&Sha256::digest(&changed)),
     });
     let before = observed_identity(&support.entry);
     let mut after = None;
@@ -2850,9 +2850,9 @@ fn support_required_external_markdown_and_links_do_not_change_either_source_inve
         digest.update(Sha256::digest(&source.bytes));
     }
     eprintln!(
-        "RUST_SOURCE_INVENTORY {} {:x}",
+        "RUST_SOURCE_INVENTORY {} {}",
         before.sources().len(),
-        digest.finalize()
+        crate::hex(&digest.finalize())
     );
 }
 

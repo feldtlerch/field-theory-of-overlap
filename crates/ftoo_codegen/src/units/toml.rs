@@ -4,7 +4,7 @@ use ftoo_manifest::{
     ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitFault, UnitSite, UnitStage,
 };
 use std::{collections::BTreeMap, ops::Range};
-use toml_edit::{ImDocument, Item, TableLike, Value};
+use toml_edit::{Document, Item, TableLike, Value};
 
 pub(crate) struct Node {
     pub site: UnitSite,
@@ -73,7 +73,7 @@ pub(crate) fn parse_array_bounded(
     key: &str,
     limit: usize,
 ) -> Result<Result<Node, UnitSite>, Box<UnitDiagnostic>> {
-    let document = ImDocument::parse(text).map_err(|e| {
+    let document = Document::parse(text).map_err(|e| {
         let mut location = site(file);
         location.anchor = e.span().map_or(SourceAnchor::Unavailable, |r| {
             SourceAnchor::Bytes(r.start, r.end)

@@ -632,7 +632,7 @@ pub(super) fn lock(root: &Path) -> Result<Lock> {
     Ok(Lock {
         source: Some((
             fs::canonicalize(&path).map_err(|e| io_error(NativeOperation::Inspect, &path, &e))?,
-            format!("{:x}", Sha256::digest(&source.bytes)),
+            crate::hex(&Sha256::digest(&source.bytes)),
         )),
         engine,
         files,
@@ -720,7 +720,7 @@ fn hash_file(path: &Path, mut file: fs::File) -> Result<String> {
             actual: Some((&after).into()),
         });
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(crate::hex(&hasher.finalize()))
 }
 fn list(root: &Path, relative: &str, output: &mut Vec<String>) -> Result<()> {
     let directory = root.join(relative);

@@ -6,7 +6,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     use sha2::{Digest, Sha256};
     let old = include_str!("../../../tests/fixtures/native/historical-en.tex");
     assert_eq!(
-        format!("{:x}", Sha256::digest(old.as_bytes())),
+        crate::hex(&Sha256::digest(old.as_bytes())),
         "b0e2d86f4052058e5dab8d26fc50b87aafc2e24dc6518a7f19ebc2ebbd5de338"
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

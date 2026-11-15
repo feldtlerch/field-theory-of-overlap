@@ -161,11 +161,11 @@ fn companion_source_phases_suppress_later_skeleton_and_display_faults() {
     }
     let text = "schema=1\nschema=1\n";
     let expected = boundary(
-        location(&[], SourceAnchor::Bytes(9, 10)),
+        location(&[], SourceAnchor::Bytes(9, 15)),
         RuleId::M002,
         UnitStage::Syntax,
         UnitFault::TomlSyntax {
-            message: "duplicate key `schema` in document root".into(),
+            message: "duplicate key".into(),
         },
     );
     assert_eq!(sources(text).unwrap_err(), expected);

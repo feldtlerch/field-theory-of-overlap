@@ -263,9 +263,9 @@ fn native_lock_metadata_faults_keep_literal_sites_and_restore() {
         let source = original.replacen("schema=1\n", &format!("schema=1\n{duplicate}=1\n"), 1);
         check(
             &source,
-            literal(&[], 9..10),
+            literal(&[], 9..9 + duplicate.len()),
             NativeMetadataReason::Boundary(UnitFault::TomlSyntax {
-                message: "duplicate key `schema` in document root".into(),
+                message: "duplicate key".into(),
             }),
         );
     }
@@ -687,18 +687,10 @@ fn every_skeleton_table_refuses_missing_and_extra_fields_and_restores() {
 #[test]
 fn skeleton_syntax_precedes_unknown_fields_and_variants_globally() {
     for (source, message, bytes) in [
-        (
-            "schema=1\nschema=1\n",
-            "duplicate key `schema` in document root",
-            9..10,
-        ),
-        (
-            "schema=1\n\"schema\"=1\n",
-            "duplicate key `schema` in document root",
-            9..10,
-        ),
-        ("x={a=1,a=2}\n", "duplicate key `a`", 3..4),
-        ("x=[{a=1,a=2}]\n", "duplicate key `a`", 4..5),
+        ("schema=1\nschema=1\n", "duplicate key", 9..15),
+        ("schema=1\n\"schema\"=1\n", "duplicate key", 9..17),
+        ("x={a=1,a=2}\n", "duplicate key", 7..8),
+        ("x=[{a=1,a=2}]\n", "duplicate key", 8..9),
     ] {
         let good = b"schema=1\nskeleton={document='main',sections=[]}\n".to_vec();
         let mut sources = vec![

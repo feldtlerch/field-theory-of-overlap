@@ -63,13 +63,13 @@ fn documentary_unknown_and_duplicate_fields_restore_and_reread() {
     }
     let changed = format!("{LEDGER}handle = \"other\"\n");
     let mut site = input::site(FILE);
-    site.anchor = SourceAnchor::Bytes(LEDGER.len(), LEDGER.len() + 1);
+    site.anchor = SourceAnchor::Bytes(LEDGER.len(), LEDGER.len() + "handle".len());
     let expected = fault(
         RuleId::M002,
         UnitStage::Syntax,
         site,
         UnitFault::TomlSyntax {
-            message: "duplicate key `handle` in table `events`".into(),
+            message: "duplicate key".into(),
         },
     );
     std::fs::write(&path, &changed).unwrap();
@@ -284,7 +284,7 @@ fn documentary_exclusive_fields_and_tokens_restore() {
             UnitSite {
                 file: FILE.into(),
                 path: vec![PathPart::Key("events".into()), PathPart::Index(0)],
-                anchor: SourceAnchor::Parent(11, changed.trim_end().len()),
+                anchor: SourceAnchor::Parent(11, 11 + "[[events]]".len()),
                 decoded: None,
                 occurrence: None,
             },
@@ -367,7 +367,7 @@ fn documentary_ledger_checks_first_event_fields_and_production_admissions() {
         UnitSite {
             file: FILE.into(),
             path: vec![PathPart::Key("events".into()), PathPart::Index(0)],
-            anchor: SourceAnchor::Bytes(11, LEDGER.len() - 1),
+            anchor: SourceAnchor::Bytes(11, 11 + "[[events]]".len()),
             decoded: None,
             occurrence: None,
         }
@@ -543,7 +543,7 @@ fn documentary_encoding_duplicates_bounds_and_missing_file_refuse_exactly() {
             UnitFault::Bom,
         ),
     );
-    where_.anchor = SourceAnchor::Bytes(9, 10);
+    where_.anchor = SourceAnchor::Bytes(9, 15);
     assert_refusal(
         load(&source("schema=1\nschema=1\n")),
         fault(
@@ -551,7 +551,7 @@ fn documentary_encoding_duplicates_bounds_and_missing_file_refuse_exactly() {
             UnitStage::Syntax,
             where_,
             UnitFault::TomlSyntax {
-                message: "duplicate key `schema` in document root".into(),
+                message: "duplicate key".into(),
             },
         ),
     );
