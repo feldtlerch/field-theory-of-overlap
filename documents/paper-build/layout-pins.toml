@@ -1,0 +1,141 @@
+# Source files addressed by line in reader-hooks.tex. Each pin names the addressed lines and the
+# SHA256 of the file that holds them, so any change to that file refuses preparation until the hook
+# lines are rechecked and the pin is renewed.
+
+[[pin]]
+site = "paragraph-front-138-144"
+target = "documents/paper/parts/front.tex"
+lines = [138, 144]
+sha256 = "ecefe970be164c3005a1e947ff8a05127d986f2c2449d1f781ff304faf00a8b2"
+
+[[pin]]
+site = "paragraph-front-161-180"
+target = "documents/paper/parts/front.tex"
+lines = [161, 180]
+sha256 = "ecefe970be164c3005a1e947ff8a05127d986f2c2449d1f781ff304faf00a8b2"
+
+[[pin]]
+site = "paragraph-partA-481-492"
+target = "documents/paper/parts/partA.tex"
+lines = [481, 492]
+sha256 = "30e74040f7a980daf12f59d9c8a2cf1259610ec48460b71429054ccef4b9dc19"
+
+[[pin]]
+site = "paragraph-partB-71-80"
+target = "documents/paper/parts/partB.tex"
+lines = [71, 80]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "paragraph-partB-201-204"
+target = "documents/paper/parts/partB.tex"
+lines = [201, 204]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "paragraph-partB-544-551"
+target = "documents/paper/parts/partB.tex"
+lines = [544, 551]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "paragraph-partB-591-594"
+target = "documents/paper/parts/partB.tex"
+lines = [591, 594]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "paragraph-partB-699-704"
+target = "documents/paper/parts/partB.tex"
+lines = [699, 704]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "paragraph-partD-143-146"
+target = "documents/paper/parts/partD.tex"
+lines = [143, 146]
+sha256 = "17a3b822cbf88923b05cd28c84e7544175e2e8dddae613a396fd42cf6ceac0fe"
+
+[[pin]]
+site = "paragraph-partE-123-131"
+target = "documents/paper/parts/partE.tex"
+lines = [123, 131]
+sha256 = "e3ec12b227c9983170ee957f7c70d73e839680dc74c511acf72d3b7ed0fa801c"
+
+[[pin]]
+site = "paragraph-partF-144-152"
+target = "documents/paper/parts/partF.tex"
+lines = [144, 152]
+sha256 = "ca85d17bf2d57053e6259d049bf10ab9aad2bf7efb8a3e1580feb94f53fde18a"
+
+[[pin]]
+site = "paragraph-partF-251-263"
+target = "documents/paper/parts/partF.tex"
+lines = [251, 263]
+sha256 = "ca85d17bf2d57053e6259d049bf10ab9aad2bf7efb8a3e1580feb94f53fde18a"
+
+[[pin]]
+site = "paragraph-partG-81-84"
+target = "documents/paper/parts/partG.tex"
+lines = [81, 84]
+sha256 = "a6eef59fe8fffd302e4de5c53e325bc43439b53de181cd207c0a00fe28466269"
+
+[[pin]]
+site = "paragraph-appendices-1040-1045"
+target = "documents/paper/parts/appendices.tex"
+lines = [1040, 1045]
+sha256 = "dbd81e146c8183efb85bfd69ba465eeeb737b23eb58bbdb17b5dd8685443f710"
+
+[[pin]]
+site = "paragraph-explainer-592-592"
+target = "documents/paper/explainer/explainer.tex"
+lines = [592, 592]
+sha256 = "cb773f4e64c9a38c25b78367a95280ad7537a873052707acca11ac6e083db737"
+
+[[pin]]
+site = "paragraph-explainer-633-633"
+target = "documents/paper/explainer/explainer.tex"
+lines = [633, 633]
+sha256 = "cb773f4e64c9a38c25b78367a95280ad7537a873052707acca11ac6e083db737"
+
+[[pin]]
+site = "paragraph-explainer-826-826"
+target = "documents/paper/explainer/explainer.tex"
+lines = [826, 826]
+sha256 = "cb773f4e64c9a38c25b78367a95280ad7537a873052707acca11ac6e083db737"
+
+[[pin]]
+site = "paragraph-explainer-930-930"
+target = "documents/paper/explainer/explainer.tex"
+lines = [930, 930]
+sha256 = "cb773f4e64c9a38c25b78367a95280ad7537a873052707acca11ac6e083db737"
+
+[[pin]]
+site = "heading-break-partB-591"
+target = "documents/paper/parts/partB.tex"
+lines = [591, 591]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "grade-gap-partC-25"
+target = "documents/paper/parts/partC.tex"
+lines = [25, 25]
+sha256 = "9b1fe2d0b67c87523bb0ed9707121aba20df16093db723c03ab9c7bbb4552e7c"
+
+[[pin]]
+site = "alignment-partA-686"
+target = "documents/paper/parts/partA.tex"
+lines = [686, 686]
+sha256 = "30e74040f7a980daf12f59d9c8a2cf1259610ec48460b71429054ccef4b9dc19"
+
+[[pin]]
+site = "alignment-partB-40"
+target = "documents/paper/parts/partB.tex"
+lines = [40, 40]
+sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
+
+[[pin]]
+site = "alignment-partD-22"
+target = "documents/paper/parts/partD.tex"
+lines = [22, 22]
+sha256 = "17a3b822cbf88923b05cd28c84e7544175e2e8dddae613a396fd42cf6ceac0fe"

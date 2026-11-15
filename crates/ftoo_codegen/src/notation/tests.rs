@@ -2864,10 +2864,26 @@ fn committed_adapter_and_ci_pins_are_fixed() {
     assert!(ci.contains("name: bounded smoke — support-dependent suites require the full battery"));
     assert!(ci.contains("test --workspace --locked -- --skip support_required"));
     assert!(ci.contains("unshare --user --map-root-user --net"));
-    assert!(!ci.contains("FTOO_NOTATION_SUPPORT"));
-    assert!(!ci.contains("FTOO_ASSEMBLY_SUPPORT"));
-    assert!(!ci.contains("prepare-native.py"));
-    assert!(!ci.contains("npm ci"));
+    let workflows = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.github/workflows");
+    for entry in std::fs::read_dir(workflows).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
+        let workflow = std::fs::read_to_string(&path).unwrap();
+        for forbidden in [
+            "FTOO_NOTATION_SUPPORT",
+            "FTOO_ASSEMBLY_SUPPORT",
+            "prepare-native.py",
+            "npm ci",
+        ] {
+            assert!(
+                !workflow.contains(forbidden),
+                "{} contains {forbidden}",
+                path.display()
+            );
+        }
+    }
     let script = include_str!("../../../../tools/notation/check.cjs");
     assert!(script.contains("require(entry)"));
     assert!(script.contains("throwOnError: true, strict: 'error', trust: false"));

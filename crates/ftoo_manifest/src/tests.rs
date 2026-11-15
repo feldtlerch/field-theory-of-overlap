@@ -547,7 +547,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
-        M061, M062, M063,
+        M061, M062, M063, M064,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -556,7 +556,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
-            M057, M058, M059, M060, M061, M062, M063
+            M057, M058, M059, M060, M061, M062, M063, M064
         ]
     );
     for rule in RULES {
@@ -566,7 +566,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
-            | M058 | M059 | M060 | M061 | M062 | M063 => RuleState::Enforced,
+            | M058 | M059 | M060 | M061 | M062 | M063 | M064 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
         };
@@ -627,7 +627,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 63);
+    assert_eq!(RULES.len(), 64);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -707,7 +707,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        54
+        55
     );
     assert_eq!(
         RULES
@@ -1068,4 +1068,26 @@ fn m015_awaiting_claim_prevents_complete_even_outside_slice() -> TestResult {
         crate::Disposition::Incomplete,
     );
     Ok(())
+}
+
+#[test]
+fn paper_rule_consumers_are_explicit() {
+    assert_eq!(
+        RULES[62..64]
+            .iter()
+            .map(|r| (r.number, r.scope, r.state))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                RuleId::M063,
+                "The paper's tag lookup with 329 paper spellings, 87 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
+                RuleState::Enforced
+            ),
+            (
+                RuleId::M064,
+                "Expanded paper identity output, shipped occurrence ledgers and rendered-text leak checking; enforced by reader-hooks.tex, tools/paper/identities.py and tools/paper/ledger.py through the support-required paper gate. Number-only and family locators do not mint identities.",
+                RuleState::Enforced
+            ),
+        ]
+    );
 }

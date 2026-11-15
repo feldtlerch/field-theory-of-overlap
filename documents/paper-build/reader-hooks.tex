@@ -1,0 +1,204 @@
+% Lookup alters glyph arguments only; delayed writes survive only shipped boxes.
+\edef\PaperRestoreAt{\catcode64=\the\catcode64\relax}
+\makeatletter
+\ExplSyntaxOn
+\prop_new:N \g_paper_spelling_prop
+\prop_new:N \g_paper_status_prop
+\tl_new:N \l_paper_key_tl
+\tl_new:N \l_paper_spelling_tl
+\tl_new:N \l_paper_site_tl
+\tl_new:N \l_paper_kind_tl
+\box_new:N \l_paper_new_box
+\bool_new:N \l_paper_whole_itself_bool
+\bool_new:N \l_paper_ledger_bool
+\AddToHook{env/table/end}{
+  \bool_if:NT\l_paper_whole_itself_bool{\hyphenation{it-self}}}
+\tl_set:Nn \l_paper_kind_tl {identity}
+\AddToHook{cmd/@starttoc/before}{\tl_set:Nn\l_paper_kind_tl{contents}}
+\AddToHook{cmd/@starttoc/after}{\tl_set:Nn\l_paper_kind_tl{identity}}
+\newwrite\PaperLedger
+\immediate\openout\PaperLedger=\jobname.identities
+\NewDocumentCommand\PaperBinding{mmm}{
+  \prop_gput:Nnn \g_paper_spelling_prop {#1}{#2}
+  \prop_gput:Nnn \g_paper_status_prop {#1}{#3}}
+\input{reader-lookup.tex}
+\cs_generate_variant:Nn \prop_item:Nn {NV}
+\cs_generate_variant:Nn \regex_match:nnTF {nV}
+\cs_new_protected:Npn \paper_resolve:n #1 {
+  \tl_set:Nx \l_paper_key_tl {#1}
+  \tl_trim_spaces:N \l_paper_key_tl
+  \prop_get:NVNTF \g_paper_spelling_prop \l_paper_key_tl \l_paper_spelling_tl
+    {}{\PackageError{paper}{M064:~Missing~printed~identity~\l_paper_key_tl}{Supply~an~explicit~review~binding.}}
+}
+\cs_new_protected:Npn \paper_record:nn #1#2 {
+  \protected@write\PaperLedger{}{
+    \jobname|\thepage|#1|#2|\l_paper_spelling_tl|
+    \prop_item:NV \g_paper_status_prop \l_paper_key_tl|
+    \CurrentFilePath/\CurrentFile\c_colon_str\the\inputlineno}
+}
+\cs_new_eq:NN \paper_font:n \ftoo_tagfont:n
+\cs_new_eq:NN \paper_ref_font:n \ftoo_tagfont_ref:n
+\cs_new_protected:Npn \paper_ink:N #1 {
+  \mode_if_vertical:T{\leavevmode}
+  \exp_args:NVV\str_if_eq:nnTF\l_paper_key_tl\l_paper_spelling_tl
+    {#1{\paper_record:nn{\l_paper_kind_tl}{\l_paper_key_tl}\tl_use:N\l_paper_spelling_tl}}
+    {\hbox_set:Nn\l_paper_new_box{#1{\paper_record:nn{\l_paper_kind_tl}{\l_paper_key_tl}\tl_use:N\l_paper_spelling_tl}}
+     \box_use_drop:N\l_paper_new_box}}
+\cs_set_protected:Npn \ftoo_tagfont:n #1 {
+  \group_begin: \paper_resolve:n{#1}
+  \tl_if_eq:NnT\l_paper_kind_tl{identity}{
+    \regex_match:nVTF{\A tbl:}\l_paper_key_tl{\tl_set:Nn\l_paper_kind_tl{caption}}{}}
+  \paper_ink:N\paper_font:n\group_end:}
+\cs_set_protected:Npn \ftoo_tagfont_ref:n #1 {
+  \group_begin: \paper_resolve:n{#1}
+  \paper_ink:N\paper_ref_font:n\group_end:}
+% Family mentions describe a class, not an object binding.
+\cs_set_protected:Npn \ftoo_tag_glob:n #1 {\paper_ref_font:n{#1}}
+\AddToHook{file/ftoo_index.tex/before}{\tl_set:Nn\l_paper_kind_tl{index}}
+\AddToHook{file/ftoo_index.tex/after}{\tl_set:Nn\l_paper_kind_tl{identity}}
+\AddToHook{file/econ_membrane.tex/after}{
+  \RenewDocumentCommand\ftooBoxFoot{m}{
+    \tl_if_blank:eF{#1}{\par\medskip\hfill{\footnotesize
+      \group_begin:\paper_resolve:n{#1}
+      \paper_record:nn{footer}{\l_paper_key_tl}
+      \textsc{\l_paper_spelling_tl}\group_end:}}}
+  \tl_set:No\l_tmpa_tl{\GenerateConcordanceE}
+  \regex_match:nVTF{\c{thisstopsat}\c{\\}}\l_tmpa_tl
+    {\regex_replace_once:nnN{\c{thisstopsat}\c{\\}}
+       {\c{PaperStopsAt}\c{\\}}\l_tmpa_tl
+     \cs_set:Npx\GenerateConcordanceE{\exp_not:V\l_tmpa_tl}}
+    {\PackageError{paper}{M064:~Concordance~output~hook~differs}{Check~the~concordance~output~boundary.}}}
+% These typed-layer table fields contain bare identities, not reference commands.
+\AddToHook{file/ftoo_typed_tools.tex/after}{
+  \cs_set_protected:Npn\__ftoo_breakage_row:nnnn#1#2#3#4{
+    \PaperRaw{#1}&\PaperRaw{#2}&\PaperRaw{#3}&\PaperRaw{#4}\\}
+  \cs_set_protected:Npn\ftoo_evidence_side:nn#1#2{
+    \ftoo_evidence_check:nn{#1}{#2}
+    \group_begin:\tl_set:Nx\l_tmpa_tl{\ftoo_evidence_name:n{#2}}
+    \paper_font:n{\exp_args:NV\PaperRaw\l_tmpa_tl}\group_end:}
+}
+\AddToHook{file/ftoo_registers.tex/after}{
+  \prop_map_inline:Nn\g__ftoo_const_trades_prop{
+    \prop_gput:Nnn\g__ftoo_const_trades_prop{#1}{\PaperRaw{#2}}}
+  \prop_map_inline:Nn\g__ftoo_const_site_prop{
+    \prop_gput:Nnn\g__ftoo_const_site_prop{#1}{\PaperRaw{#2}}}}
+\NewDocumentCommand\PaperWarning{}{\hbox{\ooalign{\hfil\raisebox{.08ex}{\scriptsize!}\hfil\cr\ensuremath{\triangle}\cr}}\kern.15em}
+\NewDocumentCommand\PaperRaw{m}{
+  \group_begin:\tl_set:Nn\l_tmpa_tl{#1}
+  \tl_replace_all:Nnn\l_tmpa_tl{⚠}{\PaperWarning}
+  \regex_replace_all:nnN{([A-Za-z][-A-Za-z0-9_]*(:[-A-Za-z0-9_]+)+)}
+    {\c{PaperLiteral}\cB\{\1\cE\}}\l_tmpa_tl
+  % Emit outside the scratch group so bibliography punctuation state survives.
+  \exp_args:NNV\group_end:\use:n\l_tmpa_tl}
+\NewDocumentCommand\PaperStopsAt{}{\expandafter\PaperRaw\expandafter{\thisstopsat}}
+\NewDocumentCommand\PaperLiteral{m}{
+  \group_begin:\paper_resolve:n{#1}\paper_record:nn{literal}{\l_paper_key_tl}
+  \tl_use:N\l_paper_spelling_tl\group_end:}
+\DeclareFieldFormat{note}{
+  \ifboolexpr{test{\iffieldequalstr{entrykey}{a:kamenica}} or
+              test{\iffieldequalstr{entrykey}{a:grossmanstiglitz}}}
+    {#1}{\PaperRaw{#1}}\isdot}
+\NewDocumentCommand\PaperTitleLocator{m}{
+  \group_begin:\tl_set:Nx\l_paper_key_tl{#1}\tl_clear:N\l_paper_spelling_tl
+  \paper_record:nn{title-locator}{\l_paper_key_tl}\group_end:}
+\AddToHook{begindocument/end}{
+  % The companion already supplies the page abbreviation.
+  \cs_if_exist:NT\papercref{
+    \NewCommandCopy\PaperPageRef\zcpageref
+    \RenewDocumentCommand\zcpageref{m}{\PaperPageRef[noname]{#1}}}
+  % Anchor these labels inside their shipped box or item.
+  \cs_if_exist:NT\ftoolabel{
+  \NewCommandCopy\PaperLabel\ftoolabel
+  \cs_new_protected:Npn\paper_anchor_label:n#1{
+    \leavevmode\phantomsection\PaperLabel{#1}\ignorespaces}
+  \RenewDocumentCommand\ftoolabel{m}{
+    \str_case:nn{#1}{
+      {tbl:ledger}{\zcsetup{reftype=table}}
+      {tbl:rulings}{\zcsetup{reftype=table}}
+      {tbl:branches}{\zcsetup{reftype=table}}
+      {tbl:equivalences}{\zcsetup{reftype=table}}
+      {tbl:ev}{\zcsetup{reftype=table}}}
+    \bool_if:NT\l_paper_ledger_bool{\zcsetup{reftype=table}}
+    \exp_args:Ne\str_case:nnF{#1}{
+      {e:license}{\paper_anchor_label:n{#1}}
+      {e:extself}{\paper_anchor_label:n{#1}}
+      {nrm:incl-expo}{\paper_anchor_label:n{#1}}
+      {e:hayek}{\paper_anchor_label:n{#1}}
+      {B:salience}{\paper_anchor_label:n{#1}}}
+      {\PaperLabel{#1}}}}
+  % Local column padding keeps the rests table and its following footer together.
+  \cs_if_exist:NT\captiontag{
+    \NewCommandCopy\PaperCaptionTag\captiontag
+    \RenewDocumentCommand\captiontag{mm}{
+      \str_if_eq:nnT{#2}{tbl:W:rests}{\setlength\tabcolsep{4pt}}
+      \str_if_eq:nnT{#2}{tbl:verify}{
+        \bool_set_true:N\l_paper_whole_itself_bool\hyphenation{itself}}
+      \PaperCaptionTag{#1}{#2}}}
+  \cs_if_exist:NT\virtue{
+    \NewCommandCopy\PaperVirtue\virtue
+    \RenewDocumentCommand\virtue{m}{\PaperVirtue{#1}\PaperTitleLocator{v:#1}}}
+  \cs_if_exist:NT\ftoo_virtue_link:n{
+    \cs_new_eq:NN\paper_virtue_link:n\ftoo_virtue_link:n
+    \cs_set_protected:Npn\ftoo_virtue_link:n#1{\paper_virtue_link:n{#1}\PaperTitleLocator{v:#1}}}
+  \cs_if_exist:NT\papervirtue{
+    \NewCommandCopy\PaperCompanionVirtue\papervirtue
+    \RenewDocumentCommand\papervirtue{m}{\PaperCompanionVirtue{#1}\PaperTitleLocator{FTOO-v:#1}}}
+  \NewCommandCopy\PaperTexttt\texttt
+  \RenewDocumentCommand\texttt{m}{
+    \group_begin:\tl_set:Nx\l_tmpa_tl{#1}
+    \regex_match:nVTF{\A d:}\l_tmpa_tl
+      {\paper_resolve:n{#1}\paper_record:nn{departure}{\l_paper_key_tl}
+       \exp_args:NV\PaperTexttt\l_paper_spelling_tl}
+      {\PaperTexttt{#1}}\group_end:}
+  \NewCommandCopy\PaperZcref\zcref
+  \RenewDocumentCommand\zcref{s O{} m}{
+    \group_begin:\tl_clear:N\l_paper_spelling_tl
+    \IfBooleanTF{#1}{\PaperZcref*[#2]{#3}}{\PaperZcref[#2]{#3}}
+    \clist_map_inline:nn{#3}{\tl_set:Nn\l_paper_key_tl{##1}\paper_record:nn{locator}{##1}}\group_end:}}
+% Extra line-breaking stretch is confined to these paragraphs and restored afterward.
+\dim_new:N\l_paper_stretch_dim
+\skip_new:N\l_paper_right_skip
+\cs_new_protected:Npn\paper_rebreak:nn#1#2{
+  \int_compare:nT{\inputlineno>=#1}{
+    \int_compare:nT{\inputlineno<=#2}{\emergencystretch=2em\relax}}}
+\cs_new_protected:Npn\paper_paragraph_spacing:{
+  \exp_args:Ne\str_case:nn{\CurrentFile}{
+    {front.tex}{\paper_rebreak:nn{138}{144}\paper_rebreak:nn{161}{180}}
+    {partA.tex}{\paper_rebreak:nn{481}{492}}
+    {partB.tex}{\paper_rebreak:nn{71}{80}\paper_rebreak:nn{201}{204}
+      \paper_rebreak:nn{544}{551}\paper_rebreak:nn{591}{594}\paper_rebreak:nn{699}{704}}
+    {partD.tex}{\paper_rebreak:nn{143}{146}}
+    {partE.tex}{\paper_rebreak:nn{123}{131}}
+    {partF.tex}{\paper_rebreak:nn{144}{152}\paper_rebreak:nn{251}{263}}
+    {partG.tex}{\paper_rebreak:nn{81}{84}}
+    {appendices.tex}{\int_compare:nT{\inputlineno>=1040}{
+      \int_compare:nT{\inputlineno<=1045}{\emergencystretch=4em\relax\rightskip=0pt~plus~1em\relax}}}
+    {explainer.tex}{\paper_rebreak:nn{592}{592}\paper_rebreak:nn{633}{633}
+      \paper_rebreak:nn{826}{826}\paper_rebreak:nn{930}{930}}}}
+\AddToHook{para/end}{
+  \dim_set:Nn\l_paper_stretch_dim{\emergencystretch}
+  \skip_set:Nn\l_paper_right_skip{\rightskip}
+  \paper_paragraph_spacing:}
+\AddToHook{para/after}{\emergencystretch=\l_paper_stretch_dim\relax\rightskip=\l_paper_right_skip\relax}
+\AddToHook{env/equation/begin}{\paper_paragraph_spacing:}
+% Local ledger padding gives the following empty register room to close.
+\AddToHook{cmd/GenerateLedger/before}{
+  \group_begin:\bool_set_true:N\l_paper_ledger_bool\setlength\tabcolsep{4pt}}
+\AddToHook{cmd/GenerateLedger/after}{\group_end:}
+\AddToHook{cmd/GenerateRulings/before}{\par\nopagebreak[4]}
+% The seal theorem starts its introduction below the long heading.
+\AddToHook{cmd/DisplayClass/after}{
+  \str_if_eq:eeT{\CurrentFile}{partB.tex}{
+    \int_compare:nT{\inputlineno=591}{\newline\ignorespaces}}}
+% This heading needs two points less space after its grade, not another line.
+\AddToHook{cmd/grade/after}{
+  \str_if_eq:eeT{\CurrentFile}{partC.tex}{
+    \int_compare:nT{\inputlineno=25}{\kern-2pt}}}
+% Only these three displays exhaust the minimum alignment separation.
+\AddToHook{env/align/begin}{
+  \exp_args:Ne\str_case:nn{\CurrentFile}{
+    {partA.tex}{\int_compare:nT{\inputlineno=686}{\renewcommand\minalignsep{2pt}}}
+    {partB.tex}{\int_compare:nT{\inputlineno=40}{\renewcommand\minalignsep{3pt}}}
+    {partD.tex}{\int_compare:nT{\inputlineno=22}{\renewcommand\minalignsep{9pt}}}}}
+% The caller loads the remaining data inputs in this syntax regime.
+\PaperRestoreAt

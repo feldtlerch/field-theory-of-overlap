@@ -1,0 +1,18 @@
+# One version setting, read by both documents.
+[version]
+VERSION = '0.5.0'
+DRAFT = 'fifth draft'
+
+[english]
+MAINFONT = 'TeX Gyre Pagella'
+BABEL = 'english'
+PDFTITLE = 'A Field Theory of Overlap: Explainer'
+LANG_STRINGS = 'explainer_strings_english'
+PAGEABBR = 'p.'
+RARROW = '\textrightarrow'
+FORMALLY = 'Formal:'
+SELECTLANG = ''
+SUBFILE = 'explainer/explainer'
+
+[companion]
+target = 'paper.pdf'

@@ -1,0 +1,18 @@
+support-lock = 'tools/assembly/native-lock.toml'
+source-date-epoch = 1700000000
+force-source-date = '1'
+flags = ['--only-cached', '--untrusted', '--keep-logs', '--keep-intermediates', '--reruns', '2']
+fonts = ['texgyrepagella-regular.otf', 'texgyrepagella-bold.otf', 'texgyrepagella-italic.otf', 'texgyrepagella-bolditalic.otf', 'texgyrepagella-math.otf', 'Inconsolatazi4-Regular.otf', 'Inconsolatazi4-Bold.otf']
+max-pair-cycles = 6
+invocation-timeout = 300
+
+[environment]
+LANG = 'C.UTF-8'
+LC_ALL = 'C.UTF-8'
+TZ = 'UTC'
+
+[work-environment]
+TMPDIR = 'tmp'
+TECTONIC_CACHE_DIR = 'cache/tectonic'
+XDG_CACHE_HOME = 'cache'
+XDG_CONFIG_HOME = 'config'

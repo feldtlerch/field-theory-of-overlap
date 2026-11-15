@@ -1,0 +1,68 @@
+% Compatibility for the pinned 2022 bundle; authored sources remain authoritative.
+\ExplSyntaxOn
+\AddToHook{package/fontspec/after}{
+  % Bundled filenames avoid system-font discovery; preserve both option lists.
+  \NewCommandCopy \paper_setmainfont \setmainfont
+  \RenewDocumentCommand \setmainfont { O{} m O{} }
+    {
+      \str_if_eq:nnTF {#2} {TeX~Gyre~Pagella}
+        {\paper_setmainfont[#1]{texgyrepagella}[
+          Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,
+          ItalicFont=*-italic,BoldItalicFont=*-bolditalic,#3]}
+        {\paper_setmainfont[#1]{#2}[#3]}
+    }
+  % Supply interfaces absent from the pinned package generation only.
+  \ProvideDocumentCommand\IfBlankF{+m+m}{\tl_if_blank:nF{#1}{#2}}
+  \cs_if_exist:NF \tl_put_right:Ne {\cs_generate_variant:Nn \tl_put_right:Nn {Ne}}
+  \cs_if_exist:NF \tl_set:Ne {\cs_generate_variant:Nn \tl_set:Nn {Ne}}
+  \cs_if_exist:NF \prop_gput:Nne {\cs_generate_variant:Nn \prop_gput:Nnn {Nne}}
+  \cs_if_exist:NF \str_compare:eNeTF {\cs_generate_variant:Nn \str_compare:nNnTF {eNe}}
+}
+\AddToHook{package/datatool/after}{
+  % Preserve the database/key argument order of the authored call.
+  \providecommand{\DTLsortdata}[2]{\DTLsort{#2}{#1}}
+}
+\ExplSyntaxOff
+\makeatletter
+\ExplSyntaxOn
+\AddToHook{package/zref-clever/after}{
+  % Recover the explicit type, then counter mapping, then counter.
+  \tl_new:N \l_paper_reftype_tl
+  \keys_define:nn {zref-clever/zcsetup}
+    {reftype .tl_set:N = \l_paper_reftype_tl}
+  \zref@setcurrent{zc@type}{
+    \tl_if_empty:NTF \l_paper_reftype_tl
+      {\exp_args:NNe \prop_if_in:NnTF \l__zrefclever_counter_type_prop
+        \l__zrefclever_current_counter_tl
+        {\exp_args:NNe \prop_item:Nn \l__zrefclever_counter_type_prop
+          {\l__zrefclever_current_counter_tl}}
+        {\l__zrefclever_current_counter_tl}}
+      {\l_paper_reftype_tl}}
+}
+\ExplSyntaxOff
+\makeatother
+\AddToHook{begindocument/end}{%
+  % Mirror ordinary labels once, after packages have installed their hooks.
+  \let\PaperBaseLabel\label
+  \renewcommand{\label}[1]{\PaperBaseLabel{#1}\zlabel{#1}}%
+}
+% Imported title properties need these definitions before auxiliary loading.
+\AddToHook{package/zref-xr/before}{\RequirePackage{nameref}}
+\AddToHook{file/macros_overlap.tex/after}{\input{reader-hooks.tex}}
+
+\makeatletter
+% The long-table start emits the caption anchor on its shipped page.
+% Stepping its counter must not emit a second anchor in the caption box.
+\AddToHook{begindocument/end}{%
+  \AddToHook{cmd/XLT@@@LT@caption/before}{\@skiphyperreftrue}%
+}
+\AddToHook{package/hyperref/after}{%
+  % Named companion destinations do not take a numeric page option.
+  \let\PaperRemoteLink\hyper@linkfile
+  \def\hyper@linkfile#1#2#3{%
+    \begingroup
+    \ifx\\#3\\\else\let\Hy@href@page\@empty\fi
+    \PaperRemoteLink{#1}{#2}{#3}%
+    \endgroup}%
+}
+\makeatother

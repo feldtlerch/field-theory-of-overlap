@@ -74,6 +74,7 @@ pub enum RuleId {
     M061,
     M062,
     M063,
+    M064,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -94,7 +95,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 63] = [
+pub const RULES: [RuleSpec; 64] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -533,6 +534,13 @@ pub const RULES: [RuleSpec; 63] = [
         number: RuleId::M063,
         statement: "Paper-scoped tag pairs are checked for uniqueness, grammar and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each label-mint row names a line that holds its key, and that evidence validates documentary admissions without entering strict-unit scope.",
         scope: "The paper's tag lookup with 329 paper spellings, 87 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M064,
+        statement: "Every rendered object identity resolves through an admitted, paper-scoped or explicit provisional binding to a two-part spelling; missing bindings refuse every build, and provisional bindings refuse release.",
+        scope: "Expanded paper identity output, shipped occurrence ledgers and rendered-text leak checking; enforced by reader-hooks.tex, tools/paper/identities.py and tools/paper/ledger.py through the support-required paper gate. Number-only and family locators do not mint identities.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
