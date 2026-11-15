@@ -73,6 +73,7 @@ pub enum RuleId {
     M060,
     M061,
     M062,
+    M063,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -93,7 +94,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 62] = [
+pub const RULES: [RuleSpec; 63] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -509,7 +510,7 @@ pub const RULES: [RuleSpec; 62] = [
     },
     RuleSpec {
         number: RuleId::M060,
-        statement: "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle.",
+        statement: "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle. Target labels use the unit-label grammar or a name in the paper's label-mint inventory; authority labels always use the unit-label grammar.",
         scope: "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -525,6 +526,13 @@ pub const RULES: [RuleSpec; 62] = [
         number: RuleId::M062,
         statement: "Report generation and check use one canonical writer; a release claiming retained audit evidence requires a stable reread accepted report and matching generated artifacts.",
         scope: "Retained-report file lifecycle, committed report byte gate and release-retention consumer.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M063,
+        statement: "Paper-scoped tag pairs are checked for uniqueness, grammar and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each label-mint row names a line that holds its key, and that evidence validates documentary admissions without entering strict-unit scope.",
+        scope: "The paper's tag lookup with 329 paper spellings, 87 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

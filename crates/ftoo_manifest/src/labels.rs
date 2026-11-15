@@ -395,6 +395,20 @@ pub fn integrate_joint_labels<'r, 'm, 'u, 'b, 'g>(
     joint: &JointMints<'u, 'm>,
 ) -> Result<LabelIntegratedUnits<'r, 'm, 'u, 'b, 'g>, LabelErrors> {
     let markdown = joint.markdown;
+    if let Some((label, origin)) = joint
+        .mints
+        .iter()
+        .find(|(_, origin)| origin.kind == MintKind::PaperTex)
+    {
+        return Err(LabelErrors(vec![diagnostic(
+            RuleId::M063,
+            LabelStage::Namespace,
+            origin.site.clone(),
+            LabelFault::PaperMintInStrictScope {
+                label: label.clone(),
+            },
+        )]));
+    }
     if !std::ptr::eq(resolved.corpus(), joint.corpus)
         || resolved
             .book()
@@ -463,7 +477,7 @@ pub fn integrate_joint_labels<'r, 'm, 'u, 'b, 'g>(
 /// ```compile_fail,E0616
 /// fn change(v: &mut ftoo_manifest::JointMints<'_, '_>) { v.mints.clear(); }
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct JointMints<'u, 'm> {
     corpus: &'u crate::LanguageCheckedUnits,
     markdown: &'m CheckedMarkdown,
@@ -473,6 +487,35 @@ impl JointMints<'_, '_> {
     #[must_use]
     pub fn mints(&self) -> &BTreeMap<String, MintOrigin> {
         &self.mints
+    }
+    /// Extend the documentary target context with the paper's label-mint inventory.
+    /// These origins cannot serve as confirmation records, which remain Markdown mints.
+    /// # Errors
+    /// Refuses a paper key that already has any joint mint or another paper mint.
+    pub fn with_paper_mints(
+        mut self,
+        rows: Vec<(String, String, usize)>,
+    ) -> Result<Self, LabelErrors> {
+        let mut candidates: BTreeMap<String, Vec<MintOrigin>> = self
+            .mints
+            .iter()
+            .map(|(key, origin)| (key.clone(), vec![origin.clone()]))
+            .collect();
+        for (key, file, line) in rows {
+            candidates.entry(key).or_default().push(MintOrigin {
+                kind: MintKind::PaperTex,
+                site: LabelSite::PaperTex { file, line },
+            });
+        }
+        let errors = duplicates(&candidates, LabelStage::Namespace);
+        if !errors.is_empty() {
+            return Err(LabelErrors(errors));
+        }
+        self.mints = candidates
+            .into_iter()
+            .filter_map(|(key, origins)| origins.into_iter().next().map(|origin| (key, origin)))
+            .collect();
+        Ok(self)
     }
 }
 /// Admit one complete joint mint inventory without resolving authored tags.

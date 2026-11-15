@@ -2470,6 +2470,9 @@ fn citation_run(
         ftoo_manifest::MintKind::Markdown | ftoo_manifest::MintKind::UnitMetadata => {
             ftoo_manifest::AddressTarget::Documentary(text.clone())
         }
+        ftoo_manifest::MintKind::PaperTex => {
+            unreachable!("strict unit integration refuses paper mints")
+        }
     };
     Inline::Citation {
         identity: super::CitationIdentity {
@@ -2650,6 +2653,7 @@ pub(super) fn citation_origins(
                 },
             ),
             ftoo_manifest::LabelSite::RustHistory { .. }
+            | ftoo_manifest::LabelSite::PaperTex { .. }
             | ftoo_manifest::LabelSite::MintContext => unreachable!("checked mint origin"),
         };
         origins.push(SourceOrigin {

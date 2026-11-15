@@ -12,7 +12,7 @@ mod native_format;
 mod native_support;
 mod pending;
 mod plan;
-mod registry;
+pub(crate) mod registry;
 mod retained;
 mod runtime;
 #[cfg(test)]
@@ -240,11 +240,25 @@ pub(crate) fn prepare_context(
     neutral(&markdown, true, AssemblyStage::Source)?;
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
+    let mut registry_joint = joint.clone();
+    if root.join(registry::PAPER_MINTS).try_exists().map_err(|e| {
+        input::io_error(
+            DocumentIoOperation::Inspect,
+            &root.join(registry::PAPER_MINTS),
+            &e,
+        )
+    })? {
+        let data = input::read(root, registry::PAPER_MINTS)?;
+        registry_joint = registry_joint
+            .with_paper_mints(registry::paper_mint_rows(&data)?)
+            .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
+        inputs.insert(registry::PAPER_MINTS.into(), data);
+    }
     let source = registry::read(root)?;
     let events = registry::load(&source)?;
     inputs.insert(source.file, source.bytes);
     let book = book
-        .with_documentary(&joint, events)
+        .with_documentary(&registry_joint, events)
         .map_err(DocumentError::DocumentaryRegistry)?;
     let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book)
         .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;

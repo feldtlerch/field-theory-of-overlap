@@ -619,6 +619,9 @@ pub enum DocumentEntryKind {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentInputFault {
+    PaperMintRow {
+        line: usize,
+    },
     InvalidSourceName {
         value: String,
     },

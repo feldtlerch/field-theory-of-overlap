@@ -12,6 +12,10 @@ pub enum LabelStage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LabelSite {
     MintContext,
+    PaperTex {
+        file: String,
+        line: usize,
+    },
     Markdown {
         file: String,
         bytes: Range<usize>,
@@ -35,6 +39,7 @@ impl fmt::Display for LabelSite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MintContext => f.write_str("joint-mint context"),
+            Self::PaperTex { file, line } => write!(f, "paper source {file:?} line {line}"),
             Self::Markdown { file, bytes } => {
                 write!(f, "markdown {file:?} bytes {}..{}", bytes.start, bytes.end)
             }
@@ -61,6 +66,7 @@ pub enum MintKind {
     RustIdentity,
     Markdown,
     UnitMetadata,
+    PaperTex,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MintOrigin {
@@ -74,6 +80,9 @@ pub enum ReferenceDomain {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LabelFault {
+    PaperMintInStrictScope {
+        label: String,
+    },
     MintContextMismatch {
         expected: std::collections::BTreeMap<String, MintOrigin>,
         actual: std::collections::BTreeMap<String, MintOrigin>,

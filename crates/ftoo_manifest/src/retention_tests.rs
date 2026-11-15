@@ -120,7 +120,7 @@ fn retention_register_has_complete_independent_records() {
         }
     );
     assert_eq!(
-        RULES[60..],
+        RULES[60..62],
         [
             RuleSpec {
                 number: RuleId::M061,
@@ -154,6 +154,6 @@ fn retention_register_has_complete_independent_records() {
                 .filter(|rule| rule.deferred_reason.is_some())
                 .count()
         ),
-        (62, 53, 4, 5)
+        (63, 54, 4, 5)
     );
 }

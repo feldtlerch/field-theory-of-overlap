@@ -5,6 +5,60 @@ const LABEL: &str = "dec:fixture:target";
 const AUTHORITY: &str = "dec:fixture:authority";
 
 #[test]
+fn paper_mint_targets_reuse_admission_without_becoming_confirmation_records() {
+    let graph = seed().unwrap();
+    let corpus = corpus();
+    let mut sources = markdown().sources().to_vec();
+    sources.push(MarkdownSource {
+        file: "history.md".into(),
+        bytes: "# Kernel · `proposal:manifest:kernel-bite`\n# Addressing · `proposal:manifest:addressing-lifecycle-bite`\n".as_bytes().to_vec(),
+    });
+    let markdown = check_markdown_sources(sources).unwrap();
+    let key = "B:fixture";
+    let draft = vec![event(0, "fixture", Some(key))];
+    let plain = collect_joint_mints(&corpus, &markdown).unwrap();
+    assert!(
+        addressing(&graph)
+            .unwrap()
+            .with_documentary(&plain, draft.clone())
+            .is_err()
+    );
+    let joint = collect_joint_mints(&corpus, &markdown)
+        .unwrap()
+        .with_paper_mints(vec![(key.into(), "documents/paper/main.tex".into(), 1)])
+        .unwrap();
+    let book = addressing(&graph)
+        .unwrap()
+        .with_documentary(&joint, draft.clone())
+        .unwrap();
+    assert_eq!(
+        book.documentary().next().unwrap().origin().kind,
+        MintKind::PaperTex
+    );
+    let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+    let error = integrate_joint_labels(&resolved, &joint).unwrap_err();
+    assert!(matches!(
+        &error.diagnostics()[0].fault,
+        LabelFault::PaperMintInStrictScope { label } if label == key
+    ));
+    integrate_joint_labels(&resolved, &plain).unwrap();
+    let mut wrong = draft;
+    wrong[0].authority_record.value = key.into();
+    assert!(
+        addressing(&graph)
+            .unwrap()
+            .with_documentary(&joint, wrong)
+            .is_err()
+    );
+    assert!(
+        collect_joint_mints(&corpus, &markdown)
+            .unwrap()
+            .with_paper_mints(vec![(LABEL.into(), "documents/paper/main.tex".into(), 1)])
+            .is_err()
+    );
+}
+
+#[test]
 fn documentary_phases_sort_by_event_then_field_and_restore() {
     let graph = seed().unwrap();
     let corpus = corpus();

@@ -756,7 +756,7 @@ fn display_and_documentary_register_statements_are_exact() {
             ),
             (
                 RuleId::M060,
-                "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle.",
+                "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle. Target labels use the unit-label grammar or a name in the paper's label-mint inventory; authority labels always use the unit-label grammar.",
                 "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
                 RuleState::Enforced,
                 None

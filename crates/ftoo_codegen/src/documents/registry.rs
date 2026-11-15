@@ -10,7 +10,28 @@ use ftoo_manifest::{
 };
 
 pub(super) const FILE: &str = "registry/documentary-tags.toml";
-pub(super) fn read(root: &std::path::Path) -> Result<UnitSource, DocumentError> {
+pub(crate) const PAPER_MINTS: &str = "documents/paper-build/label-mints.tsv";
+
+pub(crate) fn paper_mint_rows(data: &[u8]) -> Result<Vec<(String, String, usize)>, DocumentError> {
+    let fault = |line| DocumentError::Input(super::DocumentInputFault::PaperMintRow { line });
+    let text = std::str::from_utf8(data).map_err(|_| fault(0))?;
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| !line.starts_with('#'))
+        .map(|(index, line)| {
+            let fields: Vec<_> = line.split('\t').collect();
+            if fields.len() != 3 {
+                return Err(fault(index + 1));
+            }
+            let number = fields[2].parse::<usize>().map_err(|_| fault(index + 1))?;
+            if fields[0].is_empty() || fields[1].is_empty() || number == 0 {
+                return Err(fault(index + 1));
+            }
+            Ok((fields[0].into(), fields[1].into(), number))
+        })
+        .collect()
+}
+pub(crate) fn read(root: &std::path::Path) -> Result<UnitSource, DocumentError> {
     use std::io::Read;
     let path = root.join(FILE);
     let metadata = std::fs::symlink_metadata(&path)
@@ -70,7 +91,7 @@ fn limit(
     )
 }
 #[allow(clippy::too_many_lines)] // Keep the closed event schema and its field provenance together.
-pub(super) fn load(source: &UnitSource) -> Result<Vec<DocumentaryEventDraft>, DocumentError> {
+pub(crate) fn load(source: &UnitSource) -> Result<Vec<DocumentaryEventDraft>, DocumentError> {
     if source.bytes.len() > 1_048_576 {
         return Err(limit(
             input::site(&source.file),

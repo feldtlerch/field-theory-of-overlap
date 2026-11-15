@@ -315,7 +315,10 @@ fn fault_order(fault: &RegistryFault) -> u8 {
         RegistryFault::DocumentaryPartition { .. } => 12,
     }
 }
-fn history(events: &[DocumentaryEventDraft]) -> Result<(), RegistryErrors> {
+fn history(
+    events: &[DocumentaryEventDraft],
+    mints: &JointMints<'_, '_>,
+) -> Result<(), RegistryErrors> {
     let mut errors = vec![];
     let mut states = BTreeMap::<&str, Option<DocumentaryRetirement>>::new();
     for (index, event) in events.iter().enumerate() {
@@ -340,7 +343,14 @@ fn history(events: &[DocumentaryEventDraft]) -> Result<(), RegistryErrors> {
         {
             let reason = if value.value.trim().is_empty() {
                 Some(MetadataReason::Blank)
-            } else if label && !crate::units::label_name(&value.value) {
+            } else if label
+                && !crate::units::label_name(&value.value)
+                && !(field == "label"
+                    && mints
+                        .mints()
+                        .get(&value.value)
+                        .is_some_and(|origin| origin.kind == MintKind::PaperTex))
+            {
                 Some(MetadataReason::InvalidLabel)
             } else {
                 None
@@ -568,12 +578,20 @@ impl AddressBook<'_> {
             )]));
         }
         catalogue(&self, &events)?;
-        history(&events)?;
+        history(&events, mints)?;
         let bindings = targets(&events, mints)?;
         partition(&events, &bindings)?;
         self.documentary = bindings;
         self.documentary_history = events;
-        self.joint_mints = Some(mints.mints().clone());
+        // Paper mints prove documentary targets without entering strict-unit scope.
+        self.joint_mints = Some(
+            mints
+                .mints()
+                .iter()
+                .filter(|(_, origin)| origin.kind != MintKind::PaperTex)
+                .map(|(label, origin)| (label.clone(), origin.clone()))
+                .collect(),
+        );
         self.reindex();
         Ok(self)
     }
