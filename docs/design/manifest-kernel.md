@@ -28,7 +28,7 @@ These names identify coherent review boundaries, not a requirement that every su
 
 ## M1a: modules and types · `sec:manifest:types`
 
-The crate follows the existing audit crate's library-first shape: a documented `lib.rs`, private implementation modules, explicit public re-exports and `#[cfg(test)] mod tests` in `src/tests.rs`. Public fallible APIs document their errors; tests return a result and distinguish the expected refusal from unrelated failures. There is no new binary. Package edition, Rust version, license, publication setting and lints continue to inherit from the workspace. The inspected workspace specifies edition 2024, Rust version 1.99.1 and toolchain `nightly-2026-11-03`; the implementation uses the workspace's choices without revising them. Clippy all and pedantic remain denied, CI supplies `-D warnings`, and all build commands use `--locked` (`dec:workspace:norms`).
+The crate follows the existing audit crate's library-first shape: a documented `lib.rs`, private implementation modules, explicit public re-exports and `#[cfg(test)] mod tests` in `src/tests.rs`. Public fallible APIs document their errors; tests return a result and distinguish the expected refusal from unrelated failures. There is no new binary. Package edition, Rust version, license, publication setting and lints continue to inherit from the workspace. The inspected workspace specifies edition 2024, Rust version 1.99.1 and the toolchain pinned in `rust-toolchain.toml`; the implementation uses the workspace's choices without revising them. Clippy all and pedantic remain denied, CI supplies `-D warnings`, and all build commands use `--locked` (`dec:workspace:norms`).
 
 |Module|Responsibility|
 |---|---|
