@@ -2861,7 +2861,7 @@ fn support_required_external_markdown_and_links_do_not_change_either_source_inve
 fn committed_adapter_and_ci_pins_are_fixed() {
     assert_eq!(support::NODE_PIN.as_bytes(), b"22.16.0\n");
     let ci = include_str!("../../../../.github/workflows/ci.yml");
-    assert!(ci.contains("actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11"));
+    assert!(ci.contains("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"));
     assert!(ci.contains("name: bounded smoke — support-dependent suites require the full battery"));
     assert!(ci.contains("test --workspace --locked -- --skip support_required"));
     assert!(ci.contains("unshare --user --map-root-user --net"));
