@@ -1,0 +1,127 @@
+schema = 1
+
+[[question]]
+label = "open:converter:baseline-calibration"
+title = "the baseline converter"
+concern = "theory"
+question = "What value does the identification scheme's own method give the baseline converter, and does one global linear elasticity suffice for it or does it vary from node to node?"
+about = [
+  { paper = "sem:converter:funded-gradient-to-rate" },
+  { paper = "sem:claim:will-identification" },
+]
+settled-when = "A calibration is posted by the identification scheme's own method with the bias direction the registry states, and the global linear form is either borne out by that measurement or replaced by the per-node alternative the shapes register prices."
+blocks = [
+  { paper = "sem:operator:moral-baseline" },
+]
+state = "open"
+
+[[question]]
+label = "open:deontic:binding"
+title = "the deontic's scope"
+concern = "theory"
+question = "Is the forcing the theory reads as deontic field-impervious, with susceptibility identically zero, rather than a pull saturated flat on the range tested?"
+about = [
+  { paper = "sem:source-class:open-loop-forcing" },
+  { paper = "sem:claim:one-sided-susceptibility-test" },
+]
+settled-when = "Only refutation settles it: a nonzero susceptibility slope across environments in a forcing the theory reads as deontic answers no, and no observation answers yes, because a zero slope is also what a saturated pull shows."
+state = "open"
+
+[[question]]
+label = "open:explainer:claim-scope"
+title = "the companion explainer"
+concern = "documents"
+question = "In which of the paper's degenerate corners, the restricted domains on which the full theory reduces to a simpler form, does each claim of the companion explainer hold, and which of its claims hold in none?"
+about = [
+  { file = "documents/paper/explainer/explainer.tex" },
+  { paper = "tbl:corners" },
+]
+settled-when = "Every claim of the explainer names the corner in which the paper supports it, and every claim that holds in no corner is withdrawn from its text."
+state = "open"
+
+[[question]]
+label = "open:measurement:construct-validity"
+title = "construct validity"
+concern = "theory"
+question = "Are the anchored observables measurable at all, that is, can an instrument with established construct validity estimate them?"
+about = [
+  { paper = "sem:claim:verdict-model-scope" },
+]
+settled-when = "An instrument for the anchored observables is specified and its construct validity established, or an argument shows that no such instrument can exist."
+state = "open"
+
+[[question]]
+label = "open:paper:fixed-data-tables"
+title = "the paper's fixed data tables"
+concern = "machinery"
+question = "Do the paper's fixed data tables state what the theory graph states, object for object, tag for tag and register for register?"
+about = [
+  { record = "dec:paper:authored-latex" },
+  { file = "documents/paper/data/ftoo_manifest.tex" },
+  { file = "documents/paper/data/ftoo_registers.tex" },
+  { file = "documents/paper/data/ftoo_symbols.tex" },
+  { file = "documents/paper/data/ftoo_symbols_historical.tex" },
+  { file = "documents/paper/data/ftoo_index.tex" },
+  { paper = "app:ledger" },
+]
+settled-when = "Each table is generated from the theory graph under a byte gate after its fixed content has been compared with the graph, every difference has been resolved in the graph, and the table has left the paper's source list."
+state = "open"
+
+[[question]]
+label = "open:paper:typed-layer-checks"
+title = "the typed layer's checks"
+concern = "machinery"
+question = "Which of the typed layer's build-time refusals and warnings over grades, spends, branches and evidence keys become numbered rules over parsed unit mathematics, and what checking is lost for each that does not?"
+about = [
+  { record = "dec:paper:authored-latex" },
+  { record = "arg:paper:consequences" },
+  { file = "documents/paper/ftoo_typed_tools.tex" },
+  { file = "documents/paper/macros_overlap.tex" },
+  { file = "documents/paper/econ_membrane.tex" },
+  { paper = "tbl:verify" },
+]
+settled-when = "Every refusal and warning of the typed layer is a registered rule with its state and scope or a loss stated in the verification contract, and the typed-tools file has left the paper's source list."
+rests-on = ["open:paper:fixed-data-tables"]
+state = "open"
+
+[[question]]
+label = "open:profile:antichain-cause"
+title = "the antichain's cause"
+concern = "theory"
+question = "When two real lives are incomparable under the canonical partial order, what separates incomparability by type, which the order proves, from incomparability by ignorance, where the lives are merely unread?"
+about = [
+  { paper = "sem:claim:canonical-partial-order" },
+  { paper = "sem:profile:antichain" },
+  { paper = "tbl:P:antichain" },
+]
+settled-when = "A criterion drawn from the lives' readings tells the two kinds of incomparability apart for the antichain's members, or an argument shows that no reading can tell them apart."
+state = "open"
+
+[[question]]
+label = "open:profile:narration-motivation"
+title = "the narration coordinate's motivation"
+concern = "theory"
+question = "What motivates typing the profile's narration coordinate as a node-private welfare-like axis?"
+about = [
+  { paper = "sem:named:trait-narration" },
+  { paper = "sem:profile:profile" },
+]
+settled-when = "An argument or construction derives the node-private welfare-like typing of the narration coordinate, or a different typing replaces it."
+blocks = [
+  { paper = "sem:claim:no-dimensionally-natural-norm" },
+]
+state = "open"
+
+[[question]]
+label = "open:stock:reservoir-presence"
+title = "the stock rival"
+concern = "theory"
+question = "Does maintenance draw on a reservoir whose time constant a release experiment can resolve, so that a released curve shows a knee?"
+about = [
+  { paper = "sem:claim:release-knee" },
+]
+settled-when = "Only a finding settles it: a release that shows a knee at the experiment's resolution answers yes, and each knee-free release only tightens the upper bound on the reservoir's time constant."
+blocks = [
+  { paper = "sem:foundation:will-package" },
+]
+state = "open"

@@ -17,6 +17,12 @@ pub use support_bracket::SupportIdentity;
 mod labels;
 pub mod paper;
 mod projection;
+mod questions;
+pub use questions::{
+    OPEN_QUESTION_REGISTER, OPEN_QUESTION_STORE, OpenQuestionError, OpenQuestionSummary,
+    QuestionInputFault, QuestionIoOperation, RegisterFault, check_open_questions,
+    generate_open_questions,
+};
 pub mod retention;
 mod units;
 mod weld;

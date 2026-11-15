@@ -12,6 +12,8 @@ The decision records in `docs/adr/` carry the full design with its reasons; `doc
 - claims are audited through producers on the [Naturrhythmuszentrum engine](https://github.com/naturrhythmuszentrum/naturrhythmuszentrum) at a pinned public commit, with certified enclosures and typed undecided outcomes (ADR 007);
 - every retained commit is signed and lands green through CI, each layer together with its validator (ADR 009), and anything published passes the publication audit (ADR 008, `docs/publication-policy.md`).
 
+The open questions the repository records are listed in `generated/open-questions.md`, generated from `registry/open-questions.toml`; it holds the recorded questions, not every open question of the theory.
+
 ## Status
 
 Pre-release skeleton. The decision records are complete; the crates are empty shells awaiting their first reviewed bites; the engine pin lands with the audit crate's first bite, and the capability requests the audit needs are routed as public issues on the engine's repository. The coverage declaration will state at every point how far the audited slice reaches.

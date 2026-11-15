@@ -31,6 +31,22 @@ pub(crate) fn paper_mint_rows(data: &[u8]) -> Result<Vec<(String, String, usize)
         })
         .collect()
 }
+pub(crate) const PAPER_TAGS: &str = "documents/paper-build/paper-tags.tsv";
+/// The paper's tag lookup as `(spelling, target, line)` rows; a malformed row names its line.
+pub(crate) fn paper_tag_rows(data: &[u8]) -> Result<Vec<(String, String, usize)>, usize> {
+    let text = std::str::from_utf8(data).map_err(|_| 0_usize)?;
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| !line.starts_with('#'))
+        .map(|(index, line)| {
+            let fields: Vec<_> = line.split('\t').collect();
+            if fields.len() != 3 || fields.iter().any(|f| f.is_empty()) {
+                return Err(index + 1);
+            }
+            Ok((fields[0].into(), fields[1].into(), index + 1))
+        })
+        .collect()
+}
 pub(crate) fn read(root: &std::path::Path) -> Result<UnitSource, DocumentError> {
     use std::io::Read;
     let path = root.join(FILE);
