@@ -37,10 +37,17 @@ mod labels;
 pub use labels::{
     CheckedMarkdown, JointMints, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
     LabelOccurrence, LabelSite, LabelSourceError, LabelSourceFault, LabelStage, MarkdownSource,
-    MintKind, MintOrigin, ReferenceDomain, check_markdown_sources, collect_joint_mints,
-    integrate_joint_labels, integrate_labels,
+    MintKind, MintOrigin, ReferenceDomain, check_markdown_sources, check_paper_tag_targets,
+    collect_joint_mints, integrate_joint_labels, integrate_labels,
 };
 mod documentary;
+mod questions;
+pub use questions::{
+    OpenQuestion, OpenQuestionDraft, OpenQuestions, QuestionConcern, QuestionDiagnostic,
+    QuestionDomains, QuestionErrors, QuestionFault, QuestionList, QuestionReference, QuestionStage,
+    QuestionState, QuestionStateKind, QuestionText, ReferenceDraft, ReferenceKind, Settlement,
+    StateDraft, Succession, TextReason, Withdrawal, admit_open_questions,
+};
 mod seed;
 mod status;
 mod tag_history;

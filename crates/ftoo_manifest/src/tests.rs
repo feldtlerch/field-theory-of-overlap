@@ -547,7 +547,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
-        M061, M062, M063, M064, M065,
+        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -556,25 +556,30 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M015, M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028,
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
-            M057, M058, M059, M060, M061, M062, M063, M064, M065
+            M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
+            M071, M072
         ]
     );
     for rule in RULES {
         let expected = match rule.number {
-            M005 | M011 | M030 | M049 => RuleState::Structural,
+            M005 | M011 | M030 | M049 | M066 => RuleState::Structural,
             M006 | M007 | M008 | M009 | M010 | M013 | M014 | M015 | M020 | M021 | M022 | M023
             | M024 | M025 | M026 | M027 | M028 | M031 | M032 | M033 | M034 | M035 | M036 | M001
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
-            | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 => RuleState::Enforced,
+            | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
+            | M071 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
+            M072 => RuleState::DeferredPaperUnits,
         };
         assert_eq!(rule.state, expected);
         assert!(!rule.statement.is_empty() && !rule.scope.is_empty());
         match expected {
             RuleState::Structural | RuleState::Enforced => assert_eq!(rule.deferred_reason, None),
-            RuleState::DeferredM2 | RuleState::DeferredExclusiveRoutes => {
+            RuleState::DeferredM2
+            | RuleState::DeferredExclusiveRoutes
+            | RuleState::DeferredPaperUnits => {
                 assert_ne!(rule.deferred_reason.ok_or("missing reason")?, "");
             }
         }
@@ -627,7 +632,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 65);
+    assert_eq!(RULES.len(), 72);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -707,18 +712,18 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        56
+        61
     );
     assert_eq!(
         RULES
             .iter()
             .filter(|r| r.state == RuleState::Structural)
             .count(),
-        4
+        5
     );
     assert_eq!(
         RULES.iter().filter(|r| r.deferred_reason.is_some()).count(),
-        5
+        6
     );
 }
 
@@ -739,6 +744,10 @@ fn exact_deferral_reasons() {
         (
             M029,
             "Exclusive routes await their first claim and isolation consumer.",
+        ),
+        (
+            M072,
+            "The paper's appendices are authored LaTeX under ADR 014; the table is generated once they are statement units.",
         ),
     ];
     assert_eq!(

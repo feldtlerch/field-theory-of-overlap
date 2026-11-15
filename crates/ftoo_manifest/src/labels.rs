@@ -163,6 +163,33 @@ fn duplicates(mints: &Mints, stage: LabelStage) -> Vec<LabelDiagnostic> {
         })
         .collect()
 }
+/// The label kind only the open-question store mints.
+pub(crate) const OPEN_KIND: &str = "open";
+pub(crate) fn open_kind(label: &str) -> bool {
+    label.split(':').next() == Some(OPEN_KIND)
+}
+fn reserved(mints: &Mints) -> Vec<LabelDiagnostic> {
+    mints
+        .iter()
+        .filter(|(label, _)| open_kind(label))
+        .flat_map(|(label, origins)| {
+            origins
+                .iter()
+                .filter(|origin| origin.kind != MintKind::OpenQuestion)
+                .map(move |origin| {
+                    diagnostic(
+                        RuleId::M068,
+                        LabelStage::Namespace,
+                        origin.site.clone(),
+                        LabelFault::ReservedOpenKind {
+                            label: label.clone(),
+                            origin: origin.clone(),
+                        },
+                    )
+                })
+        })
+        .collect()
+}
 fn source_names(sources: &[MarkdownSource]) -> Result<(), LabelSourceError> {
     let mut names: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
     for (position, source) in sources.iter().enumerate() {
@@ -491,7 +518,8 @@ impl JointMints<'_, '_> {
     /// Extend the documentary target context with the paper's label-mint inventory.
     /// These origins cannot serve as confirmation records, which remain Markdown mints.
     /// # Errors
-    /// Refuses a paper key that already has any joint mint or another paper mint.
+    /// Refuses a paper key of the store-reserved kind, then a paper key that already has
+    /// any joint mint or another paper mint.
     pub fn with_paper_mints(
         mut self,
         rows: Vec<(String, String, usize)>,
@@ -507,7 +535,10 @@ impl JointMints<'_, '_> {
                 site: LabelSite::PaperTex { file, line },
             });
         }
-        let errors = duplicates(&candidates, LabelStage::Namespace);
+        let mut errors = reserved(&candidates);
+        if errors.is_empty() {
+            errors = duplicates(&candidates, LabelStage::Namespace);
+        }
         if !errors.is_empty() {
             return Err(LabelErrors(errors));
         }
@@ -518,15 +549,86 @@ impl JointMints<'_, '_> {
         Ok(self)
     }
 }
+impl JointMints<'_, '_> {
+    /// Check the admitted open-question store against the joint inventory as a mint origin.
+    /// The result serves this check only; store labels enter no citation domain yet.
+    /// # Errors
+    /// Refuses under M068 any store label that already has a joint mint, naming every origin.
+    pub fn with_open_questions(
+        mut self,
+        store: &crate::OpenQuestions,
+    ) -> Result<Self, LabelErrors> {
+        let mut candidates: BTreeMap<String, Vec<MintOrigin>> = self
+            .mints
+            .iter()
+            .map(|(key, origin)| (key.clone(), vec![origin.clone()]))
+            .collect();
+        for (record, question) in store.records().iter().enumerate() {
+            candidates
+                .entry(question.label().to_owned())
+                .or_default()
+                .push(MintOrigin {
+                    kind: MintKind::OpenQuestion,
+                    site: LabelSite::OpenQuestion {
+                        file: store.file().to_owned(),
+                        record,
+                    },
+                });
+        }
+        let mut errors = reserved(&candidates);
+        if errors.is_empty() {
+            errors = duplicates(&candidates, LabelStage::Namespace);
+            for error in &mut errors {
+                error.rule = RuleId::M068;
+            }
+        }
+        if !errors.is_empty() {
+            return Err(LabelErrors(errors));
+        }
+        self.mints = candidates
+            .into_iter()
+            .filter_map(|(key, origins)| origins.into_iter().next().map(|origin| (key, origin)))
+            .collect();
+        Ok(self)
+    }
+}
+/// Refuse paper tag targets of the kind only the open-question store mints.
+/// # Errors
+/// Names every reserved target with its row in the tag lookup.
+pub fn check_paper_tag_targets(
+    file: &str,
+    rows: &[(String, String, usize)],
+) -> Result<(), LabelErrors> {
+    let mut targets: Mints = BTreeMap::new();
+    for (_, target, line) in rows {
+        targets.entry(target.clone()).or_default().push(MintOrigin {
+            kind: MintKind::PaperTex,
+            site: LabelSite::PaperTex {
+                file: file.to_owned(),
+                line: *line,
+            },
+        });
+    }
+    let errors = reserved(&targets);
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(LabelErrors(errors))
+    }
+}
 /// Admit one complete joint mint inventory without resolving authored tags.
 /// # Errors
-/// Refuses every duplicate in the joint permanent namespace.
+/// Refuses every use of the store-reserved kind, then every duplicate in the joint
+/// permanent namespace.
 pub fn collect_joint_mints<'u, 'm>(
     corpus: &'u crate::LanguageCheckedUnits,
     markdown: &'m CheckedMarkdown,
 ) -> Result<JointMints<'u, 'm>, LabelErrors> {
     let mints = joint_mints(corpus, markdown, &NodeId::ALL);
-    let errors = duplicates(&mints, LabelStage::Namespace);
+    let mut errors = reserved(&mints);
+    if errors.is_empty() {
+        errors = duplicates(&mints, LabelStage::Namespace);
+    }
     if !errors.is_empty() {
         return Err(LabelErrors(errors));
     }

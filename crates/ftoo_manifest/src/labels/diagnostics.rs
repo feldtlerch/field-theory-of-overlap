@@ -16,6 +16,10 @@ pub enum LabelSite {
         file: String,
         line: usize,
     },
+    OpenQuestion {
+        file: String,
+        record: usize,
+    },
     Markdown {
         file: String,
         bytes: Range<usize>,
@@ -40,6 +44,9 @@ impl fmt::Display for LabelSite {
         match self {
             Self::MintContext => f.write_str("joint-mint context"),
             Self::PaperTex { file, line } => write!(f, "paper source {file:?} line {line}"),
+            Self::OpenQuestion { file, record } => {
+                write!(f, "open-question store {file:?} record {record}")
+            }
             Self::Markdown { file, bytes } => {
                 write!(f, "markdown {file:?} bytes {}..{}", bytes.start, bytes.end)
             }
@@ -67,6 +74,7 @@ pub enum MintKind {
     Markdown,
     UnitMetadata,
     PaperTex,
+    OpenQuestion,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MintOrigin {
@@ -82,6 +90,10 @@ pub enum ReferenceDomain {
 pub enum LabelFault {
     PaperMintInStrictScope {
         label: String,
+    },
+    ReservedOpenKind {
+        label: String,
+        origin: MintOrigin,
     },
     MintContextMismatch {
         expected: std::collections::BTreeMap<String, MintOrigin>,

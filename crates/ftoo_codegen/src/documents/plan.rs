@@ -2467,7 +2467,9 @@ fn citation_run(
             };
             ftoo_manifest::AddressTarget::Theory(*identity)
         }
-        ftoo_manifest::MintKind::Markdown | ftoo_manifest::MintKind::UnitMetadata => {
+        ftoo_manifest::MintKind::Markdown
+        | ftoo_manifest::MintKind::UnitMetadata
+        | ftoo_manifest::MintKind::OpenQuestion => {
             ftoo_manifest::AddressTarget::Documentary(text.clone())
         }
         ftoo_manifest::MintKind::PaperTex => {
@@ -2642,7 +2644,8 @@ pub(super) fn citation_origins(
                     occurrence: None,
                 },
             ),
-            ftoo_manifest::LabelSite::RustIdentity { file, .. } => (
+            ftoo_manifest::LabelSite::RustIdentity { file, .. }
+            | ftoo_manifest::LabelSite::OpenQuestion { file, .. } => (
                 None,
                 UnitSite {
                     file: file.clone(),
