@@ -604,8 +604,8 @@ pub(super) fn lock(root: &Path) -> Result<Lock> {
     {
         return Err(invalid(&f[2].site, "33", toml::raw(f[2], text)));
     }
-    if string(f[1])? != "0.15.0" {
-        return Err(invalid(&f[1].site, "0.15.0", &string(f[1])?));
+    if string(f[1])? != "0.17.0" {
+        return Err(invalid(&f[1].site, "0.17.0", &string(f[1])?));
     }
     let e = toml::fixed(
         f[3],

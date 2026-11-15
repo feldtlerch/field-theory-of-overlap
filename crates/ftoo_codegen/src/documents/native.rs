@@ -509,7 +509,7 @@ fn consume_observed(
         completed(&scratch, &result);
         let checked = support.after_consumer(lock);
         let format = seed.map_or(Ok(()), |seed: std::sync::Arc<Seed>| {
-            seed.check(&scratch.join("cache"), FormatPhase::AfterCase)
+            seed.check(&scratch.join("bundle-cache"), FormatPhase::AfterCase)
                 .map_err(|fault| support.poison(fault))
         });
         let cleanup_phase = crate::telemetry::Phase::new("native.cleanup");
@@ -557,7 +557,7 @@ fn invoke(
     if reuse {
         let format = support.format_seed(lock, native_format::BOOTSTRAP)?;
         format
-            .copy(&scratch.join("cache"))
+            .copy(&scratch.join("bundle-cache"))
             .map_err(|fault| support.poison(fault))?;
         crate::telemetry::counter("native.format_copies", 1);
         *seed = Some(format);
@@ -706,7 +706,7 @@ pub(super) fn bootstrap(
             }
             .into());
         }
-        Seed::capture(&scratch.join("cache"), &lock.bundle_digest)
+        Seed::capture(&scratch.join("bundle-cache"), &lock.bundle_digest)
             .map_err(|fault| support.poison(fault).into())
     })();
     drop(guard);

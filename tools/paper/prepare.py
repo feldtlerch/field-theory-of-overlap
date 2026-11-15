@@ -109,7 +109,7 @@ def prepare(repository, support, work):
     bridge = read(work/'paper_xref.tex.in')
     require(bridge.count('@PAPER_PDF@') == 1, 'Companion target occurrence differs')
     write(work/'paper_xref.tex', bridge.replace('@PAPER_PDF@',templates['companion']['target']))
-    derive(support/'bundle/biblatex.bst',repository/SOURCES/'references.bib',work)
+    derive(repository/SOURCES/'references.bib',work)
     return sorted(packages)
 
 

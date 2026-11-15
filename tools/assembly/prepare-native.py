@@ -200,7 +200,7 @@ def read_lock(path):
     fields(lock, ["schema", "engine-version", "format-serial", "executable", "bundle"])
     require(type(lock["schema"]) is int and lock["schema"] == 1
             and schema_token == "1", "schema raw token")
-    require(lock["engine-version"] == "0.15.0", "engine-version")
+    require(lock["engine-version"] == "0.17.0", "engine-version")
     require(type(lock["format-serial"]) is int and lock["format-serial"] == 33, "format-serial")
     engine = lock["executable"]
     fields(engine, ["platform", "url", "archive-sha256", "member", "sha256"])
@@ -337,7 +337,7 @@ def main():
         directory(support / name)
     engine = lock["executable"]
     bundle = lock["bundle"]
-    executable_archive = support / "downloads/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz"
+    executable_archive = support / "downloads/tectonic-0.17.0-x86_64-unknown-linux-musl.tar.gz"
     bundle_archive = support / "downloads/bundle.tar"
     download(engine, executable_archive)
     download(bundle, bundle_archive)

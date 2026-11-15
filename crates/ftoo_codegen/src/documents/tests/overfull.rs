@@ -476,10 +476,7 @@ pub(super) fn support_required_overfull_boxes_refuse_complete_frames_and_restore
         let stdout = stdout.replace("@SCRATCH@", raw.scratch.to_str().unwrap());
         let stdout = stdout.replace(
             "@PDF-KIB@",
-            &format!(
-                "{:.2}",
-                f64::from(u32::try_from(raw.pdf_bytes.unwrap()).unwrap()) / 1024.0
-            ),
+            &(f64::from(u32::try_from(raw.pdf_bytes.unwrap()).unwrap()) / 1024.0).to_string(),
         );
         let mut alternate: Vec<_> = stdout.split_inclusive('\n').collect();
         let writes: Vec<_> = alternate

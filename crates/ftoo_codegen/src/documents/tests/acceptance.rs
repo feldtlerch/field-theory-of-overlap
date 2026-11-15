@@ -216,7 +216,7 @@ pub(super) fn support_required_native_negative_contexts_pin_complete_evidence_an
 fn small_lock() -> String {
     let digest = "a".repeat(64);
     format!(
-        "schema=1\nengine-version='0.15.0'\nformat-serial=33\n[executable]\nplatform='x86_64-unknown-linux-musl'\nurl='https://example.invalid/engine'\narchive-sha256='{digest}'\nmember='tectonic'\nsha256='{digest}'\n[bundle]\nurl='https://example.invalid/bundle'\narchive-sha256='{digest}'\nbundle-digest='{digest}'\nfiles=[{{member='SHA256SUM',sha256='{digest}'}}]\n"
+        "schema=1\nengine-version='0.17.0'\nformat-serial=33\n[executable]\nplatform='x86_64-unknown-linux-musl'\nurl='https://example.invalid/engine'\narchive-sha256='{digest}'\nmember='tectonic'\nsha256='{digest}'\n[bundle]\nurl='https://example.invalid/bundle'\narchive-sha256='{digest}'\nbundle-digest='{digest}'\nfiles=[{{member='SHA256SUM',sha256='{digest}'}}]\n"
     )
 }
 

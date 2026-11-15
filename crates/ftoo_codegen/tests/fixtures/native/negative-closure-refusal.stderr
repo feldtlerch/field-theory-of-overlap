@@ -1,3 +1,24 @@
 error: !Emergency stop
 *** (job aborted, no legal \end found)
-error: *** (job aborted, no legal \end found)
+error: something bad happened inside XeTeX; its output follows:
+
+===============================================================================
+(document.tex
+LaTeX2e <2021-11-15> patch level 1
+L3 programming layer <2022-02-24> (article.cls
+Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
+(size10.clo)) (amsmath.sty
+For additional information on amsmath, use the `?' option.
+(amstext.sty (amsgen.sty)) (amsbsy.sty) (amsopn.sty)) (amssymb.sty
+(amsfonts.sty)) (fontspec.sty (xparse.sty (expl3.sty (l3backend-xetex.def)))
+(fontspec-xetex.sty (fontenc.sty) (fontspec.cfg))) (notation.tex)
+(addressing.tex)
+No file document.aux.
+(ts1cmr.fd))
+! Emergency stop
+*** (job aborted, no legal \end found)
+No pages of output.
+Transcript written on document.log.
+===============================================================================
+error: the XeTeX engine had an unrecoverable error
+caused by: *** (job aborted, no legal \end found)

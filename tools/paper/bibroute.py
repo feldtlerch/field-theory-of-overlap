@@ -10,39 +10,22 @@ from common import require, digest, read, write, timed, runtime
 
 INPUTS = ["tools/paper/bibroute.py", "tools/paper/common.py", "documents/paper/references.bib"]
 
-STOCK_STYLE = 'dc8757e6828e6ee605fdb20752f9adcee32069accf2541f1b511da78486cb5b0'
 STOCK_BIB = '280fcfc82c0b4c49c152542b18d1cfd430b1bdbadda6207ffb3ee37f3021f003'
-DERIVED_STYLE = '488bfe355c24318a3a8c24a84887e0fe377f697e9da2d1bc39820930550cae97'
 DERIVED_BIB = '8e4f8f413998e962b4d78c38e4c639d3b22e8abdd5236c9a678ef8b01be38cfa'
-FLAGS = 'skipbib skiplos skiplab useauthor useeditor usetranslator useprefix singletitle'.split()
 
 
-def derive(style_path, bib_path, output):
-    stock_style, stock_bib = style_path.read_bytes(), bib_path.read_bytes()
-    require(digest(stock_style) == STOCK_STYLE, 'Stock style hash differs')
+def derive(bib_path, output):
+    # The style is the bundle's stock biblatex.bst, checked against the support lock
+    # by preparation. The retirement command's integer probe checks that the pinned
+    # engine still accepts the entry-local integer assignment during ITERATE that this
+    # style relies on; derivation does not run it.
+    stock_bib = bib_path.read_bytes()
     require(digest(stock_bib) == STOCK_BIB, 'Published bibliography hash differs')
-    style = stock_style.decode('utf-8')
-    old = '  { skipbib skiplos skiplab\n    useauthor useeditor usetranslator useprefix\n    singletitle }\n  { entryoptions'
-    require(style.count(old) == 1, 'Entry declaration differs')
-    # Tectonic 0.15.0, embedded BibTeX 0.99d, crates/engine_bibtex/src/exec.rs:
-    # interp_gets (:=) rejects entry-local INTEGER assignment
-    # during ITERATE with "You can't mess with entries here". String storage
-    # and boolean accessors preserve the entry-local semantics. Retire only
-    # when the integer probe below prints 1 without an error on a fixed engine.
-    style = style.replace(old, '  {}\n  { ' + ' '.join(n+'.str' for n in FLAGS) + '\n    entryoptions')
-    counts = {}
-    for name in FLAGS:
-        style, counts[name] = re.subn("'"+name+r'\s*:=', "int.to.str$ '"+name+'.str :=', style)
-        require(counts[name] > 0, 'Missing assignment: '+name)
-    pos = style.index('FUNCTION {initialize}')
-    accessors = ''.join('FUNCTION {'+n+'} { '+n+'.str "1" = }\n' for n in FLAGS)
-    style = style[:pos]+accessors+style[pos:]
-    require(digest(style.encode('utf-8')) == DERIVED_STYLE, 'Derived style hash differs')
-    # Tectonic 0.15.0, embedded BibTeX 0.99d, crates/engine_bibtex/src/exec.rs:
-    # text.length$'s special-character loop fails to advance
-    # on this nested accent group: nontermination, with no error diagnostic.
-    # The outer grouping is typographically redundant. Retire only when the
-    # accent probe terminates and prints 8 unchanged; its runner has a timeout.
+    # Tectonic 0.17.0, embedded BibTeX 0.99d, crates/engine_bibtex/src/exec.rs:
+    # text.length$ counts this nested accent group as 12 characters where
+    # BibTeX 0.99d counts a special character as one (8 in total), with no error
+    # diagnostic. The outer grouping is typographically redundant. Retire only
+    # when the accent probe terminates and prints 8 unchanged; its runner has a timeout.
     bib = stock_bib.decode('utf-8')
     require(bib.count(r'Fran{\c{c}}ois') == 1, 'Accent occurrence count differs')
     bib = bib.replace(r'Fran{\c{c}}ois', r'Fran\c{c}ois')
@@ -60,11 +43,10 @@ def derive(style_path, bib_path, output):
     bib = bib.replace('Multi-Dimensioned', r'Multi-Dimen\-sioned')
     require(digest(bib.encode('utf-8')) == DERIVED_BIB, 'Derived bibliography hash differs')
     output.mkdir(parents=True, exist_ok=True)
-    for name, value in [('biblatex.bst',style), ('references.bib',bib)]:
-        (output/name).write_bytes(value.encode('utf-8'))
-    for name, before, after in [('style',stock_style.decode('utf-8'),style), ('bibliography',stock_bib.decode('utf-8'),bib)]:
-        write(output/(name+'.diff'), ''.join(difflib.unified_diff(before.splitlines(True),after.splitlines(True),fromfile='stock/'+name,tofile='derived/'+name)))
-    record = dict(stock_style=STOCK_STYLE, stock_bibliography=STOCK_BIB, derived_style=DERIVED_STYLE, derived_bibliography=DERIVED_BIB, assignments=counts)
+    (output/'references.bib').write_bytes(bib.encode('utf-8'))
+    before = stock_bib.decode('utf-8')
+    write(output/'bibliography.diff', ''.join(difflib.unified_diff(before.splitlines(True),bib.splitlines(True),fromfile='stock/bibliography',tofile='derived/bibliography')))
+    record = dict(stock_bibliography=STOCK_BIB, derived_bibliography=DERIVED_BIB)
     write(output/'derivation.json', json.dumps(record,indent=2)+'\n')
     return record
 
@@ -109,7 +91,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     derive_parser = sub.add_parser('derive')
-    for name in ['style', 'bibliography', 'output']: derive_parser.add_argument(name, type=pathlib.Path)
+    for name in ['bibliography', 'output']: derive_parser.add_argument(name, type=pathlib.Path)
     retire = sub.add_parser('retirement')
     retire.add_argument('--repository', type=pathlib.Path, default=pathlib.Path(__file__).resolve().parents[2])
     retire.add_argument('--support', type=pathlib.Path, default=os.environ.get('FTOO_ASSEMBLY_SUPPORT'))
@@ -118,7 +100,7 @@ if __name__ == '__main__':
     retire.add_argument('--timeout', type=int, default=30)
     args = parser.parse_args()
     with timed(args.command):
-        if args.command == 'derive': print(json.dumps(derive(args.style, args.bibliography, args.output), indent=2))
+        if args.command == 'derive': print(json.dumps(derive(args.bibliography, args.output), indent=2))
         else:
             require(args.support is not None, 'Set FTOO_ASSEMBLY_SUPPORT or --support')
             retirement(args.repository.resolve(), args.support.resolve(), args.runtime_lock, args.output.resolve(), args.timeout)

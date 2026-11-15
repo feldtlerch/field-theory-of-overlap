@@ -4,4 +4,37 @@ error: document.tex:14: Fatal Package ftdoc Error: Addressing runtime refusal. D
 (ftdoc)                      unit , language en, site u0-t0.
 
 Type <return> to continue
-error: halted on potentially-recoverable error as specified
+error: something bad happened inside XeTeX; its output follows:
+
+===============================================================================
+(document.tex
+LaTeX2e <2021-11-15> patch level 1
+L3 programming layer <2022-02-24> (article.cls
+Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
+(size10.clo)) (amsmath.sty
+For additional information on amsmath, use the `?' option.
+(amstext.sty (amsgen.sty)) (amsbsy.sty) (amsopn.sty)) (amssymb.sty
+(amsfonts.sty)) (fontspec.sty (xparse.sty (expl3.sty (l3backend-xetex.def)))
+(fontspec-xetex.sty (fontenc.sty) (fontspec.cfg))) (notation.tex)
+(addressing.tex)
+No file document.aux.
+(ts1cmr.fd)
+FTDOC-R:i:0:1:633a3031
+FTDOC-R:s:0:1:75302d7430
+FTDOC-R:m:0:2:7461672022633a3031223a20756e6b6e
+FTDOC-R:m:1:2:6f776e
+FTDOC-END
+
+! Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
+(ftdoc)                      unit , language en, site u0-t0.
+
+Type <return> to continue.
+ ...                                              
+                                                  
+l.14 \FtdocTag{c:01}{u0-t0}
+                           
+No pages of output.
+Transcript written on document.log.
+===============================================================================
+error: the XeTeX engine had an unrecoverable error
+caused by: halted on potentially-recoverable error as specified

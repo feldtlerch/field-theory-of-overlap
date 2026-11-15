@@ -1,13 +1,13 @@
 schema = 1
-engine-version = "0.15.0"
+engine-version = "0.17.0"
 format-serial = 33
 
 [executable]
 platform = "x86_64-unknown-linux-musl"
-url = "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz"
-archive-sha256 = "dfb82876f2986862996e564fa507a9e576e0c1e3bee63c2c1bd677c2543e6407"
+url = "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.17.0/tectonic-0.17.0-x86_64-unknown-linux-musl.tar.gz"
+archive-sha256 = "8533d07f9ccbd7a65824b9e0459041bca34af1eb33daba48f59215593753a3b7"
 member = "tectonic"
-sha256 = "4df19452c202c5bef9f7c7e4a01a3f2b9d5199f0a1f73b70b4fe1bffbc9837f6"
+sha256 = "a98aa59ad5c1df39a6c9e56cbfc5088f2b11d6c179c0130b97998e4bd46a46da"
 
 [bundle]
 url = "https://data1.fullyjustified.net/tlextras-2022.0r0.tar"

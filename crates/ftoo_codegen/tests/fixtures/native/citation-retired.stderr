@@ -3,4 +3,45 @@ error: document.tex:19: Fatal Package ftdoc Error: Addressing runtime refusal. D
 (ftdoc)                      u0-c0.
 
 Type <return> to continue
-error: halted on potentially-recoverable error as specified
+error: something bad happened inside XeTeX; its output follows:
+
+===============================================================================
+(document.tex
+LaTeX2e <2021-11-15> patch level 1
+L3 programming layer <2022-02-24> (article.cls
+Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
+(size10.clo)) (amsmath.sty
+For additional information on amsmath, use the `?' option.
+(amstext.sty (amsgen.sty)) (amsbsy.sty) (amsopn.sty)) (amssymb.sty
+(amsfonts.sty)) (fontspec.sty (xparse.sty (expl3.sty (l3backend-xetex.def)))
+(fontspec-xetex.sty (fontenc.sty) (fontspec.cfg))) (notation.tex)
+(addressing.tex)
+No file document.aux.
+(ts1cmr.fd)
+FTDOC-R:i:0:1:6465633a77656c64
+FTDOC-R:s:0:1:75302d6330
+FTDOC-R:m:0:9:74616720226465633a77656c64223a20
+FTDOC-R:m:1:9:726574697265643b206c6162656c2064
+FTDOC-R:m:2:9:65633a77656c643a657175616c2d6164
+FTDOC-R:m:3:9:64726573732d736574733b206576656e
+FTDOC-R:m:4:9:7420343b20617574686f726974792064
+FTDOC-R:m:5:9:65633a746167733a626f756e642d746f
+FTDOC-R:m:6:9:2d6c6162656c733b20726561736f6e20
+FTDOC-R:m:7:9:2246697874757265207265746972656d
+FTDOC-R:m:8:9:656e742e22
+FTDOC-END
+
+! Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
+(ftdoc)                      unit sec:fixture:citation, language en, site
+(ftdoc)                      u0-c0.
+
+Type <return> to continue.
+ ...                                              
+                                                  
+l.19 See \FtdocTag{dec:weld}{u0-c0}
+                                   % cite dec:weld:equal-address-sets
+No pages of output.
+Transcript written on document.log.
+===============================================================================
+error: the XeTeX engine had an unrecoverable error
+caused by: halted on potentially-recoverable error as specified

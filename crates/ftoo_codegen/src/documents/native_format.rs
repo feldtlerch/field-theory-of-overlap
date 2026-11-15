@@ -228,7 +228,7 @@ fn inventory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, NativeAdapterFaul
 }
 impl Seed {
     pub(super) fn capture(cache: &Path, digest: &str) -> Result<Self, NativeAdapterFault> {
-        let files = inventory(&cache.join("Tectonic/formats"))?;
+        let files = inventory(&cache.join("formats"))?;
         let expected = format!("{digest}-latex-33.fmt");
         let unexpected: Vec<_> = files
             .keys()
@@ -254,7 +254,7 @@ impl Seed {
         let phase = crate::telemetry::Phase::new("native.format_copy");
         let result = (|| {
             for (name, bytes) in &self.files {
-                let path = cache.join("Tectonic/formats").join(name);
+                let path = cache.join("formats").join(name);
                 fs::create_dir_all(path.parent().expect("format parent"))
                     .and_then(|()| fs::write(&path, bytes))
                     .map_err(|e| {
@@ -267,7 +267,7 @@ impl Seed {
         result
     }
     pub(super) fn check(&self, cache: &Path, phase: FormatPhase) -> Result<(), NativeAdapterFault> {
-        let actual = inventory(&cache.join("Tectonic/formats"))?;
+        let actual = inventory(&cache.join("formats"))?;
         let missing: Vec<_> = self
             .files
             .keys()
@@ -326,7 +326,7 @@ mod tests {
             FormatPhase::AfterCase,
         ] {
             seed.copy(&directory.0).unwrap();
-            let formats = directory.0.join("Tectonic/formats");
+            let formats = directory.0.join("formats");
             fs::remove_file(formats.join("a.fmt")).unwrap();
             fs::write(formats.join("b.fmt"), b"changed").unwrap();
             fs::write(formats.join("c.fmt"), b"unexpected").unwrap();
@@ -457,7 +457,7 @@ mod tests {
                 |_| {},
                 |scratch, result| {
                     evidence = Some(result.clone());
-                    let directory = scratch.join("cache/Tectonic/formats");
+                    let directory = scratch.join("bundle-cache/formats");
                     fs::rename(directory.join(&member), directory.join("extra.fmt")).unwrap();
                 },
             );

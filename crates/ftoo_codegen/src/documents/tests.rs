@@ -1767,11 +1767,11 @@ fn support_required_native_lost_character_is_a_complete_hard_error(
     } else {
         ""
     };
-    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.64 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
+    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.6416015625 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
     let stderr = if support.cold_format.get() {
-        b"warning: open of input /dev/null failed\ncaused by: access to the path `/dev/null` is forbidden\nerror: halted on potentially-recoverable error as specified\n".to_vec()
+        include_bytes!("../../tests/fixtures/native/cold-lost-character-refusal.stderr").to_vec()
     } else {
-        b"error: halted on potentially-recoverable error as specified\n".to_vec()
+        include_bytes!("../../tests/fixtures/native/lost-character-refusal.stderr").to_vec()
     };
     let expected = DocumentError::Assembly(
         AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {

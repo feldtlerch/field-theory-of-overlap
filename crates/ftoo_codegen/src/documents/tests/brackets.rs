@@ -243,7 +243,7 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
             let stdout = if status == 0 {
                 let size =
                     u32::try_from(evidence.pdf_bytes.expect("successful private PDF")).unwrap();
-                stdout.replace("@PDF-KIB@", &format!("{:.2}", f64::from(size) / 1024.0))
+                stdout.replace("@PDF-KIB@", &(f64::from(size) / 1024.0).to_string())
             } else {
                 stdout
             };
@@ -754,11 +754,8 @@ fn support_required_format_state_fault_poison_discards_provisional_results_and_n
         let result = support.scope(&lock, || -> Result<Vec<&str>, NativeAdapterFault> {
             support.observe(&lock)?;
             seed.copy(&cache)?;
-            crate::support_bracket::mutation::write(
-                cache.join("Tectonic/formats/a.fmt"),
-                b"mutation",
-            )
-            .unwrap();
+            crate::support_bracket::mutation::write(cache.join("formats/a.fmt"), b"mutation")
+                .unwrap();
             assert_eq!(
                 seed.check(&cache, phase)
                     .map_err(|fault| support.poison(fault)),
@@ -787,10 +784,7 @@ fn support_required_format_state_fault_poison_discards_provisional_results_and_n
         });
         assert_eq!(result, Err(fault.clone()));
         assert_eq!(support.closing_hash(), Some(Ok(())));
-        assert_eq!(
-            fs::read(cache.join("Tectonic/formats/a.fmt")).unwrap(),
-            b"seed"
-        );
+        assert_eq!(fs::read(cache.join("formats/a.fmt")).unwrap(), b"seed");
         assert_eq!(
             support.scope(&lock, || {
                 support.observe(&lock)?;
