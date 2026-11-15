@@ -152,8 +152,9 @@
   \medskip\par
 }
 
+% The paragraph ends inside the size group, so the note keeps its own line spacing.
 \NewDocumentCommand{\formalfoot}{m}{%
-  \par\medskip\noindent{\footnotesize\textbf{@FORMALLY@}\enspace #1}\par}
+  \par\medskip\noindent{\footnotesize\textbf{@FORMALLY@}\enspace #1\par}}
 
 \NewDocumentCommand{\gloss}{m m}{#1~{\footnotesize(\textit{#2})}}
 

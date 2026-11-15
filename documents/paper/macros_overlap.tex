@@ -301,7 +301,8 @@
 }
 
 \NewDocumentCommand{\coda}{m}{%
-  \clearpage\addcontentsline{toc}{part}{Coda --- #1}%
+  % The contents entry links to the Coda's own first page.
+  \clearpage\phantomsection\addcontentsline{toc}{part}{Coda --- #1}%
   \begin{center}\LARGE\scshape Coda\par\medskip\normalfont\itshape #1\par\end{center}\bigskip
 }
 

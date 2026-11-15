@@ -124,8 +124,8 @@
     {
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 53428,
-      "end": 56121,
+      "start": 53402,
+      "end": 56095,
       "sha256": "002068089d36e3135d0e0926bb745dcb8708930db2ef87de3ce24c476d2ba453",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "\\section{The Paper and Its Checks}"
