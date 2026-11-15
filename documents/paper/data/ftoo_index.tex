@@ -1,0 +1,470 @@
+
+\ExplSyntaxOn
+
+\prg_new_conditional:Npnn \__ftoo_index_anchored:n #1 { TF }
+  {
+    \cs_if_exist:cTF { r@#1 }
+      { \prg_return_true: }
+      { \prg_return_false: }
+  }
+
+\cs_new_protected:Npn \__ftoo_index_tag:n #1
+  {
+    \__ftoo_index_anchored:nTF { #1 }
+      { \hyperref[#1]{ \ftoo_tagfont_ref:n { #1 } } }
+      { \ftoo_tagfont_ref:n { #1 } }
+  }
+
+\cs_new_protected:Npn \__ftoo_index_where:n #1
+  {
+    \__ftoo_index_anchored:nTF { #1 }
+      { \zcref{ #1 } }
+      { \textit{\small not~written} }
+  }
+
+\NewDocumentCommand{\ftooindexrow}{ m m m }
+  { \__ftoo_index_tag:n { #1 } & #2 & #3 & \__ftoo_index_where:n { #1 } \\ }
+
+\NewDocumentCommand{\ftooindexregister}{ m m }
+  { \textbf{ \ttfamily #1: } & \textbf{ #2~bound~tags } & & \\ }
+
+\ExplSyntaxOff
+
+\noindent The paper's public vocabulary, grouped by register: 329 tags across 29
+registers. The \emph{referent} column is the title recorded for what the tag names and
+the \emph{kind} column its kind; \emph{where} is the site the paper anchors the tag at,
+found afresh at every build, or \textit{not written} for a tag the prose does not yet
+spend. These rows expose the vocabulary; they do not certify what it names.
+
+\begingroup
+\small
+\begin{xltabular}{\textwidth}{@{}
+    l
+    >{\RaggedRight}X
+    >{\RaggedRight\ttfamily\footnotesize}p{0.20\textwidth}
+    >{\RaggedRight}p{0.14\textwidth} @{}}
+  \toprule
+  \textbf{tag} & \textbf{referent} & \textbf{kind} & \textbf{where} \\
+  \midrule \endfirsthead
+  \toprule
+  \textbf{tag} & \textbf{referent} & \textbf{kind} & \textbf{where} \\
+  \midrule \endhead
+  \bottomrule \endfoot
+  \addlinespace
+  \ftooindexregister{J}{9}
+  \addlinespace[2pt]
+  \ftooindexrow{J:broker}{ The broker's two products: suppressing a witness density has two targets at two prices, deterrence and foreclosure }{ claim }
+  \ftooindexrow{J:forensics}{ Seal forensics: a tail-seal leaves a standing residual and a broker-seal leaves a shortfall, and the identification scheme reads the difference }{ claim }
+  \ftooindexrow{J:hip}{ Five objects, not one: the hip holds apart what caring fused }{ claim }
+  \ftooindexrow{J:occ}{ Occupancy }{ construction }
+  \ftooindexrow{J:power}{ The occupancy power form: maintenance power as occupancy takes it }{ reading }
+  \ftooindexrow{J:read}{ The readability joint }{ construction }
+  \ftooindexrow{J:seal}{ The toll-keeper's kernel: holding one's own edge shut against its opening is a standing spend as dark as fidelity's }{ claim }
+  \ftooindexrow{J:seal-floor}{ The toll-keeper's floor: the mean equation prices the cheapest seal at zero and the sphere does not }{ claim }
+  \ftooindexrow{J:tremble}{ The trembling identity: the fluctuation record reads maintenance }{ claim }
+  \addlinespace
+  \ftooindexregister{P}{13}
+  \addlinespace[2pt]
+  \ftooindexrow{P:akrasia}{ The akratic dissociation: self-narration is orthogonal to maintenance, so self-awareness does not carry the power to hold }{ claim }
+  \ftooindexrow{P:anti}{ The antichain }{ construction }
+  \ftooindexrow{P:axes}{ Within-axis and between-axis: a shared metric resolves the first incommensurability and no metric touches the second }{ claim }
+  \ftooindexrow{P:bld}{ Trait building }{ named-quantity }
+  \ftooindexrow{P:dens}{ Trait density }{ named-quantity }
+  \ftooindexrow{P:dir}{ Trait direction }{ named-quantity }
+  \ftooindexrow{P:nar}{ Trait narration }{ named-quantity }
+  \ftooindexrow{P:nonorm}{ No dimensionally-natural norm: the agency-score fails across nodes and between axes, on independent grounds }{ claim }
+  \ftooindexrow{P:order}{ The only choice-free structure: without a norm the partial order is all that is canonical, and on real lives it is an antichain }{ claim }
+  \ftooindexrow{P:res}{ Trait restraint }{ named-quantity }
+  \ftooindexrow{P:sig}{ Trait alignment }{ named-quantity }
+  \ftooindexrow{P:vec}{ The trait point }{ construction }
+  \ftooindexrow{P:will}{ Trait will }{ named-quantity }
+  \addlinespace
+  \ftooindexregister{art}{2}
+  \addlinespace[2pt]
+  \ftooindexrow{art:directive}{ The directive }{ construction }
+  \ftooindexrow{art:keepers}{ The keepers' limit: integrity under unbounded capture rent tends to the unpriced fraction and no further }{ claim }
+  \addlinespace
+  \ftooindexregister{bd}{6}
+  \addlinespace[2pt]
+  \ftooindexrow{bd:G}{ Funding gap }{ named-quantity }
+  \ftooindexrow{bd:V}{ Non representable fraction }{ named-quantity }
+  \ftooindexrow{bd:edge}{ Edge load }{ named-quantity }
+  \ftooindexrow{bd:fab}{ The fabrication line }{ construction }
+  \ftooindexrow{bd:fab-power}{ Fabrication power: once verification is costed the fabrication line has a power form, and it is the same boundary }{ claim }
+  \ftooindexrow{bd:rep}{ Representation boundary }{ named-quantity }
+  \addlinespace
+  \ftooindexregister{bf}{5}
+  \addlinespace[2pt]
+  \ftooindexrow{bf:cred}{ Credibility }{ construction }
+  \ftooindexrow{bf:factors}{ The four belief-factors }{ construction }
+  \ftooindexrow{bf:ind}{ Independence }{ construction }
+  \ftooindexrow{bf:mot}{ Motivation }{ construction }
+  \ftooindexrow{bf:unb}{ Unbias }{ construction }
+  \addlinespace
+  \ftooindexregister{c}{15}
+  \addlinespace[2pt]
+  \ftooindexrow{c:D}{ The directional diffusion rate }{ parameter }
+  \ftooindexrow{c:Da}{ The ambient noise }{ parameter }
+  \ftooindexrow{c:Gstar}{ The public goods-space metric family }{ anchor }
+  \ftooindexrow{c:Npool}{ The witness pool count }{ normalization }
+  \ftooindexrow{c:W0}{ The achievement scale }{ parameter }
+  \ftooindexrow{c:Wstar}{ The rent-into-surplus threshold }{ parameter }
+  \ftooindexrow{c:burn}{ The burn cost per anchored witness }{ parameter }
+  \ftooindexrow{c:exch}{ Interpersonal welfare currency }{ converter }
+  \ftooindexrow{c:kappa0}{ The belonging calibration }{ calibration }
+  \ftooindexrow{c:lam}{ The private node-local weighting }{ access-object }
+  \ftooindexrow{c:mu}{ The coupling atrophy rate }{ parameter }
+  \ftooindexrow{c:n}{ The sphere dimension }{ parameter }
+  \ftooindexrow{c:nu}{ The funded private-gradient-to-rate converter }{ converter }
+  \ftooindexrow{c:q}{ The log's reading axis }{ anchor }
+  \ftooindexrow{c:tau}{ The densification maturity }{ parameter }
+  \addlinespace
+  \ftooindexregister{ch}{3}
+  \addlinespace[2pt]
+  \ftooindexrow{ch:deep}{ The radial deepening channel }{ control-channel }
+  \ftooindexrow{ch:right}{ The tangent-gradient righting channel }{ control-channel }
+  \ftooindexrow{ch:rot}{ A rotational caring-direction channel }{ control-channel }
+  \addlinespace
+  \ftooindexregister{d}{6}
+  \addlinespace[2pt]
+  \ftooindexrow{d:annex}{ Annexation }{ editorial-classification }
+  \ftooindexrow{d:caveat}{ Caveat promoted to constraint }{ editorial-classification }
+  \ftooindexrow{d:flatten}{ Flattening }{ editorial-classification }
+  \ftooindexrow{d:freeze}{ Freezing }{ editorial-classification }
+  \ftooindexrow{d:scalar}{ Scalarization }{ editorial-classification }
+  \ftooindexrow{d:wall}{ Scope wall }{ editorial-classification }
+  \addlinespace
+  \ftooindexregister{deon}{2}
+  \addlinespace[2pt]
+  \ftooindexrow{deon:open}{ Open-loop forcing }{ semantic-source-class }
+  \ftooindexrow{deon:test}{ Refutable, never verifiable: a nonzero susceptibility slope refutes bind and a zero slope does not establish it }{ claim }
+  \addlinespace
+  \ftooindexregister{dyn}{44}
+  \addlinespace[2pt]
+  \ftooindexrow{dyn:bend}{ Bend function }{ named-quantity }
+  \ftooindexrow{dyn:bif}{ The origin destabilizes when formation outruns decay, and that is not an existence condition }{ claim }
+  \ftooindexrow{dyn:drift}{ Endogenous alignment drift }{ drift }
+  \ftooindexrow{dyn:floor}{ The ambient-coupling floor }{ construction }
+  \ftooindexrow{dyn:flow}{ The flow equation }{ construction }
+  \ftooindexrow{dyn:form}{ The mean-field formation amplitude }{ control-amplitude }
+  \ftooindexrow{dyn:formclose}{ The interior additive formation closure }{ construction }
+  \ftooindexrow{dyn:formdrift}{ Formation contribution to the alignment rate }{ control-projection }
+  \ftooindexrow{dyn:gamma}{ The free mean decay rate }{ parameter }
+  \ftooindexrow{dyn:jac}{ The ring Jacobian }{ construction }
+  \ftooindexrow{dyn:lapse}{ The passive decay term }{ construction }
+  \ftooindexrow{dyn:lift}{ The co-movement field dynamical-lift interface }{ dynamical-lift }
+  \ftooindexrow{dyn:loop}{ Loop currents at a held edge: stationary fluctuations satisfy detailed balance exactly when the skew sector vanishes }{ claim }
+  \ftooindexrow{dyn:moment}{ The spherical first moment }{ claim }
+  \ftooindexrow{dyn:orbitlag}{ Rotational lag asymmetry }{ construction }
+  \ftooindexrow{dyn:orbitvar}{ Phase-resolved orbit variance }{ construction }
+  \ftooindexrow{dyn:pitch}{ The pitch }{ construction }
+  \ftooindexrow{dyn:pitchpair}{ The pitch pair: tremor circulation and release pitch read the same local skew sector, held versus let-go }{ claim }
+  \ftooindexrow{dyn:polar}{ The polar model }{ model-shape }
+  \ftooindexrow{dyn:precess}{ Precession }{ construction }
+  \ftooindexrow{dyn:radial}{ The radial occupancy: holding a tie at mean coupling requires a standing radial feed }{ claim }
+  \ftooindexrow{dyn:reconcile}{ Release is the mean; lapse is the distribution }{ claim }
+  \ftooindexrow{dyn:release}{ Release }{ diagnostic }
+  \ftooindexrow{dyn:req}{ Required stationary righting }{ reading }
+  \ftooindexrow{dyn:resp}{ The response rate }{ construction }
+  \ftooindexrow{dyn:rot}{ The travelling phase-wave }{ construction }
+  \ftooindexrow{dyn:scramble}{ The accelerating scramble: the completed branch makes directional diffusion coupling-dependent, so weak ties scramble fast }{ claim }
+  \ftooindexrow{dyn:seed}{ The seed regime }{ construction }
+  \ftooindexrow{dyn:sigma}{ The spherical alignment coordinate }{ coordinate }
+  \ftooindexrow{dyn:skew}{ The skew sector }{ construction }
+  \ftooindexrow{dyn:sphgen}{ The spherical coordinate generator }{ mathematical-object }
+  \ftooindexrow{dyn:sphlift}{ The fixed-coupling spherical caring-direction lift }{ dynamical-lift }
+  \ftooindexrow{dyn:split}{ The generator split }{ construction }
+  \ftooindexrow{dyn:spont}{ The spontaneous regime }{ construction }
+  \ftooindexrow{dyn:stand}{ Spectral prohibition: a ring mode travels only through the antisymmetric part of the coupling }{ claim }
+  \ftooindexrow{dyn:stat}{ The fixed-coupling stationary map }{ construction }
+  \ftooindexrow{dyn:sub}{ The subsidy regime }{ construction }
+  \ftooindexrow{dyn:sym}{ The symmetric sector }{ construction }
+  \ftooindexrow{dyn:tcurve}{ The fixed-coupling trembling curve }{ construction }
+  \ftooindexrow{dyn:tri}{ The three regimes: the interior structure is a trichotomy, not a threshold }{ claim }
+  \ftooindexrow{dyn:ttax}{ The completed trembling taxonomy }{ diagnostic }
+  \ftooindexrow{dyn:unif}{ The uniform sphere lapse }{ construction }
+  \ftooindexrow{dyn:vmf}{ The von Mises-Fisher coordinate family }{ mathematical-object }
+  \ftooindexrow{dyn:whereskew}{ The trembling-localization diagnostic }{ diagnostic }
+  \addlinespace
+  \ftooindexregister{e}{34}
+  \addlinespace[2pt]
+  \ftooindexrow{e:afriat}{ Rationalization reaches enlargement, never the rate at rest }{ economics-membrane }
+  \ftooindexrow{e:arrow}{ Impossibility, biting at the inputs }{ economics-membrane }
+  \ftooindexrow{e:artifact}{ Mechanism design with the objective deleted }{ economics-membrane }
+  \ftooindexrow{e:balance}{ Collusion as the welfare theorems' missing axis }{ economics-membrane }
+  \ftooindexrow{e:baseline}{ Subtracting the right gradient }{ economics-membrane }
+  \ftooindexrow{e:bistab}{ Coordination failure on the witness graph }{ economics-membrane }
+  \ftooindexrow{e:capability}{ The flourishing pole }{ economics-membrane }
+  \ftooindexrow{e:capital}{ Reswitching as honest ambivalence }{ economics-membrane }
+  \ftooindexrow{e:carework}{ The nearest occupants of the still center }{ economics-membrane }
+  \ftooindexrow{e:cartel}{ Interdependent utility and the unseen cartel }{ economics-membrane }
+  \ftooindexrow{e:closure}{ Resourced closure is not friction }{ economics-membrane }
+  \ftooindexrow{e:colour}{ Cheap talk as a directed field }{ economics-membrane }
+  \ftooindexrow{e:commitment}{ Commitment, given a fixed address }{ economics-membrane }
+  \ftooindexrow{e:dmp}{ Search-and-matching, one assumption away }{ economics-membrane }
+  \ftooindexrow{e:externality}{ The externality instruments, disarmed }{ economics-membrane }
+  \ftooindexrow{e:extself}{ The household at fixed weights }{ economics-membrane }
+  \ftooindexrow{e:faces}{ One will under two arguments }{ economics-membrane }
+  \ftooindexrow{e:fwt}{ The invisible hand and its blind half }{ economics-membrane }
+  \ftooindexrow{e:goodhart}{ Motivated beliefs reach the warm reading; the residual does not move }{ economics-membrane }
+  \ftooindexrow{e:hayek}{ Less aggregable than price }{ economics-membrane }
+  \ftooindexrow{e:input}{ The borrowed move, one level up }{ economics-membrane }
+  \ftooindexrow{e:lemons}{ The lemons wall }{ economics-membrane }
+  \ftooindexrow{e:license}{ The blind crossing, never the sighted }{ economics-membrane }
+  \ftooindexrow{e:menus}{ Self-control priced at the menu }{ economics-membrane }
+  \ftooindexrow{e:netform}{ Network formation, without a witness field }{ economics-membrane }
+  \ftooindexrow{e:osc}{ The prohibition, transported to a witness graph }{ economics-membrane }
+  \ftooindexrow{e:pow}{ Costly proof splits credibility }{ economics-membrane }
+  \ftooindexrow{e:rent-surplus}{ Broker rent versus the gains from trade }{ economics-membrane }
+  \ftooindexrow{e:repeated}{ The repeated-games condition, factored in two }{ economics-membrane }
+  \ftooindexrow{e:robbins}{ Robbins, dimensioned }{ economics-membrane }
+  \ftooindexrow{e:smith}{ Both books on one network }{ economics-membrane }
+  \ftooindexrow{e:stock}{ Relational capital, given its instrument }{ economics-membrane }
+  \ftooindexrow{e:sybil}{ The Sybil attack, promoted to a constraint }{ economics-membrane }
+  \ftooindexrow{e:witness}{ Structural holes versus closure }{ economics-membrane }
+  \addlinespace
+  \ftooindexregister{epi}{5}
+  \addlinespace[2pt]
+  \ftooindexrow{epi:blind}{ Instantaneous blindness: one choice fixes the lean and not its rate, and the moral velocity recovers only over a biography }{ claim }
+  \ftooindexrow{epi:conv}{ The converter principle: an instrument reads what is spent into it and nothing else }{ claim }
+  \ftooindexrow{epi:fact}{ The Readability Fact: a single state-snapshot cannot decompose a zero net rate into its opposing forces }{ claim }
+  \ftooindexrow{epi:option}{ Option-visibility: restraint against a known option is priceable and the permanent null is restraint against an unknown one }{ claim }
+  \ftooindexrow{epi:shadow}{ The instrument shadow: the one fact is the converter principle specialized to the poorest instrument, and richer instruments read exactly what is spent into them }{ claim }
+  \addlinespace
+  \ftooindexregister{epist}{1}
+  \addlinespace[2pt]
+  \ftooindexrow{epist:duhem}{ Underdetermination over a known palette }{ quoted-library }
+  \addlinespace
+  \ftooindexregister{ev}{6}
+  \addlinespace[2pt]
+  \ftooindexrow{ev:afriat-conv}{ the epistemic posit: rationalization recovers every spent gradient and nothing unspent }{ evidence-warrant }
+  \ftooindexrow{ev:decay-occ}{ the APPLICABILITY of occupancy, not the will's existence: neglected edges actually decay, so occupancy is not vacuous in a zero-decay world }{ evidence-warrant }
+  \ftooindexrow{ev:knee-rate}{ the will's TYPE alone: no knee at resolution bounds a reservoir's time-constant, which is the rate reading and not the bundled posit }{ evidence-warrant }
+  \ftooindexrow{ev:resid-ex}{ EXISTENCE: a nonzero identified residual, where edges are held below self-sustainment and zero in a will-free world }{ evidence-warrant }
+  \ftooindexrow{ev:resid-opp}{ DIRECTION, a separate warrant from existence: the residual space is signed, so opposition to the reward gradient is a finding the field could fail }{ evidence-warrant }
+  \ftooindexrow{ev:tremble-conv}{ the instrument ladder: each richer record removes from the dark exactly what is spent into it }{ evidence-warrant }
+  \addlinespace
+  \ftooindexregister{f}{26}
+  \addlinespace[2pt]
+  \ftooindexrow{f:Ncount}{ The effective anchored witness count }{ construction }
+  \ftooindexrow{f:acc}{ Accountability }{ named-quantity }
+  \ftooindexrow{f:ambiv}{ Ambivalence }{ construction }
+  \ftooindexrow{f:care}{ The caring covector }{ construction }
+  \ftooindexrow{f:ceiling}{ The price ceiling: the coupling bounds what one anchored unit of event can cost its holder }{ claim }
+  \ftooindexrow{f:comov}{ The co-movement edge operator }{ mathematical-object }
+  \ftooindexrow{f:couple}{ Coupling }{ named-quantity }
+  \ftooindexrow{f:defector}{ The counterfactual defector }{ construction }
+  \ftooindexrow{f:eff}{ Effective witness density }{ reading }
+  \ftooindexrow{f:felt}{ The felt total }{ construction }
+  \ftooindexrow{f:feltmag}{ The felt stake }{ construction }
+  \ftooindexrow{f:feltsign}{ The felt sign }{ construction }
+  \ftooindexrow{f:feltzero}{ Felt zero, the apparent stranger }{ construction }
+  \ftooindexrow{f:field}{ The co-movement field }{ mathematical-object }
+  \ftooindexrow{f:holonomy}{ Valuation holonomy }{ named-quantity }
+  \ftooindexrow{f:local}{ Local witnessing }{ reading }
+  \ftooindexrow{f:opp}{ Gradient opposition: reward and accountability oppose globally on operator-space }{ claim }
+  \ftooindexrow{f:path}{ Path witnessing }{ reading }
+  \ftooindexrow{f:pool}{ Coherence pools the value; independence supplies the weight }{ claim }
+  \ftooindexrow{f:reach}{ The witness's reach }{ construction }
+  \ftooindexrow{f:rew}{ Reward field }{ named-quantity }
+  \ftooindexrow{f:seal-law}{ Sealed-commons: three zeros, not two, and the wall is structural rather than reachable by neglect }{ claim }
+  \ftooindexrow{f:sealed}{ The structural seal }{ construction }
+  \ftooindexrow{f:split}{ Invariant total, anchored decomposition: the felt total exists without the anchor and its decomposition does not }{ claim }
+  \ftooindexrow{f:stake}{ The realized stake }{ reading }
+  \ftooindexrow{f:surplus}{ Surplus }{ named-quantity }
+  \addlinespace
+  \ftooindexregister{gen}{10}
+  \addlinespace[2pt]
+  \ftooindexrow{gen:alph}{ The alphabet }{ construction }
+  \ftooindexrow{gen:basins}{ Two basins }{ construction }
+  \ftooindexrow{gen:ext}{ Extensivity }{ construction }
+  \ftooindexrow{gen:goods}{ Shared goods, node-graded welfare }{ construction }
+  \ftooindexrow{gen:grade}{ Graded dimensions }{ construction }
+  \ftooindexrow{gen:trich}{ Converter trichotomy }{ construction }
+  \ftooindexrow{gen:w-exists}{ Existence: there is an input to edge dynamics beyond reward and decay }{ claim }
+  \ftooindexrow{gen:w-opp}{ Direction: the connective will opposes the reward gradient }{ claim }
+  \ftooindexrow{gen:w-rate}{ Type: the input is a rate, with no reservoir behind it }{ claim }
+  \ftooindexrow{gen:will}{ The Will }{ foundation-package }
+  \addlinespace
+  \ftooindexregister{lib}{4}
+  \addlinespace[2pt]
+  \ftooindexrow{lib:killing}{ Sphere Killing fields }{ quoted-library }
+  \ftooindexrow{lib:sphere}{ Sphere coordinate identities }{ quoted-library }
+  \ftooindexrow{lib:totvar}{ The law of total variance }{ quoted-library }
+  \ftooindexrow{lib:vmf}{ The von Mises-Fisher coordinate law }{ quoted-library }
+  \addlinespace
+  \ftooindexregister{maint}{2}
+  \addlinespace[2pt]
+  \ftooindexrow{maint:ident}{ The will is an identified residual }{ claim }
+  \ftooindexrow{maint:knee}{ The release knee: no knee at resolution bounds a reservoir's time-constant }{ claim }
+  \addlinespace
+  \ftooindexregister{mod}{4}
+  \addlinespace[2pt]
+  \ftooindexrow{mod:branch}{ The branch statement }{ model-shape }
+  \ftooindexrow{mod:drifts}{ The both-drifts reading }{ model-shape }
+  \ftooindexrow{mod:facets}{ Construction and access: every object carries two gradings, what it is built on and what it is read through, and neither column collapses into the other }{ claim }
+  \ftooindexrow{mod:recruit}{ The motivation-gated recruitment reading }{ model-shape }
+  \addlinespace
+  \ftooindexregister{nrm}{23}
+  \addlinespace[2pt]
+  \ftooindexrow{nrm:anch}{ Alignment anchored }{ named-quantity }
+  \ftooindexrow{nrm:anchbase}{ The counterfactual foot }{ construction }
+  \ftooindexrow{nrm:anchmetric}{ The metric foot }{ construction }
+  \ftooindexrow{nrm:annex}{ Annexation }{ construction }
+  \ftooindexrow{nrm:assign}{ The assigned weight }{ construction }
+  \ftooindexrow{nrm:expo}{ Accountable stake }{ named-quantity }
+  \ftooindexrow{nrm:floor}{ The self-nondeception floor }{ construction }
+  \ftooindexrow{nrm:funding}{ Only funding type is necessary: the public line is anchored and the tipping point is anchored twice }{ claim }
+  \ftooindexrow{nrm:good}{ Good, the present reading }{ reading }
+  \ftooindexrow{nrm:grid}{ The moral grid }{ space }
+  \ftooindexrow{nrm:hold}{ Holding }{ reading }
+  \ftooindexrow{nrm:incl}{ Inclusion }{ construction }
+  \ftooindexrow{nrm:incl-expo}{ Inclusion and exposure: you are what leans with you and you answer for what moves through you, one magnitude split by sign }{ claim }
+  \ftooindexrow{nrm:int}{ Alignment interpretive }{ named-quantity }
+  \ftooindexrow{nrm:martyr}{ Self-floor and martyr threshold: the martyrdom line has two facets, a private funding type and a public threshold }{ claim }
+  \ftooindexrow{nrm:maxbook}{ No over-booking: on the own-measure ray, booked content never exceeds the positive part of the lived return }{ claim }
+  \ftooindexrow{nrm:modest}{ The known modest-good corner }{ interpretive-scope }
+  \ftooindexrow{nrm:nodepl}{ Non-depletion }{ normative-axiom }
+  \ftooindexrow{nrm:public}{ Publicization }{ construction }
+  \ftooindexrow{nrm:self}{ The wise region is the non-negative orthant on the extended self }{ claim }
+  \ftooindexrow{nrm:telos}{ The telos: under positive holding and positive currency every nonnegative perturbation raises the extended self }{ claim }
+  \ftooindexrow{nrm:wedge}{ The martyr wedge: the good-not-wise region never closes at finite holding }{ claim }
+  \ftooindexrow{nrm:wise}{ Wise, the forward reading }{ reading }
+  \addlinespace
+  \ftooindexregister{op}{16}
+  \addlinespace[2pt]
+  \ftooindexrow{op:L}{ The L-restriction: the two readouts agree on the non-negative orthant and part only on the L }{ claim }
+  \ftooindexrow{op:actual}{ The actual alignment rate }{ construction }
+  \ftooindexrow{op:afriat}{ The recession floor: rationalization recovers spent gradients and nothing unspent }{ claim }
+  \ftooindexrow{op:cancel}{ The cancellation lemma: with the trajectory baseline the field's own motion cancels identically }{ claim }
+  \ftooindexrow{op:cos}{ Standing alignment of a directed edge }{ reading }
+  \ftooindexrow{op:cosev}{ Event alignment of a directed edge }{ reading }
+  \ftooindexrow{op:mvel}{ Alignment moral velocity }{ construction }
+  \ftooindexrow{op:null}{ Moral null projection }{ named-quantity }
+  \ftooindexrow{op:pgrad}{ Private marginal return }{ construction }
+  \ftooindexrow{op:pret}{ Private captured return }{ construction }
+  \ftooindexrow{op:pull}{ The funded private pull }{ construction }
+  \ftooindexrow{op:read}{ Readout }{ named-quantity }
+  \ftooindexrow{op:recess}{ The self-deception readout }{ readout }
+  \ftooindexrow{op:traj}{ The funded trajectory rate }{ construction }
+  \ftooindexrow{op:vel}{ Moral velocity projection }{ named-quantity }
+  \ftooindexrow{op:vmoral}{ The Moral Baseline }{ construction }
+  \addlinespace
+  \ftooindexregister{pr}{17}
+  \addlinespace[2pt]
+  \ftooindexrow{pr:agg}{ Aggregation is the null projection: the reader-independent component of a verdict stack carries zero information }{ claim }
+  \ftooindexrow{pr:certnull}{ The certificate is null: a portable verdict on a person is real within a shared anchor and null across anchors }{ claim }
+  \ftooindexrow{pr:colour}{ The colour loading }{ construction }
+  \ftooindexrow{pr:deltaspan}{ Span density }{ named-quantity }
+  \ftooindexrow{pr:detach}{ The detached invariant: removing colour leaves a fact and leaves a verdict at zero }{ claim }
+  \ftooindexrow{pr:equi}{ Impartiality is equi-interest: the maximin selects the high-attachment corner of the colour-zero manifold, not the detached one }{ claim }
+  \ftooindexrow{pr:forge}{ The node is forgeable: a funded actor can show apparent colour zero while holding a concealed slant }{ claim }
+  \ftooindexrow{pr:gain}{ Colour gain }{ named-quantity }
+  \ftooindexrow{pr:info}{ Recovered information }{ construction }
+  \ftooindexrow{pr:report}{ The coloured report }{ construction }
+  \ftooindexrow{pr:scope}{ The wall, operationalized: the quantitative identification results are model-bound and the qualitative wall is not }{ claim }
+  \ftooindexrow{pr:silence}{ The silencing: the most-motivated witness is the least de-colourable to the side that most needs the report }{ claim }
+  \ftooindexrow{pr:span}{ The colour-span }{ construction }
+  \ftooindexrow{pr:span-ident}{ Colour-span identification: in the equal-noise corner the precision of the recovered fact is governed by the colour-span }{ claim }
+  \ftooindexrow{pr:stand}{ The standing vector }{ construction }
+  \ftooindexrow{pr:verdict}{ Reader verdict }{ named-quantity }
+  \ftooindexrow{pr:woven}{ The woven node }{ construction }
+  \addlinespace
+  \ftooindexregister{recov}{27}
+  \addlinespace[2pt]
+  \ftooindexrow{recov:Lhat}{ Audience diversity }{ named-quantity }
+  \ftooindexrow{recov:anchorflow}{ Anchor-precision flow: precision is a stock with a flux and a lapse, and decays without maintenance }{ claim }
+  \ftooindexrow{recov:ancill}{ Crowd ancillary: the margins of effective reads vanish in whichever factor is abundant }{ claim }
+  \ftooindexrow{recov:auditor}{ Falsifier requires external auditor }{ claim }
+  \ftooindexrow{recov:blocks}{ Multi-anchor ceiling: routed blocks add precision and the covering condition caps it }{ claim }
+  \ftooindexrow{recov:ceil}{ Certification ceiling: any one-place certificate is bounded by the anchor ceiling }{ claim }
+  \ftooindexrow{recov:compare}{ Comparative identification: contrasts are identified exactly within a connected component of the subject-frame graph }{ claim }
+  \ftooindexrow{recov:contrast}{ Contrast, certificate, leaderboard guard: comparative recovery does not revive the portable verdict }{ claim }
+  \ftooindexrow{recov:cover}{ The covering condition }{ construction }
+  \ftooindexrow{recov:demod}{ The co-moving demodulated alignment residual }{ estimate }
+  \ftooindexrow{recov:effreads}{ Effective reads }{ named-quantity }
+  \ftooindexrow{recov:estimand}{ The anchored externality estimand }{ construction }
+  \ftooindexrow{recov:ext}{ Anchors extensive, readers intensive: independent anchors add for truth and readers stop adding once the cap binds }{ claim }
+  \ftooindexrow{recov:factor}{ Covariance split is anchor-relative }{ claim }
+  \ftooindexrow{recov:gap}{ Covariance debts are one anchor gap }{ claim }
+  \ftooindexrow{recov:groupframe}{ Group-frame residue: group-keyed offsets make cross-group contrasts require bridge anchors }{ claim }
+  \ftooindexrow{recov:held}{ A verdict is held, not had }{ claim }
+  \ftooindexrow{recov:hold}{ Anchor precision is occupied-kernel: it is held by maintenance, not merely observed }{ claim }
+  \ftooindexrow{recov:net}{ Recovered net alignment forcing }{ estimate }
+  \ftooindexrow{recov:null}{ Null verdict as span condition: under covering by internally pinned frames the recovery fact is non-identified }{ claim }
+  \ftooindexrow{recov:right}{ Recovered righting amplitude }{ estimate }
+  \ftooindexrow{recov:route}{ Directed de-colouring route: routed clean reads are the idiosyncratic variance against the inverse identity covariance }{ claim }
+  \ftooindexrow{recov:sat}{ The saturation law: Woodbury splits the recovery fact's precision into a reader term and an anchor correction }{ claim }
+  \ftooindexrow{recov:scope}{ Necessity scope: the non-identification is necessary inside the additive frame-offset model, and the model itself is feasible }{ claim }
+  \ftooindexrow{recov:span}{ Colour-span is block orthogonality }{ claim }
+  \ftooindexrow{recov:split}{ Credibility routes, unbias weighs }{ claim }
+  \ftooindexrow{recov:victim}{ Victim routes to contested anchor: absent external access the victim's report is another internally framed observation }{ claim }
+  \addlinespace
+  \ftooindexregister{shape}{10}
+  \addlinespace[2pt]
+  \ftooindexrow{shape:axial-skew}{ Axial skew }{ model-shape }
+  \ftooindexrow{shape:fixed-coupling}{ Fixed coupling }{ model-shape }
+  \ftooindexrow{shape:isotropic}{ Isotropic directional diffusion }{ model-shape }
+  \ftooindexrow{shape:mean-form}{ Mean-field formation }{ model-shape }
+  \ftooindexrow{shape:one-orbit}{ Single harmonic orbit }{ model-shape }
+  \ftooindexrow{shape:orbit-phase}{ Stationary orbit phase }{ model-shape }
+  \ftooindexrow{shape:scalar-mobility}{ Scalar funded mobility }{ model-shape }
+  \ftooindexrow{shape:sphere}{ Spherical direction }{ model-shape }
+  \ftooindexrow{shape:tangent-right}{ Tangent righting }{ model-shape }
+  \ftooindexrow{shape:zero-current}{ Zero-current stationarity }{ model-shape }
+  \addlinespace
+  \ftooindexregister{snk}{5}
+  \addlinespace[2pt]
+  \ftooindexrow{snk:anch}{ The second terminus: the anchor, in arrears }{ construction }
+  \ftooindexrow{snk:anch-G}{ Anchor-relative settlement }{ construction }
+  \ftooindexrow{snk:anch-t}{ Warrant-in-arrears }{ construction }
+  \ftooindexrow{snk:ker}{ The still center }{ construction }
+  \ftooindexrow{snk:two}{ The two feet }{ construction }
+  \addlinespace
+  \ftooindexregister{src}{1}
+  \addlinespace[2pt]
+  \ftooindexrow{src:nd}{ The motive distinction }{ unrepresented-distinction }
+  \addlinespace
+  \ftooindexregister{ten}{8}
+  \addlinespace[2pt]
+  \ftooindexrow{ten:deon}{ The deontic tenant }{ construction }
+  \ftooindexrow{ten:fid}{ Fidelity }{ construction }
+  \ftooindexrow{ten:lapse}{ Lapse }{ construction }
+  \ftooindexrow{ten:res}{ Restraint }{ construction }
+  \ftooindexrow{ten:self}{ Self-fidelity }{ construction }
+  \ftooindexrow{ten:sev}{ Severance-resolve }{ construction }
+  \ftooindexrow{ten:spite}{ The spiteful sealer }{ construction }
+  \ftooindexrow{ten:toll}{ Toll-keeping, funded }{ construction }
+  \addlinespace
+  \ftooindexregister{v}{8}
+  \addlinespace[2pt]
+  \ftooindexrow{v:beauty}{ Beauty }{ interpretive-weld }
+  \ftooindexrow{v:goodness}{ Goodness }{ interpretive-weld }
+  \ftooindexrow{v:health}{ Health }{ interpretive-weld }
+  \ftooindexrow{v:kindness}{ Kindness }{ interpretive-weld }
+  \ftooindexrow{v:love}{ Love }{ interpretive-weld }
+  \ftooindexrow{v:truth}{ Truth }{ interpretive-weld }
+  \ftooindexrow{v:wisdom}{ Wisdom }{ interpretive-weld }
+  \ftooindexrow{v:wonder}{ Wonder }{ interpretive-weld }
+  \addlinespace
+  \ftooindexregister{w}{17}
+  \addlinespace[2pt]
+  \ftooindexrow{w:anti}{ Anti righting will }{ named-quantity }
+  \ftooindexrow{w:con}{ The connective will }{ construction }
+  \ftooindexrow{w:deep}{ The normalized deepening amplitude }{ control-amplitude }
+  \ftooindexrow{w:enl}{ The enlargement will }{ construction }
+  \ftooindexrow{w:exp}{ The expansion will }{ construction }
+  \ftooindexrow{w:faces}{ The two faces: the connective will splits by the argument it acts on }{ claim }
+  \ftooindexrow{w:net}{ Net alignment-coordinate forcing }{ reading }
+  \ftooindexrow{w:radial}{ Direct radial control }{ control-amplitude }
+  \ftooindexrow{w:rec}{ Reconciliation will }{ named-quantity }
+  \ftooindexrow{w:res}{ The restraint will }{ construction }
+  \ftooindexrow{w:right}{ The righting amplitude }{ control-amplitude }
+  \ftooindexrow{w:rot}{ The rotational amplitude }{ control-amplitude }
+  \ftooindexrow{w:sev}{ Severing will }{ named-quantity }
+  \ftooindexrow{w:signed}{ The signed will: the forcing term superposes four signed wills against passive decay }{ claim }
+  \ftooindexrow{w:torque}{ Torque privacy: the forcing term of a directed edge belongs to its tail }{ claim }
+  \ftooindexrow{w:ustate}{ Net state-space control }{ control-vector }
+  \ftooindexrow{w:vir}{ The virtue will }{ construction }
+\end{xltabular}
+\endgroup

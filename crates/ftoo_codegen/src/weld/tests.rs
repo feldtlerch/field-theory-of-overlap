@@ -631,7 +631,7 @@ fn w13_actual_file_set_matrix_restores_every_mutation() {
             texts: 2,
             tag_sites: 2,
             rust_mints: 4,
-            markdown_mints: 119,
+            markdown_mints: 120,
             unit_mints: 1,
             markdown_citations: 100,
             rust_citations: 8,

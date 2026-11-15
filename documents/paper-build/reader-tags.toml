@@ -1,0 +1,449 @@
+schema = 1
+# Source keys preserve destinations and first-use state; values change glyphs only.
+
+[[aliases]]
+key = "dyn:exact"
+spelling = "dyn:stat"
+
+[[aliases]]
+key = "dyn:response"
+spelling = "dyn:resp"
+
+[[aliases]]
+key = "cor:tremble:curve"
+spelling = "dyn:tcurve"
+
+[[admissions]]
+key = "eq:coda:feet"
+spelling = "eq:tenses"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:dyn:flow"
+spelling = "eq:flow"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:f:acc"
+spelling = "eq:acc"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:f:cap"
+spelling = "eq:cap"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:f:charge"
+spelling = "eq:stake"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:f:felt"
+spelling = "eq:felt"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:J:occ"
+spelling = "eq:occ"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:normative:lived-return"
+spelling = "eq:lived"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "eq:will:passive-decay"
+spelling = "eq:lapse"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:branches"
+spelling = "tbl:branches"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:corners"
+spelling = "tbl:corners"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:covectors"
+spelling = "tbl:covectors"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:dividends"
+spelling = "tbl:dividends"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:inclexpo"
+spelling = "tbl:incl-expo"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:propagation"
+spelling = "tbl:propagation"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:stake"
+spelling = "tbl:stake"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:cosine:zeros"
+spelling = "tbl:vanishings"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:coupling"
+spelling = "tbl:coupling"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:debts"
+spelling = "tbl:debts"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:epi:spend"
+spelling = "tbl:spend-route"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:equivalences"
+spelling = "tbl:equivalences"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:ev"
+spelling = "tbl:ev"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:fabline"
+spelling = "tbl:fabline"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:falsifiers"
+spelling = "tbl:falsifiers"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:gen:grades"
+spelling = "tbl:grades"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:good:kernel"
+spelling = "tbl:kernel"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:good:spends"
+spelling = "tbl:two-spends"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:gw:bottomleft"
+spelling = "tbl:sacrifice"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:gw:ladder"
+spelling = "tbl:funding"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:ledger"
+spelling = "tbl:ledger"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:log:concordance"
+spelling = "tbl:concordance"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:log:knock"
+spelling = "tbl:knocks"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:log:split"
+spelling = "tbl:splits"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:ont:zeros"
+spelling = "tbl:zeros"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:P:antichain"
+spelling = "tbl:lives"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:P:gates"
+spelling = "tbl:gates"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:portraits"
+spelling = "tbl:portraits"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:rulings"
+spelling = "tbl:rulings"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:scales"
+spelling = "tbl:scales"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:self:duality"
+spelling = "tbl:duality"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:self:struts"
+spelling = "tbl:struts"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:shapes"
+spelling = "tbl:shapes"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:still:tenants"
+spelling = "tbl:tenants"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:verify"
+spelling = "tbl:verify"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:W:rests"
+spelling = "tbl:rests"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "tbl:will:reach"
+spelling = "tbl:reach"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "app:recovery"
+spelling = "app:recovery"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "sec:say:direction"
+spelling = "sec:which-way"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "subsec:fixed:exact"
+spelling = "sec:closure-scope"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "B:belief"
+spelling = "B:belief"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "B:record"
+spelling = "B:record"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "B:relevance"
+spelling = "B:relevance"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "B:salience"
+spelling = "B:salience"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "R:askonly"
+spelling = "R:askonly"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "R:nostake"
+spelling = "R:nostake"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "R:trusted"
+spelling = "R:trusted"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "T:audited"
+spelling = "T:audited"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "T:justice"
+spelling = "T:justice"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "T:wound"
+spelling = "T:wound"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "W:connect"
+spelling = "rest:connect"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "W:keepers"
+spelling = "rest:keepers"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "W:lookout"
+spelling = "rest:lookout"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "W:seed"
+spelling = "rest:seed"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "f:cap"
+spelling = "f:cap"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "gen:obj"
+spelling = "gen:obj"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "J:anchor"
+spelling = "J:anchor"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "J:triage"
+spelling = "J:triage"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "P:leak"
+spelling = "P:leak"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:gate"
+spelling = "g:gate"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:knock"
+spelling = "g:knock"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:proj"
+spelling = "g:proj"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:rec"
+spelling = "g:rec"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:sign"
+spelling = "g:sign"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "g:split"
+spelling = "g:split"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "gate:G1"
+spelling = "gate:G1"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "gate:G2"
+spelling = "gate:G2"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "gate:G3"
+spelling = "gate:G3"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "gate:G4"
+spelling = "gate:G4"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "mod:reg"
+spelling = "mod:reg"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:comovement"
+spelling = "xstmt:comovement"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:converter"
+spelling = "xstmt:converter"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:fact"
+spelling = "xstmt:fact"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:fidelity"
+spelling = "xstmt:fidelity"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:place"
+spelling = "xstmt:place"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:plain"
+spelling = "xstmt:plain"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:sweep"
+spelling = "xstmt:sweep"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "xstmt:verdict"
+spelling = "xstmt:verdict"
+confirmation = "dec:reader:confirmed-tags"

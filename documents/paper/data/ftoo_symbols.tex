@@ -1,0 +1,509 @@
+
+\ExplSyntaxOn
+
+
+\NewDocumentCommand
+  { \edgeto }
+  { m m }
+  {
+    #1\!\to\!#2
+  }
+
+
+\NewDocumentCommand
+  { \currencyto }
+  { m m }
+  {
+    \ensuremath{#1\!\leftarrow\!#2}
+  }
+
+
+\NewDocumentCommand
+  { \pairindex }
+  { m m }
+  {
+    #1#2
+  }
+
+
+\NewDocumentCommand
+  { \tripleindex }
+  { m m m }
+  {
+    \ensuremath{#1#2#3}
+  }
+
+
+\NewDocumentCommand
+  { \positivepart }
+  { m }
+  {
+    \ensuremath{\left(#1\right)\sb{+}}
+  }
+
+
+\NewDocumentCommand
+  { \transpose }
+  {  }
+  {
+    \ensuremath{\sp{\mathsf{T}}}
+  }
+
+
+\NewDocumentCommand
+  { \comovfield }
+  {  }
+  {
+    \ensuremath{S}
+  }
+
+
+\NewDocumentCommand
+  { \standingalignment }
+  { m m }
+  {
+    \ensuremath{\sigma\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \comov }
+  { m m }
+  {
+    \ensuremath{S\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \caringcovector }
+  { m m }
+  {
+    \ensuremath{\mathbf{m}\sb{\pairindex{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \normGvec }
+  { m }
+  {
+    \ensuremath{\left\lVert #1 \right\rVert\sb{\anchormetric}}
+  }
+
+
+\NewDocumentCommand
+  { \normGcov }
+  { m }
+  {
+    \ensuremath{\left\lVert #1 \right\rVert\sb{\anchormetric\sp{-1}}}
+  }
+
+
+\NewDocumentCommand
+  { \ipGvec }
+  { m m }
+  {
+    \ensuremath{\ip{#1}{#2}\sb{\anchormetric}}
+  }
+
+
+\NewDocumentCommand
+  { \ipGcov }
+  { m m }
+  {
+    \ensuremath{\ip{#1}{#2}\sb{\anchormetric\sp{-1}}}
+  }
+
+
+\NewDocumentCommand
+  { \ip }
+  { m m }
+  {
+    \ensuremath{\langle #1 , #2 \rangle}
+  }
+
+
+\NewDocumentCommand
+  { \willright }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{right}}}
+  }
+
+
+\NewDocumentCommand
+  { \willrotate }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{rot}}}
+  }
+
+
+\NewDocumentCommand
+  { \willdeepen }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{deep}}}
+  }
+
+
+\NewDocumentCommand
+  { \decayrate }
+  {  }
+  {
+    \ensuremath{\gamma}
+  }
+
+
+\NewDocumentCommand
+  { \nuconv }
+  { m }
+  {
+    \ensuremath{\nu\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \framepull }
+  {  }
+  {
+    \ensuremath{\dot{\sigma}\sp{\mathrm{fund}}}
+  }
+
+
+\NewDocumentCommand
+  { \moralvel }
+  {  }
+  {
+    \ensuremath{s}
+  }
+
+
+\NewDocumentCommand
+  { \goodunit }
+  { m }
+  {
+    \ensuremath{W\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \nodewelfareunit }
+  { m }
+  {
+    \ensuremath{W\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \publicwelfareunit }
+  {  }
+  {
+    \ensuremath{W\sb{\bullet}}
+  }
+
+
+\NewDocumentCommand
+  { \countunit }
+  {  }
+  {
+    \ensuremath{\#}
+  }
+
+
+\NewDocumentCommand
+  { \timeunit }
+  {  }
+  {
+    \ensuremath{T}
+  }
+
+
+\NewDocumentCommand
+  { \dimratio }
+  {  }
+  {
+    \ensuremath{[1]}
+  }
+
+
+\NewDocumentCommand
+  { \dimtime }
+  {  }
+  {
+    \ensuremath{[\timeunit]}
+  }
+
+
+\NewDocumentCommand
+  { \dimrate }
+  {  }
+  {
+    \ensuremath{[\timeunit\sp{-1}]}
+  }
+
+
+\NewDocumentCommand
+  { \dimcount }
+  {  }
+  {
+    \ensuremath{[\countunit]}
+  }
+
+
+\NewDocumentCommand
+  { \dimcountinverse }
+  {  }
+  {
+    \ensuremath{[\countunit\sp{-1}]}
+  }
+
+
+\NewDocumentCommand
+  { \dimcountrate }
+  {  }
+  {
+    \ensuremath{[\countunit\,\timeunit\sp{-1}]}
+  }
+
+
+\NewDocumentCommand
+  { \dimspace }
+  {  }
+  {
+    \ensuremath{\symbb{D}}
+  }
+
+
+\NewDocumentCommand
+  { \dimwelfare }
+  {  }
+  {
+    \ensuremath{[\publicwelfareunit]}
+  }
+
+
+\NewDocumentCommand
+  { \dimgood }
+  { m }
+  {
+    \ensuremath{[\goodunit{#1}]}
+  }
+
+
+\NewDocumentCommand
+  { \dimgoodratio }
+  { m m }
+  {
+    \ensuremath{[\,\goodunit{#1}/\goodunit{#2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimnodewelfare }
+  { m }
+  {
+    \ensuremath{[\nodewelfareunit{#1}]}
+  }
+
+
+\NewDocumentCommand
+  { \dimnodewelfareratio }
+  { m m }
+  {
+    \ensuremath{[\,\nodewelfareunit{#1}/\nodewelfareunit{#2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimnodewelfaresq }
+  { m }
+  {
+    \ensuremath{[\,\nodewelfareunit{#1}\sp{2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimnodepergood }
+  { m m }
+  {
+    \ensuremath{[\,\nodewelfareunit{#1}/\goodunit{#2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimnodeperpublic }
+  { m }
+  {
+    \ensuremath{[\,\nodewelfareunit{#1}/\publicwelfareunit\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimpublicpercount }
+  {  }
+  {
+    \ensuremath{[\,\publicwelfareunit/\countunit\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimpublicwelfaresq }
+  {  }
+  {
+    \ensuremath{[\,\publicwelfareunit\sp{2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimpublicwelfareinvsq }
+  {  }
+  {
+    \ensuremath{[\,\publicwelfareunit\sp{-2}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimpublicwelfarerate }
+  {  }
+  {
+    \ensuremath{[\,\publicwelfareunit\,\timeunit\sp{-1}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \dimhingeA }
+  {  }
+  {
+    \ensuremath{[\,\publicwelfareunit\sp{-1}\timeunit\sp{-1}\,]}
+  }
+
+
+\NewDocumentCommand
+  { \countgrade }
+  {  }
+  {
+    \ensuremath{[1]\sb{1}}
+  }
+
+
+\NewDocumentCommand
+  { \intensivegrade }
+  {  }
+  {
+    \ensuremath{[1]\sb{0}}
+  }
+
+
+\NewDocumentCommand
+  { \alignrateactual }
+  {  }
+  {
+    \ensuremath{\dot{\sigma}\sp{\mathrm{actual}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignrateself }
+  {  }
+  {
+    \ensuremath{\dot{\sigma}\sp{\mathrm{self}}}
+  }
+
+
+\NewDocumentCommand
+  { \normof }
+  { m }
+  {
+    \ensuremath{\left\lVert #1 \right\rVert}
+  }
+
+
+\NewDocumentCommand
+  { \normG }
+  { m }
+  {
+    \ensuremath{\left\lVert #1 \right\rVert\sb{\anchormetric}}
+  }
+
+
+\NewDocumentCommand
+  { \opnormG }
+  { m }
+  {
+    \ensuremath{\left\lVert #1 \right\rVert\sb{\mathrm{op},\anchormetric}}
+  }
+
+
+\NewDocumentCommand
+  { \stake }
+  {  }
+  {
+    \ensuremath{\operatorname{stake}}
+  }
+
+
+\NewDocumentCommand
+  { \willresid }
+  { o }
+  {
+    \ensuremath{\hat{\omega}\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \fielddrift }
+  {  }
+  {
+    \ensuremath{F}
+  }
+
+
+\NewDocumentCommand
+  { \projone }
+  {  }
+  {
+    \ensuremath{\Pi\sb{\mathbf{1}}}
+  }
+
+
+\NewDocumentCommand
+  { \projim }
+  {  }
+  {
+    \ensuremath{\Pi\sb{\operatorname{im}}}
+  }
+
+
+\NewDocumentCommand
+  { \projker }
+  {  }
+  {
+    \ensuremath{\Pi\sb{\ker}}
+  }
+
+
+\NewDocumentCommand
+  { \pinv }
+  { m }
+  {
+    \ensuremath{\left(#1\right)\sp{+}}
+  }
+
+
+\NewDocumentCommand
+  { \colourspanof }
+  { m }
+  {
+    \ensuremath{\Xi(#1)}
+  }
+
+
+\NewDocumentCommand
+  { \onesvector }
+  {  }
+  {
+    \ensuremath{\mathbf{1}}
+  }
+
+
+\ExplSyntaxOff

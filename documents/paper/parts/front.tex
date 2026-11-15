@@ -1,0 +1,358 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\begin{center}
+  {\LARGE\scshape A Field Theory of Overlap}\\[0.4ex]
+  {\itshape\docdraft}\\[1.4ex]
+  {\itshape co-movement as a field; the will as its only exogenous forcing;\\
+            the two readings neither instrument supplies}\\[1ex]
+  {\small\docversion}
+\end{center}
+\bigskip
+
+\begin{abstract}
+\noindent A relationship is a directed edge carrying an operator $\comov{i}{j}$, the
+co-movement of two nodes' graded outcomes. It is read four ways. Contracted through both
+nodes' weightings it yields a standing alignment $\lean{i}{j}\in[-1,1]$, the cosine of a
+caring covector against a feeling covector --- direction; contracted through an event it
+yields an event alignment, the lean of that act. Its norm yields a capacity, and an act
+moving through it a realized stake --- the magnitude of co-moving fate. Beneath all four,
+prior to any shared anchor, lies the felt total: what the event costs its holder, by that
+holder's caring.
+Direction, capacity, realized stake, and felt total are not one quantity, and nearly every
+confusion below is their conflation. We treat $\comovfield$ as a field over a network, read
+through these quantities, locate its fixed points, and isolate the single input that moves
+an edge between them: a rate $\will$ opposing the reward gradient --- a will in humans, a
+behaviour in animals, an allocation in plants. Two dimensions run the apparatus ---
+public welfare scalars are $\dimwelfare$, the will is a rate $\dimrate$ --- and one
+epistemic posit organizes the rest: a converter is readable only where it is spent. Its
+shadow under the poorest instrument is the familiar fact --- a state is readable at a
+point; a rate is not. From this follow a
+scope boundary that is reachability, a still center whose maintenance trembles visibly
+while its private wage remains unreadable, a moral grid split across time, \emph{good} the
+present predicate and \emph{wise} the forward; accountability a per-reader structure on
+one coloured fact, summing to no verdict --- quantitatively within the linear reading,
+qualitatively on the independence of anchors; and a life that spans every dimension at once
+and carries no dimensionally-natural magnitude --- a place, not a height. The buildable
+artifact is a signed externality log: gate on capacity, price realized stake, settle in
+arrears, certify no one. What it must never price is alignment, the mere lean two fates
+share. The moral center is the enlargement of a common that always contains the self, the
+self extended along the edges actually held.
+\end{abstract}
+
+\begin{center}\small
+  \textbf{How to cite.}\quad Results, displays, and floats carry stable tags
+  (e.g.\ \ftag*{f:stake}). Cite by tag: a number is a locator and may change between
+  revisions; a tag, once published, does not.
+\end{center}
+
+\clearpage
+\begingroup\hypersetup{hidelinks}%
+\tableofcontents
+\endgroup
+
+
+\clearpage
+\part*{Introduction}
+\addcontentsline{toc}{part}{Introduction}
+\section{The object, the stance, the generators}
+\label{sec:generators}
+
+\subsection{The object}
+\label{subsec:gen:object}
+\secgrade{nec}%
+A node is any locus whose fate can co-move with another's. A node's outcome is graded,
+$\outcomevector{i}\in\outcomespace=\bigoplus_a\dimgood{a}$ --- a plurality of
+incommensurable goods, a single length only after a weighting collapses it. The edge $ij$
+carries the co-movement operator,
+\begin{equation}
+  \comov{i}{j}:\outcomespace\to\outcomespace,\qquad
+  \comovcomp{i}{j}{a}{b}:\dimgoodratio{a}{b},
+  \label{gen:obj}
+\end{equation}
+how $j$'s goods move $i$'s. It is read scalar-ly here through its alignment
+$\ftag{op:cos}$ $\lean{i}{j}\in[-1,1]$ and a stake beneath it; the construction is held at
+$\ftag*{op:cos}$. On the alignment alone: $\leanbare>0$, $j$'s loss is to that degree $i$'s
+loss; $\leanbare=0$, ambivalence --- a tie whose components cancel; the apparent stranger is
+off the scale entirely ($\caringcovector{i}{j}=0$, no lean to read, yet $\comovfield\neq0$);
+the genuine stranger has no fate to share ($\comovfield=0$); $\leanbare<0$, shared
+enmity, $j$'s loss is $i$'s gain. The object of study is $\comovfield$ as a \emph{field over a network} --- its
+equilibria, their stability, and the one input that moves an edge between them.
+
+\begin{definition}[\hdr{gen:goods}]\grade{nec}
+  Readable edges live in the shared goods-space, the co-movement operator ranges over
+  shared goods, and a node's welfare scalar is node-graded:
+  \begin{align}
+    \outcomespace &= \bigoplus_a \dimgood{a}
+      \label{eq:gen:goods}\\
+    \comovcomp{i}{j}{a}{b} &: \dimgoodratio{a}{b}
+      \label{eq:gen:Srange}\\
+    \selfweight{i} &: \dimnodepergood{i}{a}, \qquad
+      \privatewelfare{i} : \dimnodewelfare{i}
+      \label{eq:gen:wgrade}
+  \end{align}
+  Goods outside a shared representation are outside that edge's read, not denied.
+\end{definition}
+
+\begin{definition}[\hdr{gen:grade}]\grade{nec}
+  A grading is an index on a dimension whose sectors do not add without a posted converter.
+  A grading is type-checked like a dimension but carries no independent weight in a norm.
+  The apparatus has two fundamental dimensions,
+  \begin{equation}
+    \dimspace = \{\dimwelfare,\ \dimrate\},
+    \label{eq:gen:dimspace}
+  \end{equation}
+  with $\dimratio$ their ratio-space.
+\end{definition}
+
+\begin{definition}[\hdr{gen:ext}]\grade{nec}
+  A pool lowers degree:
+  \begin{align}
+    \dimcount &:= \countgrade, \qquad \dimratio := \intensivegrade,
+      \label{eq:gen:extdef}\\
+    [\cdot]\sb{1}/\dimcount &= [\cdot]\sb{0}.
+      \label{eq:gen:pool}
+  \end{align}
+  Thus $N\dimcount$ while $N/\countpool$ is intensive.
+\end{definition}
+
+\begin{definition}[\hdr{gen:trich}]\grade{nec}
+  \begin{equation}
+    \begin{array}{c|c|c}
+      \text{plurality} & \text{converter} & \text{structure} \\
+      \hline
+      \text{goods} & \anchormetric & \text{flat public metric} \\
+      \text{persons} & \currency{i}{j} & \text{curved interpersonal currency} \\
+      \text{traits} & \text{none} & \text{non-normable profile}
+    \end{array}
+    \label{eq:gen:trich}
+  \end{equation}
+\end{definition}
+
+The alphabet is two fundamental dimensions plus ratio-space and count-grade,
+\begin{equation}
+  \dimspace=\{\,\dimwelfare,\ \dimrate\,\};\qquad
+  \dimratio\text{ is ratio-space};\qquad
+  \dimcount=\countgrade\text{ is count-grade},
+  \label{gen:alph}
+\end{equation}
+No unenumerated grading is used by the apparatus. Shared goods are plural,
+$\outcomespace=\bigoplus_a\dimgood{a}$: a length only under a weighting, privately by a
+held $\selfweight{i}$ (dark, \ftag{snk:ker}) or publicly by an anchored metric
+$\anchormetric$ (\ftag{op:cos}). No third option makes a graded space a length, and the held
+collapse is kept, not given (\ftag{ten:self}). The one fact:
+\begin{equation}
+  \boxed{\textbf{a state is readable at a point; a rate is not.}}
+  \label{eq:gen:fact}
+\end{equation}
+Outcomes are states; the will is a rate. The fact is stated for the poorest instrument
+--- passive, noiseless, a single instant --- and it is that instrument's \emph{shadow}
+of the epistemic posit stated next (\ftag{epi:shadow}): richer records read more, and
+the posit says exactly how much more.
+
+\subsection{The two posits}
+\label{subsec:gen:posits}
+\secgrade{nec}%
+The apparatus rests on two typed posits, one per basin, and neither is proven here. Each
+is stated where only the construction needs it, corroborated downstream, settled in
+arrears; the back-edges that carry the warrants are posted, every one, in the evidential
+register (\zcref{tbl:ev}). The symmetry is the design.
+
+\begin{postulate}[\hdr{gen:will}]\grade{nec}
+  The ontic posit --- four claims under one name, each with its own modality, stated
+  where only the construction needs them. \emph{Existence} \handle{gen:w-exists}
+  (\gradeword{cont}): there is
+  an input to edge dynamics beyond reward and decay. \emph{Type} \handle{gen:w-rate}
+  (\gradeword{feas}):
+  the input is a rate $\will\ \dimrate$ --- no reservoir behind it. \emph{Direction}
+  \handle{gen:w-opp}
+  (\gradeword{cont}): the connective will opposes the reward gradient
+  $\nabla\rewardfield$ --- appetitive, gradient-opposing, a population claim.
+  \emph{Exogeneity} (\gradeword{nec}): its source carries no dimension and nothing in
+  the field grips it --- the ground itself (\ftag{src:nd}), the one component that is
+  and stays axiomatic. No warrant is reachable here, all of it lying downstream of
+  crossings forbidden by the basin split (\ftag{gen:basins}); it is collected at the
+  data layer --- the measured decay (\ftag{ev:decay-occ}), the release knee
+  (\ftag{ev:knee-rate}), the identified residual (\ftag{ev:resid-ex},
+  \ftag{ev:resid-opp}) --- under posted
+  identification conditions (\ftag{maint:ident}), transmitted by \ftag{J:occ},
+  settled by \ftag{snk:anch-t}.
+\end{postulate}
+
+\begin{postulate}[\hdr{epi:conv}]\grade{nec}
+  The epistemic posit: \textbf{a converter is readable only where it is spent.} A
+  weighting, a currency, a metric --- any exchange-rate between incommensurables --- has
+  observable consequences exactly at its transactions, and none at rest. Warrant
+  downstream at \ftag{op:afriat} (\ftag{ev:afriat-conv}: rationalization recovers every
+  spent gradient and nothing unspent), at \ftag{J:occ} (the maintainer's price), and at
+  every stall the ledger records (\ftag{P:leak}).
+\end{postulate}
+
+\begin{corollary}[\hdr{epi:shadow}]\grade{nec}
+  For the passive, noiseless, single-instant instrument, \ftag{epi:conv} specializes to
+  the fact \zcref{eq:gen:fact}: a state is readable at a point; a rate is not
+  ($\dimrate$-at-rest spends nothing \emph{into that instrument}). Richer instruments
+  read more --- persistence, trembling, relaxation --- and the principle says exactly how
+  much more: everything spent into them, nothing that is not. The fact is scoped to
+  that instrument and to no other: the time-series record reads persistence, the
+  fluctuation record reads maintenance (\ftag{J:tremble}), the probe reads restoring
+  force, and what no instrument reads is the converter spent into none of them
+  (\ftag*{epi:conv}).
+\end{corollary}
+
+One may assume naively that the fact is the light and the principle its elaboration; the
+dependence runs the other way --- the fact is the shadow the principle casts on the
+poorest instrument, and the still center's population is scoped by exactly that
+dependence: darkness is the set of held, unposted converters, with the unspendable
+ground beneath (\ftag{src:nd}).
+
+\subsection{A life is a place, not a height}
+\label{subsec:gen:place}
+\secgrade{nec}%
+\handle*{P:sig}\handle*{P:dens}\handle*{P:will}\handle*{P:dir}%
+\handle*{P:nar}\handle*{P:bld}\handle*{P:res}%
+A node's traits form a point
+\begin{equation}
+  \profile=\bigl(\underbrace{\traitsigma}_{\dimratio},\ \underbrace{\traitdensity}_{\dimratio},\
+  \underbrace{\traitwill}_{\dimrate},\ \underbrace{\traitdirection}_{\dimrate},\
+  \underbrace{\traitnarration}_{\dimnodewelfare{i}},\ \underbrace{\traitbuilding}_{\dimrate},\
+  \underbrace{\traitrestraint}_{\dimrate}\bigr),
+  \label{P:vec}
+\end{equation}
+entanglement, witnessability, maintenance, direction, self-narration, institution-building,
+and restraint. The space spans three incommensurable dimensions, and the outcome axis
+$\dimnodewelfare{i}$ is itself private, so the incommensurability runs within an axis as
+well as across. Any agency-score
+$\normof{\profile}^2\sim\dimratio+\dimrate\sp{2}+\dimnodewelfare{i}\sp{2}$ adds unlike units.
+It is not hard to compute; it is type-incorrect, like taking one Euclidean norm across
+length and temperature coordinates. The claim is \ftag{P:nonorm}, paid where the coordinates are defined; here it stands
+as the object. A life carries no dimensionally-natural magnitude --- \ftag{g:knock} on the
+grandest sentence the document states.
+
+\subsection{Two basins}
+\label{subsec:gen:basins}
+\secgrade{nec}\handle*{gen:basins}%
+The generators fall into two independent sources. The epistemic basin
+$\{\ftag*{gen:alph},\ftag*{epi:fact}\}$ asks what can be known --- readability, scope, the
+kernel. The ontic basin $\{\ftag*{gen:obj},\ftag*{gen:will}\}$ asks what is and what moves ---
+the field, its gradients, its forcing term. Upstream they run separately; they meet exactly
+once, at the flow \ftag{dyn:flow}, the heart --- and their instruments fail at one shared
+floor, where the ontic engine that constructs a will (\ftag{op:afriat}) and the epistemic
+fact that the net never yields its components (\ftag{epist:duhem}) point into the same dark,
+\ftag{src:nd}\ \ftag{snk:two}. The meeting acts; the floor goes silent. Everything before it is
+one basin or the other; everything after is the consequence of their confluence. One
+consequence is reflexive: the warrant for \ftag*{gen:will}'s empirical components ---
+instruments of the epistemic basin corroborating ontic claims, an epistemic reading
+fixing an ontic type --- is a pre-confluence
+cross-basin inference, architecturally unavailable until the flow. The will cannot
+be argued early; the deferral is forced, not lazy.
+
+\subsection{Audit}
+\label{subsec:gen:audit}
+\secgrade{nec}%
+Theorems are distinctions forced by a definition, a derivative-sign, or a dimension. Three
+struts brace the construction: \handle{g:knock}, equate two
+dimensions and a mismatch kills the identity; \handle{g:proj},
+split a map into image and kernel;
+\handle{g:rec}, recover a degenerate corner on a restricted
+domain. The dimensional form:
+\begin{equation}
+  \boxed{\text{no equating state}=\text{rate; no sampling a rate at a point;
+         no scalarizing a relation.}}
+\end{equation}
+Register discipline \handle{mod:reg}: silence marks the
+structurally unavailable, never the forbidden; no result below is a prohibition unless an
+agent declines an available act.
+
+Three further gaits read the construction rather than guard it:
+\handle{g:split}, part one object into two by a finer reading;
+\handle{g:gate}, the gate-stride $X=g\cdot f$, an on/off
+magnitude times an amplifier; and \handle{g:sign}, read a
+result off the sign of a derivative. Six gaits in all, the document's whole repertoire of
+moves.
+
+\subsection{Grades}
+\label{subsec:gen:grades}
+\secgrade{nec}%
+Each result carries one grade, fixing what it rests on.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The grade register, two columns}{tbl:gen:grades}
+  \begin{tabularx}{\textwidth}{@{} l L L @{}}
+    \toprule
+    \textbf{grade} & \textbf{built on} (the spend set) & \textbf{read through} (the access route) \\
+    \midrule
+    \gradeword{nec}       & no converter spent: a construction or a dimension
+                          & any instrument, at once \\
+    \gradeword{feas}      & stated conditions & wherever the conditions are checked \\
+    \gradeword{cont}      & an external fact & the fact's own record \\
+    \gradeword{cont-anch} & the anchored public metric $\anchormetric$ (\ftag{c:Gstar}),
+                            or witness-independence (\ftag{J:anchor})
+                          & any reader sharing the anchor; settles at it \\
+    \gradeword{cont-comm} & a held weighting $\selfweight{i}$ (\ftag{c:lam}), private and dark
+                          & the holder's own biography, in arrears \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent Both anchors are out-of-band; neither is ever \gradeword{nec}. The two columns
+are two gradings, not one (\ftag{mod:facets}): what a claim is built on is the compiler's
+column, audited from the spend set wherever its quantities are typed; what it is read
+through is the reader's, the spend
+route of \zcref{tbl:epi:spend}. Neither column collapses into the other --- a quantity
+built on nothing can still be read only through a held converter, and the felt sign
+(\ftag{f:feltsign}) is the register's cleanest exhibit.
+
+\subsection{Covenant}
+\label{subsec:gen:covenant}
+\secgrade{nec}%
+Two membranes stay loose while the body densifies. The scholar's, \registername{[econ]}, locates
+each result in its economic antecedent and marks where it departs --- the document's one
+flourish; it carries \ftag{epist:duhem}, the one citation the framework does not annex but
+meets at the floor --- no departure, no Concordance-E row, because here the apparatus agrees
+rather than departs. The human's, the eight virtue-words and the plain refrains, welds each
+to a formal part and renders clean: a single carried point, never expanded. The visible
+labels are the connective tissue --- a result stated once under its tag is referenced
+forever by that tag, never by relative phrasing or section number. The scope boundary is
+reachability: whether incentive, cost, or argument can grip the input --- and grip is a
+susceptibility. The bind-without-pull register --- duty kept against inclination --- is
+an \emph{open-loop} input: it carries a forcing term, as whatever holds an edge must;
+it takes no field quantity as an argument; and it is out of scope as a \emph{target} ---
+in scope as a term, ungrippable as a lever, neither modeled further nor judged
+(\see{subsec:still:deontic}). This sets the
+readability joint \handle{J:read}: the joint between the two posits, \ftag*{gen:will} and
+\ftag*{epi:conv}, where what can move meets what can be read --- all that can be known at
+all is known through what is spent, and the poorest instrument's shadow of that is the
+state/rate split (\ftag*{epi:shadow}).
+
+\begin{econ}[label=e:input, title={The borrowed move, one level up},
+  ref=gen:will, cites={a:degustibus,a:mechdesign}, departs=annex,
+  stopsat={annexes the readable; cannot host a moving input or reach the rate at rest}]
+  The move is economics' own, run one level up, and the borrowed license must be named
+  before it is spent. \textcite{a:degustibus} --- \emph{de gustibus non est disputandum}
+  --- take preferences as exogenous and build a complete science downstream; mechanism
+  design --- Hurwicz, Myerson, Maskin, Roth, Milgrom \parencite{a:mechdesign} --- designs
+  rules so that, \emph{given} preferences, good outcomes follow, agnostic about where
+  preferences come from. We place one undischarged input \ftag*{gen:will} and derive the rest:
+  the \emph{move} is identical, and so is its warrant --- we impose a type no measurement
+  supplies and run what it forces, exactly as economics imposes ``preference is a complete
+  preorder'' and runs the welfare theorems. Granted the bridge, the machinery is valid; the
+  bridge is granted or it is not. This is the whole epistemic contract, and it has a precise
+  reach. Four type-posits are \emph{co-liable} with the discipline --- outcomes-as-states
+  against preference-as-preorder, the revealed frame, the scalar aggregate, the two anchors:
+  deny our typing of these and you have denied the move your own field is built on. One
+  posit is ours alone and carries no economic cover, because economics works in a single
+  currency and never needs it --- that the alphabet \ftag*{gen:alph} is \emph{closed}, no
+  fifth fundamental dimension hiding in the social ontology. That is the seam to cut if you
+  would break the method, and we name it rather than hide it. The departure from the
+  borrowed move is type: their input is a parameter the machine reads at rest, $\dimwelfare$;
+  ours is a force opposing the field the machine computes, $\dimrate$, against
+  $\nabla\rewardfield$ --- and where mechanism design optimizes an objective over outcomes,
+  the artifact it licenses optimizes nothing it records (\see{sec:artifact}, the objective
+  deleted, the deletion forced not weakened). The agnosticism about the input's origin is
+  the wall the discipline cannot cross --- and the wall, not the agnosticism, is what the
+  rest of this document maps.
+\end{econ}
+
+\end{document}

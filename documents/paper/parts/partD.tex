@@ -1,0 +1,556 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\clearpage
+\part{The per-reader field}
+
+\section{The coloured report}
+\label{sec:coloured-report}
+
+\subsection{The report carries content and slant}
+\label{subsec:rep:content}
+\secgrade{nec}%
+Accountability is not a field but a four-role structure --- actor $i$ who causes
+$\outcomechange{k}$, subject $k$, witness $w$ who logs, reader $r$ who judges --- and only
+$\outcomechange{k}$ is a field-fact, never directly observed. The witness logs it as they frame it.
+
+\begin{definition}[\hdr{pr:report}]\grade{nec}
+  With \ftag{g:split} separating the $\dimwelfare$ content from the $\dimwelfare$ distortion, the
+  log carries content plus slant. The act itself is a goods \emph{vector} and a slant is a
+  scalar; the two add only after the act is read on a published axis
+  (\ftag{art:directive}, \ftag*{c:q}) --- one scalar coin for fact and slant alike:
+  \begin{align}
+    &\witnessreport{w} = \mathbf q\transpose\outcomechange{k} + \witnesscolour{w}
+      \label{eq:pr:report}\\
+    &\witnesscolour{w} = (\lean{w}{i}-\lean{w}{k})\,\witnessstake{w}
+      &:& \eqtag{pr:colour}{$\dimratio\cdot\dimwelfare=\dimwelfare$, direction $\times$ magnitude}
+  \end{align}
+\end{definition}
+
+A direction --- the difference of leans --- scaling a magnitude --- the witness's stake in
+the act. It is the operator's two readings re-fused, the cousin of \ftag{nrm:incl}: the graph
+splits $\comovfield$ into lean and coupling at the source and rejoins them here, once for inclusion,
+once for colour. Pro-actor colour exculpates, pro-subject colour condemns, and equi-interest
+($\lean{w}{i}=\lean{w}{k}$) gives colour $0$, faithful. The reader reconstructs the
+de-coloured read,
+$\reconstruct{k}{r}=\witnessreport{w}-\colourestimate{w}{r}$, and applies their own stake.
+
+\subsection{Colour-span: when enemies agree}
+\label{subsec:colour-span}
+\secgrade{nec}%
+One witness can be faithful by being equi-interested; a crowd can be faithful by spanning
+colours. The first is \ftag{pr:woven}; the second is the ensemble mechanism already latent in
+\ftag{pr:report}. A crowd is not yet an anchor: it must be independent twice, not copied and
+not one colour.
+
+\begin{definition}[\hdr{pr:gain}]\grade{nec}
+  For an act by actor $i$ affecting subject $k$, witness $w$ has colour gain
+  \begin{equation}
+    \colourgain{w}:=\lean{w}{i}-\lean{w}{k}\qquad \dimratio.
+    \label{eq:pr:gain}
+  \end{equation}
+  The gain is a difference of leans. Undefined leans are not zeros: a witness with no
+  readable lean on one of the relevant edges is excluded from gain-based de-colouring until
+  that edge is anchored, or else enters through a separate detached route. Felt-zero is not
+  balance; ambivalence supplies a zero gain only when both leans are defined and equal.
+\end{definition}
+
+As algebra, \ftag{pr:gain} is \gradeword{nec}: once the two leans are supplied, their
+difference is typed. Public use of $\colourgain{w}$ inherits \gradeword{cont-anch}, because
+the leans are read through $\anchormetric$ and must be posted independently of the focal
+report. If the report authors the gains by which it is de-coloured, the span is fabricated,
+not measured.
+
+\begin{definition}[\hdr{pr:span}]\grade{nec}
+  For a finite witness set with defined gains, let
+  \begin{equation}
+    \meancolourgain=\frac1{\countof}\sum_w\colourgain{w},\qquad
+    \meansqcolourgain=\frac1{\countof}\sum_w\colourgain{w}^{2},\qquad
+    \varcolourgain=\meansqcolourgain-\meancolourgain^{2}.
+    \label{eq:pr:span-moments}
+  \end{equation}
+  The colour-span, including the zero-colour corner, is
+  \begin{equation}
+    \boxed{
+    \colourspanof{\colourgainfamily}:=
+    \begin{cases}
+      1, & \meansqcolourgain=0,\\[4pt]
+      \dfrac{\varcolourgain}{\meansqcolourgain}, & \meansqcolourgain>0.
+    \end{cases}}
+    \qquad \dimratio.
+    \label{eq:pr:span}
+  \end{equation}
+  Hence $0\le\colourspan\le1$.
+\end{definition}
+
+The two $\colourspan=1$ corners are distinct. If every witness has
+$\colourgain{w}=0$, there is no colour to remove: the fact is faithful without span. If the
+gains oppose and balance, the fact is faithful by cancellation. If every witness carries the
+same nonzero gain, the fact and slant are confounded: one colour, no bracket. Thus
+\colourspan names recoverability, not mere diversity.
+
+\begin{proposition}[\hdr{pr:span-ident}]\grade{feas}
+  In the local equal-noise, equal-colour-amplitude corner, with gains supplied independently
+  of the focal report, read the report through its anchored scalar fact
+  $\recoveryfact=\normG{\outcomechange{k}}$ as in the recovery appendix. Then
+  \begin{equation}
+    \witnessreport{w}
+      =\recoveryfact+\colourgain{w}\colouramplitude+\spannoise{w},
+    \qquad
+    \recoveryfact,\colouramplitude,\spannoise{w}:\dimwelfare,\quad
+    \colourgain{w}:\dimratio,\quad
+    \spannoisevariance:\dimpublicwelfaresq,
+    \label{eq:pr:span-model}
+  \end{equation}
+  and $\operatorname{Var}(\spannoise{w})=\spannoisevariance$. After profiling out the
+  colour-amplitude, the information about the anchored scalar fact is
+  \begin{equation}
+    \boxed{\ \precisionof{\recoveryfact}
+      =\frac{\countof\,\colourspan}{\spannoisevariance}.\ }
+    \label{eq:pr:span-ident}
+  \end{equation}
+  Count supplies mass; colour-span supplies de-colourability. The count factor is the
+  explicit count-grade already present in the summation: $\dimcount=\countgrade$ lowers to
+  an intensive contribution only after pooling, as in \ftag{gen:ext}. A crowd of one colour
+  carries no information about $\recoveryfact$ once its slant is unknown; two opposed colours
+  carry the gap between them.
+\end{proposition}
+
+The local proof is the regression corner. If $\meansqcolourgain>0$, this is the intercept
+precision in the regression of $\witnessreport{w}$ on $\colourgain{w}$:
+\begin{equation}
+  \spanregressordesign\transpose\spanregressordesign
+  =
+  \countof
+  \begin{pmatrix}
+    1 & \meancolourgain\\
+    \meancolourgain & \meansqcolourgain
+  \end{pmatrix},
+  \qquad
+  \operatorname{Var}(\widehat{\recoveryfact})
+  =
+  \spannoisevariance\,
+  \frac{\meansqcolourgain}{\countof\,\varcolourgain}.
+  \label{eq:pr:span-proof}
+\end{equation}
+
+If $\meansqcolourgain=0$, the colour column vanishes and
+$\witnessreport{w}=\recoveryfact+\spannoise{w}$, so
+$\precisionof{\recoveryfact}=\countof/\spannoisevariance$. The two cases are exactly
+\ftag{pr:span}. The matrix dimension of $\precisionof{\recoveryfact}$ is
+$\dimpublicwelfareinvsq$ once the count-grade is read through the pooling convention.
+
+\begin{corollary}[\hdr{pr:deltaspan}]\grade{feas}
+  When authorship-independence and colour-span are orthogonal confounds, the public
+  de-colouring density factors:
+  \begin{equation}
+    \spandensity:=\effdensity\,\colourspan\qquad \dimratio.
+    \label{eq:pr:deltaspan}
+  \end{equation}
+  $\effdensity$ kills copies; $\colourspan$ kills cliques. They multiply only under the
+  stated orthogonality. Without that condition the complete object is the joint
+  author-colour distribution, not their product.
+\end{corollary}
+
+The complete object is the joint author-colour distribution; \colourspan is only its
+second-moment leading invariant. A polarized two-camp ensemble and a broad colour-spectrum
+can share \colourspan while differing in capture-resistance.
+
+\medskip
+\noindent\textbf{Obviousness.}
+Verification has a cost $\verificationcost:\dimwelfare$. Cheap verification does not itself
+create witnesses --- \zcref{W:lookout} remains a will --- but it lowers the cost of recruiting
+them. As $\verificationcost\to0$, an obvious public fact can recruit witnesses across the
+population's native colour distribution; if that distribution has nonzero span,
+$\countanch\colourspan$ rises without authority. Proof-of-work is the engineered corner:
+costly to produce, cheap to verify, so every colour can adjudicate it. Reproducibility is
+the scientific corner: independent labs spend the cost to re-query the world. In all three,
+the anchor is not a person but cross-colour convergence on a state.
+
+\begin{econ}[label=e:pow, title={Costly proof splits credibility},
+  ref=pr:span, cites={a:signaling}, departs=flatten,
+  stopsat={one scalar credibility where the field splits burned stake, colour-span, and alignment}]
+  \textcite{a:signaling}'s signal separates types when the false type pays more to mimic it.
+  Proof-of-work is the same single-crossing shape in engineered form: costly to produce,
+  cheap to verify. The field grants the mechanism and splits what it certifies. Costly proof
+  anchors a spent magnitude, visible to every colour; cheap verification recruits
+  colour-span; neither anchors alignment. Economics reads one scalar, credibility. The field
+  reads expenditure, cross-colour convergence on a state, and the lean that remains
+  uncertified. The departure is therefore one-axis flattening where the field needs the
+  spent length, the bracketing span, and the alignment kept apart.
+\end{econ}
+
+Science is the clean institutional corner: independent replication is colour-span with the
+world as anchor. A reproducible result is one on which opposed prior commitments converge
+after re-querying the same state. Reproducibility anchors the fact, not the worth of the
+research; the is/ought wall is the same type-check in institutional form.
+
+A fact is what survives the colour sweep. A verdict is the colour sweep. Thus cross-colour
+agreement can make the world agree on what happened, and still cannot make the world agree
+what the actor is.
+
+\subsection{Four factors on four edges}
+\label{subsec:rep:factors}
+\secgrade{nec}%
+\begin{definition}[\hdr{bf:factors}]\grade{nec}
+  The witness's effect on a reader is governed by four ratios, each on a distinct directed
+  edge, which the single scalar ``reliability'' had conflated \ftag{g:split}:
+  \begin{align}
+    \text{independence} &= 1-|\lean{w}{i}|
+      &:& \eqtag{bf:ind}{not the actor's puppet; anti-Sybil}\\
+    \text{unbias} &= 1-\tfrac12|\lean{w}{i}-\lean{w}{k}|
+      &:& \eqtag{bf:unb}{the balance, not the distance}\\
+    \text{credibility} &= (\lean{r}{w})_{+}
+      &:& \eqtag{bf:cred}{closeness $=$ de-colouring ability}\\
+    \text{motivation} &= \tfrac{1-\lean{i}{w}}{2}\cdot\tfrac{1+\lean{w}{k}}{2}
+      &:& \eqtag{bf:mot}{self-protective $\times$ sympathy}
+  \end{align}
+\end{definition}
+
+\subsection{The silencing, derived}
+\label{subsec:rep:silencing}
+\secgrade{nec}%
+\begin{insight}[\hdr{pr:silence}]\grade{nec}
+  Credibility does double duty: $\lean{r}{w}$ is trust \emph{and} the capacity to subtract a
+  known slant, so a biased witness is fully informative to their own circle (who de-colour)
+  and corrupting only to those who cannot. This is structural and anchor-relative, not
+  universal: the most-motivated witness --- the actor's enemy, by \ftag{bf:mot} --- is the
+  least de-colourable to the actor's side. The victim's true report is discounted exactly
+  where it most needs hearing, not by anyone's malice but by the geometry of the four edges.
+\end{insight}
+
+\begin{econ}[label=e:colour, title={Cheap talk as a directed field}, ref=pr:colour,
+  cites={a:crawfordsobel}, departs=flatten,
+  stopsat={one sender, one receiver, a scalar bias; here a directed field, de-colourability reader-relative, the silencing derived}]
+  \textcite{a:crawfordsobel}: a biased sender's message is informative up to the bias, the
+  rational receiver discounting by the known bias. The colour is that bias made a network
+  quantity; \ftag{bf:cred} is the receiver's de-biasing. Economics' cheap talk is one sender,
+  one receiver, a scalar common-knowledge bias; here bias is a directed-$\leanbare$ field,
+  de-colourability is reader-relative, and the structural silencing of the victim is
+  \emph{derived} rather than assumed. \textcite{a:kamenica}'s Bayesian persuasion is the
+  funded fake choosing its signal structure --- optimal persuasion at the summit
+  (\see{sec:convergence}).
+\end{econ}
+
+\clearpage
+\section{The witness functional}
+\label{sec:witness-functional}
+
+\subsection{The third gate}
+\label{subsec:wit:gate}
+\secgrade{nec}%
+\begin{definition}[\hdr{pr:info}]\grade{nec}
+  Reader $r$ recovers, from witness $w$, information of content
+  \begin{align}
+  &\info_r(w) &=& \ \bigl(1-\tfrac12|\lean{w}{i}-\lean{w}{k}|\bigr)\,
+                  (\lean{r}{w})_{+}\ \in[0,1] \label{eq:pr:info}\\
+  &\text{unbias}      &:& \ \bigl(1-\tfrac12|\lean{w}{i}-\lean{w}{k}|\bigr),\ \ftag{bf:unb}
+    \label{eq:pr:info-unb}\\
+  &\text{credibility} &:& \ (\lean{r}{w})_{+},\ \ftag{bf:cred}
+    \label{eq:pr:info-cred}
+  \end{align}
+  This is the gate-stride \ftag{g:gate} at \zcref{tbl:sc:info}: information is zero if the witness
+  is slanted (unbias $0$) \emph{or} unreachable (credibility $0$).
+\end{definition}
+
+\subsection{The functional}
+\label{subsec:wit:functional}
+\secgrade{nec}%
+\begin{definition}[\hdr{pr:woven}]\grade{nec}
+  The woven node is \emph{defined}, not described, as the witness credible to all and slanted
+  toward none --- the maximin of recovered information:
+  \begin{equation}
+    \boxed{\ w^\star=\argmax_{w}\ \min_{r}\ \info_r(w).\ }
+    \label{eq:pr:woven}
+  \end{equation}
+\end{definition}
+
+``Close to all, enemy to none'' is the gloss of this $\argmax\min$; the functional is the
+object; the functional \emph{is} the fair judge, and the register that meets it is the
+concordance's, at \ftag{e:smith}. Off the reachable set the $\min$ is degenerate: one
+reader with $(\lean{r}{w})_{+}=0$ zeroes a candidate, so in a heterogeneous network every
+candidate can tie at zero and the $\argmax$ selects nothing. The functional therefore
+ranks only over readers a candidate can reach; the unreached remainder is the anchor
+debt, and the built instance that pays it --- the institution manufactured equi-interested
+--- is \zcref{T:justice}. The woven node is an ideal the telos approaches
+(\ftag{nrm:telos}), not a guaranteed occupant.
+
+\subsection{Two stationary points on one manifold}
+\label{subsec:wit:manifold}
+\secgrade{nec}%
+\begin{insight}[\hdr{pr:equi}]\grade{nec}
+  Unbias $=1$ cuts the colour-zero manifold $\lean{w}{i}=\lean{w}{k}$; symmetrized over all
+  parties, the equi-interest manifold $\alignall{w}\equiv c$, on which $\info_r=c$. Two
+  colour-zero configurations sit on it, separated only by credibility, and \ftag{g:knock} keeps
+  them distinct without collapsing the entailment. The detachment corner $c=0$
+  ($\alignall{w}\equiv0$) is unbiased and worthless --- $\info\equiv0$, de-colourable
+  by no one, the view from nowhere, faithful and inert. The equi-interest corner $c\to1$
+  ($\alignall{w}\equiv1$) is unbiased and maximally credible --- the view from
+  everywhere, colour-zero by balance of attachments, not their absence. The maximin selects
+  the high-$c$ corner: impartiality is not disinterest but equi-interest, and it must be
+  \emph{built} --- the will raising $\leanbare$ toward all --- not assumed.
+\end{insight}
+
+The configuration is a $\dimratio$ cause; it \emph{entails} the distinct $\dimratio$
+properties \{credible, unbiased, fair-judge\} and the $\dimwelfare$ property \{wise, enlarged
+self\} --- entailment across dimensions, never the identity ``credible $=$ wise.''
+
+\refrain{}{Close to all, enemy to none.}
+
+\begin{econ}[label=e:smith, title={Both books on one network}, ref=pr:woven,
+  cites={a:smithtms}, departs=flatten,
+  stopsat={impartiality by detachment ($c{=}0$, credible to no one); the framework's judge is equi-interest ($c\to1$)}]
+  Adam Smith's impartial spectator \parencite{a:smithtms} is the classical fair judge, and
+  the departure is an inversion of its mechanism read off the colour-zero manifold. To be
+  fair to Smith, his device is not crude disinterest but the \emph{internalized generalized
+  other}, a balance of fellow-feelings rather than their absence --- nearer the framework's
+  corner than a careless reading allows. But the \emph{mechanism} he gives it lands at the
+  $c=0$ corner --- impartiality by detachment from any party's stake --- which \ftag{pr:woven}
+  shows is the unique colour-zero point credible to \emph{no one}. The framework's judge is
+  the opposite corner of the same manifold: equi-interest, $c\to1$, colour-zero by
+  \emph{balance} of attachments --- the internalized-other Smith reached for, routed through
+  equi-interest instead of detachment. Impartiality is taken by Smith as projected through
+  fellow-feeling and freely had; here it is built and forgeable (\see{sec:convergence}). The
+  framework is \emph{Wealth of Nations} --- the reward field \ftag{f:rew} --- and \emph{Moral
+  Sentiments} --- this functional --- on one network, and it splits, self-interested gradient
+  from impartial witness, exactly where Smith's two books split.
+\end{econ}
+
+\clearpage
+\section{The null verdict}
+\label{sec:null-verdict}
+
+\subsection{The standing vector}
+\label{subsec:verd:standing}
+\secgrade{nec}%
+\begin{definition}[\hdr{pr:stand}]\grade{nec}
+  Stack actor $i$'s per-reader verdicts as $\verdictstack{i}$, each reader judging the de-coloured externality
+  through their own read-stake:
+  \begin{align}
+    &\verdictstack{i} = \bigl(\readerverdict{r}{i}\bigr)_r \label{eq:pr:stand}\\
+    &\readerverdict{r}{i} = -\reconstruct{k}{r}\,\lean{r}{k}
+      &:& \eqtag{pr:verdict}{$r$'s de-coloured externality,
+        $\dimwelfare\cdot\dimratio=\dimwelfare$}
+  \end{align}
+\end{definition}
+
+Persecution is structural, not a bug: $-\mathbf q\transpose\outcomechange{k}\,\lean{r}{k}$
+flips sign with the
+network's read-stake, so the same act is condemnation to one circle and vindication to
+another.
+
+\refrain{}{You author the act; the network authors the response.}
+
+\subsection{Aggregation is the null projection}
+\label{subsec:verd:null-projection}
+\secgrade{nec}%
+\begin{theorem}[\hdr{pr:agg}]\grade{nec}
+  A global verdict is a portable scalar $\meanverdict{i}$ with
+  $\verdictstack{i}=\meanverdict{i}\,\mathbf 1+\orthverdict{i}$. Decompose along the all-readers direction with
+  \ftag{g:proj}:
+  \begin{equation}
+    \verdictstack{i}=\underbrace{\meanverdict{i}\,\mathbf 1}_{\projone\verdictstack{i}}
+      +\underbrace{\orthverdict{i}}_{\text{reader-indexed}}.
+    \label{eq:verd:decompose}
+  \end{equation}
+  The reader-independent component $\meanverdict{i}$ is built on the externality de-coloured
+  \emph{without} any reader's local $\lean{r}{w}$ --- exactly the witness-independence
+  \ftag{J:anchor} proved non-computable and Sybil-fabricable. Therefore
+  \begin{equation}
+    \boxed{\ \text{absent an external anchor:}\quad
+      \projone\,\verdictstack{i}\in\ker(\text{signal}),\qquad
+      \text{all signal lives in }\orthverdict{i}.\ }
+    \label{eq:pr:agg}
+  \end{equation}
+  In the recovery model the condition is the covering
+  $\mathbf 1\in\operatorname{col}(Z_{\mathrm{int}})$ --- internally pinned frames spanning
+  the constant direction --- under which the global verdict is non-identified.
+\end{theorem}
+
+Aggregation is the projection onto the \emph{kernel} of the signal: the global verdict is not
+forbidden but the component proven to carry zero information; the antecedent that meets
+this wall is the concordance's, at \ftag{e:hayek}.
+
+\subsection{The certificate is null}
+\label{subsec:verd:certificate}
+\secgrade{nec}%
+\begin{corollary}[\hdr{pr:certnull}]\grade{nec}
+  A verdict on a person --- ``safe, audit no further'' / ``dangerous, deny no further'' ---
+  is the portable scalar $\meanverdict{i}$, which sits in $\ker(\text{signal})$. It is \textbf{real
+  within a shared anchor and a shared commensuration}, where $\lean{r}{k}$ and $\lean{r}{w}$
+  are common across readers, $\orthverdict{i}\to0$, and $\meanverdict{i}$ \emph{is} the
+  verdict; it is \textbf{null across anchors}, where $\orthverdict{i}$ is the whole signal ---
+  the same wall as the sealed commons \ftag{f:acc}. A certificate is real only to the precision
+  of the external access routed into it.
+\end{corollary}
+
+\begin{remark}[\hdr{pr:scope}]
+  The family's two walls are of different kinds, and the scope is posted where each
+  binds: the \emph{quantitative} identification results are model-bound --- the linear
+  reading of the recovery appendix, flagged there --- while the \emph{qualitative} wall
+  rests on the independence of anchors (\ftag{J:anchor}), not on any model class. And
+  the family is not verdict-less about everything: the framework's own estimators are
+  its worked operational face --- the identified residual (\zcref{maint:ident}), the
+  susceptibility slope (\zcref{deon:test}), the seal attribution
+  (\zcref{J:forensics}) --- each one-sided, each anchored, each a measurement a
+  per-reader structure can make while certifying no one.
+\end{remark}
+
+\begin{theorem}[\hdr{pr:detach}]\grade{nec}
+  A fact and a verdict lose colour differently. A fact-report has an intercept:
+  \begin{equation}
+    \colourreport{\colourcoordinate}
+      =\recoveryfact+\colourcoordinate\,\colouramplitude.
+    \label{eq:pr:fact-intercept}
+  \end{equation}
+  Removing colour leaves $\recoveryfact$. A per-reader verdict is
+  \begin{equation}
+    \readerverdict{r}{i}
+      =
+      -\reconstruct{k}{r}\,\lean{r}{k}.
+    \label{eq:pr:verdict-colour}
+  \end{equation}
+  At the reader-detached corner,
+  \begin{equation}
+    \boxed{\ \lean{r}{k}=0\quad\Longrightarrow\quad \readerverdict{r}{i}=0.\ }
+    \label{eq:pr:colour-detached}
+  \end{equation}
+  A fact has a colour-invariant because it is a state with a world behind it; a verdict is
+  proportional to the reader's stake and has no invariant except the detached zero.
+\end{theorem}
+
+This is not \ftag{pr:agg} repeated. \ftag{pr:agg} is epistemic: the global scalar is
+non-identified because reader-independent de-colouring requires the anchor. \ftag{pr:detach}
+is ontic: stripping reader-colour from a verdict strips the verdict itself. The two nulls
+agree in consequence, not in mechanism.
+
+Above the fabrication line a Sybil mints marks of either sign for free, so the count carries
+no information. There is no throne to refuse: certificate and blacklist are category errors,
+not prohibited acts. The flywheel is unharmed --- \emph{seen} enlargement still pays through
+the record and the reader's own stake --- only the \emph{sum into a person} is empty.
+
+\begin{econ}[label=e:arrow, title={Impossibility, biting at the inputs}, ref=pr:agg,
+  cites={a:arrow,a:sensocialchoice}, departs=scalar,
+  stopsat={no SWF aggregates orderings; here the orderings are per-reader readings of one coloured fact, so the impossibility bites at inputs Arrow assumes clean}]
+  \textcite{a:arrow}: no social-welfare function aggregates individual orderings under
+  unanimity, IIA, and non-dictatorship --- the standing vector refusing a scalar, each reader
+  a distinct ordering. The framework derives that the orderings are themselves per-reader
+  \emph{readings} of one coloured fact, so the impossibility bites at inputs Arrow assumes
+  clean; \textcite{a:sensocialchoice} located the lever as the informational basis, and the
+  framework specifies the information --- $\outcomechange{k}$, $\leanbare$-indexed, anchor-relative.
+\end{econ}
+
+\begin{econ}[label=e:hayek, title={Less aggregable than price}, ref=pr:agg,
+  cites={a:hayek}, departs=scalar,
+  stopsat={price is a (partial) sufficient statistic; the field's scalar is its null space --- duality of sign, not of degree}]
+  \textcite{a:hayek}: knowledge is dispersed and coordinates without an aggregator. Price
+  aggregates because traders may hold independent partial access. The verdict scalar is null
+  when reports share a frame but no external access. The operative knowledge here,
+  $\lean{r}{w}$ in $\orthverdict{i}$, is local and non-portable, no transaction moving one
+  reader's de-colourability to another. The contrast must be drawn with care, because Hayek's
+  price does not aggregate \emph{fully}:
+  \textcite{a:grossmanstiglitz} is precisely the proof that a price informative enough to
+  aggregate destroys the incentive to gather what it aggregates --- the price is a
+  \emph{partial} sufficient statistic, $\Pi_{\text{price}}$ projecting onto signal but never
+  onto all of it. Grant even that bounded aggregation, though, and the relational field is
+  still its strict dual --- $\Pi_{\mathbf 1}$ projects onto signal's \emph{kernel}, recovering
+  \emph{zero}, not a noisy remainder. Moral standing is less aggregable than price not by the
+  degree G--S already bounds but by the \emph{sign} of the projection: the market's scalar is
+  its (partial) sufficient statistic, the field's scalar is its null space.
+\end{econ}
+
+\clearpage
+\section{Convergence and forgeability}
+\label{sec:convergence}
+
+\subsection{The telos}
+\label{subsec:conv:telos}
+\secgrade{nec}%
+Tying your fate to the subject before you act makes the row follow the column.
+
+\begin{theorem}[\hdr{nrm:telos}]\grade{nec}
+  Let $\ownwelfarechange{k}:=\ownwelfarechangedef{k}$. If
+  \begin{equation}
+    \holding{i}{k}>0
+    \quad\text{and}\quad
+    \currency{i}{k}>0
+    \qquad\forall k,
+    \label{eq:conv:positive-holding}
+  \end{equation}
+  then every componentwise nonnegative perturbation with some positive component raises the
+  extended self:
+  \begin{equation}
+    \boxed{\
+      \ownwelfarechange{k}\ge0,
+      \quad \exists k:\ownwelfarechange{k}>0
+      \quad\Longrightarrow\quad
+      \Delta\extself{i}
+      =\sum_k\holding{i}{k}\currency{i}{k}\ownwelfarechange{k}>0.\ }
+    \label{eq:conv:telos}
+  \end{equation}
+  Therefore, on the positive orthant, good and wise coincide.
+\end{theorem}
+
+The telos is a positivity lemma --- one line, nearly definitional --- and its
+non-trivial content is the converse geometry:
+
+\begin{theorem}[\hdr{nrm:wedge}]\grade{nec}
+  On one edge with booking $\holding{i}{k}\currency{i}{k}$, in the plane of lived
+  change against the other's gain, the good-not-wise region --- the martyr wedge ---
+  has angular measure
+  \begin{equation}
+    \boxed{\ \theta_{\mathrm{wedge}}
+      =\arctan\!\bigl(1/(\holding{i}{k}\currency{i}{k})\bigr),\ }
+    \label{eq:nrm:wedge}
+  \end{equation}
+  and it never closes at finite holding: goodness strictly exceeds wisdom for every
+  real bond, the wedge shrinking like the inverse booking as the holding deepens.
+  ``Widen until they are not a stranger'' is a limit statement, not an achievable
+  state --- the grenade verdict holds only where the booking is already large, and
+  the wedge prices exactly how large. The angle's positivity is gauge-invariant; its
+  decimal is not: how wide the wedge is spends the anchor, that it is open does not.
+\end{theorem}
+
+As an egalitarian normal form, if $\holding{i}{k}\to1$ and
+$\currency{i}{k}\to\parconverter{i}{k}$ for all $k$, then
+\begin{equation}
+  \extself{i}\to
+  \privatewelfare{i}+
+  \sum_k\parconverter{i}{k}\privatewelfare{k}.
+  \label{eq:conv:normalform}
+\end{equation}
+In the flat par gauge this becomes $\privatewelfare{i}+\sum_k\privatewelfare{k}$, and par
+currency gives $\holonomy{i}{j}{k}\to1$ on every cycle. Once every reachable other is
+positively held, helping anyone in the positive orthant helps the extended self; there the
+present and forward predicates coincide. The woven node \ftag{pr:woven}, the equi-interested
+judge, and the enlarged self are not three reachings but one.
+
+\subsection{The node is forgeable}
+\label{subsec:conv:forge}
+\secgrade{cont-anch}%
+The configuration entails everything except independence: closeness is about the node's
+edges, independence about \emph{who authored the node}. So the woven node admits a
+counterfeit.
+
+\begin{theorem}[\hdr{pr:forge}]\grade{cont-anch}
+  Split $\leanbare=\alignanch+\alignint$: a funded actor sets \emph{observed}
+  $\lean{w}{i}=\lean{w}{k}$ --- apparent colour $0$ --- while holding a concealed
+  $\alignintof{w}{\mathrm{author}}>0$ that re-introduces a hidden slant:
+  \begin{equation}
+    \boxed{\ \text{apparent colour}=0,\qquad
+      \text{true colour}=\alignintof{w}{\mathrm{author}}\,\stake\neq0.\ }
+    \label{eq:conv:forge}
+  \end{equation}
+\end{theorem}
+
+This is the funded-fake face of the colour: persuasion choosing its own signal structure, the
+captured authority --- beloved, trusted, serenely ``fair'' over a concealed $\dimwelfare$
+slant. It steals not credibility but \textbf{de-colourability}: the genuine node has true
+colour $0$, faithful to all; the forged has apparent $0$ over a hidden slant,
+un-de-colourable because the bias is concealed. The genuine and the counterfeit share one
+surface, parted only by the external anchor and the fabrication line \ftag{bd:fab} --- from
+outside, slowly, in arrears. The moral telos and the perfect mask have the same shape; at the
+summit as at the floor, the saint and the funded saint are distinguished only by the slow
+honesty of real ties built where no one is paying.
+
+\end{document}

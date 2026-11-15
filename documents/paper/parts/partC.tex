@@ -1,0 +1,431 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\clearpage
+\part{The normative turn}
+
+\section{Goodness, the two faces, the baseline}
+\label{sec:goodness}
+
+\subsection{Goodness, located}
+\label{subsec:good:located}
+\secgrade{nec}%
+Goodness is a will toward $\leanbare$: raising $\alignfactof{i}{k}$ where it was zero ---
+setting $\assignweight{i}{k}>0$ where $\alignfactof{i}{k}=0$ --- a preference \emph{over} the
+weights, identified with \ftag{gen:will}. Its object is the utility function itself, so no
+fixed-$u$ representation contains it.
+
+The two faces \ftag{g:split} by the argument each acts on: \ftag{w:exp} reaches for an unmeasured
+$\surplus$; \ftag{w:vir} moves toward a someone. Both oppose $\nabla\rewardfield$, hence
+coincide wherever $\surplus>0$; they separate as $\surplus\to0$, where surplus (extensive,
+$\dimwelfare$) switches off while rent (intensive, $\dimratio$) persists --- so \ftag{w:vir}
+stands alone at the \textbf{known modest good}: real benefit, no discovery, no witness. A
+type-difference, not a posited crossover.
+
+\begin{definition}[\hdr{nrm:modest}]\grade{nec}
+  The known modest-good corner is the local, presently legible beneficiary-good region in
+  which another's gain is read by that beneficiary's own measure and enlargement requires
+  neither speculative surplus nor distant witnessing.
+\end{definition}
+
+``Modest'' names the epistemic and relational scope of the corner, not a threshold on the
+magnitude of the benefit. Nothing here is a cutoff: a large gain read by its beneficiary's
+own measure, needing no discovery and no witness, is in the corner, and a small one bought
+with unread surplus is not.
+
+The virtuous will itself splits: \ftag{w:enl} enlargement raises $\alignpair{i}{k}$ and is seen;
+\ftag{w:res} restraint declines the right column and is not.
+
+\subsection{The full baseline}
+\label{subsec:good:baseline}
+\secgrade{nec}%
+\begin{definition}[\hdr{op:vmoral}]\grade{nec}
+  The moral sign is a deviation from the \emph{funded trajectory}: the path written
+  jointly by the field's own motion and the gradient of total privately-captured
+  return --- both poles of \ftag{f:rew} in the gradient:
+  \begin{granting}[the baseline converter is the ledger's one open debt: the
+    registry posts its dimension, and what stays open is its calibration]{c:nu}
+  \begin{align}
+    \moralvel &= \alignrateactual-\alignrateself,
+      \qquad
+      \alignrateself=\fielddrift(\leanbare)+\framepull, && \dimrate,
+      \label{eq:op:vmoral}\\
+    \framepull &\proptoconst{c:nu} \nabla_{\leanbare}\left(
+      \selfweight{i}\transpose\outcomechange{i}
+      +\sum_j\foldchangeterm{i}{j}
+      \right)
+      && \dimnodewelfare{i}.
+      \label{eq:op:vmoralself}
+  \end{align}
+  \end{granting}
+  $\fielddrift(\leanbare)$ is the field's endogenous motion --- formation and decay,
+  the flow with no will in it --- and the funded pull $\framepull$ is the gradient
+  \emph{in the lean} $\leanbare$, in $i$'s own welfare units before the converter
+  turns it into a rate. The baseline is
+  a full counterfactual \textbf{trajectory}, not a forcing. One may assume naively
+  that subtracting the funded pull alone would do; both candidates are rates and the
+  dimension check passes --- but then the field's own motion leaks into the moral
+  register, and a passive agent on a spontaneously-opening edge is minted virtue by
+  the drift itself: a semantic type error no dimension checker can catch. Subtracting
+  the trajectory removes it exactly:
+\end{definition}
+
+\begin{lemma}[\hdr{op:cancel}]\grade{nec}
+  (Scope: the interior additive form of the flow \zcref{eq:dyn:flow}, under the
+  both-drifts reading \ftag{mod:drifts}.)
+  With the trajectory baseline the field's motion cancels identically,
+  \begin{equation}
+    \moralvel
+      =\bigl(\fielddrift+\will\bigr)-\bigl(\fielddrift+\framepull\bigr)
+      =\will-\framepull,
+    \label{eq:vmoral:cancel}
+  \end{equation}
+  independent of the formation coefficient, the decay, and the lean. On this form the
+  moral register therefore inherits \emph{none} of the dynamical sector's corrections:
+  not the two constants (\ftag{dyn:response}), not the shifted boundaries, not the
+  pole and founding factors, not the coupling's own law (\ftag{dyn:polar}) --- every
+  exact correction flows along the dynamical axis and cancels out of $\moralvel$. What
+  the disclaimer costs when the form is retired, and what survives it, is scoped
+  immediately below.
+\end{lemma}
+
+The scope is not a formality, because this document retires that form from everything
+stationary. The interior additive equation is a closure (\ftag{dyn:formclose}), stated
+approximate as a trajectory at \see{subsec:fixed:exact}; on the exact branch forcing
+does not enter additively at all but through the geometric factor
+(\zcref{dyn:moment}), which vanishes at the poles and averages to $(n-1)/n$ under a
+weak hold. So the subtraction has to say where the funded pull enters the motion, and
+that is a modelling choice and not a theorem: the pull may occupy the same slot as the
+will --- a drift on the caring direction --- or be subtracted as a rate after the
+factor has acted. This document \textbf{chooses}, and posts the price.
+
+\begin{statement}{mod:drifts}{The both-drifts reading}
+  The funded pull enters the motion \textbf{where the will enters it}: $\will$ and
+  $\framepull$ are both drifts on the caring direction, and the counterfactual funded
+  trajectory is the same dynamics run at $\framepull$ in place of $\will$. The
+  alternative is an \emph{additive-pull} reading, in which the pull is subtracted as a
+  rate after the geometric factor has acted. Its price is a price on the \emph{sign},
+  posted below --- which is why the reading is chosen here rather than left to
+  whichever one a reader supplies.
+\end{statement}
+
+Under the posted reading the exact branch returns the lemma's cancellation and one
+factor more:
+\begin{equation}
+  \moralvel=\bigl(\will-\framepull\bigr)\,
+    \mathbb E\bigl[1-\leanbare^{2}\bigr]
+  \qquad\dimrate.
+  \label{eq:vmoral:cancel-exact}
+\end{equation}
+The two halves of the lemma part company here. The field's own motion still cancels
+identically --- the half the definition's type-error argument needs, and it is robust
+across the two forms. The disclaimer on magnitudes is not: the surviving factor is
+exactly the pole degradation and the founding toll (\zcref{dyn:moment}) that the
+lemma lists as not inherited, so magnitudes of moral spend are not comparable across
+regimes without it. What does survive is the \emph{sign} and the \emph{zero-set}: the
+factor is strictly positive off the poles, so $\moralvel=0$ exactly when
+$\will=\framepull$, and $\moralvel$ carries the sign of $\will-\framepull$. The
+partition of \zcref{tbl:good:spends} --- funded against unfunded, which is what the
+normative half reads --- is the same partition on either form. That is the seam
+between the paper's descriptive half and its normative half: watertight in sign,
+scoped in magnitude, and this lemma is the weld.
+
+The alternative's price, stated: under an additive-pull reading the residual is
+$\will\,\mathbb E[1-\leanbare^{2}]-\framepull$, and where the factor is small ---
+near the poles, and in the founding regime where it is at most $(n-1)/n$ --- its sign
+parts from the sign of $\will-\framepull$. A will exceeding the funded pull can then
+read as unfunded, which is a verdict and not a magnitude. Nothing above is an argument
+that the additive-pull reading is wrong; it is the reason the choice is posted.
+
+And none of the correction reaches the operational route, which never leaves
+will-space: the identification scheme returns the will itself
+(\zcref{maint:ident}), inverting the exact map rather than the additive one, so
+comparing will against funded pull is a difference of two rates with no geometric
+factor in it anywhere. The place the moral register is actually read is the place the
+correction does not go.
+
+The zero is normative, not computable, and it is doubly anchored: in \emph{metric}
+($\anchormetric$, \gradeword{cont-anch}) and in \emph{internality}
+($\selfsurplus$ unread, \gradeword{cont-comm}) --- two distinct dependencies, its error
+a residual. The baselines coincide as $\surplus\to0$, the modest good again, where the reading
+is cleanest.
+
+\begin{econ}[label=e:baseline, title={Subtracting the right gradient}, ref=op:vmoral,
+  cites={a:samuelson,a:internality}, departs=scalar,
+  stopsat={prices the cost you do yourself across time; has no axis for surplus kept across the held edge}]
+  Revealed preference \parencite{a:samuelson} reads static choice; the decisive datum is a
+  velocity against the \emph{right} gradient. Subtracting only rent --- the naive selfish
+  baseline --- over-certifies, scoring entrepreneurial surplus-capture as virtue-shaped
+  wherever $\selfsurplus>0$; the correct baseline subtracts captured surplus too.
+  Behavioral welfare economics has an ``internality'' \parencite{a:internality} --- a cost
+  the present self imposes on the future self, \emph{within} one node's timeline --- and it is
+  not this one: $\selfsurplus$ is captured surplus across the $\leanbare$-extended
+  self, an interpersonal magnitude the single-node internality has no room for. Economics can
+  price the cost you do yourself across time; it has no axis for the surplus you keep across
+  the held edge, which is exactly the quantity the moral baseline must subtract.
+\end{econ}
+
+\subsection{The two spends}
+\label{subsec:good:spends}
+\secgrade{nec}%
+Two deviations, one per axis, and every census below sorts by both. The
+\emph{dynamical spend} is $\will\neq0$: forcing held against the field's own drift ---
+what \ftag{J:occ} prices, what the kernel hides. Effort. The \emph{moral spend} is
+$\moralvel=\will-\framepull\neq0$: deviation from the funded choice --- what
+\ftag{op:vmoral} grades. Virtue or vice. The axes are independent
+(\zcref{op:cancel}), and their crossing is a partition:
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The two spends, crossed}{tbl:good:spends}
+  \begin{tabularx}{\textwidth}{@{} l L L @{}}
+    \toprule
+    & \textbf{funded} ($\moralvel=0$) & \textbf{unfunded} ($\moralvel\neq0$) \\
+    \midrule
+    \textbf{working} ($\will\neq0$) & funded work: the entrepreneur, and the rational
+      toll-keeper of \ftag*{J:seal} & virtue and vice proper: the modest good; the
+      spiteful sealer \\
+    \addlinespace
+    \textbf{at rest} ($\will=0$) & lapse & the keeper's restraint: a moral spend at
+      zero dynamical spend \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Rent sits in the baseline --- the funded choice includes rent-following --- \emph{and}
+$\willanti$ remains a will: holding an edge shut against the field's drift is work.
+Two claims on two axes, no contradiction. One may assume naively that ``funded work''
+is a collapse waiting to happen --- a chosen action subtracted as if it were gravity;
+the baseline subtracts the \emph{counterfactual funded choice}, which is what a
+baseline is for, while the actual gravity --- the field's drift --- cancels out of the
+register entirely (\zcref{op:cancel}). Funded work is not a costume: it is
+the exact name of the quadrant where the toll-keeper and the entrepreneur stand
+together, effort the record cannot see and the moral ledger does not owe.
+
+\subsection{The kernel takes its moral content}
+\label{subsec:good:kernel}
+\secgrade{nec}%
+\handle*{ten:res}\handle*{ten:fid}\handle*{ten:lapse}%
+Acts with $\outcomechange{k}=0$ against an unknown option give $\alignrateactual=0$ and
+land in $\ker\readout$, separated only by the funded pull $\framepull$ (which
+$\readout$ annihilates).
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The kernel's first three tenants}{tbl:good:kernel}
+  \begin{tabularx}{\textwidth}{@{} l c L c @{}}
+    \toprule
+    \textbf{tenant} & $\alignrateactual$ & \textbf{frame $\framepull$}
+      & $\moralvel,\ \will$ \\
+    \midrule
+    \tagdef{ten:res} restraint (declined harm that paid) & $0$ & $\neq0$, toward harm
+      & $\moralvel\neq0,\ \will\ge0$ \\
+    \addlinespace
+    \tagdef{ten:fid} fidelity (held edge vs decay) & $0$ & $\neq0$, toward lapse
+      & $\moralvel\neq0,\ \will>0$ \\
+    \addlinespace
+    \tagdef{ten:lapse} lapse (withheld good that cost) & $0$ & $0$, at funded rest
+      & $\moralvel=0,\ \will=0$ \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent The first two are the occupied kernel --- \ftag{ten:res} concrete (restraint
+against a paying option, no conjecture), \ftag{ten:fid} dense (every maintained edge,
+standing $\will>0$ against decay, \ftag{J:occ}). The tenants are regions, not points,
+and restraint's far corner is its purest case: a declined option-\emph{event} asks no
+forcing at all, a moral spend at zero dynamical spend
+(\zcref{tbl:good:spends}) --- nothing for any instrument to catch even in principle.
+The third is the empty null: rest, no work, neither vice nor
+virtue but \textbf{insufficiency}. The record sees $0=0$ across all three; the frame
+that separates them is exactly what it cannot read. The full tenancy --- severance,
+self-fidelity, the toll pair, the deontic --- waits on the descent
+(\see{sec:still-center}).
+
+\subsection{Two licenses}
+\label{subsec:good:licenses}
+\secgrade{nec}%
+The same uncertifiability cuts both moral directions. \emph{Hope-virtue} (\ftag{w:exp}): a
+blind, bounded-loss, stoppable experiment --- the unfunded self-breach would require
+\emph{certainty} that benefit is impossible, which \ftag{dyn:bif} forbids establishing, so
+unreadability is permission. \emph{Sight-virtue} (\ftag{w:vir}): reads a reachable cell
+(self $\ge0$, others $+$), no superposition. The direct-legacy case is the lone exception,
+where the discriminator is a standing state, present-tense (\see{sec:good-wise}).
+
+\begin{econ}[label=e:commitment, title={Commitment, given a fixed address}, ref=op:vmoral,
+  cites={a:degustibus,a:senrational,a:bowlesgintis}, departs=freeze,
+  stopsat={carries the preference-revising preference as selection, never as a will}]
+  \emph{De gustibus} \parencite{a:degustibus} forbids exactly this: a preference that revises
+  preferences. \textcite{a:senrational} located the gap --- commitment, acting against one's
+  own welfare ranking, escapes the single ordering revealed choice recovers and demands a
+  meta-ranking --- but left it as critique; endogenous-preference economics
+  \parencite{a:bowlesgintis} moves $w$ by selection, a desireless fixed point. The object is
+  not unmodeled but unrepresentable in the fixed-utility frame: Sen's commitment given a fixed
+  address, $\ker\readout$.
+\end{econ}
+
+\begin{econ}[label=e:license, title={The blind crossing, never the sighted}, ref=dyn:bif,
+  cites={a:knight,a:weitzman}, departs=annex,
+  stopsat={describes the blind crossing only; never the sighted good, nor unreadability as license}]
+  Knightian uncertainty \parencite{a:knight} and optimal experimentation
+  \parencite{a:weitzman} describe the blind crossing only --- never the sighted crossing at
+  the known good, nor unreadability as a license.
+\end{econ}
+
+\clearpage
+\section{Good versus wise}
+\label{sec:good-wise}
+
+\subsection{The temporal split}
+\label{subsec:gw:temporal}
+\secgrade{nec}%
+Good and wise are both welfare states differing in time-index, not a state/rate pair:
+\ftag{nrm:good} the present predicate, authored now, read plural; \ftag{nrm:wise} the forward,
+settled later, singular. Helping a subject settles into \emph{enlargement} or \emph{martyr};
+harming settles into \emph{exploitation-that-paid} or \emph{spite-that-backfired} --- and
+the row cannot be read at the instant. The act is half-chosen (the column is yours) and
+half-fated (the row is the network's settling).
+
+\subsection{Self-funding uniqueness}
+\label{subsec:gw:uniqueness}
+\secgrade{feas}%
+\begin{theorem}[\hdr{nrm:self}]\grade{feas}
+  The wise region is the non-negative orthant on the extended self, and the boundary
+  rule rests on three axioms, separable, each refusable on its own: \emph{own-measure
+  booking} --- others enter only through their welfare by their own measure, the
+  anti-annexation clause (\ftag{J:hip}); \emph{non-depletion} --- a pure transfer, an
+  act with no co-movement and zero lived return, never raises the extended self; and
+  \emph{no over-booking} \handle{nrm:maxbook} --- on the own-measure ray, booked
+  content never exceeds the
+  positive part of the lived return
+  \begin{align}
+    &\livedreturn{i}{k} := \livedreturndef{i}{k}
+      =\selfweight{i}\transpose\comov{i}{k}\outcomechange{k}
+      \quad \dimnodewelfare{i}
+      &:& \eqtag*{eq:normative:lived-return}{\vtop{\hbox{(the felt total \ftag*{f:felt},}
+                                   \hbox{\ at the boundary)}}}
+  \end{align}
+  --- currency-free and $\anchormetric$-free. The theorem then splits in two. The
+  \emph{support} is forced by non-depletion alone: who can be inside at all is exactly
+  the positively-aligned held edges --- any $w$-keyed rule admits unfunded depletion,
+  any rule wider than held overlap re-imports it. The \emph{magnitude} is forced by
+  no-over-booking up to the ledger: among admissible rules there is a unique
+  \textbf{maximal} one --- it books exactly the lived return on the own-measure ray,
+  any larger rule over-books, any smaller leaves funded content unbooked --- and
+  $b=\holding{i}{k}$ is that rule in the \emph{funding gauge}, the posted currency
+  equal to the belonging radius per unit of the other's anchored length. The shape is
+  forced; the scale is the ledger's, already posted (\ftag{P:leak}). Love as large as
+  honesty allows, and no larger.
+\end{theorem}
+
+\begin{proposition}[\hdr{nrm:nodepl}]\grade{nec}
+  Non-depletion itself is a posted axiom, provably independent of the field: a
+  prioritarian rule --- book distant others by a posted need-weight, decreasing in
+  their welfare level, regardless of co-movement --- is dimensionally legal on the
+  same field and violates non-depletion \emph{by design}, since on that ethics a
+  transfer to the distant worst-off should count. No rule satisfies both
+  non-depletion and need-responsiveness on strangers; the disagreement is
+  axiom-level, and neither side can theorem it away. What the framework says back is
+  one thing only: \emph{post your converter}. The rival must put a new object on its
+  ledger --- the need-shape --- where the Stoic drawing spends only converters the
+  descriptive apparatus already posts. The honest advantage is parsimony of posted
+  converters, not truth: the choice between the ledgers is a value-theory made
+  visible (\ftag{P:leak}), priced, never refuted.
+\end{proposition}
+
+\begin{insight}[\hdr{nrm:funding}]\grade{nec}
+  The only necessary content is the type of the funding fact. The public line is anchored;
+  the tipping point is anchored twice.
+\end{insight}
+
+\begin{remark}[\hdr{nrm:martyr}]\grade{cont-anch}
+  The self-floor is private in funding type and public only at its threshold. A martyrdom
+  line therefore has two facets: the lived return $\livedreturn{i}{k}\in\dimnodewelfare{i}$
+  and the anchored public support that locates where the gift tips.
+\end{remark}
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Funding modality ladder}{tbl:gw:ladder}
+  \begin{tabularx}{\textwidth}{@{} l l l @{}}
+    \toprule
+    \textbf{facet} & \textbf{object} & \textbf{grade} \\
+    \midrule
+    funding type & $\livedreturn{i}{k}\in\dimnodewelfare{i}$ & \gradeword{nec} \\
+    felt sign & $\operatorname{sign}\livedreturn{i}{k}$ & \gradeword{cont-comm} \\
+    public support & $\operatorname{supp}\lean{i}{k}^{+}$ & \gradeword{cont-anch} \\
+    threshold & magnitude through $\anchormetric$ and $\currency{i}{k}$ & \gradeword{cont-anch} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{proposition}[\hdrunbacked{Triage currency cancellation}{J:triage}]\grade{nec}
+  The worth-comparison component of triage cancels the chooser's welfare unit:
+  \begin{equation}
+    \frac{\currency{i}{k}}{\currency{i}{m}}
+    :
+    \frac{\dimnodewelfareratio{i}{k}}{\dimnodewelfareratio{i}{m}}
+    =\dimnodewelfareratio{m}{k}.
+    \label{eq:J:triage-cancel}
+  \end{equation}
+\end{proposition}
+
+\refrain{}{When triage reaches for worth, it finds no height of self --- only a posted rate between the others, which someone hoped to read as fate.}
+
+So virtue is \textbf{enlargement} --- build $\holding{i}{k}>0$ until $k$ enters a self that still
+holds the lived self, self-funding through positive holding --- and \textbf{not transfer} --- holding
+$u_k$ up by driving lived $u_i$ down across $\holding{i}{k}=0$, unfunded. The
+choice-forced content reduces to a single desideratum, self-funding; the Stoic drawing of the
+boundary through held edges is the forced rule under non-depletion, not a taste.
+
+And because inclusion folds each member by \emph{their} weighting (\ftag{nrm:incl}, the aligned
+stake, not the cosine and not $\selfweight{i}$), widening the self is never annexing the other
+--- self-funding carries the intensity of the holding, so spending heavily on a faint tie is
+not made costless by a high lean. The extended self is therefore \gradeword{cont-comm}: privately
+weighted, dark, settled by the holder's own $\selfweight{i}$.
+
+\subsection{The bottom-left, resolved}
+\label{subsec:gw:bottom-left}
+\secgrade{nec}%
+Sacrifice at lived-self $-$, others $+$ is three positions of one self-boundary, recovered by
+\ftag{g:rec}:
+\begin{table}[htbp]
+  \centering
+  \captiontag{Sacrifice: three positions of one self-boundary}{tbl:gw:bottomleft}
+  \begin{tabularx}{\textwidth}{@{} >{\hsize=.8\hsize}L >{\hsize=1.2\hsize}L @{}}
+    \toprule \textbf{configuration} & \textbf{reading} \\ \midrule
+    beneficiary inside the held self  & wise (extended-self orthant) \\
+    beneficiary outside the held self & good, not wise \\
+    others $0$                        & void \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+The grenade for a child ($\holding{i}{k}>0$ and large) is (self $+$, others $+$), wise, its
+discriminator a standing state present-tense; the martyr for strangers
+($\holding{i}{k}=0$) is (self $-$, others $+$), good not wise --- goodness
+exceeding wisdom, the proof that the two predicates are not one. Sacrifice for a stranger is
+wise only to the degree holding is already positive: widen until they are not a stranger ---
+funded only to the radius posted at \ftag{nrm:incl}, and the act is funded.
+
+\begin{econ}[label=e:extself, title={The household at fixed weights}, ref=nrm:self,
+  cites={a:beckerhh}, departs=freeze,
+  stopsat={aggregates members at fixed altruism weights, not at held overlap the will can widen}]
+  The nearest economic extended self is \textcite{a:beckerhh}'s household and its rotten-kid
+  theorem --- but it aggregates members at fixed altruism weights $w$, not at held overlap
+  $\leanbare$ the agent can widen by will. No economic axis carries an extended self drawn along
+  held edges; the uniqueness theorem makes the Stoic drawing the forced one under
+  non-depletion, converting a philosophical choice into a structural property.
+\end{econ}
+
+\begin{statement}{}{Love and wisdom}
+The holding that draws the self-boundary along held edges is \virtue{love} ---
+\ftag{nrm:self} under the uniqueness theorem; it funds the grenade where mere weight cannot,
+and love overshooting held edges is goodness-without-wisdom, not vice. The guard of the whole
+orthant boundary, refusing self-erasure on one wall and exploitation on the other, is
+\virtue{wisdom} --- \ftag{J:hip}.
+\end{statement}
+
+\refrain{}{You become good not by widening the circle in name, but by extending the real
+boundary of the self outward, edge by edge.}
+
+\end{document}

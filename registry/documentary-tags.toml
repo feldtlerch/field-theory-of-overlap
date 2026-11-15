@@ -6,3 +6,699 @@ handle = "dec:weld"
 label = "dec:weld:equal-address-sets"
 authority-record = "dec:tags:bound-to-labels"
 reason = "Addresses the weld decision."
+
+[[events]]
+ordinal = 2
+change = "admit"
+handle = "eq:tenses"
+label = "eq:coda:feet"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 3
+change = "admit"
+handle = "eq:flow"
+label = "eq:dyn:flow"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 4
+change = "admit"
+handle = "eq:acc"
+label = "eq:f:acc"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 5
+change = "admit"
+handle = "eq:cap"
+label = "eq:f:cap"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 6
+change = "admit"
+handle = "eq:stake"
+label = "eq:f:charge"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 7
+change = "admit"
+handle = "eq:felt"
+label = "eq:f:felt"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 8
+change = "admit"
+handle = "eq:occ"
+label = "eq:J:occ"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 9
+change = "admit"
+handle = "eq:lived"
+label = "eq:normative:lived-return"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 10
+change = "admit"
+handle = "eq:lapse"
+label = "eq:will:passive-decay"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 11
+change = "admit"
+handle = "tbl:branches"
+label = "tbl:branches"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 12
+change = "admit"
+handle = "tbl:corners"
+label = "tbl:corners"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 13
+change = "admit"
+handle = "tbl:covectors"
+label = "tbl:cosine:covectors"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 14
+change = "admit"
+handle = "tbl:dividends"
+label = "tbl:cosine:dividends"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 15
+change = "admit"
+handle = "tbl:incl-expo"
+label = "tbl:cosine:inclexpo"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 16
+change = "admit"
+handle = "tbl:propagation"
+label = "tbl:cosine:propagation"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 17
+change = "admit"
+handle = "tbl:stake"
+label = "tbl:cosine:stake"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 18
+change = "admit"
+handle = "tbl:vanishings"
+label = "tbl:cosine:zeros"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 19
+change = "admit"
+handle = "tbl:coupling"
+label = "tbl:coupling"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 20
+change = "admit"
+handle = "tbl:debts"
+label = "tbl:debts"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 21
+change = "admit"
+handle = "tbl:spend-route"
+label = "tbl:epi:spend"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 22
+change = "admit"
+handle = "tbl:equivalences"
+label = "tbl:equivalences"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 23
+change = "admit"
+handle = "tbl:ev"
+label = "tbl:ev"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 24
+change = "admit"
+handle = "tbl:fabline"
+label = "tbl:fabline"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 25
+change = "admit"
+handle = "tbl:falsifiers"
+label = "tbl:falsifiers"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 26
+change = "admit"
+handle = "tbl:grades"
+label = "tbl:gen:grades"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 27
+change = "admit"
+handle = "tbl:kernel"
+label = "tbl:good:kernel"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 28
+change = "admit"
+handle = "tbl:two-spends"
+label = "tbl:good:spends"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 29
+change = "admit"
+handle = "tbl:sacrifice"
+label = "tbl:gw:bottomleft"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 30
+change = "admit"
+handle = "tbl:funding"
+label = "tbl:gw:ladder"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 31
+change = "admit"
+handle = "tbl:ledger"
+label = "tbl:ledger"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 32
+change = "admit"
+handle = "tbl:concordance"
+label = "tbl:log:concordance"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 33
+change = "admit"
+handle = "tbl:knocks"
+label = "tbl:log:knock"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 34
+change = "admit"
+handle = "tbl:splits"
+label = "tbl:log:split"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 35
+change = "admit"
+handle = "tbl:zeros"
+label = "tbl:ont:zeros"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 36
+change = "admit"
+handle = "tbl:lives"
+label = "tbl:P:antichain"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 37
+change = "admit"
+handle = "tbl:gates"
+label = "tbl:P:gates"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 38
+change = "admit"
+handle = "tbl:portraits"
+label = "tbl:portraits"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 39
+change = "admit"
+handle = "tbl:rulings"
+label = "tbl:rulings"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 40
+change = "admit"
+handle = "tbl:scales"
+label = "tbl:scales"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 41
+change = "admit"
+handle = "tbl:duality"
+label = "tbl:self:duality"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 42
+change = "admit"
+handle = "tbl:struts"
+label = "tbl:self:struts"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 43
+change = "admit"
+handle = "tbl:shapes"
+label = "tbl:shapes"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 44
+change = "admit"
+handle = "tbl:tenants"
+label = "tbl:still:tenants"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 45
+change = "admit"
+handle = "tbl:verify"
+label = "tbl:verify"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 46
+change = "admit"
+handle = "tbl:rests"
+label = "tbl:W:rests"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 47
+change = "admit"
+handle = "tbl:reach"
+label = "tbl:will:reach"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 48
+change = "admit"
+handle = "app:recovery"
+label = "app:recovery"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 49
+change = "admit"
+handle = "sec:which-way"
+label = "sec:say:direction"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 50
+change = "admit"
+handle = "sec:closure-scope"
+label = "subsec:fixed:exact"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 51
+change = "admit"
+handle = "B:belief"
+label = "B:belief"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 52
+change = "admit"
+handle = "B:record"
+label = "B:record"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 53
+change = "admit"
+handle = "B:relevance"
+label = "B:relevance"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 54
+change = "admit"
+handle = "B:salience"
+label = "B:salience"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 55
+change = "admit"
+handle = "R:askonly"
+label = "R:askonly"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 56
+change = "admit"
+handle = "R:nostake"
+label = "R:nostake"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 57
+change = "admit"
+handle = "R:trusted"
+label = "R:trusted"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 58
+change = "admit"
+handle = "T:audited"
+label = "T:audited"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 59
+change = "admit"
+handle = "T:justice"
+label = "T:justice"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 60
+change = "admit"
+handle = "T:wound"
+label = "T:wound"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 61
+change = "admit"
+handle = "rest:connect"
+label = "W:connect"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 62
+change = "admit"
+handle = "rest:keepers"
+label = "W:keepers"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 63
+change = "admit"
+handle = "rest:lookout"
+label = "W:lookout"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 64
+change = "admit"
+handle = "rest:seed"
+label = "W:seed"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 65
+change = "admit"
+handle = "f:cap"
+label = "f:cap"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 66
+change = "admit"
+handle = "gen:obj"
+label = "gen:obj"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 67
+change = "admit"
+handle = "J:anchor"
+label = "J:anchor"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 68
+change = "admit"
+handle = "J:triage"
+label = "J:triage"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 69
+change = "admit"
+handle = "P:leak"
+label = "P:leak"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 70
+change = "admit"
+handle = "g:gate"
+label = "g:gate"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 71
+change = "admit"
+handle = "g:knock"
+label = "g:knock"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 72
+change = "admit"
+handle = "g:proj"
+label = "g:proj"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 73
+change = "admit"
+handle = "g:rec"
+label = "g:rec"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 74
+change = "admit"
+handle = "g:sign"
+label = "g:sign"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 75
+change = "admit"
+handle = "g:split"
+label = "g:split"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 76
+change = "admit"
+handle = "gate:G1"
+label = "gate:G1"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 77
+change = "admit"
+handle = "gate:G2"
+label = "gate:G2"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 78
+change = "admit"
+handle = "gate:G3"
+label = "gate:G3"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 79
+change = "admit"
+handle = "gate:G4"
+label = "gate:G4"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 80
+change = "admit"
+handle = "mod:reg"
+label = "mod:reg"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 81
+change = "admit"
+handle = "xstmt:comovement"
+label = "xstmt:comovement"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 82
+change = "admit"
+handle = "xstmt:converter"
+label = "xstmt:converter"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 83
+change = "admit"
+handle = "xstmt:fact"
+label = "xstmt:fact"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 84
+change = "admit"
+handle = "xstmt:fidelity"
+label = "xstmt:fidelity"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 85
+change = "admit"
+handle = "xstmt:place"
+label = "xstmt:place"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 86
+change = "admit"
+handle = "xstmt:plain"
+label = "xstmt:plain"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 87
+change = "admit"
+handle = "xstmt:sweep"
+label = "xstmt:sweep"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 88
+change = "admit"
+handle = "xstmt:verdict"
+label = "xstmt:verdict"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper object."

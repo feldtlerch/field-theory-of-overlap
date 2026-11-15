@@ -21,7 +21,7 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
         texts: 4,
         tag_sites: 3,
         rust_mints: 4,
-        markdown_mints: 117,
+        markdown_mints: 118,
         unit_mints: 4,
         markdown_citations: 100,
         rust_citations: 8,

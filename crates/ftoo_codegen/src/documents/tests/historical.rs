@@ -21,9 +21,15 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     let corpus = crate::load_unit_sources(declaration, statements.clone()).unwrap();
     let markdown = crate::load_markdown_files(&root).unwrap();
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let registry_joint = joint
+        .clone()
+        .with_paper_mints(
+            registry::paper_mint_rows(&input::read(&root, registry::PAPER_MINTS)?).unwrap(),
+        )
+        .unwrap();
     let book = book
         .with_documentary(
-            &joint,
+            &registry_joint,
             registry::load(&registry::read(&root).unwrap()).unwrap(),
         )
         .unwrap();

@@ -1,0 +1,357 @@
+
+
+
+\tl_new:N \g_ftoo_version_tl
+\NewDocumentCommand{\setversion}{m}{ \tl_gset:Nn \g_ftoo_version_tl {#1} }
+\NewDocumentCommand{\docversion}{}{ \tl_use:N \g_ftoo_version_tl }
+
+\NewDocumentCommand{\ftoolabel}{m}{ \label{#1} }
+
+\cs_new_protected:Npn \ftoo_set_titleref:n #1
+  {
+    \cs_gset:cpn { @currentlabelname } { #1 }
+    \use:c { zref@titleref@setcurrent } { #1 }
+    \cs_gset_eq:cc { zref@titleref@current } { zref@titleref@current }
+  }
+\cs_generate_variant:Nn \ftoo_set_titleref:n { e }
+
+\newtheoremstyle{ftooplain}{\topsep}{\topsep}{\itshape}{0pt}{\bfseries}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+\newtheoremstyle{ftoodefn}{\topsep}{\topsep}{\normalfont}{0pt}{\bfseries}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+\newtheoremstyle{ftoorem}{\topsep}{\topsep}{\normalfont}{0pt}{\itshape}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+
+\theoremstyle{ftooplain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\theoremstyle{ftoodefn}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{postulate}[theorem]{Postulate}
+\theoremstyle{ftoorem}
+\newtheorem{insight}[theorem]{Insight}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{property}[theorem]{Property}
+
+\tl_new:N \l_ftoo_thmtype_tl
+\AddToHook{env/theorem/begin}     { \tl_set:Nn \l_ftoo_thmtype_tl { theorem } }
+\AddToHook{env/proposition/begin} { \tl_set:Nn \l_ftoo_thmtype_tl { proposition } }
+\AddToHook{env/lemma/begin}       { \tl_set:Nn \l_ftoo_thmtype_tl { lemma } }
+\AddToHook{env/corollary/begin}   { \tl_set:Nn \l_ftoo_thmtype_tl { corollary } }
+\AddToHook{env/definition/begin}  { \tl_set:Nn \l_ftoo_thmtype_tl { definition } }
+\AddToHook{env/postulate/begin}   { \tl_set:Nn \l_ftoo_thmtype_tl { postulate } }
+\AddToHook{env/conjecture/begin}  { \tl_set:Nn \l_ftoo_thmtype_tl { result } }
+\AddToHook{env/insight/begin}     { \tl_set:Nn \l_ftoo_thmtype_tl { remark } }
+\AddToHook{env/remark/begin}      { \tl_set:Nn \l_ftoo_thmtype_tl { remark } }
+\AddToHook{env/property/begin}    { \tl_set:Nn \l_ftoo_thmtype_tl { result } }
+
+
+\prop_if_exist:NF \g_ftoo_tag_to_id_prop     { \prop_new:N \g_ftoo_tag_to_id_prop }
+\prop_if_exist:NF \g_ftoo_id_to_tag_prop     { \prop_new:N \g_ftoo_id_to_tag_prop }
+\prop_if_exist:NF \g_ftoo_id_to_heading_prop { \prop_new:N \g_ftoo_id_to_heading_prop }
+
+\tl_new:N \l_ftoo_hdr_id_tl
+\tl_new:N \l_ftoo_hdr_tag_tl
+\tl_new:N \l_ftoo_hdr_head_tl
+\cs_generate_variant:Nn \prop_get:NnNF { NVNF }
+
+\msg_new:nnn { ftoo } { hdr-two-argument-form }
+  {
+    \token_to_str:N \hdr~takes~the~tag~alone:~the~heading~is~read~from~the~paper's~
+    manifest~data.~The~second~argument~seen~here~was~'#1'.
+  }
+\msg_new:nnn { ftoo } { hdr-unbound-tag }
+  {
+    The~result~head~mints~'#1',~a~tag~the~manifest~data~binds~to~no~referent.~
+    Bind~'#1'~in~documents/paper/data/ftoo_manifest.tex~or~do~not~mint~it.
+  }
+\msg_new:nnn { ftoo } { hdr-alias-tag }
+  {
+    The~result~head~mints~'#1',~which~is~an~alias~rather~than~the~canonical~
+    tag~of~its~referent.~A~mint~must~print~and~anchor~one~published~name.
+  }
+\msg_new:nnn { ftoo } { hdr-no-heading }
+  {
+    '#1'~resolves~to~a~referent~the~manifest~data~publishes~no~heading~for.~The~
+    heading~is~missing;~review~the~tag~and~its~manifest~declaration.
+  }
+
+\cs_new_protected:Npn \ftoo_hdr_resolved:n #1
+  {
+    \prop_get:NVNF \g_ftoo_id_to_tag_prop \l_ftoo_hdr_id_tl \l_ftoo_hdr_tag_tl
+      { \tl_clear:N \l_ftoo_hdr_tag_tl }
+    \str_if_eq:eeF { \l_ftoo_hdr_tag_tl } { \tl_to_str:n {#1} }
+      { \msg_error:nnn { ftoo } { hdr-alias-tag } {#1} }
+    \prop_get:NVNF \g_ftoo_id_to_heading_prop \l_ftoo_hdr_id_tl \l_ftoo_hdr_head_tl
+      {
+        \msg_error:nnn { ftoo } { hdr-no-heading } {#1}
+        \tl_clear:N \l_ftoo_hdr_head_tl
+      }
+    \ftoo_set_titleref:e { \l_ftoo_hdr_head_tl }
+    ( \tl_use:N \l_ftoo_hdr_head_tl ) \ftootagsep
+    \ftoo_tagfont:n {#1}
+    \tl_set:Ne \l_tmpa_tl { reftype = \l_ftoo_thmtype_tl }
+    \exp_args:NV \zcsetup \l_tmpa_tl
+    \ftoolabel{#1}
+    \zcsetup { reftype = }
+  }
+
+\cs_new_protected:Npn \ftoo_hdr_two_argument:nn #1#2
+  { \msg_error:nnn { ftoo } { hdr-two-argument-form } {#2} }
+
+\cs_new_protected:Npn \ftoo_hdr_dispatch:n #1
+  {
+    \prop_get:NnNTF \g_ftoo_tag_to_id_prop {#1} \l_ftoo_hdr_id_tl
+      { \ftoo_hdr_resolved:n {#1} }
+      { \msg_error:nnn { ftoo } { hdr-unbound-tag } {#1} }
+  }
+
+\NewDocumentCommand{\hdr}{m}
+  {
+    \peek_meaning:NTF \c_group_begin_token
+      { \ftoo_hdr_two_argument:nn {#1} }
+      { \ftoo_hdr_dispatch:n {#1} }
+  }
+
+\NewDocumentCommand{\hdrunbacked}{m m}
+  {
+    \ftoo_set_titleref:n { #1 }
+    (#1) \ftootagsep
+    \ftoo_tagfont:n {#2}
+    \tl_set:Ne \l_tmpa_tl { reftype = \l_ftoo_thmtype_tl }
+    \exp_args:NV \zcsetup \l_tmpa_tl
+    \ftoolabel{#2}
+    \zcsetup { reftype = }
+  }
+
+\NewDocumentCommand{\hdrtitleonly}{m}
+  {
+    \ftoo_set_titleref:n { #1 }
+    (#1)
+  }
+
+\numberwithin{equation}{section}
+\numberwithin{table}{section}
+
+\newcounter{statement}[section]
+\cs_set:Npn \thestatement { \thesection.\arabic{statement} }
+
+\newcounter{gateway}
+\cs_set:Npn \thegateway { \Roman{gateway} }
+
+\newcounter{buildable}[section] \cs_set:Npn \thebuildable {B\arabic{buildable}}
+\newcounter{refusal}[section]   \cs_set:Npn \therefusal   {R\arabic{refusal}}
+\newcounter{wtheorem}[section]  \cs_set:Npn \thewtheorem  {T\arabic{wtheorem}}
+\newcounter{willitem}[section]  \cs_set:Npn \thewillitem  {W\arabic{willitem}}
+
+\newcounter{appblock}[section]
+\cs_set:Npn \theappblock { \thesection.\arabic{appblock} }
+\newcounter{gatescale}
+\cs_set:Npn \thegatescale { \arabic{gatescale} }
+
+\NewDocumentCommand{\appblock}{m m}
+  {
+    \par\medskip\refstepcounter{appblock}
+    \ftoo_set_titleref:n {#2}
+    \noindent\textbf{\theappblock\ --- #2}\ftoolabel{#1}\ 
+  }
+\NewDocumentCommand{\appblockrow}{m}
+  { \refstepcounter{appblock}\theappblock\ftoolabel{#1} }
+\NewDocumentCommand{\gatescalerow}{m}
+  { \refstepcounter{gatescale}\thegatescale\ftoolabel{#1} }
+
+
+
+
+\cs_new_protected:Npn \ftoo_tagfont:n     #1 { \text{\small\textsc{#1}} }
+\cs_new_protected:Npn \ftoo_tagfont_ref:n #1 { \text{\small\textsc{\textit{#1}}} }
+\NewDocumentCommand{\tagdef}{m}{ \ftoo_tagfont:n {#1} }
+\NewDocumentCommand{\ftootagsep}{}{ \nobreakspace\textperiodcentered\enspace }
+
+\prop_new:N \g_ftoo_seen_prop
+
+\cs_new_protected:Npn \ftoo_tag_bare:n #1 { \hyperref[#1]{ \ftoo_tagfont_ref:n {#1} } }
+\cs_new_protected:Npn \ftoo_tag_locator:n #1
+  { \mode_if_math:TF { \,\text{\footnotesize(\zcref{#1})} } {~{\footnotesize(\zcref{#1})}} }
+\cs_new_protected:Npn \ftoo_tag_located:n #1
+  { \ftoo_tagfont_ref:n {#1}\ftoo_tag_locator:n {#1} }
+
+\NewDocumentCommand{\ftag}{s m}
+  {
+    \IfBooleanTF{#1}
+      { \ftoo_tag_bare:n {#2} }
+      {
+        \prop_if_in:NnTF \g_ftoo_seen_prop {#2}
+          { \ftoo_tag_bare:n {#2} }
+          {
+            \prop_gput:Nnn \g_ftoo_seen_prop {#2} {1}
+            \ftoo_tag_located:n {#2}
+          }
+      }
+  }
+
+\NewDocumentCommand{\see}{m}{ \textrightarrow\,\zcref{#1} }
+
+\NewDocumentCommand{\handle}{s m}
+  {
+    \IfBooleanF{#1}{ \ftoo_tagfont:n {#2} }
+    \phantomsection \ftoolabel{#2}
+  }
+
+\NewDocumentCommand{\eqtag}{s m m}
+  {
+    \ \ftoo_tagfont:n{#2} & \IfBooleanTF{#1}{ \textnormal{#3} }{ \textnormal{(#3)} }
+    \ftoolabel{#2}
+  }
+
+\NewDocumentCommand{\captiontag}{m m}
+  {
+    \caption{ #1 \ftootagsep \ftoo_tagfont:n {#2} }
+    \ftoo_set_titleref:n {#1}
+    \ftoolabel{#2}
+  }
+
+\cs_new_protected:Npn \ftoo_tag_link:n #1
+  { \hyperref[#1]{ \ftoo_tagfont_ref:n {#1} } }
+\NewDocumentCommand{\ftaglist}{m}
+  { \clist_map_inline:nn {#1} { \ftoo_tag_link:n {##1}\space } }
+
+\cs_new_protected:Npn \ftoo_tag_glob:n #1 { \ftoo_tagfont_ref:n {#1} }
+\NewDocumentCommand{\ftagfam}{m}{ \ftoo_tag_glob:n {#1} }
+
+\cs_new_protected:Npn \ftoo_tag_reset: { \prop_gclear:N \g_ftoo_seen_prop }
+\AddToHook{cmd/section/before}    { \ftoo_tag_reset: }
+\AddToHook{cmd/subsection/before} { \ftoo_tag_reset: }
+
+\clist_new:N \g_ftoo_virtues_clist
+\clist_new:N \g_ftoo_departures_clist
+
+\cs_new_protected:Npn \ftoo_roster_gather:Nn #1#2
+  {
+    \seq_if_exist:NT \g_ftoo_all_ids_seq
+      {
+        \seq_map_inline:Nn \g_ftoo_all_ids_seq
+          {
+            \tl_set:Nx \l_tmpa_tl
+              { \prop_item:Nn \g_ftoo_id_to_class_prop {##1} }
+            \str_if_eq:VnT \l_tmpa_tl {#2}
+              {
+                \tl_set:Nx \l_tmpb_tl
+                  { \prop_item:Nn \g_ftoo_id_to_slug_prop {##1} }
+                \clist_gput_right:NV #1 \l_tmpb_tl
+              }
+          }
+      }
+  }
+
+\prg_new_protected_conditional:Npnn \ftoo_roster_admits:Nn #1#2 { T , F , TF }
+  {
+    \clist_if_empty:NTF #1
+      { \prg_return_true: }
+      {
+        \clist_if_in:NnTF #1 {#2}
+          { \prg_return_true: }
+          { \prg_return_false: }
+      }
+  }
+
+\ftoo_roster_gather:Nn \g_ftoo_virtues_clist   { virtue-weld }
+\ftoo_roster_gather:Nn \g_ftoo_departures_clist { departure }
+
+\msg_new:nnn { ftoo } { bad-departure } { Unknown~departure~'#1'. }
+
+
+\NewDocumentCommand{\grade}{m}
+  { {\normalfont\footnotesize\textsc{#1}}\quad }
+\NewCommandCopy{\secgrade}{\grade}
+\NewDocumentCommand{\gradeword}{m}{ \textsc{#1} }
+\NewDocumentCommand{\registername}{m}{ \textsc{#1} }
+
+
+
+
+
+\NewDocumentEnvironment{serieslist}{}
+  {\begin{description}[leftmargin=*,font=\normalfont\bfseries]}
+  {\end{description}}
+\NewDocumentCommand{\seriesitem}{m m m}
+  {%
+    \refstepcounter{#1}%
+    \ftoo_set_titleref:n { #3 }%
+    \item[\use:c {the#1}\ ---\ #3.]\ftoolabel{#2}%
+  }
+\NewDocumentCommand{\bitem}{m m}{ \seriesitem{buildable}{#1}{#2} }
+\NewDocumentCommand{\ritem}{m m}{ \seriesitem{refusal}{#1}{#2} }
+\NewDocumentCommand{\titem}{m m}{ \seriesitem{wtheorem}{#1}{#2} }
+\NewDocumentCommand{\witem}{m m}{ \seriesitem{willitem}{#1}{#2} }
+
+
+
+\NewDocumentCommand{\gateway}{m m}{%
+  \clearpage\refstepcounter{gateway}%
+  \ftoo_set_titleref:n { #2 }%
+  \ftoolabel{#1}%
+  \addcontentsline{toc}{part}{Gateway~\thegateway{}:~#2}%
+  \thispagestyle{plain}%
+  \begin{center}\Large\scshape Gateway~\thegateway\par\medskip
+  \LARGE\normalfont\itshape #2\par\end{center}\bigskip
+}
+
+\NewDocumentCommand{\coda}{m}{%
+  \clearpage\addcontentsline{toc}{part}{Coda --- #1}%
+  \begin{center}\LARGE\scshape Coda\par\medskip\normalfont\itshape #1\par\end{center}\bigskip
+}
+
+\NewDocumentCommand{\refrain}{m m}{%
+  \par\medskip
+  \tl_if_blank:nF {#1} { \phantomsection\ftoolabel{#1} }%
+  \begin{center}{\itshape #2}\end{center}%
+  \nobreak\vskip-\medskipamount\smallskip
+  \tl_if_blank:nF {#1}
+    { \noindent\hfill{\footnotesize\tagdef{#1}}\par }%
+  \medskip\par
+}
+
+\prop_new:N \g_ftoo_virtue_prop
+\NewDocumentCommand{\virtue}{m}
+  {
+    \ftoo_roster_admits:NnTF \g_ftoo_virtues_clist {#1}
+      {
+        \prop_if_in:NnTF \g_ftoo_virtue_prop {#1}
+          { \hyperref[v:#1]{ \textbf{\textit{#1}} } }
+          {
+            \prop_gput:Nnn \g_ftoo_virtue_prop {#1} {1}
+            \phantomsection \ftoolabel{v:#1}
+            \textbf{\textup{#1}}
+          }
+      }
+      { \msg_error:nnn { ftoo } { bad-virtue } {#1} }
+  }
+\msg_new:nnn { ftoo } { bad-virtue }
+  { Unknown~virtue~'#1'.~The~roster~is~the~manifest's~`virtue-weld'~class,~
+    not~a~list~in~this~file. }
+
+\cs_new_protected:Npn \ftoo_virtue_link:n #1
+  { \hyperref[v:#1]{ \textbf{\textit{#1}} } }
+\NewDocumentCommand{\virtuelist}{m}
+  { \clist_map_inline:nn {#1} { \ftoo_virtue_link:n {##1}\space } }
+
+\NewDocumentCommand{\auditnote}{m}{\par\noindent{\itshape #1}\par\medskip}
+
+\DeclareMathOperator{\reach}{reach}
+\DeclareMathOperator{\colour}{colour}
+\DeclareMathOperator{\info}{info}
+\DeclareMathOperator{\verdict}{verdict}
+\DeclareMathOperator{\report}{report}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\col}{col}
+\DeclareMathOperator{\imageop}{im}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+
+

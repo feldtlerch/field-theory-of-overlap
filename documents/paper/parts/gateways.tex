@@ -1,0 +1,163 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\gateway{part:gw:anchor}{The anchor}
+\section{Independence and the Sybil wall}
+\label{sec:anchor}
+
+\subsection{Independence is not internally computed}
+\label{subsec:anchor:internal}
+\secgrade{cont-anch}%
+The discount in $\effdensity$ is taken against the counterfactual defector (\ftag{f:defector})
+--- but that reference profile is a node of the measured field, so
+$\aligndefect{w}$ is itself an edge in it. With no external authority,
+an adversary authors witnesses with overlap set to mimic independence.
+
+\begin{theorem}[\hdrunbacked{The Anchor Joint}{J:anchor}]\grade{cont-anch}
+  \begin{equation}
+    \boxed{\ \effdensity\ \text{is not internally computable --- a regulative target
+      from an exogenous anchor.}\ }
+    \label{eq:J:anchor}
+  \end{equation}
+\end{theorem}
+
+A funded Sybil farm, a clannish clique, and a sealed commons are one object: bought
+co-movement internally indistinguishable from independent witnessing. The gap is detection,
+not description. And the fabrication is single-authored --- staging the witness and staging
+the co-movement it reports are one act, so a forger cannot stage the stake while leaving the
+witnessing independently honest. The one combination an attacker would most want is the one
+the constraint forbids.
+
+A second independence, not yet payable here, waits on the report algebra: witnesses may be
+independently authored and still all carry one slant. The copy-confound is killed by
+$\effdensity$; the clique-confound is killed later by colour-span $\colourspan$ (\ftag{pr:span}).
+Both are anchor debts, but they are not the same debt.
+
+\subsection{The two overlaps}
+\label{subsec:anchor:overlaps}
+\secgrade{nec}%
+The sign of the wall is a split \ftag{g:split} of $\alignfact$:
+\begin{equation}
+  \alignfact=\alignint+\alignanch.
+  \label{eq:anchor:split}
+\end{equation}
+\handle{nrm:int} is within one author's power, fabricable on command; \handle{nrm:anch} is
+grounded in an external process the adversary cannot author, or in non-collusion of
+independent authors. Only \ftag*{nrm:anch} resists capture; the two are not interchangeable,
+and every downstream use of $\effdensity$ inherits \gradeword{cont-anch} from this line.
+
+\subsection{The second foot}
+\label{subsec:anchor:second-foot}
+\secgrade{nec}%
+Crossing this gateway changes the modality of everything after it: downstream results are
+\gradeword{cont-anch}, true within a shared anchor and null across one. This plants the second
+terminus \handle{snk:anch}, the dual of the kernel filled at \ftag{J:occ}. Where \ftag{snk:ker}
+is what no instrument reads \emph{now} --- the rate at rest --- \ftag*{snk:anch} is what no
+instrument settles \emph{now} but time may settle later: the anchor, in arrears.
+
+This sink itself splits \ftag{g:split}: \handle{snk:anch-t}, warrant-in-arrears (temporal,
+axis $\dimtime$, settled later because downstream), and \handle{snk:anch-G}, anchor-relative
+settlement (modal, contingent on a shared $\anchormetric$). In-world verdicts (\ftag{nrm:wise})
+carry both; the document's own type-posits carry only \ftag*{snk:anch-t} --- settled-later without
+being anchor-contingent, the timing/anchor split run one level up, as alignment/stake was run
+on the operator. The fabrication line \ftag{bd:fab}, the forward leg of accountability, the
+verdict that is real only once readers share a ground --- all settle here or never. The
+framework has two feet, and they are these: the unreadable-now and the settled-later.
+
+\begin{econ}[label=e:sybil, title={The Sybil attack, promoted to a constraint},
+  ref=J:anchor, cites={a:sybil}, departs=caveat,
+  stopsat={a side-caveat on reputation systems elsewhere; here a constraint on a relational primitive}]
+  \textcite{a:sybil} proved the Sybil attack undefeatable without a trusted authority or a
+  resource cost --- treated elsewhere as a caveat on reputation systems. Here it is promoted
+  to a constraint on a relational primitive: the independence the whole accountability field
+  rests on is not a quantity any internal computation supplies. Reputation systems assume the
+  witness graph and collapse the instant the out-of-band anchor is removed.
+\end{econ}
+
+\refrain{}{A crowd is not enough; the witnesses must be independent --- a crowd buys down idiosyncrasy and stops at the shared blind spot, and only an outside anchor moves the cap.}
+
+\gateway{part:gw:hip}{The hip}
+\section{Weight is not overlap}
+\label{sec:hip}
+
+\subsection{The three-way split}
+\label{subsec:hip:split}
+\secgrade{nec}%
+A normative reading assigns a weight,
+\begin{equation}
+  U_i=\sum_j w_{ij}\,u_j,\qquad w_{ij}\ \text{free},
+  \label{nrm:assign}
+\end{equation}
+and \ftag{g:split} at the hip holds apart five objects a single ``caring'' had fused.
+
+\begin{theorem}[\hdr{J:hip}]\grade{nec}
+  Five objects, not one:
+  \par\medskip
+  \begin{tabularx}{\textwidth}{@{} l l L @{}}
+    \toprule
+    \textbf{object} & \textbf{symbol} & \textbf{role} \\
+    \midrule
+    own measure & $\selfweight{i}$ & holder's private weighting \\
+    holding & $\holding{i}{j}$ & edge belongs by positive aligned coupling \\
+    assigned weight & $w_{ij}$ & free normative assignment (\ftag{nrm:assign}) \\
+    currency & $\currency{i}{j}$ & convert $\dimnodewelfare{j}$ to $\dimnodewelfare{i}$ \\
+    other's measure & $\feelingcovector{j}$ & content folded by the other's own measure \\
+    \bottomrule
+  \end{tabularx}
+  \par\medskip
+\end{theorem}
+
+This is the plane the audit polices for the rest of the document --- $w$ against
+$u,\leanbare,\selfweight{i}$ --- and the source of the anti-sacrificial structure
+\ftag{nrm:self}.
+
+\begin{definition}[\hdr{nrm:public}]\grade{nec}
+  \begin{equation}
+    \selfweight{i}\transpose\outcomevector{j}
+    \quad/\quad
+    \currency{i}{j}\selfweight{j}\transpose\outcomevector{j}
+    \quad/\quad
+    \normG{\outcomechange{j}}.
+    \label{eq:nrm:public}
+  \end{equation}
+  These are annexation, inclusion, and publicization. The first two read the standing
+  outcome $\outcomevector{j}$; only the anchored read is event-typed, in $\outcomechange{j}$.
+\end{definition}
+
+\subsection{The cartel is entailed, not added}
+\label{subsec:hip:cartel}
+\secgrade{nec}%
+Set $w=\alignfact$ and the conflation has a cost it cannot avoid: for an insider
+$j$ and an outsider $k$, the agent abets harm to $k$ whenever
+\begin{equation}
+  \assignweight{i}{j}\,\normof{\outcomechange{j}}>\assignweight{i}{k}\,\normof{\outcomechange{k}}.
+  \label{eq:hip:cartel}
+\end{equation}
+Warmest in-group and cruelest cartel are one equation in two settings --- the harm is
+\emph{entailed} by any weighting keyed to closeness, not added as a separate vice. Care may
+set what you value and which edges you build; it may never discount a harm.
+
+The directed operator sharpens the diagnosis twice. Collapsing a person's plural memberships
+into one in-group licenses out-group harm --- the $w=\leanbare$ cartel. And folding the other
+under one's \emph{own} weighting $\selfweight{i}$ rather than theirs --- annexation
+\ftag{nrm:annex} --- is the same collapse run inside care itself, the cartel of love. The
+asymmetry is dimensional, not only moral: folding the other by their own measure
+$\privatewelfare{j}$ requires the currency that makes their welfare-length commensurable
+with yours, while folding by your own caring covector
+$\caringcovector{i}{j}\transpose\outcomevector{j}$ lands in your units unaided ---
+annexation is unit-closed, inclusion is currency-dependent, and the cartel of love is the
+path of least resistance in the units as well as the heart. Both are one \ftag{g:split}
+failure: a weighting keyed to closeness, applied where only the other's measure belongs.
+
+\begin{econ}[label=e:cartel, title={Interdependent utility and the unseen cartel}, ref=J:hip,
+  cites={a:beckerinterdep,a:fehrschmidt,a:akerlofkranton,a:senidentity}, departs=freeze,
+  stopsat={the in-group as a fixed preference term, never seeing the cartel any closeness-keyed weighting already entails}]
+  \textcite{a:beckerinterdep}'s interdependent utility and \textcite{a:fehrschmidt} put
+  others' payoffs in the utility as fixed weights $w$; identity economics
+  \parencite{a:akerlofkranton} added the in-group as a preference term and never saw the
+  cartel was already entailed by any closeness-keyed weighting. \textcite{a:senidentity}
+  names the moral structure the economics only parametrizes: singular affiliation, the self
+  drawn at one wall instead of along the edges actually held.
+\end{econ}
+
+\end{document}

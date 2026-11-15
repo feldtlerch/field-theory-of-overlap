@@ -1,0 +1,1073 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\clearpage
+\part{The heart}
+
+\section{The flow equation}
+\label{sec:flow}
+
+\subsection{The branch, chosen}
+\label{subsec:flow:branch}
+\secgrade{nec}%
+Three theories fit the geometry upstream, and no argument selects among them. The
+alignment cannot be a cosine of persistent objects, decay linearly, and live in a
+noiseless world at once: any two of these exclude the third. At the poles the cosine of
+persistent covectors is stationary in every metric, so a linear lapse of alignment is
+unwritable there; an isotropic fade of caring decays the coupling and leaves the lean
+untouched; only a diffusing caring \emph{direction} yields the linear law, and only in
+the mean. The choice among the three consistent theories is empirical in principle and
+open in fact; this document \textbf{chooses}, and posts the price.
+
+\begin{statement}{mod:branch}{The branch statement}
+  This document takes the \textbf{stochastic} branch: the alignment remains a cosine
+  (\ftag*{op:cos}), lapse remains linear, and noiselessness is surrendered. The caring
+  direction diffuses; the flow below is the \emph{mean} of that motion. The alternatives
+  are priced in \zcref{tbl:branches}: the geometric branch trades the linear lapse for
+  pole-vanishing decay; the scalar branch trades the cosine ontology for a primitive
+  bounded lean. Sites that survive only under some branches are so marked, in the same
+  ledger.
+\end{statement}
+
+\subsection{Confluence}
+\label{subsec:flow:confluence}
+\secgrade{cont-anch}%
+The epistemic and ontic basins enter a single node.
+
+\begin{definition}[\hdr{dyn:flow}]\grade{cont-anch}
+\defines{\decayderived,\noisediff}\DisplayClass{dynamics}%
+  On a maintained neighbourhood, the mean alignment obeys
+  \begin{align}
+    &\frac{d\,\mathbb E[\leanbare]}{dt} &=& \ \mathrlap{\willnet - \willdecay
+        + \hingeA\,\normG{\surplus}\,\effdensity\,\bendfn(\mathbb E[\leanbare])
+        \ \dimrate}\label{eq:dyn:flow}\\
+    &\willnet   &:& \eqtag{w:net}{ontic forcing, the four signed wills (\ftag*{w:signed})}\\
+    &\willdecay &:& \eqtag{dyn:lapse}{passive decay, $\willdecay=\decayrate\,\mathbb E[\leanbare]$}\\
+    &\decayrate=\decayderived
+      &:& \eqtag{dyn:gamma}{derived, not posted: wobble times room to wobble}\\
+    &\text{bent formation term} &:&
+      \eqtag{dyn:formclose}{\vtop{\hbox{the additive INTERIOR closure,}
+                                  \hbox{\ $\hingeA\,\dimhingeA$, $\bendfn(0)=0$}}}
+  \end{align}
+  The flow is written in the alignment $\leanbare$, the operator's readable shadow; the stake
+  rides beneath it, the held $\heldweight$ beneath that. The equation is the expectation
+  under the sharp-hold closure, whose scope is stated at \see{subsec:fixed:exact},
+  and approximate as a
+  trajectory; the underlying motion lives on the sphere of caring directions, which
+  preserves $\leanbare\in[-1,1]$ by construction --- the mean equation needs no boundary
+  device, because it was never the dynamics, only their shadow. The closure has three edges,
+  all posted: it fails at criticality, where fluctuations are large; it degrades at
+  the poles, where any forcing that turns the caring direction enters the mean through a
+  geometric factor that vanishes with $1-\leanbare^{2}$ --- the additive $\willnet$ is the
+  interior form; and it flatters the founding regime, where a weak hold leaves the
+  distribution near-uniform and the geometric factor averages to $(n-1)/n$, not $1$
+  (\zcref{dyn:moment}) --- every unit of forcing buys less turn than the interior form
+  books, exactly where founding happens. Only the decay term, the sphere Laplacian's
+  degree-one eigenvalue (\zcref{dyn:gamma}), is pole-exact --- and the stationary
+  structure downstream does not ride the closure at all: the exact map carries it
+  (\zcref{dyn:exact}).
+\end{definition}
+
+Its dimensional closure needs the surplus as an \emph{anchored length}: $\surplus$ is
+plural (\ftag{gen:obj}), carrying no scalar magnitude until $\anchormetric$ collapses it to
+$\normG{\surplus}\ \dimwelfare$; only then does $\hingeA$'s inverse-welfare factor close
+the formation term to a rate. That length is the edge's fact, not either agent's, and a
+different $\anchormetric$ gives a different $\normG{\surplus}$ and so a different
+$\alignrate$ --- so \ftag{dyn:flow} is \gradeword{cont-anch}: the heart runs on the public
+commensuration and is metric-relative. The ontic basin supplies the drive and the bent
+formation term; the epistemic basin supplies, at the next line, the verdict that the parameter
+governing this equation is a rate, blind at a point.
+
+One word must not bind two objects. The flow's drift $\hingeA\,\normG{\surplus}\,
+\effdensity\,\bendfn(\leanbare)$ is the \textbf{formation term}: a rate, rising near
+the origin, the field's own surplus-seeking. The reward of \ftag{f:rew} is a
+\emph{potential}: dimensionless, peaking at the sealed stranger, falling as the edge
+opens. Different dimensions, opposite gradients --- \ftag{gen:will}'s ``opposes the
+reward gradient'' reads the potential, never the formation term. Binding both under
+one word manufactures a dilemma at the moral baseline that the two-spend grading
+dissolves (\see{subsec:good:spends}); the alphabet keeps them apart here, at the
+source.
+
+Every term is $\dimrate$ --- the equation is dimensionally closed, the act it describes
+fittable. What is not fittable is the source of the forcing: pull and bind enter $\will$
+identically, and the quantity that would distinguish them carries no dimension in
+\ftag{gen:alph}.
+
+\begin{definition}[\hdr{src:nd}]\grade{nec}
+  The \emph{non-dimensional source} is the one thing the flow forces into its forcing term
+  with no dimension to hold it. It is not a gap an instrument might later close, nor
+  underdetermination over a known basis that convention might fix (\ftag{epist:duhem},
+  \ftag{op:recess}), but a distinction the alphabet does not contain: the flow is closed in
+  its arithmetic and open in its interpretation.
+\end{definition}
+
+\ftag{src:nd} is the seam the second half works and the wall the last section names.
+
+\begin{econ}[label=e:dmp, title={Search-and-matching, one assumption away}, ref=dyn:flow,
+  cites={a:dmp}, departs=annex,
+  stopsat={search effort aligns with the reward gradient; the will opposes it}]
+  The confluence has the most structurally parallel machinery in all of economics sitting
+  one assumption away: search-and-matching, Diamond--Mortensen--Pissarides \parencite{a:dmp}.
+  A formation process, a separation rate that decays the stock, a steady state where the two
+  balance --- \ftag{dyn:flow} is that equation, $\willdecay$ the separation hazard, \ftag{dyn:bif}
+  the matching threshold. The parallel is close enough to locate the departure exactly, and
+  it is the document's one recurring departure-shape: DMP search effort responds \emph{to} the
+  reward gradient --- you search where the surplus is, $\will$ aligned with
+  $\nabla\rewardfield$ --- while the forcing term here \emph{opposes} it, $\will$ against
+  $\nabla\rewardfield$. Grant DMP its matching function and you have granted a rate that
+  forms ties; the wall is that the rate it grants is the wrong sign for the only term that
+  distinguishes weaving from extraction. The richest theory of relationship-as-rate the
+  discipline has stops precisely at the will's type, which is where this document begins.
+\end{econ}
+
+\clearpage
+\section{The readout}
+\label{sec:readout}
+
+\subsection{Image and kernel}
+\label{subsec:readout:image-kernel}
+\secgrade{nec}%
+\begin{definition}[\hdr{op:read}]\grade{nec}
+  The readout $\readout$ is real-linear, and \ftag{g:proj} splits the moral velocity
+  $\moralvel=\alignrateactual-\alignrateself$ it carries:
+  \begin{align}
+    \readout:\ \moralvel &\longmapsto
+      \bigl(\,\Pi_{\mathrm{im}\,\readout}\,\moralvel,\ \Pi_{\ker\readout}\,\moralvel\,\bigr),
+      \label{eq:op:M}\\
+    \moralvelocity &=\Pi_{\mathrm{im}}\,\moralvel\ \ (\ftag*{op:vel}),\qquad
+    \moralnull =\Pi_{\ker}\,\moralvel\ \ (\ftag*{op:null}).
+      \label{eq:op:Mproj}
+  \end{align}
+\end{definition}
+
+\begin{lemma}[\hdr{epi:blind}]\grade{nec}
+  $\moralvel$ is a rate; one choice fixes $\leanbare(t)$, not $\alignrate(t)$; $\moralvelocity$ recovers
+  only as $\biographylength\to\infty$, by integration over a biography.
+\end{lemma}
+
+\begin{lemma}[\hdr{epi:option}]\grade{nec}
+  Restraint against a \emph{known} option is (known capacity) $\wedge$ (no use) ---
+  informative, in $\mathrm{im}\,\readout$, priceable; the permanent null is restraint against
+  an \emph{unknown} option.
+\end{lemma}
+
+The map is real-linear: no interference term, no imaginary part in the record's algebra
+--- the complex structure the framework admits lives in the generators' skew sectors
+(\ftag{dyn:split}), internal and relational, never in the readout itself. The split has
+an engineering name: \ftag{op:read} is an observability decomposition and $\ker\readout$
+the unobservable subspace \parencite{a:kalman} --- and the discipline enters twice,
+because its dual enters at the deontic: the ungrippable input is controllability's
+mirror (\see{subsec:still:deontic}).
+
+\subsection{The kernel, born descriptive}
+\label{subsec:readout:kernel}
+\secgrade{nec}%
+$\ker\readout$ is the still center \handle{snk:ker}: $\dimrate$-at-rest, the configuration
+\ftag{epi:fact} isolated as having no recovery path. Here it is named only as a subspace of
+the readout; what occupies it, and whether it is occupied at all, are the next two sections'
+work. The record sees $0=0$ across it.
+
+\clearpage
+\section{Fixed points: the trichotomy, and the seed}
+\label{sec:fixed-points}
+
+\subsection{The second gate}
+\label{subsec:fixed:gate}
+\secgrade{nec}%
+With the will and the anti-will absent, the flow's fixed points are the gate-stride
+\ftag{g:gate} at \zcref{tbl:sc:bif}.
+
+\begin{proposition}[\hdr{dyn:bif}]\grade{cont-anch}\DisplayClass{dynamics}%
+  The trivial $\leanbare=0$ is always a fixed point, and it destabilizes iff
+  \begin{equation}
+    \boxed{\;
+    \underbrace{\hingeA\,\normG{\surplus}\,\effdensity\,\bendfn'(0)}_{\text{formation rate}}
+    >\underbrace{\decayrate}_{\text{decay rate}}\;}\qquad\dimrate\ \text{balance.}
+    \label{eq:dyn:bif}
+  \end{equation}
+  The will is absent from the threshold --- the boundary is set by formation and decay alone.
+  One may assume naively that the same inequality governs the \emph{existence} of a held
+  root $\alignfixed>0$; it does not, and cannot: existence is set by the global shape of
+  the bend, and bistability requires the trivial root to stay stable. This
+  inequality is one regime boundary of three. And on the
+  stochastic branch its constant is corrected: the exact boundary compares the
+  formation rate against the response constant $\respderived$, not the decay $\decayrate$
+  (\ftag{dyn:response}) --- the closure's threshold is the many-goods limit, low by
+  $n/(n-1)$.
+\end{proposition}
+
+\subsection{The three regimes}
+\label{subsec:fixed:tri}
+\secgrade{cont-anch}%
+The bend's curvature carries a name of its own: \handle{dyn:bend}, sigmoidal
+$\bendfn$, increasing returns at the bottom of closeness.
+
+\begin{theorem}[\hdr{dyn:tri}]\grade{cont-anch}
+\defines{\bendslope}\DisplayClass{dynamics}%
+  Let $C=\hingeA\,\normG{\surplus}\,\effdensity\ \dimrate$ and
+  $\psi(\leanbare)=\bendfn(\leanbare)/\leanbare$, unimodal for sigmoidal $\bendfn$ with
+  slope $\bendslope$ ($\bendfn''>0$ near $0$). The interior structure
+  is a trichotomy, not a threshold:
+  \begin{align}
+    &\text{subsidy} &:& \eqtag{dyn:sub}{$C\psi_{\max}<\decayrate$:
+      openness lives only on continuous will}\\
+    &\text{seed} &:& \eqtag{dyn:seed}{$C\bendfn'(0)<\decayrate<C\psi_{\max}$:
+      bistable; one crossing suffices}\\
+    &\text{spontaneous} &:& \eqtag{dyn:spont}{$C\bendfn'(0)>\decayrate$:
+      the edge opens itself; closure must be funded}
+  \end{align}
+  In the seed regime the minimal founding act is dimensionless: $\int\will\,dt\
+  \dimratio$, bounded below by the separatrix gap --- a finite \emph{turn}, not a
+  quantity of welfare. The seed regime is where increasing returns at the bottom of
+  closeness live: two basins, a sealed root and an open one, a separatrix between.
+  The inequalities above are the closure's; the exact boundaries, and the factor by
+  which each moves, are posted at \ftag{dyn:response} --- structure intact, every
+  boundary up by at least $n/(n-1)$.
+\end{theorem}
+
+\subsection{The exact map}
+\label{subsec:fixed:exact}
+\secgrade{cont-anch}%
+The closure can be retired from everything stationary. On the stochastic branch the
+sphere is not a metaphor but a computable world, and the fixed-point structure above is
+that world's own, not the closure's.
+
+Which fixes the scope of the additive flow, and it is stated here rather than assumed:
+the additive mean equation is an interior first-moment closure. Near criticality, where
+fluctuations are not negligible, it is not used as an exact trajectory law; stationary
+existence and response claims are taken from the exact self-consistency map instead. The
+first moment it approximates is exact and closure-free below (\ftag{dyn:moment}); the
+stationary structure is the map's (\ftag{dyn:exact}), with the boundaries it moves posted
+at \ftag{dyn:response}.
+
+\begin{theorem}[\hdr{dyn:moment}]\grade{nec}\DisplayClass{dynamics}%
+  (Scope: the stochastic branch, \ftag{mod:branch}.) The alignment is a degree-one
+  harmonic of the diffusing caring direction, so for a constant forcing $\will$ the
+  first moment obeys, exactly and with no closure,
+  \begin{equation}
+    \frac{d\,\mathbb E[\leanbare]}{dt}
+      =\will\,\mathbb E\bigl[1-\leanbare^{2}\bigr]\;-\;\decayderived\,\mathbb E[\leanbare]
+    \qquad\dimrate.
+    \label{eq:dyn:moment}
+  \end{equation}
+  Three readings. The decay term is pole-exact: \zcref{dyn:gamma} is confirmed, not
+  approximated. The forcing enters through the geometric factor, which vanishes at the
+  poles with $1-\leanbare^{2}$ --- the posted degradation (\ftag{dyn:flow}), made
+  precise. And under a \emph{weak} hold the distribution is near-uniform, where the
+  factor averages to $(n-1)/n$, not $1$: the founding regime pays a toll the interior
+  form never posted. The additive flow \zcref{eq:dyn:flow} is the interpolation between
+  these, with irreducible relative error at least $1/n$ exactly where founding happens.
+\end{theorem}
+
+\begin{theorem}[\hdrunbacked{The exact self-consistency map}{dyn:exact}]\grade{cont-anch}\DisplayClass{dynamics}%
+  (Same scope.) At constant forcing the stationary law of the caring direction is von
+  Mises--Fisher at concentration $\will/\noisediff$, and the mean lean is the Bessel
+  ratio $\Abessel$ --- strictly increasing, $\Abessel(0)=0$, saturating at the pole.
+  Harmonics of degree two and higher relax at least twice as fast as the mean, so the
+  distribution tracks the shape set by the current mean --- an adiabatic grounding that
+  holds in the weak regime where sharp-hold fails --- and the held roots of the flow
+  solve one implicit equation,
+  \begin{equation}
+    \boxed{\ \alignfixed=\Abessel\!\Bigl(\frac{\will+C\,\bendfn(\alignfixed)}{\noisediff}\Bigr),\ }
+    \qquad C=\hingeA\,\normG{\surplus}\,\effdensity\ \dimrate,
+    \label{eq:dyn:exact}
+  \end{equation}
+  exact under the drift reading of the forcing, with no sharp-hold anywhere. The
+  trichotomy \zcref{dyn:tri} is this map's root structure --- three regimes, bistable
+  middle, separatrix --- intact.
+\end{theorem}
+
+\begin{theorem}[\hdrunbacked{Two constants, not one}{dyn:response}]\grade{cont-anch}\DisplayClass{dynamics}%
+\defines{\respderived}%
+  The sphere hands the theory two dimensioned rates, and the closure spends one for
+  both. Free means die at the decay constant $\decayderived$ (\zcref{dyn:gamma}); a
+  weakly held mean answers forcing at the \textbf{response constant} $\respderived$ ---
+  the uniform measure's coordinate variance is $1/n$, not the $1/(n-1)$ of the decay
+  eigenvalue:
+  \begin{equation}
+    \bar\leanbare=\frac{\will}{\noisediff\,n}+O(\will^{3})
+    \qquad\dimratio.
+    \label{eq:dyn:response}
+  \end{equation}
+  Every regime boundary therefore compares the formation rate against $\respderived$, not
+  $\decayrate$: subsidy $C\psi_{\max}\lesssim\respderived$; seed
+  $C\bendfn'(0)<\respderived\lesssim C\psi_{\max}$; spontaneous
+  $C\bendfn'(0)>\respderived$. The linear boundary rescales by exactly $n/(n-1)$; the
+  seed regime's lower edge is a tangency of the Bessel map at finite lean, where its
+  concavity bites, so the saddle-node moves by \emph{more} --- ``at least $n/(n-1)$'',
+  never ``exactly''. In a three-goods reference world with unit diffusion and one
+  representative bend, the closure's seed window $(6.7,\,40)$ becomes $(11.51,\,60)$:
+  the lower edge by more than the factor, the upper exactly by it. Spontaneous opening
+  is harder, the seed window higher, and the subsidy region --- where openness lives
+  only on continuous will --- \emph{larger} than the closure posts. Every correction
+  the exact treatment forces runs in the same direction: more of the social world is
+  funded, less of it is free.
+\end{theorem}
+
+\subsection{Latency is triply modal}
+\label{subsec:fixed:latency}
+\secgrade{nec}%
+The margin of the spontaneous regime
+\begin{equation}
+  \DisplayClass{dynamics}%
+  \biforce=\hingeA\,\normG{\surplus}\,\effdensity\,\bendfn'(0)-\decayrate
+  \label{eq:fixed:beta}
+\end{equation}
+is a rate $\dimrate$ --- by \ftag{epi:fact}, blind at a point. $\surplus$ is discoverable
+only by crossing; $\bendfn'(0)$ is unmeasurable at zero. So which regime one sits in ---
+subsidized, seeded, or already-climbing --- is indistinguishable from the corner:
+\ftag{g:knock} on $\biforce$ proves the latency.
+
+And the latency is triply modal: blind at a point (\ftag{epi:fact}), anchor-relative
+(\gradeword{cont-anch}, from the flow), and closure-breaking at the threshold itself ---
+the mean equation is a first moment whose closure fails exactly where fluctuations grow,
+which is at criticality (\see{subsec:fixed:exact}). Two communities with different $\anchormetric$ disagree,
+both correctly, whether one edge is latent-viable or dead; and where the question is
+sharpest, the equation asked is least a trajectory. Contested development priorities
+are contested \ftag{c:Gstar}.
+
+\begin{econ}[label=e:bistab, title={Coordination failure on the witness graph}, ref=dyn:tri,
+  cites={a:bigpush,a:arthur}, departs=annex,
+  stopsat={increasing returns relocated to witnessing; valid only for anchored density}]
+  $\surplus>0$ is the division of labor supplying the gain; the seed regime's bistability
+  is coordination failure --- the big push / poverty trap (Rosenstein-Rodan;
+  Murphy--Shleifer--Vishny; Schelling) \parencite{a:bigpush}, with increasing returns
+  (Arthur; Romer) \parencite{a:arthur} relocated from industries and knowledge stocks to
+  the density of independent witnessing, and valid only for anchored $\effdensity$.
+\end{econ}
+
+\begin{econ}[label=e:netform, title={Network formation, without a witness field}, ref=dyn:tri,
+  cites={a:netform}, departs=annex,
+  stopsat={pairwise exogenous link values, formation responding to returns; no witness field, no regime where closure is funded}]
+  Strategic network formation --- \textcite{a:netform}; Bala--Goyal --- is the
+  discipline's own theory of costly links that form and decay, and its central wedge,
+  pairwise stability against efficiency, is a true cousin of the opposition between the
+  reward field and accountability. The annexation is double: link values are exogenous
+  pairwise surpluses, where here the value of an edge rides a witness field the edge
+  itself moves; and formation responds \emph{to} returns --- the DMP sign
+  (\ftag{e:dmp}) again, one graph over. No formation model carries the spontaneous
+  regime's dual: an agent spending to keep a profitable link \emph{unformed} is, in
+  that grammar, simply absent.
+\end{econ}
+
+\clearpage
+\section{Maintenance: the kernel is occupied}
+\label{sec:maintenance}
+
+\subsection{Standing will against decay}
+\label{subsec:maint:standing}
+\secgrade{nec}%
+Take any held $\alignfixed>0$ with the formation term absent and $\willanti=\willsever=0$.
+
+\begin{theorem}[\hdr{J:occ}]\grade{nec}\DisplayClass{dynamics}%
+  (Scope: the stochastic and scalar branches; priced at \zcref{tbl:branches}.) At
+  $\alignrate=0$ the flow forces
+  \begin{equation}
+    \boxed{\ \willeff=\decayrate\alignfixed>0\quad\text{continuously, in expectation.}\ }
+    \label{eq:J:occ}
+  \end{equation}
+  Fidelity is not a frozen state but standing will, a rate held against decay at
+  $\alignrate=0$. The conditional is \gradeword{nec} and metric-free --- \emph{held
+  implies occupied}, the flow at rest, no $\anchormetric$ in it. On the stochastic
+  branch the boxed identity is the many-goods linearization of the exact occupancy map,
+  \begin{equation}
+    \will=\noisediff\,\Abessel^{-1}(\alignfixed)\ \ge\ \respderived\,\alignfixed,
+    \label{eq:J:occ:exact}
+  \end{equation}
+  strictly increasing and divergent at the pole (\zcref{dyn:exact}): perfect fidelity
+  would take infinite standing will, so every held edge lives strictly inside the pole
+  --- and the posted rate understates the wage by at least $n/(n-1)$, double in a
+  two-goods world. The conditional itself only strengthens: $\Abessel$ is monotone with
+  $\Abessel(0)=0$, so held-iff-occupied needs no closure at all.
+\end{theorem}
+
+\begin{corollary}[\hdr{J:power}]\grade{cont-comm}
+  One may assume naively that the standing rate is itself a dissipated power; a rate
+  $\dimrate$ is not a power, and the alphabet can say so. The dissipation reading is
+  priced, not free:
+  \begin{equation}
+    P_{\mathrm{maint}}=\willeff\;\edgeprice{i}{j},
+    \qquad
+    \edgeprice{i}{j}=\frac{\coupling{i}{j}}{\belongingradiusof{i}}\,
+      \currency{i}{j}\,\privatewelfare{j}\ \ \dimnodewelfare{i},
+    \label{eq:J:power}
+  \end{equation}
+  the marginal worth of the edge to its holder, spent at the decay rate,
+  $P_{\mathrm{maint}}:[\,\nodewelfareunit{i}\,T\sp{-1}\,]$. The currency and the radius
+  are posted; the weighting inside the coupling is held --- so the thermodynamic warrant
+  for \ftag{gen:will} settles in arrears \emph{and} in a private currency
+  (\ftag{snk:anch-t}). And the exact occupancy map raises
+  $\willeff$ by at least $n/(n-1)$ (\zcref{eq:J:occ:exact}), the power with it: the
+  invisible wage is larger than the linearized identity posts --- and two-part, once
+  the coupling's own law is posted (\zcref{dyn:radial}).
+\end{corollary}
+
+\begin{corollary}[\hdr{J:tremble}]\grade{feas}
+  On the stochastic branch a held edge is distinguishable \emph{in distribution} from a
+  frozen one: maintenance leaves a stationary wobble whose variance ties to $\noisediff$,
+  and the measured pair --- decay of neglected edges, wobble of held ones --- must
+  satisfy $\decayrate=\decayderived$ (\zcref{dyn:gamma}). The record can see that the
+  glass trembles. What it still cannot see is the price: the held $\selfweight{i}$ by
+  which the edge counts as a good at all.
+\end{corollary}
+
+\begin{corollary}[\hdrunbacked{The trembling curve}{cor:tremble:curve}]\grade{feas}\DisplayClass{dynamics}%
+  On the stochastic branch the tie is sharper than a pair of estimates: the stationary
+  law fixes the wobble from the mean alone,
+  \begin{equation}
+    \boxed{\ \operatorname{Var}(\leanbare)
+      =\Abessel'\bigl(\Abessel^{-1}(\bar\leanbare)\bigr)\ }
+    \qquad\dimratio,
+    \label{eq:tremble:curve}
+  \end{equation}
+  one curve per $n$, \textbf{no free parameter}: neither $\noisediff$, $\decayrate$,
+  nor $\will$ appears. A held tie's measured mean and measured wobble must land on the
+  curve, or the branch is false --- the cross-check of \ftag{J:tremble} upgraded to a
+  single-instrument, falsification-grade test, with no estimate of $\noisediff$
+  anywhere in it. And what moves a pair \emph{off} the curve is exactly a rival
+  mechanism --- a stock behind the rate, feedback in the hold, anisotropy in the noise
+  --- which is what makes the curve an instrument and not only a check
+  (\see{subsec:maint:stock}); each side of the curve carries a reading, completed at
+  \zcref{dyn:ttax}.
+\end{corollary}
+
+The existential is not: that \emph{this} edge is held, $\alignfixed>0$ at all, inherits
+\gradeword{cont-anch} from \ftag{dyn:tri} --- whether the non-trivial root exists is the latency
+question, anchor-relative. Held implies occupied always; this-edge-held only within a shared
+metric. It is the one thing economics has no result for, and the nearest miss must be
+argued past, not around. One may assume naively that the joint also \emph{corroborates}
+the type of \ftag{gen:will} from the will's own no-reservoir form; a consequence that
+cannot fail carries no corroboration --- given $\decayrate>0$, no parameter draw makes
+held-implies-occupied false, so the joint has zero evidential content about the posit.
+It is a \textbf{transmission} theorem: it converts a measured decay and an observed hold
+into the standing rate, adding no evidence of its own. The warrant it transmits is
+collected upstream, at the data layer --- the measured decay itself
+(\ftag{ev:decay-occ}), the release knee (\ftag{ev:knee-rate}), the identified residual
+(\ftag{ev:resid-ex}, \ftag{ev:resid-opp}), under posted identification conditions (\ftag{maint:ident})
+--- and is still settled at the price \ftag{J:power} posts: in arrears, in a private
+currency.
+
+\begin{econ}[label=e:menus, title={Self-control priced at the menu}, ref=J:occ,
+  cites={a:gulpesendorfer}, departs=wall,
+  stopsat={reaches menu-visible restraint exactly; stops where no menu varies}]
+  \textcite{a:gulpesendorfer} axiomatize a real, continuous cost of resisting temptation
+  --- the discipline's closest approach to a standing rate spent against a pull. The
+  approach must be honoured precisely, because its boundary is exactly this theorem's:
+  the Gul--Pesendorfer cost is \emph{priced at the menu} --- it surfaces in preferences
+  over choice sets, the agent paying to remove the tempting option --- so it is
+  option-visibility in the discipline's own axioms: known capacity, observed avoidance,
+  squarely in $\mathrm{im}\,\readout$. What it cannot reach is the restraint with no
+  menu in view, and the maintenance with no option-event at all --- the flow at rest.
+  Economics reaches menu-visible restraint exactly; the occupied kernel begins where no
+  menu varies, which is where \ftag{J:occ} lives.
+\end{econ}
+
+\subsection{The stock rival, bounded}
+\label{subsec:maint:stock}
+\secgrade{feas}%
+The strongest rival to the rate reading is not a rival ontology but a rival plumbing:
+maintenance drawn from a \emph{reservoir} --- goodwill as capital, invested now and
+drawn down in neglect. The framework does not refute the reservoir; it \textbf{bounds}
+it, twice, with instruments this section already owns.
+
+\begin{proposition}[\hdr{maint:knee}]\grade{feas}\DisplayClass{dynamics}%
+  Let maintenance draw on a stock that drains with time-constant $\tau_K$ once
+  investment stops. The released curves are exact:
+  \begin{equation}
+    \leanbare_{\mathrm{rate}}(t)=\alignfixed e^{-\decayrate t},\qquad
+    \leanbare_{\mathrm{stock}}(t)=\alignfixed e^{-\decayrate t}
+      +\bar\will\,\frac{e^{-t/\tau_K}-e^{-\decayrate t}}{\decayrate-1/\tau_K}.
+    \label{eq:maint:knee}
+  \end{equation}
+  The rate world departs at slope $-\decayrate\alignfixed$ immediately; the stock world
+  departs at slope exactly \emph{zero} --- the reservoir keeps paying while it drains,
+  and the curve only bends into the decay as the stock empties: a \textbf{knee}. The
+  deviation between the curves scales linearly in $\tau_K$, so a release experiment at
+  measurement resolution $\eta_{\mathrm{res}}$ \emph{bounds} the reservoir: no knee at
+  that resolution forces $\tau_K\lesssim\eta_{\mathrm{res}}/(\decayrate\alignfixed)$.
+  The rate-type of \ftag{gen:will} is thereby the statement $\tau_K<\text{resolution}$
+  --- a measured upper bound that every release experiment tightens, not a metaphysics
+  --- and the reservoir is squeezed from a second, independent side by the stationary
+  law: a stock smooths, so it trembles \emph{below} the curve of
+  \zcref{cor:tremble:curve} at given mean, while a live hold trembles on it. Bounded,
+  never excluded: the warrant is one-sided, and the framework says so
+  (\ftag{ev:knee-rate}).
+\end{proposition}
+
+\begin{econ}[label=e:stock, title={Relational capital, given its instrument}, ref=maint:knee,
+  cites={a:coleman,a:beckerhh,a:rusbult}, departs=annex,
+  stopsat={models the held tie as a stock; the knee and the curve are the measured difference}]
+  The discipline's nearest reading of maintenance is capital-theoretic: social capital
+  accumulated in closure \parencite{a:coleman}, relationship-specific capital sunk and
+  drawn down \parencite{a:beckerhh}, the investment model of commitment
+  \parencite{a:rusbult} --- a reservoir behind the tie, investment now
+  funding standing later. The annexation is honest, and the difference is now an
+  experiment rather than a taste: a reservoir releases with a knee and trembles below
+  the curve; a rate releases at full slope and trembles on it. What the discipline
+  models as stock, this branch measures as a pair of instruments (\ftag{maint:knee},
+  \ftag{cor:tremble:curve}) --- and the reservoir the instruments cannot find, they
+  bound.
+\end{econ}
+
+\subsection{The will, identified}
+\label{subsec:maint:ident}
+\secgrade{cont-anch}%
+A residual category is vicious only if the subtracted model can absorb anything. Here
+the subtractors are pinned: the decay $\decayrate$ is measured on protocol-released
+edges, the diffusion $\noisediff$ on the wobble of held ones, and the formation
+coefficient $C=\hingeA\,\normG{\surplus}\,\effdensity$ is built from anchored
+observables with the hinge constant $\hingeA$ posted \textbf{globally} --- one number
+for the whole field, never fitted per edge. The global posting is an exclusion
+restriction, and it is what buys identification.
+
+\begin{proposition}[\hdr{maint:ident}]\grade{cont-anch}\DisplayClass{dynamics}%
+  Run the occupancy map backwards, edge by edge:
+  \begin{equation}
+    \willresid[e]\;=\;\noisediff_{e}\,\Abessel^{-1}(\bar\leanbare_{e})
+      \;-\;C_{e}\,\bendfn(\bar\leanbare_{e})
+    \qquad\dimrate.
+    \label{eq:maint:ident}
+  \end{equation}
+  Where the anchored observables vary across edges and environments, the residual
+  field is identified: a will-free world returns it zero --- the category has failure
+  room, so definition-by-exclusion is falsifiable, hence not vicious --- and a
+  subtractor misread as formation announces itself by correlating with the exogenous
+  formation scale, where an honest residual does not. The flag is one-sided, as every
+  exclusion test is: a true will that happened to covary with formation would be flagged
+  with it, and the framework says so. And the residual space is \emph{signed}: the
+  toll-keeper's gradient-following $\willanti$ comes back with its sign intact, so
+  nothing gradient-following is absorbed into the subtractors --- ``opposes the reward
+  gradient'' is a population-level finding the field could fail, not a definitional
+  truth (\ftag{ev:resid-opp}).
+\end{proposition}
+
+The identification has exactly one dead corner: a single edge in a single environment,
+where a one-parameter family of will-and-formation pairs fits any record exactly. There
+the scheme is a consistency check, not a measurement --- the circle lives in the
+corner, not in the method. This is dark-matter methodology made exact: a residual
+against an independently calibrated luminous model is physics precisely where the
+calibration varies, and the variation requirement is posted where a reader audits
+(\ftag*{maint:ident}).
+
+\subsection{The kernel is filled}
+\label{subsec:maint:filled}
+\secgrade{nec}%
+$\willeff=\decayrate\alignfixed$ sits at $\alignrate=0$ in $\ker\readout$: a real, positive,
+against-decay rate the readout cannot see. Every edge maintained \emph{below
+self-sustainment} holds one --- wherever passive decay and the formation term do not
+themselves balance, the residue is a standing rate; in the spontaneous regime an open
+edge is reward-fed at $\will=0$, and there the kernel's occupant is the toll-keeper
+(\ftag{J:seal}), not the faithful. The still center
+is therefore not empty but \textbf{densely occupied by the maintained social world}
+(\ftag{ten:fid}).
+
+What it hides is not the rate's magnitude (given $\decayrate$ and $\alignfixed$, that is inferable)
+but its source: the held $\selfweight{i}$ by which the maintainer counts this edge a good at
+all, dark to the maintainer themselves (\ftag{snk:ker}). Contingent on decay $\decayrate>0$; where edges
+persist without maintenance --- reward-fed, or undecaying --- the occupation is merely concrete, not dense. The kernel born
+descriptive is, by this line, full.
+
+\refrain{}{Much of the social world is held still by work whose wage no ledger posts.}
+
+\begin{econ}[label=e:carework, title={The nearest occupants of the still center}, ref=ten:fid,
+  cites={a:hochschild,a:folbre}, departs=wall,
+  stopsat={prices the wage where it surfaces --- the labour market, the household accounts; cannot reach the rate at rest, no transaction at all}]
+  Emotional labour \parencite{a:hochschild} and the economics of care \parencite{a:folbre}
+  are the discipline's closest existing occupants of the still center: work whose wage no
+  ledger posts, named as work. The annexation is real and its boundary exact: both price
+  the invisible wage \emph{where it surfaces} --- the managed smile sold on a labour
+  market, the caring hours the household accounts omit --- a state or a transaction,
+  reachable by better accounting. What neither reaches is the rate at rest: maintenance
+  with no transaction at all, the flow at $\alignrate=0$ --- readable, here, only as the
+  trembling of the glass (\ftag{J:tremble}).
+\end{econ}
+
+\subsection{The kernel is two-sided}
+\label{subsec:maint:twosided}
+\secgrade{cont-anch}%
+One may assume naively that the occupied kernel is virtue's hiding place; the trichotomy
+forbids the assumption from the other side.
+
+\begin{theorem}[\hdr{J:seal}]\grade{cont-anch}\DisplayClass{dynamics}%
+  In the spontaneous regime (\zcref{dyn:spont}) the dual obligation appears: a party
+  holding their own edge \emph{shut} against its opening must spend
+  \begin{equation}
+    \willanti \;=\; \hingeA\,\normG{\surplus}\,\effdensity\,\bendfn(\alignfixed)
+      -\decayrate\,\alignfixed\;>\;0
+    \quad\text{continuously,}
+    \label{eq:J:seal}
+  \end{equation}
+  a standing rate as dark as fidelity's. This is the \emph{tail}-seal --- the only seal
+  torque privacy permits as forcing (\ftag{w:torque}); the third party's product is
+  different and priced below (\zcref{J:broker}). Entry-deterrence is not friction but
+  funded work (\ftag{e:closure}): the still center houses the toll-keeper on the same
+  terms as the faithful.
+\end{theorem}
+
+\begin{corollary}[\hdr{J:seal-floor}]\grade{feas}\DisplayClass{dynamics}%
+  The mean equation prices the cheapest seal at zero: as $\alignfixed\to0$ the standing
+  spend of \zcref{eq:J:seal} vanishes. The sphere disagrees. In the spontaneous regime
+  the origin is unstable at the margin's rate $\biforce$, and holding an unstable point
+  still against noise is fluctuation-quenching work: for the linearized lean with
+  feedback $u=-k\leanbare$, the stationary spend is minimized at twice-critical damping
+  $k=2\biforce$ --- robust to the choice of cost functional --- and
+  \begin{equation}
+    \boxed{\ \min\,\mathbb E\lvert u\rvert=2\sqrt{2\noisediff\biforce/\pi}\ }
+    \qquad\dimrate,
+    \label{eq:seal:floor}
+  \end{equation}
+  a toll the first moment is structurally blind to, with a square-root cusp in the
+  spontaneous margin --- steep just past the regime boundary. The still center's rent
+  ledger was understated on both sides of the door: maintenance above the posted rate
+  (\zcref{eq:J:occ:exact}), and closure at the origin above zero.
+\end{corollary}
+
+\begin{theorem}[\hdr{J:broker}]\grade{cont-anch}\DisplayClass{dynamics}%
+  The true third party --- the tertius, the deterrer --- has no forcing term to spend
+  (\ftag{w:torque}); what a broker can hold down is the edge's parameters. Because the
+  seed regime is bistable, suppressing the witness density has two distinct targets at
+  two distinct prices:
+  \begin{equation}
+    \delta_{\mathrm{crit}}
+      =\frac{\respderived}{\hingeA\,\normG{\surplus}\,\bendfn'(0)},
+    \qquad
+    \delta_{\mathrm{sn}}
+      =\frac{C^{*}}{\hingeA\,\normG{\surplus}},
+    \label{eq:J:broker}
+  \end{equation}
+  with $C^{*}$ the saddle-node value of the exact map (\zcref{dyn:response}).
+  \textbf{Deterrence} ($\effdensity<\delta_{\mathrm{crit}}$): the edge will not open by
+  itself --- the trivial root is stabilized --- but it stays seedable, and one willing
+  crossing defeats it (\zcref{dyn:seed} prices the crossing as a finite turn).
+  \textbf{Foreclosure} ($\effdensity<\delta_{\mathrm{sn}}$): no held root exists at all
+  --- the edge cannot be maintained even by a willing pair, and nothing short of
+  restoring the density defeats it. Foreclosure runs several times deeper than
+  deterrence in the reference geometry. Economics distinguishes entry deterrence from
+  blockaded entry; the field derives that distinction as the gap between a linear
+  threshold and a saddle-node, the price ratio computable from the bend.
+\end{theorem}
+
+\begin{corollary}[\hdr{J:forensics}]\grade{cont-anch}
+  A sealed edge has two possible histories, and they leave different fingerprints the
+  identification scheme reads (\zcref{maint:ident}). \textbf{Tail-sealed}: the residual
+  returns a standing negative forcing while the anchored parameters read natural.
+  \textbf{Broker-sealed}: the residual returns zero while the anchored observables show
+  a \emph{shortfall} against their counterfactual. Residual, the tail did it;
+  shortfall, a third party did. The caveats are the framework's own: the broker's
+  fingerprint is a shortfall against a counterfactual, so broker-detection is available
+  exactly where an anchor supplies the counterfactual density (\ftag{J:anchor} --- a
+  natural desert mimics a suppressed oasis), and the test is one-sided, like every
+  deep test this framework owns. The sorting rule that falls out is three-way: rent
+  taken through parameters is landscape, never in the will register; rent taken
+  through one's own forcing term is the funded seal (\ftag{ten:toll}); and a will
+  spent against its own funding is spite (\ftag{ten:spite}) --- three addresses, each
+  priced.
+\end{corollary}
+
+\refrain{}{The same silence keeps the faithful and the toll-keeper; the dark plays no favorites.}
+
+\clearpage
+\section{The skew sector: turning, at three scales}
+\label{sec:oscillation}
+
+\subsection{The generator, split}
+\label{subsec:osc:split}
+\secgrade{nec}%
+\begin{definition}[\hdr{dyn:split}]\grade{nec}
+\defines{\gensym,\genskew}\DisplayClass{dynamics}%
+  Any linear generator of edge dynamics decomposes uniquely:
+  \begin{align}
+    &A &=& \ \gensym + \genskew \label{eq:dyn:split}\\
+    &\gensym  &:& \eqtag{dyn:sym}{symmetric: dissipates; the variational sector}\\
+    &\genskew &:& \eqtag{dyn:skew}{antisymmetric: turns; norm-preserving, no potential}
+  \end{align}
+  The split is basis-free given the metric and exhausts the generator. Everything a
+  posted potential can represent lives in $\gensym$; the remainder of this section is the
+  theory of $\genskew$.
+\end{definition}
+
+\subsection{The coupling's own law}
+\label{subsec:osc:polar}
+\secgrade{nec}%
+Write the caring covector in polar form, coupling times direction,
+$\caringcovector{i}{j}=\kappa\,\hat{\mathbf m}$, the coupling measured in units of the
+posted scale (\ftag{c:kappa0}) so that $\kappa$ is dimensionless. The flow governs the
+direction's shadow $\leanbare$; release evolves the full vector; lapse evolves the
+direction alone. Three sectors, three implicit answers to one unasked question ---
+what is $\dot\kappa$? A branch that owes a law of motion for the norm posts one.
+
+\begin{definition}[\hdr{dyn:polar}]\grade{nec}\DisplayClass{dynamics}%
+\defines{\atrophy,\ambientD,\willvec}%
+  (Scope: the stochastic branch, \ftag{mod:branch}; the minimal linear completion ---
+  linear damping, additive isotropic noise, the alternatives priced shapes.) Writing
+  $\mathbf m$ for the caring covector, the posted law is
+  \begin{equation}
+    d\mathbf m
+      =\bigl(-\atrophy\,\mathbf m+\genskew\,\mathbf m+\willvec\bigr)\,dt
+      +\sqrt{2\ambientD}\;d\mathbf W,
+    \label{eq:dyn:polar}
+  \end{equation}
+  with two new posted constants --- the \textbf{atrophy rate} $\atrophy>0$ (\ftag{c:mu})
+  and the \textbf{ambient noise} $\ambientD>0$ (\ftag{c:Da}), both strictly positive and
+  both rates $\dimrate$, which is what makes the floor below dimensionless --- the
+  turning supplied by
+  the branch's own skew sector \zcref{dyn:skew}, and one re-typing with consequences:
+  the will enters as a \emph{vector} $\willvec$ whose polar shadows are two distinct
+  spends. The tangential shadow turns the direction --- the flow's forcing, recovered
+  as $\will=c_{\perp}/\kappa$, dimensions closing. The radial shadow $c_{\parallel}$
+  \emph{deepens the coupling} --- a spend the norm-free theory had no symbol for,
+  because a theory with no $\dot\kappa$ needed none. The sphere world of the heart is
+  this model's frozen-coupling gauge: $\atrophy\to0$, $\ambientD\to0$ with
+  $\noisediff=\ambientD/\kappa^{2}$ held fixed. The namesakes are classical --- the
+  linear law is Ornstein--Uhlenbeck \parencite{a:ou}, the stationary direction von
+  Mises--Fisher \parencite{a:vmf}; what is not classical is the transport: caring
+  directions, atrophy as neglect, the floor as background acquaintance.
+\end{definition}
+
+\begin{theorem}[\hdr{dyn:reconcile}]\grade{nec}\DisplayClass{dynamics}%
+  Under neglect ($\willvec=0$) the one process reads two ways. Its first moment is
+  exactly the release spiral,
+  \begin{equation}
+    \mathbb E[\mathbf m](t)=e^{-\atrophy t}\,e^{\genskew t}\,\mathbf m_{0},
+    \label{eq:dyn:reconcile}
+  \end{equation}
+  amplitude dying at $\atrophy$, phase advancing by the skew --- the ghost orbit of
+  \ftag{dyn:pitch} recovered verbatim, with $\operatorname{Re}\eigval=-\atrophy$
+  setting the pitch's denominator. Its stationary distribution is exactly the lapse
+  law: the direction goes uniform, the lean's marginal is
+  $p(\leanbare)\propto(1-\leanbare^{2})^{(n-3)/2}$ --- a coin flip between friend and
+  enemy at every $n$, mean zero and \emph{typical} lean far from zero. In two-goods
+  worlds the law is arcsine, piling probability at $\leanbare\approx\pm1$: left
+  alone, a two-good tie drifts toward maximal alliance or maximal enmity, with
+  neutrality the least likely state --- neutrality is a many-goods phenomenon. One
+  may assume naively that the sectors contradict, amplitude dying in release while
+  the norm survives lapse; they are the mean and the distribution of one posted
+  process, and the apparent inconsistency was a category slip.
+\end{theorem}
+
+\begin{theorem}[\hdr{dyn:floor}]\grade{nec}\DisplayClass{dynamics}%
+  Under neglect the squared coupling relaxes exponentially,
+  $\mathbb E[\kappa^{2}](t)=\kappa_{0}^{2}e^{-2\atrophy t}
+    +\ambientcoupling^{2}\bigl(1-e^{-2\atrophy t}\bigr)$, to the ambient level
+  \begin{equation}
+    \boxed{\ \ambientcoupling=\sqrt{\,n\ambientD/\atrophy\,}\ }
+    \label{eq:dyn:floor}
+  \end{equation}
+  --- neither immortality nor death but \textbf{background acquaintance}, ambient
+  noise held against atrophy. Three settlements at once. The accountability gate of
+  the thirty-years-neglected tie stays open --- \emph{at ambient strength}, the level
+  the remaining channel actually carries (\ftag{f:acc}). The \emph{true} seal is
+  unreachable by any amount of neglect: given $\ambientD>0$ and $\atrophy>0$ ---
+  the posted guards, and the boxed level is undefined without the second ---
+  $\ambientcoupling>0$ wherever a goods space
+  is shared, so sealing requires structural separation --- exactly the reading
+  \ftag{f:sealed} posts (\zcref{f:seal-law}): neglect cannot seal; only structure
+  can. And dormant-tie reactivation is neither miracle nor reductio but a decay law:
+  the surviving mean is $e^{-\atrophy t}$ --- old friends pick up where they left off
+  for $t\ll1/\atrophy$, at ambient acquaintance for $t\gg1/\atrophy$. Whether
+  full-strength reactivation is a prediction or a reductio is answered by a
+  time-constant.
+\end{theorem}
+
+\begin{theorem}[\hdr{dyn:scramble}]\grade{nec}\DisplayClass{dynamics}%
+  The completed branch makes the direction's diffusion coupling-dependent,
+  \begin{equation}
+    D_{\mathrm{dir}}(\kappa)=\ambientD/\kappa^{2}
+    \qquad\Longrightarrow\qquad
+    \gamma_{\sigma}(\kappa)=(n-1)\,\ambientD/\kappa^{2},
+    \label{eq:dyn:scramble}
+  \end{equation}
+  so weak ties scramble fast and strong ties hold their aim: the single derived decay
+  of \zcref{dyn:gamma} is the frozen-coupling shadow of a $\kappa$-dependent law. The
+  phenomenology is exact and testable: a neglected tie first fades in strength with
+  its lean stable, then, approaching the floor, the lean itself dissolves at
+  accelerating speed.
+\end{theorem}
+
+\refrain{}{A fading friend stays a friend almost to the end; what goes last is the memory of which way you leaned.}
+
+\begin{theorem}[\hdr{dyn:radial}]\grade{nec}\DisplayClass{dynamics}%
+  Holding a tie at mean coupling $\kappa^{*}$ requires a standing radial feed,
+  \begin{equation}
+    \boxed{\ c_{\parallel}=\atrophy\,\kappa^{*}\quad\text{continuously,}\ }
+    \label{eq:dyn:radial}
+  \end{equation}
+  the deepening spend --- and the held second moment carries the floor on top,
+  $\mathbb E[\kappa^{2}]=\kappa^{*2}+n\ambientD/\atrophy$. Fidelity therefore has
+  \textbf{two} dark spends: the angular hold of \ftag{J:occ}, keeping the lean aimed
+  against scramble, and the radial feed, keeping the coupling fed against atrophy ---
+  \ftag{J:power}'s wage gains a second term, and the invisible wage was undercounted
+  again.
+\end{theorem}
+
+\begin{corollary}[\hdr{dyn:ttax}]\grade{feas}
+  With live coupling-wobble the stationary direction is a mixture of concentrations,
+  and mixtures broaden: the lean's variance sits \emph{above} the curve of
+  \zcref{cor:tremble:curve} at matched mean. The instrument completes: \textbf{below}
+  the curve, a stock reservoir or stabilizing feedback in the hold
+  (\ftag{maint:knee}); \textbf{on} it, a frozen-coupling, state-constant hold;
+  \textbf{above} it, live coupling-wobble --- the completed branch's own fingerprint.
+  And the excess is over-identified: the radial wobble
+  $\operatorname{Var}(\kappa)$ is measurable on its own --- the coupling's tremor ---
+  and predicts the angular excess, a \ftag{dyn:pitchpair}-style consistency test one
+  level up. Disagreement kills the polar model, not a parameter.
+\end{corollary}
+
+\subsection{Release: neglect as protocol}
+\label{subsec:osc:release}
+\secgrade{feas}%
+\handle{dyn:release}: neglect is not a new dynamics but a measurement --- set
+$\willvec=0$ and let the ambient generator act on the held state. The trajectory of
+the mean is the polar model's own first moment (\zcref{dyn:reconcile}): a decaying
+spiral, amplitude dying by $\atrophy$ in $\gensym$, phase advancing by $\genskew$ ---
+and while held, the curl is latent. Rotation begins at the moment the hand lets go.
+
+\begin{definition}[\hdr{dyn:pitch}]\grade{feas}
+\defines{\spiralpitch}
+  The released spiral has fixed pitch
+  \begin{equation}
+    \spiralpitch=\frac{\operatorname{Im}\eigval}{\lvert\operatorname{Re}\eigval\rvert}
+    \qquad\dimratio,
+    \label{eq:dyn:pitch}
+  \end{equation}
+  degrees of lean-rotation per halving of coupling: dimensionless, gauge-invariant,
+  anchor-invariant. Monotone fade ($\spiralpitch=0$) is consistent with a potential;
+  sustained oscillatory decay --- souring and rekindling at shrinking amplitude ---
+  certifies $\genskew$ and excludes gradient flow \textbf{in any geometry}: at a fixed
+  point of $\dot x=-M(x)\nabla V$ the Jacobian is a product of a symmetric-positive and a
+  symmetric matrix, hence real-spectral for every Riemannian $M$. The asymptotic state of
+  a released tie is a ghost orbit: vanishing coupling, still turning.
+\end{definition}
+
+\subsection{The tremor turns}
+\label{subsec:osc:tremor}
+\secgrade{feas}%
+The single-edge face of $\genskew$ is precession, \handle{dyn:precess}: the caring
+composition rotating at constant $\leanbare$ --- the same amount of care, about a slowly
+turning aspect of the other. Blind to every scalar record; readable in distribution
+wherever two coordinates are logged.
+
+\begin{theorem}[\hdr{dyn:loop}]\grade{feas}
+\defines{\loopcurrent}\DisplayClass{dynamics}%
+  On the stochastic branch --- whose diffusion is the scalar, isotropic $\noisediff$
+  (\ftag{mod:branch}), the assumption this biconditional stands on: under anisotropic
+  noise detailed balance is a noise-relative condition, not a symmetry of the drift
+  alone --- the stationary fluctuations of a maintained edge satisfy
+  detailed balance iff $\genskew=0$. Otherwise the tremor circulates with mean angular
+  velocity set by $\operatorname{Im}\eigval$, and the circulation is read from lagged
+  cross-correlations: for readable coordinates $x_i,x_j$,
+  \begin{equation}
+    \langle x_i(t)\,x_j(t{+}\tau)\rangle
+      \neq\langle x_j(t)\,x_i(t{+}\tau)\rangle
+    \quad\Longleftrightarrow\quad \loopcurrent\neq0.
+    \label{eq:dyn:loop}
+  \end{equation}
+  \textbf{No release required}: the will cancels the turning in the mean; the noise
+  confesses it in the second moment. A scalar readout cannot see
+  this --- rotation needs two coordinates, by dimension count.
+\end{theorem}
+
+\begin{theorem}[\hdr{dyn:pitchpair}]\grade{feas}
+  Tremor circulation (\ftag{dyn:loop}) and release pitch (\ftag{dyn:pitch}) read the
+  \emph{same} local skew sector, held versus let-go:
+  \begin{equation}
+    \spiralpitch\big|_{\mathrm{tremor}}=\spiralpitch\big|_{\mathrm{release}}.
+    \label{eq:dyn:pitchpair}
+  \end{equation}
+  Disagreement kills the linearization, not a parameter.
+\end{theorem}
+
+\subsection{Derivation-DAG, dynamical loop}
+\label{subsec:osc:dag}
+\secgrade{nec}%
+The logical dependency of this document is acyclic; the dynamics are not. A third graph runs
+beside both: the evidential graph, what-corroborates-what, carrying the data-layer
+back-edges (\ftag{ev:decay-occ}, \ftag{ev:knee-rate}, \ftag{ev:resid-ex},
+\ftag{ev:resid-opp}). It is
+acyclic-with-back-reference, not a cycle ---
+entailment-from and warrant-for are distinct relations, every back-edge runs from a
+measurement and not from a theorem, and every one is posted
+(\zcref{tbl:ev}).
+
+Releasing the frozen neighbourhood, $\effdensity=\effdensity(\leanbare)$ (\ftag{f:eff})
+closes a loop, $\leanbare\to\effdensity\to\accountability\to\rewardfield\to\alignrate\to\leanbare$,
+and the \emph{relational} skew lives on it. The coupling
+$\partial\alignrateof{i}/\partial\alignpair{}{j}$ is \textbf{asymmetric}: $i$'s threshold depends on
+$j$'s alignment defect against \emph{$i$'s} counterfactual defector (\ftag{f:defector}).
+
+\begin{definition}[\hdr{dyn:jac}]\grade{nec}\DisplayClass{dynamics}%
+  On the minimal ring the Jacobian is
+  \begin{equation}
+    \begin{gathered}
+      DF=\jacgrowth I+\jaccouple\cyclicshift,\qquad
+        \cyclicshift=\text{the directed cyclic shift},\\
+      \text{eigenvalues}\ \ \jacgrowth+\jaccouple\,\rootofunity_m^{\,j},\qquad
+        \rootofunity_m=e^{2\pi i/m}.
+    \end{gathered}
+    \label{eq:dyn:jac}
+  \end{equation}
+  With the witness feedback linearized about a held point, the coupling constant
+  descends from the primitives:
+  \begin{equation}
+    \jaccouple=\hingeA\,\normG{\surplus}\,\bendfn(\alignfixed)\,
+      \frac{\partial\effdensity}{\partial\alignpair{}{j}}
+      \quad \dimrate.
+    \label{eq:dyn:jaccouple}
+  \end{equation}
+\end{definition}
+
+\subsection{Standing and rotating, by spectrum}
+\label{subsec:osc:spectrum}
+\secgrade{nec}%
+The eigenvalues fall on the real/complex line, and \ftag{g:knock} separates the two phenomena.
+
+\begin{theorem}[\hdr{dyn:stand}]\grade{nec}
+  On the directed ring ($m\ge3$) the Jacobian \ftag{dyn:jac} is circulant, so its eigenvectors
+  are the Fourier modes $v_j=(\rootofunity_m^{\,jk})_k$ and its eigenvalues split into a growth part
+  and a rotation part,
+  \begin{equation}
+    \begin{split}
+      \eigval[j] &= \jacgrowth+\jaccouple\,\rootofunity_m^{\,j}\\
+        &= \underbrace{\bigl(\jacgrowth+\jaccouple\cos\tfrac{2\pi j}{m}\bigr)}_{\operatorname{Re},\ \text{growth}}
+          +\,i\,\underbrace{\jaccouple\sin\tfrac{2\pi j}{m}}_{\operatorname{Im},\ \text{rotation}},
+          \qquad j=0,\dots,m-1.
+    \end{split}
+    \label{eq:dyn:stand}
+  \end{equation}
+  A mode travels iff $\operatorname{Im}\eigval[j]\neq0$, and $\operatorname{Im}\eigval[j]=\jaccouple\sin(2\pi j/m)$
+  is the eigenvalue of the \emph{antisymmetric} part $\tfrac\jaccouple2(\cyclicshift-\cyclicshift^{-1})$ of the coupling ---
+  the rotation frequency is the directedness itself.
+  \par\medskip
+  \begin{tabularx}{\textwidth}{@{} l l l >{\hsize=.9\hsize}L @{}}
+    \toprule
+    \textbf{mode} & \textbf{eigenvalue} & $\operatorname{Im}\eigval[j]$ & \textbf{regime} \\
+    \midrule
+    $j=0$              & $\jacgrowth+\jaccouple$ (real) & $0$ & standing, synchronized \\
+    \addlinespace
+    $j=m/2$ ($m$ even) & $\jacgrowth-\jaccouple$ (real) & $0$ & standing, checkerboard \\
+    \addlinespace
+    generic $j$        & $\jacgrowth+\jaccouple\,\rootofunity_m^{\,j}\in\mathbb{C}$
+      & $\jaccouple\sin\tfrac{2\pi j}{m}\neq0$
+      & rotating ($j,m{-}j$ pair; Hopf at $\operatorname{Re}\eigval[j]=0$) \\
+    \bottomrule
+  \end{tabularx}
+  \par\medskip
+  Symmetrize the coupling, $\jaccouple\cyclicshift\to\tfrac\jaccouple2(\cyclicshift+\cyclicshift^{-1})$: the antisymmetric part is
+  annihilated, every $\operatorname{Im}\eigval[j]\to0$, and the spectrum collapses to the real
+  $\jacgrowth+\jaccouple\cos(2\pi j/m)$. The standing modes persist; the rotating one cannot exist. The
+  prohibition is \gradeword{nec} --- the rotation frequency \emph{is} the antisymmetric part of
+  the witness coupling, so with $\jacgrowth,\jaccouple$ real no anchored magnitude can restore an
+  imaginary part a symmetric coupling has set to zero (the spectral theorem, read structurally).
+\end{theorem}
+
+The falsifiable content is a scoped prohibition: \emph{in the scalar, first-order,
+instantaneous witness-coupling model, symmetric coupling cannot produce a rotating wave}
+(\ftag{dyn:stand}) --- so a travelling phase-wave certifies the model is not in this class, by
+exactly one of three exits: the coupling is directed, the witnessing carries a delay, or the
+node-state is inertial. The positive claim is sharp once the other two are held shut: in the
+first-order, instantaneous model a travelling phase-wave in $\leanbare$ --- open/close cycles
+circulating a loop, period set by the imaginary part, no change in fundamentals --- is the
+signature of directed coupling (\handle{dyn:rot}).
+
+The synchronized flip is a single node's rhythm lifted across everyone; it needs neither
+asymmetry nor coupling and is not what the prohibition forbids. The crossings are three, not
+two: real eigenvalue through $0$ (the destabilization of \ftag{dyn:bif}), the symmetric standing
+mode, and a complex pair crossing the imaginary axis (Hopf, rotating) --- the last alone is
+the network oscillation, and it lives in $\mathrm{im}\,\readout$, recordable, orthogonal to
+the kernel.
+
+\begin{proposition}[\hdr{dyn:whereskew}]\grade{cont}
+  Edge pitch and ring frequency measure \emph{distinct} skew sectors --- internal
+  ($\genskew$, the curl of one tie's own dynamics) and relational (the directed part of
+  the witness coupling, $\tfrac\jaccouple2(\cyclicshift-\cyclicshift^{-1})$). One may
+  assume naively that the three instruments read one invariant at three scales; an edge
+  can spiral in release while its ring stands, and a ring can rotate over edges that fade
+  monotonically. Cross-scale agreement is a hypothesis of common origin; disagreement is
+  not noise but \textbf{localization} --- it tells you \emph{where} the field's curl
+  lives, in the ties themselves or in the witnessing between them.
+\end{proposition}
+
+\subsection{The second, softer prediction}
+\label{subsec:osc:soft}
+\secgrade{nec}%
+A second, softer prediction rides on self-narration, not on the spectrum; it waits on its
+mechanism (\see{subsec:decep:second-prediction}). The framework's falsifiable standing is
+the skew sector, read at its two addresses: the internal curl, by tremor and release
+(\ftag{dyn:pitchpair}), and the relational curl, by the travelling wave
+(\ftag{dyn:rot}) --- with \ftag{dyn:whereskew} the diagnostic between them. Neither
+instrument reads the will; the sector they read is the one a posted potential cannot
+write, and the sector they cannot read is the one this document holds dark on purpose.
+
+\subsection{The falsifiers, pre-committed}
+\label{subsec:osc:precommit}
+\secgrade{feas}%
+A falsifier earns its name before the data arrive: each instrument below is posted with
+the component its failure kills, in advance, so that no failure can be re-narrated as
+scope.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The falsifier ladder, with outcomes pre-committed}{tbl:falsifiers}
+  \begin{tabularx}{\textwidth}{@{} l >{\hsize=1.1\hsize}L >{\hsize=0.9\hsize}L @{}}
+    \toprule
+    \textbf{instrument} & \textbf{posted prediction} & \textbf{a failure kills} \\
+    \midrule
+    \ftag*{cor:tremble:curve} & a held tie's mean and wobble land on the
+      parameter-free curve & the stochastic branch --- unless the side names the
+      mechanism: below, stock or stabilizing feedback (\ftag*{maint:knee}); above,
+      live coupling-wobble (\ftag*{dyn:ttax}) \\
+    \addlinespace
+    \ftag*{dyn:pitchpair} & tremor pitch equals release pitch, a quantitative
+      equality & the linearization, not a parameter \\
+    \addlinespace
+    \ftag*{dyn:ttax} & the radial wobble predicts the angular excess
+      & the polar model, not a parameter \\
+    \addlinespace
+    \ftag*{maint:knee} & release departs at full slope & the rate reading, reviving
+      a reservoir at its measured time-constant \\
+    \addlinespace
+    \ftag*{dyn:loop} & lagged cross-correlations circulate iff the skew sector is
+      present & the isotropic-noise reading of the branch \\
+    \addlinespace
+    \ftag*{dyn:rot} & a travelling phase-wave certifies directed witness coupling
+      & the first-order, instantaneous coupling class --- by exactly one of three
+      exits \\
+    \addlinespace
+    \ftag*{deon:test} & a nonzero susceptibility slope refutes the bind label
+      & the deontic reading of that hold; never the converse \\
+    \addlinespace
+    \ftag*{maint:ident} & the identified residual is uncorrelated with the
+      exogenous formation scale & the subtractor model, flagged as misfit \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The preferred experimental order --- held-edge circulation (\ftag{dyn:loop}), release pitch
+(\ftag{dyn:pitch}), then ring-wave observation (\ftag{dyn:rot}) --- is a cost-and-access
+ordering, not a theorem. It applies only under the stated instrumentation and cost
+assumptions; the three tests remain logically independent, and any one of them can be run
+first by a reader whose instrument makes it cheapest.
+
+The commitments are one-sided where the framework's epistemology says they must be:
+every deep warrant in this document is falsification-bright and verification-dark
+(\see{subsec:coda:tenses}).
+
+\begin{econ}[label=e:osc, title={The prohibition, transported to a witness graph}, ref=dyn:rot,
+  cites={a:goodwin,a:contagion}, departs=annex,
+  stopsat={the spectral fact is familiar; its transport onto a witness graph is not}]
+  Agent-based and complexity economics --- Santa Fe; Arthur --- anticipates endogenous cycles
+  from interaction structure; \textcite{a:goodwin} gives the canonical one, the
+  employment--wage-share orbit (with Benhabib--Nishimura, Grandmont), and network contagion
+  --- Acemoglu--Ozdaglar--Tahbaz-Salehi; Schelling \parencite{a:contagion} --- its
+  coupled-tipping face. None isolates the spectral prohibition. The prohibition itself ---
+  symmetric coupling $\Rightarrow$ real spectrum $\Rightarrow$ no rotating wave --- is
+  familiar one discipline over, in synchronization dynamics (Kuramoto;
+  directed-versus-undirected consensus); what is new is neither the spectral fact nor its
+  proof but its transport onto a \emph{witness} graph, where it becomes a falsifiable
+  inference about the directedness of accountability coupling: the symmetric part of any
+  witness graph can \emph{stand} at any wavenumber but never \emph{rotate}, so a travelling
+  phase-wave in $\leanbare$ certifies directed witnessing (the model being first-order and
+  instantaneous).
+\end{econ}
+
+\end{document}

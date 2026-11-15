@@ -1,0 +1,1184 @@
+
+
+
+\exp_args_generate:n { NNee }
+\cs_generate_variant:Nn \msg_error:nnn  { nne }
+\cs_generate_variant:Nn \msg_error:nnnn { nnee }
+\cs_generate_variant:Nn \msg_error:nnnnn { nneee }
+\cs_generate_variant:Nn \msg_warning:nnn { nne }
+\cs_generate_variant:Nn \prop_get:NnN   { NeN }
+\cs_generate_variant:Nn \prop_get:NnNTF { NeN }
+\cs_generate_variant:Nn \prop_get:NnNT  { NeN }
+\cs_generate_variant:Nn \prop_get:NnNF  { NeN }
+\cs_generate_variant:Nn \prop_gput:Nnn  { Nee , NeV , Nen }
+\cs_generate_variant:Nn \prop_put:Nnn   { Nne , Nee }
+\cs_generate_variant:Nn \prop_if_in:NnTF { Ne }
+\cs_generate_variant:Nn \prop_if_in:NnF  { Ne }
+\cs_generate_variant:Nn \prop_item:Nn    { Ne }
+\cs_generate_variant:Nn \clist_if_in:NnTF { NV }
+\cs_generate_variant:Nn \clist_if_in:NnF  { NV , Ne }
+\cs_generate_variant:Nn \clist_if_in:nnTF { nV }
+\cs_generate_variant:Nn \clist_if_in:nnT  { nV }
+\cs_generate_variant:Nn \clist_put_right:Nn { Ne }
+\cs_generate_variant:Nn \str_case:nnF  { VnF }
+\cs_generate_variant:Nn \str_if_eq:nnF { VnF , VVF }
+\cs_generate_variant:Nn \str_if_eq:nnT { VnT }
+\cs_generate_variant:Nn \seq_gpush:Nn  { Ne }
+\cs_generate_variant:Nn \seq_put_right:Nn { Ne }
+\cs_generate_variant:Nn \seq_gput_right:Nn { Ne }
+\cs_generate_variant:Nn \seq_set_from_clist:Nn  { NV }
+\cs_generate_variant:Nn \seq_gset_from_clist:Nn { NV }
+\cs_generate_variant:Nn \seq_if_in:NnF { Ne }
+\cs_generate_variant:Nn \seq_if_in:NnT { Ne }
+
+\quark_new:N \q__ftoo_mark
+
+
+\prop_new:N \l__ftoo_dim_prop
+\prop_new:N \g__ftoo_dim_result_prop
+\prop_new:N \l__ftoo_dimargs_prop
+\tl_new:N   \l__ftoo_dima_tl
+
+\cs_new_protected:Npn \__ftoo_dim_add:nn #1#2
+  {
+    \prop_get:NnNTF \l__ftoo_dim_prop {#1} \l__ftoo_dima_tl
+      { \prop_put:Nne \l__ftoo_dim_prop {#1}
+          { \int_eval:n { \l__ftoo_dima_tl + (#2) } } }
+      { \prop_put:Nne \l__ftoo_dim_prop {#1} { \int_eval:n {#2} } }
+    \prop_get:NnN \l__ftoo_dim_prop {#1} \l__ftoo_dima_tl
+    \int_compare:nNnT { \l__ftoo_dima_tl } = 0
+      { \prop_remove:Nn \l__ftoo_dim_prop {#1} }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_base:n #1
+  {
+    \peek_charcode_remove:NTF [
+      { \__ftoo_dim_pow:nw {#1} }
+      { \__ftoo_dim_add:nn {#1} { 1 } }
+  }
+\cs_generate_variant:Nn \__ftoo_dim_base:n { e }
+\cs_new_protected:Npn \__ftoo_dim_pow:nw #1#2]
+  { \__ftoo_dim_add:nn {#1} {#2} }
+
+\cs_new:Npn \__ftoo_dim_resolve:n #1
+  {
+    \str_if_eq:eeTF { \str_head:n {#1} } { @ }
+      { \prop_item:Ne \l__ftoo_dimargs_prop { \str_tail:n {#1} } }
+      { \tl_to_str:n {#1} }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_grammar:
+  {
+    \cs_set_protected:Npn \Wpub      { \__ftoo_dim_base:n {Wpub} }
+    \cs_set_protected:Npn \Time      { \__ftoo_dim_base:n {T} }
+    \cs_set_protected:Npn \Cnt       { \__ftoo_dim_base:n {cnt} }
+    \cs_set_protected:Npn \One       { }
+    \cs_set_protected:Npn \Wnode ##1 { \__ftoo_dim_base:e { Wnode/ \__ftoo_dim_resolve:n {##1} } }
+    \cs_set_protected:Npn \Wgood ##1 { \__ftoo_dim_base:e { Wgood/ \__ftoo_dim_resolve:n {##1} } }
+    \cs_set_protected:Npn \DimUnknown { \__ftoo_dim_add:nn {q/unknown} {1} }
+    \cs_set_protected:Npn \DimTyped { \__ftoo_dim_add:nn {q/typed} {1} }
+  }
+
+\tl_new:N \l__ftoo_spec_tl
+\cs_new_protected:Npn \ftoo_dim_parse:nN #1#2
+  {
+    \tl_set:Nn \l__ftoo_spec_tl {#1}
+    \tl_remove_all:Nn \l__ftoo_spec_tl { ~ }
+    \group_begin:
+      \prop_clear:N \l__ftoo_dim_prop
+      \__ftoo_dim_grammar:
+      \l__ftoo_spec_tl
+      \prop_gset_eq:NN \g__ftoo_dim_result_prop \l__ftoo_dim_prop
+    \group_end:
+    \prop_set_eq:NN #2 \g__ftoo_dim_result_prop
+  }
+\cs_generate_variant:Nn \ftoo_dim_parse:nN { VN }
+
+\bool_new:N \l__ftoo_dim_eq_bool
+\prg_new_protected_conditional:Npnn \ftoo_dim_if_eq:NN #1#2 { TF , T , F }
+  {
+    \prop_if_in:NnT #1 {q/unknown} { \msg_error:nn {ftoo}{dim-unknown-compare} }
+    \prop_if_in:NnT #2 {q/unknown} { \msg_error:nn {ftoo}{dim-unknown-compare} }
+    \prop_if_in:NnT #1 {q/typed} { \msg_error:nn {ftoo}{dim-typed-compare} }
+    \prop_if_in:NnT #2 {q/typed} { \msg_error:nn {ftoo}{dim-typed-compare} }
+    \int_compare:nNnTF { \prop_count:N #1 } = { \prop_count:N #2 }
+      {
+        \bool_set_true:N \l__ftoo_dim_eq_bool
+        \prop_map_inline:Nn #1
+          {
+            \prop_get:NnNTF #2 {##1} \l__ftoo_dima_tl
+              { \tl_if_eq:NnF \l__ftoo_dima_tl {##2}
+                  { \bool_set_false:N \l__ftoo_dim_eq_bool } }
+              { \bool_set_false:N \l__ftoo_dim_eq_bool }
+          }
+        \bool_if:NTF \l__ftoo_dim_eq_bool \prg_return_true: \prg_return_false:
+      }
+      { \prg_return_false: }
+  }
+\msg_new:nnn { ftoo } { dim-typed-compare }
+  {
+    A~typed~object~has~no~scalar~dimension~to~compare:~the~type~carries~the~
+    conversions.~Comparing~one~is~a~category~error,~not~a~false~equality.
+  }
+
+\msg_new:nnn { ftoo } { dim-unknown-compare }
+  { Comparison~against~an~OPEN~dimension.~Settle~the~constant~first~(c:nu~class):~
+    an~open~debt~cannot~type-check,~only~be~named. }
+
+\seq_new:N \l__ftoo_pp_seq
+\seq_new:N \l__ftoo_split_seq
+\bool_new:N \l__ftoo_pp_first_bool
+\tl_new:N \l__ftoo_rank_tl
+\prop_new:N \l__ftoo_render_prop
+
+\cs_new_protected:Npn \__ftoo_dim_rank_set:n #1
+  {
+    \str_if_eq:nnTF {#1} {Wpub}
+      { \tl_set:Nn \l__ftoo_rank_tl {0} }
+      {
+        \str_if_eq:eeTF { \str_range:nnn {#1} {1} {6} } {Wnode/}
+          { \tl_set:Nn \l__ftoo_rank_tl {1} }
+          {
+            \str_if_eq:eeTF { \str_range:nnn {#1} {1} {6} } {Wgood/}
+              { \tl_set:Nn \l__ftoo_rank_tl {2} }
+              {
+                \str_if_eq:nnTF {#1} {T}
+                  { \tl_set:Nn \l__ftoo_rank_tl {3} }
+                  {
+                    \str_if_eq:nnTF {#1} {cnt}
+                      { \tl_set:Nn \l__ftoo_rank_tl {4} }
+                      { \tl_set:Nn \l__ftoo_rank_tl {5} }
+                  }
+              }
+          }
+      }
+  }
+
+\cs_new:Npn \__ftoo_dim_idx_of:n #1 { \__ftoo_dim_idx_of_aux:w #1 \q__ftoo_mark }
+\cs_new:Npn \__ftoo_dim_idx_of_aux:w #1 / #2 \q__ftoo_mark { #2 }
+
+\cs_new_protected:Npn \__ftoo_dim_glyph:nn #1#2
+  {
+    \str_case:nnF {#1}
+      {
+        {Wpub} { W\sb{\bullet} }
+        {T}    { T }
+        {cnt}  { \# }
+      }
+      { W\sb{ \__ftoo_dim_idx_of:n {#1} } }
+    \str_if_eq:nnF {#2} {1} { \sp{#2} }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_glyph_item:n #1
+  {
+    \seq_set_split:Nnn \l__ftoo_split_seq { | } {#1}
+    \exp_args:Nee \__ftoo_dim_glyph:nn
+      { \seq_item:Nn \l__ftoo_split_seq {2} } { \seq_item:Nn \l__ftoo_split_seq {3} }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_pretty:N #1
+  {
+    \prop_if_empty:NTF #1
+      { \ensuremath{[1]} }
+      {
+        \prop_if_in:NnTF #1 {q/typed}
+          { \ensuremath{[\,\text{typed~map}\,]} }
+          { \prop_if_in:NnTF #1 {q/unknown}
+          { \ensuremath{[\,?\,]} }
+          {
+            \seq_clear:N \l__ftoo_pp_seq
+            \prop_map_inline:Nn #1
+              {
+                \__ftoo_dim_rank_set:n {##1}
+                \seq_put_right:Ne \l__ftoo_pp_seq
+                  { \l__ftoo_rank_tl | \tl_to_str:n {##1} | \tl_to_str:n {##2} }
+              }
+            \seq_sort:Nn \l__ftoo_pp_seq
+              { \str_compare:eNeTF {##1} > {##2} { \sort_return_swapped: } { \sort_return_same: } }
+            \ensuremath
+              {
+                [\,
+                \bool_set_true:N \l__ftoo_pp_first_bool
+                \seq_map_inline:Nn \l__ftoo_pp_seq
+                  {
+                    \bool_if:NTF \l__ftoo_pp_first_bool
+                      { \bool_set_false:N \l__ftoo_pp_first_bool } { \, }
+                    \__ftoo_dim_glyph_item:n {##1}
+                  }
+                \,]
+              }
+          } }
+      }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_render_spec:n #1
+  {
+    \prop_clear:N \l__ftoo_dimargs_prop
+    \ftoo_dim_parse:nN {#1} \l__ftoo_render_prop
+    \__ftoo_dim_pretty:N \l__ftoo_render_prop
+  }
+\cs_generate_variant:Nn \__ftoo_dim_render_spec:n { V }
+
+
+\prop_new:N \g__ftoo_const_status_prop
+\prop_new:N \g__ftoo_const_dim_prop
+\prop_new:N \g__ftoo_const_trades_prop
+\prop_new:N \g__ftoo_const_site_prop
+\prop_new:N \g__ftoo_const_anchor_prop
+\seq_new:N  \g__ftoo_const_order_seq
+
+\cs_new_protected:Npn \__ftoo_const:nnnnnn #1#2#3#4#5#6
+  {
+    \prop_if_in:NnT \g__ftoo_const_status_prop {#1}
+      { \msg_error:nnn { ftoo } { const-redeclared } {#1} }
+    \clist_if_in:nnF { existing , generate } {#6}
+      { \msg_error:nnn { ftoo } { bad-anchor } {#1} }
+    \prop_gput:Nnn \g__ftoo_const_status_prop {#1} {#2}
+    \prop_gput:Nnn \g__ftoo_const_dim_prop    {#1} {#3}
+    \prop_gput:Nnn \g__ftoo_const_trades_prop {#1} {#4}
+    \prop_gput:Nnn \g__ftoo_const_site_prop   {#1} {#5}
+    \prop_gput:Nnn \g__ftoo_const_anchor_prop {#1} {#6}
+    \seq_gput_right:Nn \g__ftoo_const_order_seq {#1}
+  }
+
+\NewDocumentCommand{\PostConstant}{O{existing} m m m m}
+  { \__ftoo_const:nnnnnn {#2} {posted} {#3} {#4} {#5} {#1} }
+\NewDocumentCommand{\HoldConstant}{O{existing} m m m m}
+  { \__ftoo_const:nnnnnn {#2} {held} {#3} {#4} {#5} {#1} }
+\NewDocumentCommand{\OpenConstant}{O{existing} m m m}
+  { \__ftoo_const:nnnnnn {#2} {open} {\DimUnknown} {#3} {#4} {#1} }
+
+\NewDocumentCommand{\SettleConstant}{m m m}
+  {
+    \prop_get:NnNTF \g__ftoo_const_status_prop {#1} \l__ftoo_scratch_tl
+      {
+        \str_if_eq:VnTF \l__ftoo_scratch_tl {open}
+          {
+            \prop_gput:Nnn \g__ftoo_const_status_prop {#1} {posted}
+            \prop_gput:Nnn \g__ftoo_const_dim_prop    {#1} {#2}
+            \prop_get:NnN  \g__ftoo_const_site_prop {#1} \l__ftoo_scratch_tl
+            \prop_gput:Nne \g__ftoo_const_site_prop {#1}
+              { \exp_not:V \l__ftoo_scratch_tl ;~settled:~ \exp_not:n {#3} }
+          }
+          { \msg_error:nnn { ftoo } { bad-settle } {#1} }
+      }
+      { \msg_error:nnn { ftoo } { unknown-spend } {#1} }
+  }
+\cs_generate_variant:Nn \str_if_eq:nnTF { Vn }
+
+\msg_new:nnn { ftoo } { const-redeclared }
+  { Constant~'#1'~already~declared.~Debts~are~paid~once:~use~
+    \string\SettleConstant~for~open->posted;~nothing~else~transitions. }
+\msg_new:nnn { ftoo } { bad-settle }
+  { '#1'~is~not~an~open~debt.~Settlement~is~open->posted~only. }
+\msg_new:nnn { ftoo } { unknown-spend }
+  { Spend~key~'#1'~names~no~declared~constant.~A~typo~errors;~it~never~
+    grades.~(Declare~constants~before~the~quantities~that~spend~them.) }
+\msg_new:nnn { ftoo } { corrupt-status }
+  { Constant~'#1'~carries~a~status~outside~the~closed~enum.~This~is~a~layer~
+    bug;~report~it. }
+\msg_new:nnn { ftoo } { bad-anchor }
+  { Constant~'#1':~anchor~must~be~'existing'~(the~body~anchors~the~key)~or~
+    'generate'~(the~ledger~row~does).~One~anchor~per~constant,~never~both. }
+
+
+\seq_new:N   \g__ftoo_spendlog_seq
+\seq_new:N   \g__ftoo_grantlog_seq
+\bool_new:N  \l__ftoo_quote_bool
+\clist_new:N \l__ftoo_grant_mask_clist
+\clist_new:N \l__ftoo_define_mask_clist
+\bool_new:N  \g__ftoo_showquotes_bool
+\bool_new:N  \g__ftoo_strict_bool
+\tl_new:N    \l__ftoo_scratch_tl
+
+\cs_new_protected:Npn \ftoo_spend:nn #1#2
+  { \__ftoo_spend_aux:en { \tl_to_str:n {#1} } {#2} }
+\cs_new_protected:Npn \__ftoo_spend_aux:nn #1#2
+  {
+    \bool_if:NF \l__ftoo_quote_bool
+      {
+        \clist_if_in:NnF \l__ftoo_define_mask_clist {#1}
+          {
+            \clist_if_in:NnTF \l__ftoo_grant_mask_clist {#1}
+              { \seq_gput_right:Nn \g__ftoo_grantlog_seq {#1} }
+              { \seq_gput_right:Nn \g__ftoo_spendlog_seq {#1} }
+          }
+      }
+  }
+\cs_generate_variant:Nn \__ftoo_spend_aux:nn { en }
+\cs_generate_variant:Nn \ftoo_spend:nn { Vn }
+
+\NewDocumentCommand{\quoted}{m}
+  {
+    \group_begin:
+    \bool_set_true:N \l__ftoo_quote_bool
+    \bool_if:NTF \g__ftoo_showquotes_bool
+      {
+        \mode_if_math:TF
+          { \text{ \colorbox{black!8}{ $ #1 $ } } }
+          { \colorbox{black!8}{#1} }
+      }
+      { #1 }
+    \group_end:
+  }
+\NewDocumentCommand{\FtooShowQuotes}{}{ \bool_gset_true:N \g__ftoo_showquotes_bool }
+\NewDocumentCommand{\FtooStrict}{}{ \bool_gset_true:N \g__ftoo_strict_bool }
+
+\NewDocumentEnvironment{granting}{ O{} m }
+  {
+    \clist_map_inline:nn {#2}
+      { \prop_if_in:NeF \g__ftoo_const_status_prop { \tl_to_str:n {##1} }
+          { \msg_error:nnn {ftoo}{unknown-spend}{##1} } }
+    \clist_map_inline:nn {#2}
+      { \clist_put_right:Ne \l__ftoo_grant_mask_clist { \tl_to_str:n {##1} } }
+    \textnormal{(granting~ \clist_map_inline:nn {#2} { \ftoo_tagfont_ref:n {##1}~ }
+      \tl_if_blank:nF {#1} { ---~#1~ } )}
+  }
+  { }
+
+\NewDocumentCommand{\defines}{m}
+  {
+    \clist_map_inline:nn {#1}
+      {
+        \prop_get:NeNTF \g__ftoo_qty_spend_prop { \tl_to_str:n {##1} } \l__ftoo_scratch_tl
+          {
+            \clist_map_inline:Nn \l__ftoo_scratch_tl
+              { \clist_put_right:Ne \l__ftoo_define_mask_clist { \tl_to_str:n {####1} } }
+          }
+          { \msg_error:nne {ftoo}{unknown-define}{ \tl_to_str:n {##1} } }
+      }
+  }
+\msg_new:nnn { ftoo } { unknown-define }
+  { \string\defines{...}:~'#1'~is~not~a~declared~quantity.~Declare~it~first;~
+    the~define-mask~is~the~union~of~DECLARED~spend~sets. }
+
+
+\prop_new:N \g__ftoo_qty_dim_prop
+\prop_new:N \g__ftoo_qty_var_prop
+\prop_new:N \g__ftoo_qty_spend_prop
+\prop_new:N \g__ftoo_qty_arity_prop
+\prop_new:N \g__ftoo_qty_body_prop
+\prop_new:N \g__ftoo_qty_bodyof_prop
+\seq_new:N  \g__ftoo_equiv_seq
+\seq_new:N  \g__ftoo_branchskip_seq
+
+\clist_const:Nn \c__ftoo_variance_clist { scalar , vector , covector , operator }
+
+\tl_new:N    \l__ftoo_q_dim_tl
+\tl_new:N    \l__ftoo_q_var_tl
+\clist_new:N \l__ftoo_q_spend_clist
+\tl_new:N    \l__ftoo_q_alias_tl
+\tl_new:N    \l__ftoo_q_why_tl
+\clist_new:N \l__ftoo_q_branches_clist
+\clist_new:N \l__ftoo_q_forbid_clist
+\clist_new:N \l__ftoo_q_dynforbid_clist
+\tl_new:N    \l__ftoo_q_log_tl
+\bool_new:N  \l__ftoo_q_live_bool
+
+\keys_define:nn { ftoo/qty }
+  {
+    dim        .tl_set:N    = \l__ftoo_q_dim_tl,
+    variance   .tl_set:N    = \l__ftoo_q_var_tl,
+    spends     .clist_set:N = \l__ftoo_q_spend_clist,
+    alias-of   .tl_set:N    = \l__ftoo_q_alias_tl,
+    alias-why  .tl_set:N    = \l__ftoo_q_why_tl,
+    branches   .clist_set:N = \l__ftoo_q_branches_clist,
+    forbidden-under          .clist_set:N = \l__ftoo_q_forbid_clist,
+    dynamics-forbidden-under .clist_set:N = \l__ftoo_q_dynforbid_clist,
+    unknown    .code:n      = { \msg_error:nne {ftoo}{bad-qty-key}{\l_keys_key_str} },
+  }
+
+\cs_new_protected:Npn \__ftoo_check_body:Nn #1#2
+  {
+    \tl_if_empty:NTF \l__ftoo_q_alias_tl
+      {
+        \prop_get:NeNT \g__ftoo_qty_body_prop { \tl_to_str:n {#2} } \l__ftoo_scratch_tl
+          { \msg_error:nnee {ftoo}{duplicate-body}
+              { \tl_to_str:n {#1} } { \l__ftoo_scratch_tl } }
+      }
+      {
+        \prop_if_in:NeF \g__ftoo_qty_dim_prop { \tl_to_str:N \l__ftoo_q_alias_tl }
+          { \msg_error:nne {ftoo}{alias-target-missing}{ \tl_to_str:N \l__ftoo_q_alias_tl } }
+        \prop_get:NeN \g__ftoo_qty_bodyof_prop
+          { \tl_to_str:N \l__ftoo_q_alias_tl } \l__ftoo_scratch_tl
+        \str_if_eq:eeF { \tl_to_str:n {#2} } { \tl_use:N \l__ftoo_scratch_tl }
+          {
+            \tl_if_empty:NT \l__ftoo_q_why_tl
+              { \msg_error:nne {ftoo}{alias-why-missing}{ \tl_to_str:n {#1} } }
+            \seq_gput_right:Ne \g__ftoo_equiv_seq
+              { { \tl_to_str:n {#1} } { \tl_to_str:N \l__ftoo_q_alias_tl }
+                { \exp_not:V \l__ftoo_q_why_tl } }
+          }
+      }
+    \prop_gput:Nee \g__ftoo_qty_body_prop   { \tl_to_str:n {#2} } { \tl_to_str:n {#1} }
+    \prop_gput:Nee \g__ftoo_qty_bodyof_prop { \tl_to_str:n {#1} } { \tl_to_str:n {#2} }
+  }
+
+\cs_new_protected:Npn \__ftoo_branch_forbid:nn #1#2
+  {
+    \clist_if_in:nVT {#1} \g__ftoo_branch_tl
+      { \msg_error:nnee {ftoo}{branch-forbidden}{#2}{ \g__ftoo_branch_tl } }
+  }
+\cs_new_protected:Npn \__ftoo_dynamics_forbid:nn #1#2
+  {
+    \clist_if_in:nVT {#1} \g__ftoo_branch_tl
+      {
+        \str_if_eq:VnT \l__ftoo_displayclass_tl {dynamics}
+          { \msg_error:nnee {ftoo}{branch-forbidden}{#2}{ \g__ftoo_branch_tl~(dynamics~display) } }
+      }
+  }
+
+\NewDocumentCommand{\DeclareQuantity}{m m m m}
+  {
+    \keys_set:nn { ftoo/qty }
+      { dim = , variance = scalar , spends = {} , alias-of = , alias-why = ,
+        branches = {} , forbidden-under = {} , dynamics-forbidden-under = {} , #3 }
+    \bool_set_true:N \l__ftoo_q_live_bool
+    \clist_if_empty:NF \l__ftoo_q_branches_clist
+      {
+        \tl_if_empty:NT \g__ftoo_branch_tl
+          { \msg_error:nne {ftoo}{branch-first}{ \tl_to_str:n {#1} } }
+        \clist_if_in:NVF \l__ftoo_q_branches_clist \g__ftoo_branch_tl
+          {
+            \bool_set_false:N \l__ftoo_q_live_bool
+            \seq_gput_right:Ne \g__ftoo_branchskip_seq
+              { { \tl_to_str:n {#1} } { \exp_not:V \l__ftoo_q_branches_clist } }
+          }
+      }
+    \bool_if:NT \l__ftoo_q_live_bool { \__ftoo_declare_qty:Nnn #1 {#2} {#4} }
+  }
+
+\cs_new_protected:Npn \__ftoo_declare_qty:Nnn #1#2#3
+  {
+    \clist_if_in:NVF \c__ftoo_variance_clist \l__ftoo_q_var_tl
+      { \msg_error:nne { ftoo } { bad-variance } { \l__ftoo_q_var_tl } }
+    \clist_map_inline:Nn \l__ftoo_q_spend_clist
+      {
+        \prop_if_in:NeF \g__ftoo_const_status_prop { \tl_to_str:n {##1} }
+          { \msg_error:nnn { ftoo } { unknown-spend } {##1} }
+      }
+    \__ftoo_check_body:Nn #1 {#3}
+    \prop_gput:Nee \g__ftoo_qty_dim_prop   { \tl_to_str:n {#1} } { \exp_not:V \l__ftoo_q_dim_tl }
+    \prop_gput:NeV \g__ftoo_qty_var_prop   { \tl_to_str:n {#1} } \l__ftoo_q_var_tl
+    \prop_gput:NeV \g__ftoo_qty_spend_prop { \tl_to_str:n {#1} } \l__ftoo_q_spend_clist
+    \prop_gput:Nen \g__ftoo_qty_arity_prop { \tl_to_str:n {#1} } {#2}
+    \tl_clear:N \l__ftoo_q_log_tl
+    \clist_if_empty:NF \l__ftoo_q_forbid_clist
+      {
+        \tl_put_right:Ne \l__ftoo_q_log_tl
+          { \__ftoo_branch_forbid:nn { \exp_not:V \l__ftoo_q_forbid_clist }
+              { \tl_to_str:n {#1} } }
+      }
+    \clist_if_empty:NF \l__ftoo_q_dynforbid_clist
+      {
+        \tl_put_right:Ne \l__ftoo_q_log_tl
+          { \__ftoo_dynamics_forbid:nn { \exp_not:V \l__ftoo_q_dynforbid_clist }
+              { \tl_to_str:n {#1} } }
+      }
+    \clist_map_inline:Nn \l__ftoo_q_spend_clist
+      { \tl_put_right:Nn \l__ftoo_q_log_tl { \ftoo_spend:nn {##1} {#1} } }
+    \exp_args:NNee \NewDocumentCommand #1
+      { \prg_replicate:nn {#2} { m } }
+      { \exp_not:V \l__ftoo_q_log_tl \exp_not:n {#3} }
+  }
+
+\msg_new:nnn { ftoo } { bad-qty-key }
+  { Unknown~quantity~key~'#1'.~The~key~set~is~closed:~dim,~variance,~spends,~
+    alias-of,~alias-why,~branches,~forbidden-under,~dynamics-forbidden-under. }
+\msg_new:nnn { ftoo } { bad-variance }
+  { Unknown~variance~'#1'~(closed~set:~scalar,~vector,~covector,~operator). }
+\msg_new:nnn { ftoo } { duplicate-body }
+  { '#1'~has~the~same~body~as~'#2'.~One~object,~two~names,~two~grades~---~
+    declare~alias-of,~or~split~the~definitions. }
+\msg_new:nnn { ftoo } { alias-target-missing }
+  { alias-of~names~'#1',~which~is~not~a~declared~quantity. }
+\msg_new:nnn { ftoo } { alias-why-missing }
+  { '#1'~aliases~a~token-distinct~body:~alias-why~is~MANDATORY,~and~the~claim~
+    is~posted~to~the~equivalence~register~for~readers~to~audit. }
+
+\NewDocumentCommand{\RegisterVariance}{m m}
+  {
+    \clist_if_in:NnF \c__ftoo_variance_clist {#2}
+      { \msg_error:nnn { ftoo } { bad-variance } {#2} }
+    \prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {#1} } {#2}
+  }
+
+
+\tl_new:N \l__ftoo_va_head_tl
+\tl_new:N \l__ftoo_va_found_tl
+\tl_new:N \g__ftoo_metric_const_tl
+
+\cs_new_protected:Npn \__ftoo_var_assert:nn #1#2
+  {
+    \tl_if_blank:nTF {#1}
+      { \msg_error:nnee {ftoo}{head-unregistered}{ (empty~argument) } {#2} }
+      {
+        \tl_set:Ne \l__ftoo_va_head_tl { \tl_item:nn {#1} {1} }
+        \prop_get:NeNTF \g__ftoo_qty_var_prop
+          { \tl_to_str:N \l__ftoo_va_head_tl } \l__ftoo_va_found_tl
+          {
+            \str_if_eq:VnF \l__ftoo_va_found_tl {#2}
+              { \msg_error:nneee {ftoo}{var-mismatch}
+                  { \tl_to_str:N \l__ftoo_va_head_tl } { \l__ftoo_va_found_tl } {#2} }
+          }
+          { \msg_error:nnee {ftoo}{head-unregistered}
+              { \tl_to_str:N \l__ftoo_va_head_tl } {#2} }
+      }
+  }
+\msg_new:nnn { ftoo } { head-unregistered }
+  { Head~'#1'~is~not~a~registered~quantity~(wanted:~#2).~The~checked~grammar~
+    reads~registered~calls~only;~register~the~head~or~use~\string\applyop~/~
+    \string\applycovop~for~applications. }
+\msg_new:nnn { ftoo } { var-mismatch }
+  { Variance~clash:~head~'#1'~is~a~#2,~but~this~slot~wants~a~#3.~
+    (The~primal/dual~wall~—~this~is~the~error~class~the~split~exists~for.) }
+
+\NewDocumentCommand{\DeclareMetricPair}{m}
+  {
+    \tl_if_empty:NF \g__ftoo_metric_const_tl
+      { \msg_error:nnn {ftoo}{metric-exists}{#1} }
+    \prop_if_in:NnF \g__ftoo_const_status_prop {c:#1}
+      { \msg_error:nnn {ftoo}{unknown-spend}{c:#1} }
+    \tl_gset:Nn \g__ftoo_metric_const_tl {c:#1}
+  }
+\msg_new:nnn { ftoo } { metric-exists }
+  { A~metric~pair~is~already~declared;~'#1'~would~be~a~second~geometry.~
+    The~theory~carries~ONE~anchored~metric. }
+\msg_new:nnn { ftoo } { metric-missing }
+  { '#1'~needs~\string\DeclareMetricPair~first:~no~anchored~metric~is~declared. }
+
+\cs_new_protected:Npn \__ftoo_metric_spend:n #1
+  {
+    \tl_if_empty:NT \g__ftoo_metric_const_tl { \msg_error:nnn {ftoo}{metric-missing}{#1} }
+    \ftoo_spend:Vn \g__ftoo_metric_const_tl {#1}
+  }
+
+\cs_undefine:N \normGvec
+\cs_undefine:N \normGcov
+\cs_undefine:N \ipGvec
+\cs_undefine:N \ipGcov
+\cs_undefine:N \pairing
+
+\NewDocumentCommand{\normGvec}{m}
+  {
+    \__ftoo_var_assert:nn {#1} {vector}
+    \__ftoo_metric_spend:n {normGvec}
+    \ensuremath{ \left\lVert #1 \right\rVert \sb{ G\sb{\star} } }
+  }
+\NewDocumentCommand{\normGcov}{m}
+  {
+    \__ftoo_var_assert:nn {#1} {covector}
+    \__ftoo_metric_spend:n {normGcov}
+    \ensuremath{ \left\lVert #1 \right\rVert \sb{ G\sb{\star}\sp{-1} } }
+  }
+\NewDocumentCommand{\ipGvec}{m m}
+  {
+    \__ftoo_var_assert:nn {#1} {vector}
+    \__ftoo_var_assert:nn {#2} {vector}
+    \__ftoo_metric_spend:n {ipGvec}
+    \ensuremath{ \langle #1 , #2 \rangle \sb{ G\sb{\star} } }
+  }
+\NewDocumentCommand{\ipGcov}{m m}
+  {
+    \__ftoo_var_assert:nn {#1} {covector}
+    \__ftoo_var_assert:nn {#2} {covector}
+    \__ftoo_metric_spend:n {ipGcov}
+    \ensuremath{ \langle #1 , #2 \rangle \sb{ G\sb{\star}\sp{-1} } }
+  }
+\NewDocumentCommand{\pairing}{m m}
+  {
+    \__ftoo_var_assert:nn {#1} {covector}
+    \__ftoo_var_assert:nn {#2} {vector}
+    \ensuremath{ \langle #1 , #2 \rangle }
+  }
+
+\NewDocumentCommand{\applyop}{m m}
+  {
+    \__ftoo_var_assert:nn {#1} {operator}
+    \__ftoo_var_assert:nn {#2} {vector}
+    #1\,#2
+  }
+\NewDocumentCommand{\applycovop}{m m}
+  {
+    \__ftoo_var_assert:nn {#1} {covector}
+    \__ftoo_var_assert:nn {#2} {operator}
+    #1\,#2
+  }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\applyop} }    { vector }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\applycovop} } { covector }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\normGvec} }   { scalar }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\normGcov} }   { scalar }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\ipGvec} }     { scalar }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\ipGcov} }     { scalar }
+\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\pairing} }    { scalar }
+
+\tl_new:N \l__ftoo_doc_head_tl
+\tl_new:N \l__ftoo_doc_spec_tl
+\tl_new:N \l__ftoo_doc_arity_tl
+\tl_new:N \l__ftoo_doc_arga_tl
+\tl_new:N \l__ftoo_doc_argb_tl
+\prop_new:N \l__ftoo_dimb_prop
+
+\cs_new_protected:Npn \__ftoo_dim_of_plain:nN #1#2
+  {
+    \tl_set:Ne \l__ftoo_doc_head_tl { \tl_item:nn {#1} {1} }
+    \prop_get:NeNTF \g__ftoo_qty_dim_prop
+      { \tl_to_str:N \l__ftoo_doc_head_tl } \l__ftoo_doc_spec_tl
+      {
+        \prop_get:NeN \g__ftoo_qty_arity_prop
+          { \tl_to_str:N \l__ftoo_doc_head_tl } \l__ftoo_doc_arity_tl
+        \prop_clear:N \l__ftoo_dimargs_prop
+        \int_step_inline:nn { \l__ftoo_doc_arity_tl }
+          { \prop_put:Nee \l__ftoo_dimargs_prop {##1} { \tl_item:nn {#1} { ##1 + 1 } } }
+        \ftoo_dim_parse:VN \l__ftoo_doc_spec_tl #2
+      }
+      { \msg_error:nne {ftoo}{dim-uninferable}{ \tl_to_str:N \l__ftoo_doc_head_tl } }
+  }
+\cs_generate_variant:Nn \__ftoo_dim_of_plain:nN { VN }
+
+\cs_new_protected:Npn \__ftoo_dim_mult_into:Nnn #1#2#3
+  {
+    \prop_get:NnNTF #1 {#2} \l__ftoo_scratch_tl
+      {
+        \int_compare:nNnTF { \l__ftoo_scratch_tl + (#3) } = 0
+          { \prop_remove:Nn #1 {#2} }
+          { \prop_put:Nne #1 {#2} { \int_eval:n { \l__ftoo_scratch_tl + (#3) } } }
+      }
+      { \prop_put:Nnn #1 {#2} {#3} }
+  }
+
+\cs_new_protected:Npn \__ftoo_dim_of_call:nN #1#2
+  {
+    \tl_set:Ne \l__ftoo_doc_head_tl { \tl_item:nn {#1} {1} }
+    \bool_lazy_or:nnTF
+      { \str_if_eq_p:ee { \tl_to_str:N \l__ftoo_doc_head_tl } { \tl_to_str:n {\applyop} } }
+      { \str_if_eq_p:ee { \tl_to_str:N \l__ftoo_doc_head_tl } { \tl_to_str:n {\applycovop} } }
+      {
+        \tl_set:Ne \l__ftoo_doc_arga_tl { \tl_item:nn {#1} {2} }
+        \tl_set:Ne \l__ftoo_doc_argb_tl { \tl_item:nn {#1} {3} }
+        \__ftoo_dim_of_plain:VN \l__ftoo_doc_arga_tl #2
+        \__ftoo_dim_of_plain:VN \l__ftoo_doc_argb_tl \l__ftoo_dimb_prop
+        \prop_map_inline:Nn \l__ftoo_dimb_prop
+          { \__ftoo_dim_mult_into:Nnn #2 {##1} {##2} }
+      }
+      { \__ftoo_dim_of_plain:nN {#1} #2 }
+  }
+\msg_new:nnn { ftoo } { dim-uninferable }
+  { Dimension~of~'#1'~is~not~inferable:~the~checked~grammar~covers~registered~
+    calls~and~one-deep~application~chains~only~(norms~are~dim-opaque~on~purpose).~
+    Do~not~claim~\string\CheckedSum~over~it. }
+
+\bool_new:N \l__ftoo_cs_first_bool
+\tl_new:N \l__ftoo_cs_head_tl
+\tl_new:N \l__ftoo_cs_var_tl
+\tl_new:N \l__ftoo_cs_refvar_tl
+\prop_new:N \l__ftoo_cs_dim_prop
+\prop_new:N \l__ftoo_cs_refdim_prop
+
+\cs_new_protected:Npn \__ftoo_checked_summand:n #1
+  {
+    \tl_set:Ne \l__ftoo_cs_head_tl { \tl_item:nn {#1} {1} }
+    \prop_get:NeNF \g__ftoo_qty_var_prop
+      { \tl_to_str:N \l__ftoo_cs_head_tl } \l__ftoo_cs_var_tl
+      { \msg_error:nnee {ftoo}{head-unregistered}
+          { \tl_to_str:N \l__ftoo_cs_head_tl } { summand } }
+    \__ftoo_dim_of_call:nN {#1} \l__ftoo_cs_dim_prop
+    \bool_if:NTF \l__ftoo_cs_first_bool
+      {
+        \bool_set_false:N \l__ftoo_cs_first_bool
+        \tl_set_eq:NN \l__ftoo_cs_refvar_tl \l__ftoo_cs_var_tl
+        \prop_set_eq:NN \l__ftoo_cs_refdim_prop \l__ftoo_cs_dim_prop
+      }
+      {
+        +
+        \str_if_eq:VVF \l__ftoo_cs_var_tl \l__ftoo_cs_refvar_tl
+          { \msg_error:nnee {ftoo}{sum-var-mismatch}
+              { \tl_to_str:N \l__ftoo_cs_head_tl } { \l__ftoo_cs_refvar_tl } }
+        \ftoo_dim_if_eq:NNF \l__ftoo_cs_dim_prop \l__ftoo_cs_refdim_prop
+          { \msg_error:nne {ftoo}{sum-dim-mismatch}
+              { \tl_to_str:N \l__ftoo_cs_head_tl } }
+      }
+    #1
+  }
+\NewDocumentCommand{\CheckedSum}{m}
+  {
+    \bool_set_true:N \l__ftoo_cs_first_bool
+    \clist_map_inline:nn {#1} { \__ftoo_checked_summand:n {##1} }
+  }
+\msg_new:nnn { ftoo } { sum-var-mismatch }
+  { \string\CheckedSum:~summand~head~'#1'~does~not~carry~the~sum's~variance~
+    ('#2').~A~sum~across~variances~is~the~pr:report~disease. }
+\msg_new:nnn { ftoo } { sum-dim-mismatch }
+  { \string\CheckedSum:~summand~head~'#1'~carries~a~different~instantiated~
+    dimension~than~the~first~summand.~Sectors~do~not~add~without~a~posted~
+    converter~(gen:grade). }
+
+\NewDocumentCommand{\proptoconst}{m}
+  {
+    \prop_get:NnNTF \g__ftoo_const_status_prop {#1} \l__ftoo_scratch_tl
+      {
+        \str_case:VnF \l__ftoo_scratch_tl
+          {
+            {posted} { \ensuremath{ \mathrel{\propto}\sb{ \text{\tiny\ftoo_tagfont:n{#1}} } } }
+            {held}   { \ensuremath{ \mathrel{\propto}\sb{ \text{\tiny\ftoo_tagfont_ref:n{#1}} } } }
+            {open}   { \ensuremath{ \mathrel{\propto}\sb{ \text{\tiny\ftoo_tagfont_ref:n{#1}}\sp{?} } } }
+          }
+          { \msg_error:nnn { ftoo } { corrupt-status } {#1} }
+        \ftoo_spend:nn {#1} { proptoconst }
+      }
+      { \msg_error:nnn { ftoo } { unposted-loan } {#1} }
+  }
+\msg_new:nnn { ftoo } { unposted-loan }
+  { \string\proptoconst{#1}:~no~such~constant.~Post,~hold,~or~open~the~debt~
+    before~borrowing~against~it. }
+
+\prop_new:N \l__ftoo_dimof_prop
+\NewDocumentCommand{\dimof}{m}
+  {
+    \prop_get:NeNTF \g__ftoo_qty_dim_prop { \tl_to_str:n {#1} } \l__ftoo_scratch_tl
+      {
+        \prop_clear:N \l__ftoo_dimargs_prop
+        \prop_put:Nnn \l__ftoo_dimargs_prop {1} {i}
+        \prop_put:Nnn \l__ftoo_dimargs_prop {2} {j}
+        \prop_put:Nnn \l__ftoo_dimargs_prop {3} {k}
+        \ftoo_dim_parse:VN \l__ftoo_scratch_tl \l__ftoo_dimof_prop
+        \__ftoo_dim_pretty:N \l__ftoo_dimof_prop
+      }
+      { \msg_error:nnee {ftoo}{head-unregistered}{ \tl_to_str:n {#1} }{ dimof } }
+  }
+
+
+\seq_new:N  \g__ftoo_spendstack_seq
+\seq_new:N  \g__ftoo_grantstack_seq
+\int_new:N  \g__ftoo_envdepth_int
+\tl_new:N   \l__ftoo_claimed_tl
+\tl_new:N   \g__ftoo_secclaim_tl
+\tl_const:Nn \c__ftoo_nograde_tl { @none }
+\tl_set_eq:NN  \l__ftoo_claimed_tl  \c__ftoo_nograde_tl
+\tl_gset_eq:NN \g__ftoo_secclaim_tl \c__ftoo_nograde_tl
+\seq_new:N \l__ftoo_merge_seq
+\tl_new:N  \l__ftoo_pop_tl
+\bool_new:N \l__ftoo_posted_bool
+\bool_new:N \l__ftoo_held_bool
+\bool_new:N \l__ftoo_open_bool
+\seq_new:N \l__ftoo_grantshow_seq
+
+\cs_new_protected:Npn \ftoo_spend_push:
+  {
+    \seq_gpush:Ne \g__ftoo_spendstack_seq { \seq_use:Nn \g__ftoo_spendlog_seq { , } }
+    \seq_gclear:N \g__ftoo_spendlog_seq
+    \seq_gpush:Ne \g__ftoo_grantstack_seq { \seq_use:Nn \g__ftoo_grantlog_seq { , } }
+    \seq_gclear:N \g__ftoo_grantlog_seq
+    \int_gincr:N \g__ftoo_envdepth_int
+    \tl_set_eq:NN \l__ftoo_claimed_tl \c__ftoo_nograde_tl
+  }
+
+\cs_new_protected:Npn \ftoo_spend_pop:
+  {
+    \int_gdecr:N \g__ftoo_envdepth_int
+    \seq_gpop:NN \g__ftoo_spendstack_seq \l__ftoo_pop_tl
+    \int_compare:nNnTF { \g__ftoo_envdepth_int } > 0
+      {
+        \seq_set_from_clist:NV \l__ftoo_merge_seq \l__ftoo_pop_tl
+        \seq_map_inline:Nn \g__ftoo_spendlog_seq
+          { \seq_put_right:Nn \l__ftoo_merge_seq {##1} }
+        \seq_gset_eq:NN \g__ftoo_spendlog_seq \l__ftoo_merge_seq
+      }
+      { \seq_gset_from_clist:NV \g__ftoo_spendlog_seq \l__ftoo_pop_tl }
+    \seq_gpop:NN \g__ftoo_grantstack_seq \l__ftoo_pop_tl
+    \int_compare:nNnTF { \g__ftoo_envdepth_int } > 0
+      {
+        \seq_set_from_clist:NV \l__ftoo_merge_seq \l__ftoo_pop_tl
+        \seq_map_inline:Nn \g__ftoo_grantlog_seq
+          { \seq_put_right:Nn \l__ftoo_merge_seq {##1} }
+        \seq_gset_eq:NN \g__ftoo_grantlog_seq \l__ftoo_merge_seq
+      }
+      { \seq_gset_from_clist:NV \g__ftoo_grantlog_seq \l__ftoo_pop_tl }
+  }
+
+\cs_new_protected:Npn \ftoo_grade_audit:n #1
+  {
+    \str_if_eq:nnTF {#1} {@none}
+      {
+        \bool_if:NTF \g__ftoo_strict_bool
+          { \msg_warning:nn {ftoo}{ungraded} }
+          { \seq_if_empty:NF \g__ftoo_spendlog_seq { \msg_warning:nn {ftoo}{ungraded} } }
+      }
+      {
+        \bool_set_false:N \l__ftoo_posted_bool
+        \bool_set_false:N \l__ftoo_held_bool
+        \bool_set_false:N \l__ftoo_open_bool
+        \seq_map_inline:Nn \g__ftoo_spendlog_seq
+          {
+            \prop_get:NnNTF \g__ftoo_const_status_prop {##1} \l__ftoo_scratch_tl
+              {
+                \str_case:VnF \l__ftoo_scratch_tl
+                  {
+                    {posted} { \bool_set_true:N \l__ftoo_posted_bool }
+                    {held}   { \bool_set_true:N \l__ftoo_held_bool }
+                    {open}   { \bool_set_true:N \l__ftoo_open_bool }
+                  }
+                  { \msg_error:nnn {ftoo}{corrupt-status}{##1} }
+              }
+              { \msg_error:nnn {ftoo}{unknown-spend}{##1} }
+          }
+        \bool_if:NT \l__ftoo_open_bool
+          { \msg_warning:nnn {ftoo}{open-debt}{#1} }
+        \str_case:nnF {#1}
+          {
+            {nec}
+              {
+                \bool_lazy_any:nT
+                  { {\l__ftoo_posted_bool} {\l__ftoo_held_bool} {\l__ftoo_open_bool} }
+                  { \msg_error:nnn {ftoo}{grade-too-strong}{nec} }
+              }
+            {cont-anch}
+              {
+                \bool_lazy_or:nnT {\l__ftoo_held_bool} {\l__ftoo_open_bool}
+                  { \msg_error:nnn {ftoo}{grade-too-strong}{cont-anch} }
+              }
+          }
+          { }
+        \bool_if:NT \g__ftoo_strict_bool
+          {
+            \str_if_eq:nnT {#1} {nec}
+              {
+                \seq_if_empty:NF \g__ftoo_grantlog_seq
+                  {
+                    \seq_set_eq:NN \l__ftoo_grantshow_seq \g__ftoo_grantlog_seq
+                    \seq_remove_duplicates:N \l__ftoo_grantshow_seq
+                    \par\nobreak\hfill
+                    { \footnotesize \textit{granted:}~
+                      \seq_use:Nn \l__ftoo_grantshow_seq { ,~ } }
+                  }
+              }
+          }
+      }
+  }
+\msg_new:nnn { ftoo } { grade-too-strong }
+  { Grade~'#1'~claimed~over~a~body~that~spends~beyond~it.~
+    Either~the~grade~is~wrong,~or~a~spend~should~be~\string\quoted,~
+    or~the~antecedent~belongs~in~a~granting~scope,~or~the~environment~
+    should~declare~\string\defines. }
+\msg_new:nnn { ftoo } { ungraded }
+  { Result~environment~carries~no~grade.~It~does~not~inherit~its~parent's. }
+\msg_new:nnn { ftoo } { open-debt }
+  { An~open~constant~taints~this~'#1'~result.~Settle~the~debt~or~lower~the~grade. }
+
+\clist_map_inline:nn
+  { theorem , proposition , lemma , corollary , definition , postulate ,
+    conjecture , insight , remark , property , statement }
+  {
+    \AddToHook{env/#1/begin} { \ftoo_spend_push: }
+    \AddToHook{env/#1/end}
+      { \exp_args:NV \ftoo_grade_audit:n \l__ftoo_claimed_tl \ftoo_spend_pop: }
+  }
+
+\cs_new_protected:Npn \ftoo_sec_audit:
+  {
+    \tl_if_eq:NNTF \g__ftoo_secclaim_tl \c__ftoo_nograde_tl
+      { \seq_if_empty:NF \g__ftoo_spendlog_seq { \msg_warning:nn {ftoo}{ungraded-prose} } }
+      { \exp_args:NV \ftoo_grade_audit:n \g__ftoo_secclaim_tl }
+    \seq_gclear:N \g__ftoo_spendlog_seq
+    \seq_gclear:N \g__ftoo_grantlog_seq
+    \tl_gset_eq:NN \g__ftoo_secclaim_tl \c__ftoo_nograde_tl
+  }
+\msg_new:nnn { ftoo } { ungraded-prose }
+  { Subsection~prose~spent~constants~but~carries~no~\string\secgrade.~
+    The~prose~does~not~inherit~a~grade;~claim~one. }
+\AddToHook{cmd/section/before}    { \ftoo_sec_audit: }
+\AddToHook{cmd/subsection/before} { \ftoo_sec_audit: }
+\AddToHook{enddocument} { \ftoo_sec_audit: }
+
+\clist_const:Nn \c_ftoo_grades_clist { nec , feas , cont , cont-anch , cont-comm }
+\msg_new:nnn { ftoo } { bad-grade } { Unknown~grade~'#1'. }
+
+\RenewDocumentCommand{\grade}{m}
+  {
+    \clist_if_in:NnTF \c_ftoo_grades_clist {#1}
+      {
+        \tl_set:Nn \l__ftoo_claimed_tl {#1}
+        {\normalfont\footnotesize\textsc{#1}}\quad
+      }
+      { \msg_error:nnn { ftoo } { bad-grade } {#1} }
+  }
+\RenewDocumentCommand{\secgrade}{m}
+  {
+    \clist_if_in:NnTF \c_ftoo_grades_clist {#1}
+      {
+        \tl_gset:Nn \g__ftoo_secclaim_tl {#1}
+        {\normalfont\footnotesize\textsc{#1}}\quad
+      }
+      { \msg_error:nnn { ftoo } { bad-grade } {#1} }
+  }
+\RenewDocumentCommand{\gradeword}{m}
+  {
+    \clist_if_in:NnTF \c_ftoo_grades_clist {#1}
+      { \textsc{#1} }
+      { \msg_error:nnn { ftoo } { bad-grade } {#1} }
+  }
+
+
+\tl_new:N \g__ftoo_branch_tl
+\tl_new:N \l__ftoo_displayclass_tl
+\clist_const:Nn \c__ftoo_branches_clist { stochastic , geometric , scalar }
+
+\NewDocumentCommand{\FtooBranch}{m}
+  {
+    \clist_if_in:NnF \c__ftoo_branches_clist {#1}
+      { \msg_error:nnn {ftoo}{branch-unknown}{#1} }
+    \tl_if_empty:NF \g__ftoo_branch_tl
+      { \msg_error:nne {ftoo}{branch-exists}{ \g__ftoo_branch_tl } }
+    \tl_gset:Nn \g__ftoo_branch_tl {#1}
+  }
+\NewDocumentCommand{\DisplayClass}{m}
+  { \tl_set:Nn \l__ftoo_displayclass_tl {#1} }
+
+\msg_new:nnn { ftoo } { branch-unknown }
+  { Unknown~branch~'#1'~(closed~set:~stochastic,~geometric,~scalar). }
+\msg_new:nnn { ftoo } { branch-exists }
+  { The~branch~is~already~'#1'.~The~choice~is~exclusive~and~made~once:~
+    nobody~asserts~the~inconsistent~triad~again,~including~us. }
+\msg_new:nnn { ftoo } { branch-first }
+  { Declaration~'#1'~is~branch-keyed:~call~\string\FtooBranch~before~it. }
+\msg_new:nnn { ftoo } { branch-forbidden }
+  { '#1'~is~forbidden~under~the~chosen~branch~('#2').~The~branch-breakage~
+    ledger~names~every~site~that~survives~only~under~some~branches~---~
+    nobody~chooses~a~branch~without~reading~its~price,~including~us. }
+
+\seq_new:N \g__ftoo_breakage_seq
+\NewDocumentCommand{\PostBranchBreakage}{m m m m}
+  { \seq_gput_right:Nn \g__ftoo_breakage_seq { {#1}{#2}{#3}{#4} } }
+
+
+\seq_new:N \g__ftoo_rulings_seq
+\NewDocumentCommand{\PostRuling}{m m m}
+  { \seq_gput_right:Nn \g__ftoo_rulings_seq { {#1}{#2}{#3} } }
+
+
+\seq_new:N \g__ftoo_evidence_seq
+\NewDocumentCommand{\PostEvidence}{m m}
+  { \seq_gput_right:Nn \g__ftoo_evidence_seq { {#1}{#2} } }
+
+
+\seq_new:N \l__ftoo_gen_seq
+\tl_new:N \l__ftoo_rowkey_tl
+
+\cs_new:Npn \__ftoo_status_rank:n #1
+  { \str_case:nn {#1} { {posted}{0} {held}{1} {open}{2} } }
+\cs_generate_variant:Nn \__ftoo_status_rank:n { V }
+
+\cs_new_protected:Npn \__ftoo_ledger_row:n #1
+  {
+    \seq_set_split:Nnn \l__ftoo_split_seq { | } {#1}
+    \tl_set:Ne \l__ftoo_rowkey_tl { \seq_item:Nn \l__ftoo_split_seq {2} }
+    \exp_args:NV \__ftoo_ledger_row_aux:n \l__ftoo_rowkey_tl
+  }
+\cs_new_protected:Npn \__ftoo_row_anchor:n #1
+  {
+    \cs_if_exist:NT \phantomsection { \phantomsection }
+    \ftoolabel{#1}
+  }
+\cs_new_protected:Npn \__ftoo_row_anchor_typed:nn #1#2
+  {
+    \cs_if_exist:NT \phantomsection { \phantomsection }
+    \cs_if_exist:NT \zcsetup { \zcsetup { reftype = #2 } }
+    \ftoolabel{#1}
+    \cs_if_exist:NT \zcsetup { \zcsetup { reftype = } }
+  }
+
+\cs_new_protected:Npn \__ftoo_ledger_row_aux:n #1
+  {
+    \prop_get:NnN \g__ftoo_const_anchor_prop {#1} \l__ftoo_scratch_tl
+    \str_if_eq:VnT \l__ftoo_scratch_tl {generate}
+      { \__ftoo_row_anchor:n {#1} }
+    \tagdef{#1} &
+    \prop_item:Nn \g__ftoo_const_status_prop {#1} &
+    {
+      \prop_get:NnN \g__ftoo_const_dim_prop {#1} \l__ftoo_scratch_tl
+      \__ftoo_dim_render_spec:V \l__ftoo_scratch_tl
+    } &
+    \prop_item:Nn \g__ftoo_const_trades_prop {#1} &
+    \prop_item:Nn \g__ftoo_const_site_prop {#1} \\
+  }
+
+\NewDocumentCommand{\GenerateLedger}{ O{tbl:ledger} }
+  {
+    \seq_clear:N \l__ftoo_gen_seq
+    \seq_map_inline:Nn \g__ftoo_const_order_seq
+      {
+        \prop_get:NnN \g__ftoo_const_status_prop {##1} \l__ftoo_scratch_tl
+        \seq_put_right:Ne \l__ftoo_gen_seq
+          { \__ftoo_status_rank:V \l__ftoo_scratch_tl | ##1 }
+      }
+    \seq_sort:Nn \l__ftoo_gen_seq
+      { \str_compare:eNeTF {##1} > {##2} { \sort_return_swapped: } { \sort_return_same: } }
+    \begin{xltabular}{\textwidth}{@{} l l l >{\RaggedRight}X >{\RaggedRight}X @{}}
+      \caption{ The~constants~ledger,~generated~from~the~registry
+        \ftootagsep \tagdef{#1} } \ftoolabel{#1} \\
+      \toprule
+      \textbf{key} & \textbf{status} & \textbf{dim} & \textbf{trades} & \textbf{site} \\
+      \midrule \endfirsthead
+      \toprule
+      \textbf{key} & \textbf{status} & \textbf{dim} & \textbf{trades} & \textbf{site} \\
+      \midrule \endhead
+      \bottomrule \endfoot
+      \seq_map_inline:Nn \l__ftoo_gen_seq { \__ftoo_ledger_row:n {##1} }
+    \end{xltabular}
+  }
+
+\cs_new_protected:Npn \__ftoo_equiv_row:nnn #1#2#3
+  { {\ttfamily #1} & {\ttfamily #2} & #3 \\ }
+\NewDocumentCommand{\GenerateEquivalences}{ O{tbl:equivalences} }
+  {
+    \begin{xltabular}{\textwidth}{@{} l l >{\RaggedRight}X @{}}
+      \caption{ Posted~identity~claims~(alias-of~with~token-distinct~bodies)
+        \ftootagsep \tagdef{#1} } \ftoolabel{#1} \\
+      \toprule
+      \textbf{claimant} & \textbf{target} & \textbf{why} \\
+      \midrule \endfirsthead
+      \toprule
+      \textbf{claimant} & \textbf{target} & \textbf{why} \\
+      \midrule \endhead
+      \bottomrule \endfoot
+      \seq_map_inline:Nn \g__ftoo_equiv_seq { \__ftoo_equiv_row:nnn ##1 }
+    \end{xltabular}
+  }
+
+\cs_new_protected:Npn \__ftoo_ruling_row:nnn #1#2#3
+  { \__ftoo_row_anchor_typed:nn {#1}{ruling} \tagdef{#1} & #2 & #3 \\ }
+\NewDocumentCommand{\GenerateRulings}{ O{tbl:rulings} }
+  {
+    \begin{xltabular}{\textwidth}{@{} l >{\RaggedRight}X >{\RaggedRight}X @{}}
+      \caption{ The~rulings~register:~decisions~the~checker~forced,~shown,~
+        not~smuggled \ftootagsep \tagdef{#1} } \ftoolabel{#1} \\
+      \toprule
+      \textbf{key} & \textbf{ruling} & \textbf{consequence} \\
+      \midrule \endfirsthead
+      \toprule
+      \textbf{key} & \textbf{ruling} & \textbf{consequence} \\
+      \midrule \endhead
+      \bottomrule \endfoot
+      \seq_map_inline:Nn \g__ftoo_rulings_seq { \__ftoo_ruling_row:nnn ##1 }
+    \end{xltabular}
+  }
+
+\msg_new:nnn { ftoo } { unknown-evidence }
+  { '#1'~is~not~an~evidence~link~in~the~manifest. }
+
+\msg_new:nnn { ftoo } { unreachable-endpoint }
+  {
+    Evidence~'#1'~reaches~'#2',~which~carries~no~visible~tag~and~makes~no~
+    claim~about~a~tagged~referent,~so~the~register~cannot~name~it.
+  }
+
+\tl_new:N \l__ftoo_evidence_end_tl
+\clist_new:N \l__ftoo_evidence_about_clist
+
+\cs_new:Npn \ftoo_evidence_subject:n #1
+  { \clist_item:en { \prop_item:Nn \g_ftoo_edges_out_prop { #1 | claim-about } } { 1 } }
+\cs_generate_variant:Nn \clist_item:nn { en }
+
+\cs_new:Npn \ftoo_evidence_name:n #1
+  {
+    \prop_if_in:NnTF \g_ftoo_id_to_tag_prop {#1}
+      { \prop_item:Nn \g_ftoo_id_to_tag_prop {#1} }
+      {
+        the~claim~about~
+        \prop_item:Ne \g_ftoo_id_to_tag_prop { \ftoo_evidence_subject:n {#1} }
+      }
+  }
+\cs_generate_variant:Nn \ftoo_evidence_name:n { e }
+
+\cs_new_protected:Npn \ftoo_evidence_check:nn #1#2
+  {
+    \prop_if_in:NnF \g_ftoo_id_to_tag_prop {#2}
+      {
+        \clist_set:Nx \l__ftoo_evidence_about_clist
+          { \prop_item:Nn \g_ftoo_edges_out_prop { #2 | claim-about } }
+        \bool_lazy_and:nnF
+          { \int_compare_p:nNn { \clist_count:N \l__ftoo_evidence_about_clist } = { 1 } }
+          { \prop_if_in_p:Ne \g_ftoo_id_to_tag_prop { \ftoo_evidence_subject:n {#2} } }
+          { \msg_error:nnnn { ftoo } { unreachable-endpoint } {#1} {#2} }
+      }
+  }
+\cs_generate_variant:Nn \ftoo_evidence_check:nn { nV }
+\cs_generate_variant:Nn \prop_if_in:NnTF { Ne }
+\prg_generate_conditional_variant:Nnn \prop_if_in:Nn { Ne } { p }
+
+\cs_new_protected:Npn \ftoo_evidence_side:nn #1#2
+  {
+    \ftoo_evidence_check:nn {#1} {#2}
+    \ftoo_tagfont:e { \ftoo_evidence_name:n {#2} }
+  }
+\cs_generate_variant:Nn \ftoo_evidence_side:nn { nV }
+\cs_generate_variant:Nn \ftoo_tagfont:n { e }
+
+\cs_new_protected:Npn \ftoo_evidence_backedge:n #1
+  {
+    \prop_if_in:NnF \g_ftoo_evidence_tag_to_id_prop {#1}
+      { \msg_error:nnn { ftoo } { unknown-evidence } {#1} }
+    \tl_set:Nx \l__ftoo_evidence_end_tl
+      { \prop_item:Nn \g_ftoo_evidence_source_prop {#1} }
+    \ftoo_evidence_side:nV {#1} \l__ftoo_evidence_end_tl
+    ~$\multimap$~
+    \tl_set:Nx \l__ftoo_evidence_end_tl
+      { \prop_item:Nn \g_ftoo_evidence_target_prop {#1} }
+    \ftoo_evidence_side:nV {#1} \l__ftoo_evidence_end_tl
+  }
+
+\cs_new_protected:Npn \__ftoo_evidence_row:nn #1#2
+  {
+    \__ftoo_row_anchor_typed:nn {#1}{evidence} \tagdef{#1}
+    & \ftoo_evidence_backedge:n {#1}
+    & \prop_item:Nn \g_ftoo_evidence_force_prop {#1}
+    & #2 \\
+  }
+\NewDocumentCommand{\GenerateEvidence}{ O{tbl:ev} }
+  {
+    \begin{xltabular}{\textwidth}{@{} l l >{\RaggedRight}X >{\RaggedRight}X @{}}
+      \caption{ The~evidential~register:~every~back-edge~the~document~leans~on.~
+        The~back-edge~and~warrant~force~are~GENERATED~from~the~recorded~
+        evidence~links;~the~key~is~authored~and~roster-reconciled~against~
+        them;~the~reading~is~authored \ftootagsep \tagdef{#1} } \ftoolabel{#1} \\
+      \toprule
+      \textbf{key} & \textbf{back-edge} & \textbf{what it warrants}
+        & \textbf{reading} \\
+      \midrule \endfirsthead
+      \toprule
+      \textbf{key} & \textbf{back-edge} & \textbf{what it warrants}
+        & \textbf{reading} \\
+      \midrule \endhead
+      \bottomrule \endfoot
+      \seq_map_inline:Nn \g__ftoo_evidence_seq { \__ftoo_evidence_row:nn ##1 }
+    \end{xltabular}
+  }
+
+\cs_new_protected:Npn \__ftoo_breakage_row:nnnn #1#2#3#4
+  { #1 & #2 & #3 & #4 \\ }
+\cs_new_protected:Npn \__ftoo_branchskip_note:nn #1#2
+  { {\ttfamily #1}~(branches:~{\ttfamily #2}) }
+\NewDocumentCommand{\GenerateBranchLedger}{ O{tbl:branches} }
+  {
+    \begin{xltabular}{\textwidth}{@{} >{\RaggedRight}X >{\RaggedRight}X >{\RaggedRight}X >{\RaggedRight}X @{}}
+      \caption{ The~branch-breakage~ledger:~sites~that~survive~only~under~
+        some~branches \ftootagsep \tagdef{#1} } \ftoolabel{#1} \\
+      \toprule
+      \textbf{site} & \textbf{stochastic} & \textbf{geometric} & \textbf{scalar} \\
+      \midrule \endfirsthead
+      \toprule
+      \textbf{site} & \textbf{stochastic} & \textbf{geometric} & \textbf{scalar} \\
+      \midrule \endhead
+      \bottomrule \endfoot
+      \seq_map_inline:Nn \g__ftoo_breakage_seq { \__ftoo_breakage_row:nnnn ##1 }
+    \end{xltabular}
+    \seq_if_empty:NF \g__ftoo_branchskip_seq
+      {
+        \par\noindent
+        Chosen~branch:~{\ttfamily \tl_use:N \g__ftoo_branch_tl}.~
+        Declarations~keyed~off~this~branch~(not~live~in~this~build):~
+        \seq_map_inline:Nn \g__ftoo_branchskip_seq
+          { \__ftoo_branchskip_note:nn ##1 . ~ }
+        \par
+      }
+  }

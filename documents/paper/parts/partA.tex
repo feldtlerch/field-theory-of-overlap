@@ -1,0 +1,785 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\clearpage
+\part{The two basins}
+
+\section{The epistemic basin}
+\label{sec:epistemic}
+
+\subsection{Alphabet and fact}
+\label{subsec:epi:fact}
+\secgrade{nec}%
+Two readable dimensions, one not: $\dimwelfare$ an outcome length after a converter,
+$\dimratio$ a ratio computable against an anchor, $\dimrate$ a flow with no value at an
+instant. The fact is the claim that point-readability tracks dimension --- scoped, per
+\ftag{epi:shadow}, to the single-instant instrument.
+
+\begin{postulate}[\hdr{epi:fact}]\grade{nec}
+  A single state-snapshot cannot decompose a zero net rate $\alignrate=0$ into its opposing
+  forces; $\dimrate$-at-rest is unrecoverable from one instant.
+  \begin{equation}
+    \boxed{\;\alignrate=0\ \text{(net)}\ \;\not\Rightarrow\;\
+    \text{the forcing }\will\ \text{and the decay }\willdecay\ \text{separately.}\;}
+    \label{eq:epi:decompose}
+  \end{equation}
+\end{postulate}
+
+This is the operational form of \ftag{epi:fact}, and its honest scope is the instrument
+named in it: \emph{one snapshot}. A time series reads persistence; the fluctuation record
+reads maintenance (\ftag{J:tremble}); a probe reads the restoring force. What survives
+every enrichment of the instrument is the converter principle's residue
+(\ftag{epi:conv}): the price, spent into no record.
+
+\subsection{Readability, by spend route}
+\label{subsec:epi:readability}
+\secgrade{nec}%
+Recovery of a quantity from observation depends on where the quantity is spent, and
+exactly one configuration has no spend route at all.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Recovery by spend route}{tbl:epi:spend}
+  \begin{tabularx}{\textwidth}{@{} L L L @{}}
+    \toprule
+    \textbf{quantity} & \textbf{spent into} & \textbf{recovery} \\
+    \midrule
+    welfare state $\dimwelfare$ & the record, at settlement & settles in time \\
+    ratio $\dimratio$ & any shared anchor & computes at once \\
+    moving rate $\dimrate$,\ $\alignrate\neq0$ & the trajectory & integrates to a state \\
+    held converter ($\selfweight{i}$) & this holder's choices only
+      & a biography, in arrears (\ftag*{snk:anch-t}) \\
+    maintained rate at rest & the fluctuation record
+      & in distribution (\ftag*{J:tremble}); its \emph{price} not at all \\
+    \textbf{unspent converter} & \textbf{nothing}
+      & \textbf{none --- not by instrument, by type} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The last row is \ftag{src:nd}'s address: not a rate too still to sample but a converter
+spent into no transaction in any currency. This \ftag{g:knock} on the spend table is the
+whole engine of the scope boundary.
+
+\refrain{}{A snapshot shows the glass is still. The film shows it trembling --- and still cannot show what the holding costs the hand.}
+
+\subsection{Scope}
+\label{subsec:epi:scope}
+\secgrade{nec}%
+Let $\readout$ be the readout, the real-linear map carrying motion to record. Then
+\ftag{g:proj} splits any moral velocity $\moralvel\ \dimrate$ into a recoverable part and a permanent
+remainder:%
+\handle*{op:vel}\handle*{op:null}
+\begin{align}
+  \moralvelocity  &=\Pi_{\mathrm{im}\,\readout}\,\moralvel && (\text{state moved, recoverable}),
+    \label{eq:epi:vel}\\
+  \moralnull &=\Pi_{\ker\readout}\,\moralvel          && (\text{no motion}).
+    \label{eq:epi:null}
+\end{align}
+Scope is image; out of scope is the permanent kernel, $\dimrate$-at-rest --- the still
+center the table isolated.
+
+\subsection{The moral grid}
+\label{subsec:epi:grid}
+\secgrade{nec}%
+\handle*{nrm:good}\handle*{nrm:wise}%
+Two independent questions attach to any act: its effect on a subject, and its effect on the
+actor's extended self --- each an outcome read in a welfare unit.
+
+\begin{definition}[\hdr{nrm:grid}]\grade{nec}
+  The grid is $\dimnodewelfare{k}\times\dimnodewelfare{i}$, and \emph{good} and \emph{wise} are its two
+  readings, differing not in dimension but in time-index:
+  \begin{equation}
+    \boxed{\underbrace{\text{good}}_{\dimnodewelfare{k,\text{now}}}\Big/
+           \underbrace{\text{wise}}_{\dimnodewelfare{i,\text{fwd}}}=\text{spot}/\text{forward}
+    \quad\neq\quad
+    \underbrace{\text{state}}_{\dimwelfare}\Big/\underbrace{\text{rate}}_{\dimrate}
+    =\text{grid}/\text{will}.}
+    \label{eq:nrm:grid}
+  \end{equation}
+  \emph{Good} is the present predicate, \emph{wise} the forward; the will that moves through
+  the grid is a rate, outside it.
+\end{definition}
+
+The \ftag{g:knock} forbids two collapses at once: \emph{good} $=$ \emph{wise} (one welfare
+time-index read as another) and \emph{good} $=$ \emph{virtue} ($\dimwelfare$ read as
+$\dimrate$).
+
+\clearpage
+\section{The ontic basin I: object and fields}
+\label{sec:ontic-fields}
+
+\subsection{The operator, and its readings}
+\label{subsec:ont:operator}
+\secgrade{cont-anch}%
+\handle*{c:Gstar}%
+$\comov{i}{j}$ is directed ($\comov{i}{j}\neq\comov{j}{i}$) and carries the full cross-good
+structure. Two covectors live in one dual space $\dualspace$: the \emph{caring}
+covector $\caringcovector{i}{j}=\caringdef{i}{j}$, how $i$'s felt welfare moves per
+unit of each $j$-good, and the \emph{feeling} covector $\feelingcovector{j}$, how $j$ values
+the same goods. Alignment is projective and currency-free; inclusion is additive and needs
+currency. One may assume naively that the operator has two readings, a direction and a
+magnitude; the typed grammar finds four, and their spend-profiles differ --- that
+difference is the section's content.
+
+\begin{definition}[\hdrtitleonly{Alignment, standing and event}]\grade{nec}
+\defines{\alignstand,\alignevent}
+  The standing alignment reads caring against the other's \emph{values}; the event
+  alignment reads caring against what \emph{happened}; the coupling is the caring-norm
+  the standing cosine divides out:
+  \begin{align}
+    \alignstand{i}{j} &= \frac{\ipGcov{\caringcovector{i}{j}}{\feelingcovector{j}}}
+      {\normGcov{\caringcovector{i}{j}}\,\normGcov{\feelingcovector{j}}}
+      &:& \eqtag{op:cos}{standing: the held lean of two fates}\\
+    \alignevent{i}{j} &= \frac{\pairing{\caringcovector{i}{j}}{\outcomechange{j}}}
+      {\normGcov{\caringcovector{i}{j}}\,\normGvec{\outcomechange{j}}}
+      &:& \eqtag{op:cosev}{event: the lean of one act}\\
+    \coupling{i}{j} &= \normGcov{\caringcovector{i}{j}}\ \dimnodeperpublic{i}
+      &:& \eqtag{f:couple}{coupling, the caring-norm}
+  \end{align}
+  Both cosines are $\dimratio$, defined where their denominators are nonzero, and they
+  need not agree: a well-leaning friend can land an ill-leaning act. Normalization to
+  $\dimratio$ is the erasure of magnitude: the cosines carry pure direction, the coupling
+  $\coupling{i}{j}$ is exactly what they divide out.
+\end{definition}
+
+The coupling is bounded, not free:
+$\coupling{i}{j}\le\normGcov{\selfweight{i}}\,\opnormG{\comovfield}$ --- projecting onto your
+own welfare line can only lose coupling, and the gap is the entanglement your weighting
+hides.
+
+\begin{definition}[\hdr{f:felt}]\grade{nec}
+\defines{\felttotal,\feltstake,\feltsign}
+  What an event costs or pays $i$, by $i$'s own caring, is the metric-free pairing ---
+  covector against vector, \textbf{no converter spent}:
+  \begin{align}
+    \felttotal{i}{j} &= \pairing{\caringcovector{i}{j}}{\outcomechange{j}}
+      \quad \dimnodewelfare{i}
+      &:& \eqtag{eq:f:felt}{the felt total, invariant}\\
+    \feltstake{i}{j} & &:& \eqtag{f:feltmag}{its modulus, the felt stake}\\
+    \feltsign{i}{j}  & &:& \eqtag{f:feltsign}{its sign: helped or hurt, anchor-free}
+  \end{align}
+\end{definition}
+
+\begin{theorem}[\hdr{f:split}]\grade{cont-anch}
+  The felt total exists without the anchor; its \emph{decomposition} does not:
+  \begin{equation}
+    \felttotal{i}{j}
+      \;=\;\underbrace{\alignevent{i}{j}}_{\text{lean}}\;
+           \underbrace{\coupling{i}{j}}_{\text{coupling}}\;
+           \underbrace{\normGvec{\outcomechange{j}}}_{\text{anchored size}},
+    \label{eq:f:split}
+  \end{equation}
+  where each right-hand factor spends \ftag{c:Gstar} and the left side spends nothing.
+  What you felt is \gradeword{nec}; how much of it was lean and how much was size is
+  \gradeword{cont-anch}. Two communities disagreeing about an event's size and lean can
+  still agree what it cost its victim --- and must, \emph{once the victim's weighting is
+  supplied}: the total is built on no anchor, but it is read through the held
+  $\selfweight{i}$ (\ftag{mod:facets}), so the agreement is over the invariant, not an
+  access either community owns. And the access itself is dated: the felt total is
+  collected by a biography, in arrears --- at the instant it is felt, not yet summed;
+  nothing reads it now (\ftag{epi:fact}).
+\end{theorem}
+
+\refrain{sec:say:direction}{Direction tells which way two fates lean, never how much fate there is to lean.}
+
+\begin{definition}[\hdrunbacked{Capacity and realized stake}{f:cap}]\grade{nec}
+\defines{\capgate,\realizedstake}
+  \begin{align}
+    \capgate{i}{j} & &:& \eqtag{eq:f:cap}{the gate: what \emph{could} move, $\dimratio$}\\
+    \realizedstake{i}{j} & &:& \eqtag{f:stake}{the charge: what \emph{did} move, $\dimwelfare$}
+  \end{align}
+  $\capgate{i}{j}=0\iff\comov{i}{j}=0$, in every metric: only the genuine stranger seals.
+  The realized stake vanishes on $\ker\comov{i}{j}$ --- an act may miss today over a live
+  coupling. Gate on capacity; charge on realization; never swap them.
+\end{definition}
+
+\begin{proposition}[\hdr{f:ceiling}]\grade{cont-anch}
+  By Cauchy--Schwarz, on any edge and any event,
+  \begin{equation}
+    \feltstake{i}{j}\;\le\;\coupling{i}{j}\,\normGvec{\outcomechange{j}},
+    \label{eq:f:ceiling}
+  \end{equation}
+  with equality iff $\outcomechange{j}$ is aimed along the caring direction. The coupling
+  is the edge's \textbf{price ceiling}: the most one anchored unit of event can cost its
+  holder --- and the worst case is the targeted one.
+\end{proposition}
+
+\begin{statement}{mod:facets}{Construction and access}
+  Every object above carries two gradings, not one: what it is \textbf{built on} (the
+  spend set: the compiler's column) and what it is \textbf{read through} (the access
+  route: the reader's column). The felt total (\ftag*{f:felt}) is built on nothing and
+  read only through a held $\selfweight{i}$; the realized stake (\ftag*{f:stake}) is
+  built on the anchor and read by anyone who shares it. Neither column collapses into
+  the other.
+\end{statement}
+
+\subsection{The loom: two nodes, two goods}
+\label{subsec:ont:loom}
+\secgrade{cont-anch}%
+Every object above, computed once, in the smallest world that carries them:
+the loom. Two nodes, Alice and Bob; two shared goods, bread and song. The toy
+posts its converters up front --- it cannot be built otherwise, which is the pedagogy ---
+and holds one, which it shows only because a toy is omniscient:
+\begin{center}
+  \begin{tabular}{ll}
+    \toprule
+    posted & $\anchormetric=I$;\quad $\belongingradiusof{A}=1$ \\
+    held (shown here only) & $\selfweight{A}=(1,2)$,\quad $\selfweight{B}=(3,1)$ \\
+    \bottomrule
+  \end{tabular}
+\end{center}
+Let the edge carry $\comov{A}{B}=\bigl(\begin{smallmatrix}1&0\\0&-1\end{smallmatrix}\bigr)$:
+Bob's bread feeds Alice; Bob's song drowns hers out. Then
+\begin{equation}
+  \caringcovector{A}{B}=\selfweight{A}\transpose\comov{A}{B}=(1,-2),\qquad
+  \alignstand{A}{B}=\frac{(1)(3)+(-2)(1)}{\sqrt5\,\sqrt{10}}
+    =\frac{1}{\sqrt{50}}\approx+0.14,
+  \label{eq:loom:standing}
+\end{equation}
+mild friends by standing. Now let one event land, $\outcomechange{B}=(1,1)$ --- more
+bread, more song, unambiguously good for Bob ($\selfweight{B}\transpose\outcomechange{B}=4$):
+\begin{equation}
+  \felttotal{A}{B}=\pairing{\caringcovector{A}{B}}{\outcomechange{B}}=1-2=-1,\qquad
+  \alignevent{A}{B}=\frac{-1}{\sqrt5\,\sqrt2}\approx-0.32.
+  \label{eq:loom:event}
+\end{equation}
+The standing and event cosines split in a $2\times2$: a well-leaning friend, hurt by
+what helps him. The ceiling (\ftag{f:ceiling}) checks:
+$\feltstake{A}{B}=1\le\coupling{A}{B}\,\normGvec{\outcomechange{B}}=\sqrt5\cdot\sqrt2\approx3.16$,
+with equality exactly for the targeted event $\outcomechange{B}\propto(1,-2)$ of the same
+anchored size --- aim along the caring direction and the bound is attained. The holding
+follows only once the radius is posted:
+$\holding{A}{B}=(1)_+/(\sqrt{10}\cdot1)\approx0.32$. Every line above stalls at a
+converter until its row appears in the little ledger --- the toy buys its way past each
+stall, in the open, which is \ftag{epi:conv} run at the smallest scale that has it.
+
+\begin{definition}[\hdr{c:exch}]\grade{nec}
+  \begin{equation}
+    \currency{i}{j}:\dimnodewelfareratio{i}{j},
+    \qquad
+    \currency{i}{j}>0.
+    \label{eq:c:exch}
+  \end{equation}
+  It converts $j$'s own welfare scalar into $i$'s welfare scalar. No no-arbitrage condition
+  is imposed.
+\end{definition}
+
+\begin{definition}[\hdr{f:holonomy}]\grade{nec}
+  \begin{equation}
+    \holonomy{i}{j}{k}:=\currency{i}{j}\currency{j}{k}\currency{k}{i}.
+    \label{eq:f:holonomy}
+  \end{equation}
+  Its units telescope to $\dimratio$. A universal welfare scale exists exactly when
+  \begin{equation}
+    \currency{i}{j}=c_i/c_j
+    \quad\Longleftrightarrow\quad
+    \holonomy{i}{j}{k}=1\ \text{ on every cycle}.
+    \label{eq:f:holonomy-coherence}
+  \end{equation}
+  Complete alignment need not imply currency coherence: $\leanbare\equiv1$ can coexist with
+  $\holonomy{i}{j}{k}\neq1$.
+\end{definition}
+
+\begin{definition}[\hdr{nrm:incl}]\grade{nec}
+\defines{\holdingtyped}
+  The extended self folds each other \textbf{by the other's own measure}, weighted by the
+  holding and booked in the holder's currency:
+  \begin{align}
+    \extself{i} &= \privatewelfare{i}
+      + \sum_j \foldterm{i}{j}
+      && \dimnodewelfare{i} \label{eq:nrm:incl}\\
+    \holding{i}{j} &= \holdingdef{i}{j}
+      && \dimratio \label{eq:nrm:holding}\\
+    \holding{i}{j} &= \holdingcosform{i}{j}
+      && \text{where }\lean{i}{j}\text{ is defined} \label{eq:nrm:holding-cos}
+  \end{align}
+  At felt-zero $\caringcovector{i}{j}=0$, $\lean{i}{j}$ is undefined but
+  $\holding{i}{j}=0$. The radius $\belongingradiusof{i}$ at which holding becomes belonging
+  is posted, not given.
+\end{definition}
+
+Holding says how much of the edge belongs to the self; currency says in whose welfare-unit
+the folded content is booked; $\selfweight{j}$ says whose measure supplies the content.
+Folding the other by $\selfweight{i}$ instead is annexation \handle{nrm:annex} --- the
+cartel run inside care (\ftag{J:hip}).
+
+\subsection{The two zeros}
+\label{subsec:ont:zeros}
+\secgrade{nec}%
+The cosine vanishes two ways, and they are not one configuration \ftag{g:split}:
+\begin{align}
+  \leanbare = 0 &\iff \caringcovector{i}{j} \perp \feelingcovector{j},\ \caringcovector{i}{j} \neq 0
+    &:& \eqtag{f:ambiv}{the \emph{only} cause}\\
+  \caringcovector{i}{j} = 0   &\Longrightarrow \leanbare\ \text{undefined}
+    &:& \eqtag{f:feltzero}{the apparent stranger}\\
+  \comovfield = 0         &\subsetneq \{\,\caringcovector{i}{j} = 0\,\}
+    &:& \eqtag{f:sealed}{structural, the seal}
+\end{align}
+Felt zero \ftag{f:feltzero} is the apparent stranger: $\caringcovector{i}{j}=0$,
+$\leanbare$ undefined, yet $\comovfield\neq0$ --- a real, accountable tie $i$ does not
+feel. Net zero is \emph{ambivalence} \ftag{f:ambiv}: real co-moving fate whose
+components cancel under the weighting --- a friend in health, a rival in standing, a neutral
+lean over a positive stake. The off-diagonal the scalar cannot name lives here; alignment
+reads $0$ while stake reads large. Only structural zero is a wall.
+
+\begin{econ}[label=e:lemons, title={The lemons wall}, ref=f:feltzero,
+  cites={a:lemons,a:signaling,a:screening}, departs=wall,
+  stopsat={takes the no-signal wall as built; reads it as a structural zero, not a friction}]
+  Motion along $\leanbare$ is information economics, granted on its own terms:
+  $\caringcovector{i}{j}=0$ is
+  Akerlof's lemons wall \parencite{a:lemons}, the configuration where no quality signal
+  crosses, bridged only at the cost Spence's signaling \parencite{a:signaling} and Stiglitz's
+  screening \parencite{a:screening} measure --- we take the wall as they built it and read it
+  as a structural zero, not a friction. The transposition is part of the departure and not
+  an identification: their wall is epistemic, a claim about what quality can be signalled,
+  where $\caringcovector{i}{j}=0$ is ontic --- nothing to feel rather than nothing to read.
+\end{econ}
+
+\begin{econ}[label=e:witness, title={Structural holes versus closure}, ref=f:eff,
+  cites={a:burt,a:coleman}, departs=flatten,
+  stopsat={one axis (broker rent) where the field needs two (rent and density)}]
+  The witness axis is network economics --- \textcite{a:burt}'s structural holes and broker
+  rent against \textcite{a:coleman}'s closure; the contribution sets them orthogonal and
+  studies the field.
+\end{econ}
+
+\begin{econ}[label=e:capital, title={Reswitching as honest ambivalence}, ref=op:cos,
+  cites={a:capital}, departs=scalar,
+  stopsat={a scalar aggregate needs a weighting not exogenous to what it measures}]
+  The operator-versus-cosine split has its method-ancestor one domain over, in the
+  capital-aggregation controversy \parencite{a:capital}, and the parity is exact: Cambridge
+  granted that a scalar aggregate needs a weighting not exogenous to what it measures, and
+  \ftag{P:nonorm} is that identical refusal typed --- deny it here and the controversy goes
+  with it. Ambivalence is its reswitching read honestly, not borrowed loosely: reswitching
+  is a \emph{technique} that reverses as the interest rate moves, and the reversal \emph{is}
+  a sign-flip of the net contraction $\ip{\caringcovector{i}{j}}{\feelingcovector{j}}$ as the weighting sweeps ---
+  the monotone quantity that turns, the off-diagonal the scalar cannot name. The same
+  cancellation, found one aggregate over.
+\end{econ}
+
+\subsection{Witness density}
+\label{subsec:ont:density}
+\secgrade{nec}%
+\begin{definition}[\hdr{f:Ncount}]\grade{nec}
+  \begin{equation}
+    \countanch=
+    \sum_w(1-\aligndefect{w})\reach_w
+    \qquad \dimcount.
+    \label{eq:f:Ncount}
+  \end{equation}
+  Similarly $\countauth\ \dimcount$.
+\end{definition}
+
+Both factors are read against posted objects, not supplied by whoever computes the tally.
+
+\begin{definition}[\hdr{f:defector}]\grade{cont-anch}
+  The \textbf{counterfactual defector} is the reference profile the subscript names: for the
+  observed party, the alignment profile of a party co-present with the act whose alignment
+  that party did not author --- the witness one would face if no witness were one's own. It
+  is a profile and not a person, and it is a node of the measured field, which is why the
+  discount cannot be computed from inside it (\ftag{J:anchor}). The witness's
+  \textbf{alignment defect} is the departure of $w$'s profile from that reference,
+  \begin{equation}
+    \aligndefect{w}\in[0,1],\qquad\dimratio,
+    \label{eq:f:defector}
+  \end{equation}
+  zero for a witness whose alignment the observed party could not author and one for a
+  witness authored outright. So $1-\aligndefect{w}$ is the witness's independence weight,
+  and \ftag{f:Ncount} is a tally of independence weighted by reach.
+\end{definition}
+
+\begin{definition}[\hdr{f:reach}]\grade{cont-anch}
+  The \textbf{reach} $\reach_w$ is the witness's witnessing weight on the act,
+  \begin{equation}
+    \reach_w\in[0,1],\qquad\dimratio,
+    \label{eq:f:reach}
+  \end{equation}
+  and it is one object under the two readings this section carries. Under \handle{f:local},
+  the depth-one co-present sum and enlargement's anchor, $\reach_w$ is the co-presence
+  indicator: one for a party present at the act, zero otherwise. Under \handle{f:path}, the
+  depth-$k$ bridged path-reliability and harm's anchor, $\reach_w$ is the reliability of the
+  best bridged path from the act to $w$ --- hard-zero under concealment, which severs every
+  path. A count is computed under one reading and inherits which; the harm half discounts in
+  \ftag*{f:path} and the enlargement half in \ftag*{f:local}. Both summands being
+  $\dimratio$, the tally's $\dimcount$ is the summation's own count-grade
+  (\ftag{gen:ext}).
+\end{definition}
+
+\begin{definition}[\hdr{f:eff}]\grade{nec}
+  The second descriptive axis is $\delta$, neighbourhood density of independent witnesses,
+  with the anchored form
+  \begin{equation}
+    \effdensity[i]=\frac{\countanch}{\countpool},\qquad\dimratio,
+    \label{eq:f:eff}
+  \end{equation}
+  Unit check: $\dimcount/\dimcount=\dimratio$. A crowd is not a density until divided by
+  its pool.
+\end{definition}
+
+\begin{insight}[\hdr{f:pool}]\grade{cont-anch}
+  Coherence pools the value; independence supplies the weight.
+\end{insight}
+
+Both readings of the reach carry forward, and the independence qualifier each of them owes
+is paid at \ftag{J:anchor}.
+
+What the display does not fix is the range of the sum. A party with reach has the standing
+to witness; whether they report is a will (\zcref{W:lookout}), and a will is not a number
+the count can read off the field. So the tally must say how a party with reach becomes a
+counted witness --- and that is a modelling choice, not a theorem. This document
+\textbf{chooses}, and posts the price.
+
+\begin{statement}{mod:recruit}{The motivation-gated recruitment reading}
+  The index $w$ in \ftag{f:Ncount} runs over the \textbf{recruited} witnesses and not over
+  every party with reach. Recruitment is a Bernoulli draw whose probability is the belief
+  layer's motivation factor \ftag{bf:mot}, so the tally's $\sum_w$ is an expectation over
+  the recruited set: a party with reach enters it in proportion to their motivation, and a
+  neighbourhood in which every party with reach has motivation zero contributes no anchored
+  count. The gate acts on the \emph{index set} and never as a factor in the display, which is
+  what leaves the count motivation-free and the alternative below a genuine reading of the
+  same equation rather than a different one. The alternative is a
+  \textbf{positional} reading, in which the sum ranges over every party with reach and
+  motivation touches only the reader's weighting of a report already made. Its price is
+  posted where the bridge is spent: on the positional reading the cartel's deterrent
+  collapse is a claim about the credibility of reports and not about the density
+  (\see{subsec:ont:opposition}).
+\end{statement}
+
+\subsection{Accountability --- the first gate}
+\label{subsec:ont:accountability}
+\secgrade{cont-anch}%
+\begin{definition}[\hdr{f:acc}]\grade{cont-anch}
+  Accountability gates on capacity and charges on realization:
+  \begin{align}
+    &\accountability = \capgate{i}{j}\,(1+\effdensity)
+      &:& \eqtag{eq:f:acc}{the gate, $\dimratio$: answerable at all?}\\
+    &\realizedstake{i}{j}
+      &:& \eqtag{eq:f:charge}{the charge, $\dimwelfare$ (\ftag*{f:stake})}
+  \end{align}
+  The operator norm compares anchored lengths top and bottom, so the gate reads
+  $\dimratio$ with no reference perturbation posted.
+\end{definition}
+
+This is the gate-stride \ftag{g:gate} at \zcref{tbl:sc:acc}, and it is one-sided:
+$\accountability=0\iff\capgate{i}{j}=0\iff\comovfield=0$. Harm realized by a particular
+$\outcomechange{j}$ is priced at $\realizedstake{i}{j}$, which vanishes on
+$\ker\comov{i}{j}$ --- a coupling that happens to miss today is still answerable, because
+the gate never consulted the act. The amplifier
+$1+\effdensity\ge1$ never vanishes --- it scales, it does not gate; the on/off is the capacity
+alone. The spot cost is felt by the victim now, costless to the actor; the forward is the
+actor's loss, a claim priced in anchored density, maturity $\horizon$ the densification time,
+inert until $\effdensity>0$.
+
+Accountability gates on capacity and charges on realized stake --- neither operation uses
+alignment --- and each object carries its own reason.
+Dimension separates them: the charge is a $\dimwelfare$ where the lean is a $\dimratio$.
+Invariance is what makes the wall re-weighting-proof: the capacity $\capgate{i}{j}$
+involves neither party's weighting, where a wall built from the direction --- or from
+privately weighted felt stake --- would fall whenever either party merely re-weighted.
+
+\begin{corollary}[\hdr{f:seal-law}]\grade{nec}
+  The seal is $\comovfield=0$ alone. The three zeros are distinct configurations
+  (\zcref{tbl:ont:zeros}): the boundary is dimensional,
+  $\partial_{\effdensity}\accountability|_{\comovfield=0}=0$ is the wall,
+  $\partial_{\effdensity}\accountability|_{\comovfield\neq0}>0$ everywhere else. Only the genuine stranger is
+  sealed; the apparent stranger and the frenemy are held to account. And the wall is
+  \textbf{structural, not reachable by neglect}: on the completed branch a neglected
+  coupling relaxes to a strictly positive ambient floor wherever a goods space is
+  shared (\see{subsec:osc:polar}), so no amount of not-tending authors the seal ---
+  only the world's shape does. The genuine stranger has no fate to share; everyone
+  else remains answerable, at the strength the surviving channel carries.
+\end{corollary}
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The zeros, by quantifier}{tbl:ont:zeros}
+  \begin{tabularx}{\textwidth}{@{} l L L l @{}}
+    \toprule
+    \textbf{zero} & \textbf{standing} ($\forall$ events) & \textbf{event} ($\exists$: this act) & \textbf{verdict} \\
+    \midrule
+    felt (\ftag{f:feltzero}) & $\caringcovector{i}{j}=0$: no event can be felt ---
+      the apparent stranger & $\felttotal{i}{j}=0$: this act netted nothing; others
+      would land & accountable \\
+    \addlinespace
+    ambivalent (\ftag{f:ambiv}) & $\caringcovector{i}{j}\perp\feelingcovector{j}$:
+      values orthogonal & \quoted{$\alignevent{i}{j}=0$}: this act orthogonal & accountable \\
+    \addlinespace
+    sealed (\ftag{f:sealed}) & $\comovfield=0$: no acts to grade & --- & the true wall \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The frenemy takes his quantifier from the grid: real capacity, standing lean zero, event
+leans wildly nonzero act by act, netting out --- a sequence of felt events, each nonzero
+and anchor-free, summing to a standing zero that was never any single act's truth.
+
+\begin{econ}[label=e:repeated, title={The repeated-games condition, factored in two},
+  ref=f:acc, cites={a:folk,a:ostrom}, departs=wall,
+  stopsat={self-governance genuine inside the commons, silent at the wall}]
+  Stake times independent witnesses is the repeated-games condition factored in two: the
+  Folk Theorem \parencite{a:folk}, Baker--Gibbons--Murphy, MacLeod--Malcomson. The corollary
+  sharpens \textcite{a:ostrom}'s boundary
+  problem --- self-governance genuine inside the commons, silent at the wall --- and dating
+  the field shows the silence is a forward of infinite maturity, not a static gap; it also
+  separates the two zeros Ostrom's boundary blurs, the genuine commons-edge from the
+  ambivalent insider whose stake is real though his lean is neutral.
+\end{econ}
+
+\subsection{The two rewards}
+\label{subsec:ont:rewards}
+\secgrade{nec}%
+\handle*{f:surplus}%
+\begin{definition}[\hdr{f:rew}]\grade{nec}
+  Against accountability runs the reward field
+  \begin{equation}
+    \rewardfield \sim \bigl(1-\attenuation(\opnormG{\comovfield})\bigr)\,\rewardpotential(\leanbare)\,(1-\effdensity),
+    \qquad \dimratio,
+    \label{eq:f:rew}
+  \end{equation}
+  with $\attenuation(0)=0$, $\attenuation'>0$, and $\rewardpotential\equiv1$ at $\caringcovector{i}{j}=0$ --- an intensive rent-potential
+  peaking at the sparse, sealed stranger ($\comovfield\to0$, where coupling
+  alone governs and direction is silent because $\leanbare$ is undefined) --- never at the
+  ambivalent tie, which holds coupling and so cannot be brokered for free.
+\end{definition}
+
+Distinct from it is $\surplus$, extensive surplus magnitude $\dimwelfare$, realized only by
+moving ($\bendfn(0)=0$). The \ftag{g:knock} is dimensional: rent $\dimratio$ is a potential you
+sit on, surplus $\dimwelfare$ a magnitude you must move to capture. They peak at opposite ends
+of $\leanbare$.
+
+\begin{econ}[label=e:rent-surplus, title={Broker rent versus the gains from trade},
+  ref=f:rew, cites={a:burt,a:smithdiv,a:ricardo}, departs=flatten,
+  stopsat={scores both as additive returns to one scalar; misses that they peak at opposite ends}]
+  $\rewardfield$ is \textcite{a:burt}'s broker rent, value captured because a gap stays
+  unbridged; $\surplus$ is \textcite{a:smithdiv}'s division of labor and
+  \textcite{a:ricardo}'s comparative advantage, value created by bridging. Economics scores
+  both as additive contributions to one scalar return; separating them by dimension is what
+  exposes that they peak at opposite ends, and that the moral readout \ftag{op:vmoral} was
+  subtracting the wrong one.
+\end{econ}
+
+\subsection{Gradient opposition, and the sign that sets it}
+\label{subsec:ont:opposition}
+\secgrade{nec}%
+\begin{proposition}[\hdr{f:opp}]\grade{nec}
+  Accountability gates on capacity and charges on realized stake, and neither operation uses
+  alignment, so $\partial_{\leanbare}\accountability=0$; the opposition lives
+  on operator-space. Raising $\opnormG{\comovfield}$ raises $\accountability$ and lowers extractable rent, so
+  \ftag{g:sign} gives a global opposition
+  \begin{equation}
+    \nabla_{\comovfield}\rewardfield\cdot\nabla_{\comovfield}\accountability\le0,
+    \label{eq:f:opp}
+  \end{equation}
+  one move on $\comovfield$, read by its two projections.
+\end{proposition}
+
+Hinge constants set the exchange: $\hingeA\ \dimhingeA$ and $\hingeB\ \dimrate$ fix
+the rent--surplus rate $\Wstar=\hingeB/\hingeA\ \dimwelfare$ \ftag{c:Wstar}, the open/seal
+threshold --- posted, not derived, the framework's first dimensioned exchange-rate.
+
+The sign of $\alignfact$ is defined on the anchored metric $\anchormetric$:
+alliance, enmity, and the balanced triad are therefore \gradeword{cont-anch}, two communities
+with different $\anchormetric$ disagreeing, both correctly --- the sign-latency dual to the
+magnitude-latency at \ftag{dyn:bif}, run on the sign of $\alignfact$ rather than the
+existence of $\alignfixed$. The two readings of the stake now split the moral axis. Inclusion folds by $j$'s measure (\ftag{nrm:incl},
+\gradeword{cont-comm}); exposure is its sign-blind twin:
+\begin{align}
+  &\text{exposure} &:& \eqtag{nrm:expo}{$\accountablestake{i}{j}$,
+     sign-blind, \gradeword{cont-anch}}
+\end{align}
+
+\begin{statement}{nrm:incl-expo}{Inclusion and exposure}
+  You \textbf{are} what leans with you (inclusion); you \textbf{answer for} what moves through
+  you (exposure).
+\end{statement}
+
+They are one magnitude $\dimwelfare$, split by sign \ftag{g:split}. On $\leanbare\ge0$ they
+co-vary; they separate at the frenemy --- real stake, net-zero lean --- who is answerable-to
+but not part-of. The wedge proves they are two axes.
+
+\refrain{}{Harm is downhill; enlargement is uphill.}
+
+The line holds on $\leanbare\ge0$. At $\leanbare<0$ accountability does not invert ---
+$\accountability$ gates on $\accountablestakeof{i}{j}{\outcomechange{j}}\ge0$, sign-blind --- so
+common-enemy harm is fully accountable in principle. The inversion lives in two other
+channels. The \textbf{reward} rises as a balanced-triad surplus: for $i,j$ allied
+($\alignpair{i}{j}>0$) against common enemy $k$ ($\alignpair{i}{k},\alignpair{j}{k}<0$),
+\begin{equation}
+  \enemysurplus=\underbrace{\alignpair{i}{k}\,\selfweight{k}\transpose\outcomechange{k}}
+    _{\text{direct}}+\underbrace{\alignpair{i}{j}\alignpair{j}{k}\,
+    \selfweight{k}\transpose\outcomechange{k}}_{\text{via ally}}>0,\qquad\dimnodewelfare{k},
+  \label{eq:opp:enemy}
+\end{equation}
+both terms positive exactly under the cartel sign-pattern --- structural balance --- the
+surplus typed in $k$'s unit, $i$'s own booking of it carrying $\currency{i}{k}$ like any
+other cross-node read. The
+\textbf{deterrent} collapses in parallel, and it collapses across the posted bridge
+\ftag{mod:recruit} rather than inside the density's own display, which carries no motivation
+term. Inside a cluster uniformly aligned against $k$ \emph{both} factors of \ftag{bf:mot}
+fail at once: a witness $w$ drawn from the cluster carries $\alignment{i}{w}>0$, which cuts
+the self-protective factor below $\tfrac12$, and $\alignment{w}{k}<0$, which cuts the
+sympathy factor below $\tfrac12$, so motivation is under $\tfrac14$ for every one of them
+and vanishes in the limit $\alignment{i}{w}\to1$, $\alignment{w}{k}\to-1$. Under the
+recruitment reading the cluster therefore supplies no anchored witnesses and
+$\effdensity[k]\to0$ on its neighbourhood; under the positional alternative the count is
+untouched and what collapses is the credibility of the reports. Either way the density
+cannot see the cluster's \emph{coherence} on its own: $\effdensity$ kills copies, and the
+clique-confound is colour-span's (\ftag{pr:span}, \ftag{J:anchor}) --- so the collapse is a
+recruitment result and not a Sybil one. Surplus up,
+density down, accountability intact but unenforced --- the cartel's dark twin, the balanced
+triad, exactly where enmity is held in common.
+
+\begin{econ}[label=e:fwt, title={The invisible hand and its blind half}, ref=f:opp,
+  cites={a:fwt}, departs=wall,
+  stopsat={the premises that prove the interior are the premises that erase the sign}]
+  Smith's wager --- self-interest aligned with collective good --- is the conjecture
+  $\nabla\rewardfield\parallel\nabla\accountability$; the First Welfare Theorem, within
+  Arrow--Debreu \parencite{a:fwt}, makes a version precise under complete markets, no
+  externalities, full information. Take the theorem exactly as proved and run it to its edge.
+  The same three assumptions that earn the wager on the interior --- complete markets, no
+  externalities, full information --- are the assumptions under which $\leanbare<0$ cannot be
+  written: a balanced market has no good whose production is another's destruction, no axis
+  on which cooperation \emph{toward harm} is the aligned outcome. So the silence is not an
+  omission the theorem could repair; it is \emph{entailed} by the premises that make the
+  theorem true. You cannot keep the interior and disown the edge --- the complete-markets
+  assumption that proves the invisible hand is the same one that erases the sign on which it
+  deals the wrong card. Signed $\leanbare$ dates the wager: aligned-against on $\leanbare\ge0$,
+  fraying toward the stranger, inverted at $\leanbare<0$, where the wall here makes a
+  \emph{derived} feature of what the theorem can only pass over in silence. Grant the FWT and
+  you are co-liable for its blind half.
+\end{econ}
+
+\begin{econ}[label=e:balance, title={Collusion as the welfare theorems' missing axis},
+  ref=f:opp, cites={a:collusion,a:balance}, departs=wall,
+  stopsat={welfare apparatus and collusion apparatus are disjoint literatures the field unifies}]
+  The dark twin has a native economic literature the framework should not cede to sociology.
+  The sign-pattern under which harm to a node is extended-self-rewarded --- $i,j$ allied
+  against common enemy $k$ --- is \emph{collusion}: \textcite{a:collusion}'s oligopoly, the
+  cartel that cooperates inside precisely to extract outside, tacit-collusion theory's whole
+  object. Economics knows the structure intimately, in its \emph{positive} register; what it
+  lacks is a \emph{normative} one. Structural balance --- Heider; Cartwright--Harary
+  \parencite{a:balance} --- gives the sign-condition, and the welfare theorems have no axis
+  on which to read it as the harm it is --- because, by \ftag{e:fwt}, the premises that would
+  let them score it are the premises that assume it away. The departure is not that economics
+  cannot see the cartel --- oligopoly theory sees nothing else --- but that its welfare
+  apparatus and its collusion apparatus are two disjoint literatures the signed field unifies
+  on one axis.
+\end{econ}
+
+The expansive will \ftag{w:exp} reaching for an unpriced complementarity is
+\virtue{wonder}, and what it finds on the far side is \virtue{beauty} --- seeded here,
+harvested at the foot. In the seed regime the crossing is a finite turn paid before the
+reward exists (\see{sec:fixed-points}).
+
+\refrain{}{Wonder is the will that crosses before the reward exists; beauty is what it finds on the far side.}
+
+\clearpage
+\section{The ontic basin II: the signed will}
+\label{sec:signed-will}
+
+\subsection{The will, signed}
+\label{subsec:will:signed}
+\secgrade{nec}%
+\begin{definition}[\hdr{w:signed}]\grade{nec}
+  The forcing term is not unidirectional; it superposes, against passive decay, four wills:
+  \begin{align}
+    &\willnet    &=& \ \will + \willrec - \willanti - \willsever \quad \text{all }\dimrate \label{eq:w:signed}\\
+    &\will       &:& \eqtag{w:con}{moves edges up}\\
+    &\willrec    &:& \eqtag{w:rec}{$\will$ at $\leanbare<0$, un-makes enmity}\\
+    &\willanti   &:& \eqtag{w:anti}{opposes everywhere, for rent}\\
+    &\willsever  &:& \eqtag{w:sev}{dissolves a bad edge}\\
+    &\willdecay  &:& \eqtag{eq:will:passive-decay}{mere lapse, the term it runs
+                       against --- \ftag*{dyn:lapse}}
+  \end{align}
+\end{definition}
+
+All four \ftag{g:split}: the framework is a theory of weaving and of cutting, not of weaving
+alone --- $\willrec$ at $\leanbare<0$ undoes enmity, $\willsever$ cuts against a possibly
+captured attachment-slope, and $\willanti$'s rent-seeking closure is distinguished below from
+mere lapse. And all four are \emph{tangential} shadows of one goods-space vector: on the
+completed branch the will also carries a radial shadow --- the deepening feed that holds the
+coupling itself against atrophy (\see{subsec:osc:polar}) --- effort the lean never shows.
+
+\begin{theorem}[\hdr{w:torque}]\grade{nec}
+  The subscript was never free. On the stochastic branch the lean of a directed edge is
+  the cosine of the \emph{tail's} caring direction, and a will is a torque on that
+  direction --- a drift on the tail's own sphere; nothing in the branch's ontology lets
+  any other agent apply it. \textbf{The forcing term of a directed edge belongs to its
+  tail}: every will written on $\alignpair{i}{j}$ is the tail's own spend, and every
+  other party reaches the edge only through its parameters. Even the head is a third
+  party to your caring: $j$ moves $i$'s lean only by moving the shared surplus --- by
+  being lovable, not by turning $i$'s heart.
+\end{theorem}
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The reach matrix: who can move what}{tbl:will:reach}
+  \begin{tabularx}{\textwidth}{@{} l l L @{}}
+    \toprule
+    \textbf{agent} & \textbf{channel} & \textbf{what it is} \\
+    \midrule
+    tail $i$ & $\will$ & the only forcing term --- torque privacy \\
+    \addlinespace
+    head $j$ & $\normG{\surplus}$ & make the surplus real: the lovability channel \\
+    \addlinespace
+    witnesses & $\effdensity$ & the third-party channel the field already carries
+      (\ftag*{f:eff}, the ring feedback \ftag*{dyn:jac}) \\
+    \addlinespace
+    brokers, institutions & $\effdensity$, $\normG{\surplus}$, $\bendfn$ &
+      suppression, substitution, rule-setting \\
+    \addlinespace
+    ambient & $\noisediff$ & the noise environment, and through it the derived decay \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The formalism is dyadic exactly where it should be --- in the forcing term --- and
+third-party reach is real exactly where the field already carries it: in the
+parameters. Every register of every other person is reachable by argument, incentive,
+and love --- as parameters --- and forced by no one: no agent has a forcing term on any
+heart but their own.
+
+\begin{econ}[label=e:closure, title={Resourced closure is not friction}, ref=w:anti,
+  cites={a:bain}, departs=annex,
+  stopsat={entry-deterrence is a spent budget, not the decay constant $\decayrate$}]
+  Separating \ftag{w:anti} from \ftag{dyn:lapse} corrects an omission: entry-deterrence ---
+  Bain; Dixit--Spence \parencite{a:bain} --- is \emph{resourced} closure, a budget the
+  toll-keeper spends to hold
+  $\leanbare$ low --- not the friction $\decayrate$ can represent. And the budget's type
+  is exact under torque privacy (\ftag{w:torque}): the tail's own seal is forcing
+  ($\willanti$, priced at its floor, \zcref{J:seal-floor}); the broker's is parameter
+  suppression, never forcing, priced in two tiers (\zcref{J:broker}).
+\end{econ}
+
+\subsection{The two faces of the connective will}
+\label{subsec:will:faces}
+\secgrade{nec}%
+\begin{definition}[\hdr{w:faces}]\grade{nec}
+  The connective will splits by the argument it acts on:
+  \begin{align}
+    &\will        &=& \ \willexpand + \willvirtue \label{eq:w:faces}\\
+    &\willvirtue  &=& \ \willenlarge + \willrestrain \label{eq:w:virtue}\\
+    &\willexpand  &:& \eqtag{w:exp}{reaches for an unmeasured $\surplus$}\\
+    &\willvirtue  &:& \eqtag{w:vir}{moves toward a someone}\\
+    &\willenlarge &:& \eqtag{w:enl}{raises $\alignpair{i}{k}$ where absent (moving, seen)}\\
+    &\willrestrain &:& \eqtag{w:res}{declines a harm that paid (held, dark)}
+  \end{align}
+\end{definition}
+
+Both faces oppose $\nabla\rewardfield$, so they coincide wherever $\surplus>0$; their
+separation, and the still center where \ftag{w:res} alone stands, wait on the heart and its
+kernel.
+
+\begin{econ}[label=e:faces, title={One will under two arguments}, ref=w:vir,
+  cites={a:knight,a:kirzner,a:andreoni}, departs=annex,
+  stopsat={warm-glow is a state consumed, not a rate opposing the gradient}]
+  \ftag{w:exp} is entrepreneurship-as-judgment, \textcite{a:knight} and \textcite{a:kirzner}'s
+  alertness. \ftag{w:vir} has no fixed-utility representation: warm-glow giving
+  \parencite{a:andreoni} is a \emph{state} consumed, not a \emph{rate} opposing the reward
+  gradient. They are one will under two arguments, coincident on the funded interior,
+  separable only at the modest good --- which is why working outward from the interior sees
+  only \ftag{w:exp} and names it \emph{entrepreneur}.
+\end{econ}
+
+\end{document}

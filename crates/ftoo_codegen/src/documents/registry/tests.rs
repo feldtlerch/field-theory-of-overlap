@@ -127,6 +127,7 @@ fn preparation_joint_mints_then_registry_then_authored_tags_restore() {
         saved.insert(name.into(), fs::read(root.join(name)).unwrap());
     }
     let unit = "schema=1\n[unit]\nid='sec:fixture:reader'\ndocument='main'\nmath={}\n[unit.texts]\nen='Use @tag{c:1}'\n";
+    saved.insert(FILE.into(), LEDGER.as_bytes().to_vec());
     saved.insert(
         "units/documents.toml".into(),
         b"schema=1\n[documents.main]\nrequired-languages=['en']\n".to_vec(),
@@ -349,10 +350,10 @@ fn fault(rule: RuleId, stage: UnitStage, site: UnitSite, fault: UnitFault) -> Do
     )
 }
 #[test]
-fn documentary_production_ledger_has_exact_events_and_permitted_handle() {
+fn documentary_ledger_checks_first_event_fields_and_production_admissions() {
     let committed = include_str!("../../../../../registry/documentary-tags.toml");
-    assert_eq!(committed, LEDGER);
-    let events = load(&source(committed)).unwrap();
+    assert!(committed.starts_with(LEDGER));
+    let events = load(&source(LEDGER)).unwrap();
     let expected = [
         ("ordinal", "1"),
         ("handle", "dec:weld"),
@@ -387,8 +388,14 @@ fn documentary_production_ledger_has_exact_events_and_permitted_handle() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let corpus = crate::load_unit_files(&root).unwrap();
     let markdown = crate::load_markdown_files(&root).unwrap();
-    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
+        .unwrap()
+        .with_paper_mints(paper_mint_rows(&std::fs::read(root.join(PAPER_MINTS)).unwrap()).unwrap())
+        .unwrap();
+    let events = load(&source(committed)).unwrap();
+    assert_eq!(events.len(), 88);
     let admitted = book.with_documentary(&joint, events).unwrap();
+    assert_eq!(admitted.documentary().count(), 88);
     assert_eq!(
         admitted.resolve("dec:weld"),
         Ok(ftoo_manifest::AddressTarget::Documentary(

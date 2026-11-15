@@ -1,0 +1,190 @@
+
+\newcounter{economics}[section]
+\renewcommand{\theeconomics}{\thesection.\arabic{economics}}
+
+\newcounter{epistemology}[section]
+\renewcommand{\theepistemology}{\thesection.\arabic{epistemology}}
+
+\newcounter{episttotal}
+\AtEndDocument{%
+  \ifnum\value{episttotal}>1
+    \PackageWarning{ftoo}{More than one Epistemology box: the foil was meant to be singular.}%
+  \fi
+}
+
+\DTLnewdb{concordance}
+
+\tcbset{
+  ftoo/econ/.style={
+    breakable, enhanced, frame hidden, boxrule=0pt, sharp corners,
+    colback=black!4,
+    colbacktitle=black!4, titlerule=0pt,
+    fonttitle=\bfseries, coltitle=black,
+    left=3.5mm, right=3.5mm, top=2.5mm, bottom=2.5mm,
+    before skip=\bigskipamount, after skip=\medskipamount,
+  },
+  ftoo/epist/.style={
+    breakable, enhanced, frame hidden, boxrule=0pt, sharp corners,
+    colback=black!7,
+    colbacktitle=black!7, titlerule=0pt,
+    fonttitle=\bfseries, coltitle=black,
+    left=3.5mm, right=3.5mm, top=2.5mm, bottom=2.5mm,
+    before skip=\bigskipamount, after skip=\medskipamount,
+  },
+}
+
+\tcbset{
+  ftooEcon/.cd,
+  label/.store in=\ftooEconLabel,     label/.default={},
+  title/.store in=\ftooEconTitle,     title/.default={},
+  ref/.store in=\ftooEconRef,         ref/.default={},
+  cites/.store in=\ftooEconCites,     cites/.default={},
+  departs/.store in=\ftooEconDeparts, departs/.default={},
+  stopsat/.store in=\ftooEconStopsat, stopsat/.default={},
+}
+\tcbset{
+  ftooEpist/.cd,
+  label/.store in=\ftooEpistLabel, label/.default={},
+  title/.store in=\ftooEpistTitle, title/.default={},
+  ref/.store in=\ftooEpistRef,     ref/.default={},
+}
+
+\ExplSyntaxOn
+\tl_new:N \l_ftoo_tagdep_tl
+\cs_new_protected:Npn \ftoo_econ_process:
+  {
+    \tl_clear:N \l_ftoo_tagdep_tl
+    \clist_set:NV \l_tmpa_clist \ftooEconDeparts
+    \clist_if_empty:NT \l_tmpa_clist
+      { \msg_error:nn { ftoo } { econ-no-departure } }
+    \int_compare:nNnF { \clist_count:N \l_tmpa_clist } = { 1 }
+      { \msg_error:nnx { ftoo } { econ-one-departure-only }
+          { \clist_use:Nn \l_tmpa_clist { ,~ } } }
+    \clist_map_inline:Nn \l_tmpa_clist
+      {
+        \ftoo_roster_admits:NnF \g_ftoo_departures_clist {##1}
+          { \msg_error:nnn { ftoo } { bad-departure } {##1} }
+        \tl_if_empty:NF \l_ftoo_tagdep_tl { \tl_put_right:Nn \l_ftoo_tagdep_tl { ,~ } }
+        \tl_put_right:Nn \l_ftoo_tagdep_tl { \ftoo_tag_bare:n {d:##1} }
+        \ftoo_write_row:nVVVV {##1} \ftooEconLabel \ftooEconRef \ftooEconCites \ftooEconStopsat
+      }
+  }
+\cs_new_protected:Npn \ftoo_write_row:nnnnn #1#2#3#4#5
+  {
+    \DTLnewrow{concordance}
+    \DTLnewdbentry{concordance}{departure}{#1}
+    \DTLnewdbentry{concordance}{tag}{#2}
+    \DTLnewdbentry{concordance}{onref}{#3}
+    \DTLnewdbentry{concordance}{cites}{#4}
+    \DTLnewdbentry{concordance}{stopsat}{#5}
+  }
+\cs_generate_variant:Nn \ftoo_write_row:nnnnn { nVVVV }
+\msg_new:nnn { ftoo } { econ-no-departure }
+  { An~[ECON]~box~must~declare~departs=...~(use~[PHIL]~for~the~foil). }
+\msg_new:nnn { ftoo } { econ-one-departure-only }
+  { An~[ECON]~box~declares~EXACTLY~ONE~departure;~got~'#1'.~A~box~that~departs~
+    two~ways~has~not~been~adjudicated~---~pick~the~principal~move. }
+\cs_new_protected:Npn \ftooEconTagLine { \tl_use:N \l_ftoo_tagdep_tl }
+\cs_new_protected:Npn \ftooEconProcess { \ftoo_econ_process: }
+\tl_new:N \l_ftoo_citesep_tl
+\cs_new_protected:Npn \ftoo_citelist:n #1
+  {
+    \tl_clear:N \l_ftoo_citesep_tl
+    \clist_map_inline:nn {#1}
+      {
+        \tl_if_empty:NF \l_ftoo_citesep_tl { ;~ }
+        \textcite{##1}
+        \tl_set:Nn \l_ftoo_citesep_tl { x }
+      }
+  }
+\cs_generate_variant:Nn \ftoo_citelist:n { e }
+\cs_new_protected:Npn \ftooCiteList #1 { \ftoo_citelist:e {#1} }
+\ExplSyntaxOff
+
+\ExplSyntaxOn
+\NewDocumentCommand{\ftooBoxTitle}{m m m m m}
+  {
+    #1 \nobreakspace #2 .
+    \tl_if_blank:eF {#3} { \nobreakspace #3 }
+    \tl_if_blank:eF {#5}
+      {
+        \nobreakspace
+        { \normalfont \mdseries \footnotesize ( #4 \nobreakspace \ftoo_tag_located:n {#5} ) }
+      }
+  }
+\NewDocumentCommand{\ftooBoxFoot}{m}
+  { \tl_if_blank:eF {#1} { \par \medskip \hfill { \footnotesize \textsc { #1 } } } }
+\NewDocumentEnvironment{membranebox}{m m m m}
+  {
+    \ftoo_set_titleref:e { #3 }
+    \tcolorbox [ #1, title = { #2 } ]
+    \tl_if_blank:eF {#4} { \ftoolabel{#4} }
+  }
+  { \endtcolorbox }
+\ExplSyntaxOff
+
+\NewDocumentEnvironment{statement}{m m}{%
+  \refstepcounter{statement}%
+  \membranebox{ftoo/econ}{\ftooBoxTitle{Statement}{\thestatement}{#2}{}{}}{#2}{#1}%
+}{%
+  \ftooBoxFoot{#1}\endmembranebox
+}
+
+\NewDocumentEnvironment{econ}{ O{} }{%
+  \tcbset{ftooEcon/.cd, label=,title=,ref=,cites=,departs=,stopsat=, #1}%
+  \refstepcounter{economics}%
+  \ftooEconProcess
+  \membranebox{ftoo/econ}%
+    {\ftooBoxTitle{Economics}{\theeconomics}{\ftooEconTitle}{on}{\ftooEconRef}}%
+    {\ftooEconTitle}{\ftooEconLabel}%
+}{%
+  \par\medskip
+  \hfill{\tagdef{\ftooEconLabel}\ftootagsep\ftooEconTagLine}%
+  \endmembranebox
+}
+
+\NewDocumentEnvironment{epist}{ O{} }{%
+  \tcbset{ftooEpist/.cd, label=,title=,ref=, #1}%
+  \stepcounter{episttotal}\refstepcounter{epistemology}%
+  \membranebox{ftoo/epist}%
+    {\ftooBoxTitle{Epistemology}{\theepistemology}{\ftooEpistTitle}{at}{\ftooEpistRef}}%
+    {\ftooEpistTitle}{\ftooEpistLabel}%
+}{%
+  \ftooBoxFoot{\ftooEpistLabel}\endmembranebox
+}
+
+\newif\ifftooconcfirst
+\newcommand{\GenerateConcordanceE}{%
+  \DTLsortdata{concordance}{departure}%
+  \begingroup
+  \def\prevdep{@none}%
+  \ftooconcfirsttrue
+  \begin{xltabular}{\textwidth}{@{} l l L @{}}
+    \caption{Concordance~E: the departure-spine \ftootagsep \tagdef{tbl:log:concordance}}%
+      \ftoolabel{tbl:log:concordance}\\
+    \toprule
+    \textbf{departs} & \textbf{tag} & \textbf{antecedents \textperiodcentered\ stops at} \\
+    \midrule
+    \endfirsthead
+    \toprule
+    \textbf{departs} & \textbf{tag} & \textbf{antecedents \textperiodcentered\ stops at} \\
+    \midrule
+    \endhead
+    \bottomrule
+    \endfoot
+    \DTLforeach*{concordance}%
+      {\thisdep=departure, \thistag=tag, \thiscites=cites,
+       \thison=onref, \thisstopsat=stopsat}%
+      {%
+        \ifftooconcfirst \ftooconcfirstfalse
+        \else \ifx\thisdep\prevdep\else \addlinespace \fi\fi
+        \ifx\thisdep\prevdep\else \phantomsection\ftoolabel{d:\thisdep}\fi
+        \texttt{d:\thisdep} &
+        \ftaglist{\thistag} &
+        \ftooCiteList{\thiscites}\ \textperiodcentered\ \thisstopsat\\%
+        \let\prevdep\thisdep
+      }%
+  \end{xltabular}%
+  \endgroup
+}
+

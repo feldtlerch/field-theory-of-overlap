@@ -1,0 +1,158 @@
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{fontspec}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{unicode-math}
+
+\setmainfont{TeX Gyre Pagella}[Numbers=OldStyle]
+\setmonofont{Inconsolatazi4-Regular.otf}[
+  BoldFont = Inconsolatazi4-Bold.otf,
+  Scale    = MatchLowercase,
+]
+\setmathfont{texgyrepagella-math.otf}
+
+
+\usepackage{geometry}
+\geometry{a4paper, textwidth=6.0in, top=1in, bottom=1in, marginparwidth=0pt, centering}
+\linespread{1.10}
+
+\makeatletter
+\g@addto@macro\normalsize{%
+  \setlength\abovedisplayskip{18pt plus 6pt minus 2pt}%
+  \setlength\belowdisplayskip{20pt plus 8pt minus 2pt}%
+  \setlength\abovedisplayshortskip{10pt plus 5pt}%
+  \setlength\belowdisplayshortskip{12pt plus 5pt minus 2pt}%
+}
+\makeatother
+\setlength{\jot}{8pt}%
+
+\usepackage{microtype}
+\usepackage{parskip}
+
+
+\usepackage{titlesec}
+\renewcommand{\thepart}{\Alph{part}}
+
+\titleformat{\subsection}[runin]
+  {\normalfont\bfseries}{\thesubsection}{0.5em}{}[.\quad]
+\titlespacing*{\subsection}{0pt}{1.5\bigskipamount plus 4pt minus 2pt}{0.6em}
+
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xltabular}
+\usepackage{ragged2e}
+\newcolumntype{L}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{C}{>{\Centering\arraybackslash}X}
+\newcolumntype{R}{>{\RaggedLeft\arraybackslash}X}
+
+\usepackage[most]{tcolorbox}
+\usepackage{datatool}
+
+\usepackage[english]{babel}
+\usepackage{csquotes}
+\usepackage[backend=bibtex, style=authoryear, maxcitenames=2, mincitenames=1,
+            uniquename=full, uniquelist=true, doi=true, isbn=false, url=false]{biblatex}
+\ExecuteBibliographyOptions{ibidtracker=false, idemtracker=false}
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+\addbibresource{references.bib}
+
+\usepackage{subfiles}
+\usepackage{hyperref}
+\usepackage{xurl}
+\usepackage{zref-clever}
+\usepackage{zref-titleref}
+
+\definecolor{linkhl}{rgb}{0.80,0.00,0.00}
+
+\hypersetup{
+  colorlinks=false,
+  linkbordercolor=linkhl, citebordercolor=blue, urlbordercolor=cyan,
+  pdfborder={0 0 0.1},
+  pdftitle={A Field Theory of Overlap},
+  pdfauthor={},
+  bookmarksnumbered=true, unicode=true,
+}
+
+\input{data/ftoo_manifest.tex}
+
+\input{data/ftoo_symbols.tex}
+\input{data/ftoo_symbols_historical.tex}
+
+\ExplSyntaxOn
+  \input{macros_overlap.tex}
+  \input{ftoo_typed_tools.tex}
+  \input{data/ftoo_registers.tex}
+\ExplSyntaxOff
+\input{econ_membrane.tex}
+
+\zcLanguageSetup{english}{ type=buildable, Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+\zcLanguageSetup{english}{ type=refusal,   Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+\zcLanguageSetup{english}{ type=wtheorem,  Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+\zcLanguageSetup{english}{ type=willitem,  Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+\zcLanguageSetup{english}{ type=appblock,  Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+\zcLanguageSetup{english}{ type=gatescale, Name-sg={scale}, name-sg={scale},
+                          Name-pl={scales}, name-pl={scales} }
+\zcLanguageSetup{english}{ type=DTLrowi,   Name-sg={}, name-sg={}, Name-pl={}, name-pl={} }
+
+\zcLanguageSetup{english}{ type=equation, Name-sg={Eq.}, name-sg={Eq.},
+                          Name-pl={Eqs.}, name-pl={Eqs.},
+                          refbounds-first-sg={,,,}, refbounds={,,,} }
+\zcLanguageSetup{english}{ type=section, Name-sg={\S}, name-sg={\S},
+                          Name-pl={\S\S}, name-pl={\S\S}, namesep={} }
+
+\zcLanguageSetup{english}{ type=theorem,     Name-sg={Thm.},   name-sg={Thm.},   Name-pl={Thms.},   name-pl={Thms.} }
+\zcLanguageSetup{english}{ type=proposition, Name-sg={Prop.},  name-sg={Prop.},  Name-pl={Props.},  name-pl={Props.} }
+\zcLanguageSetup{english}{ type=lemma,       Name-sg={Lem.},   name-sg={Lem.},   Name-pl={Lems.},   name-pl={Lems.} }
+\zcLanguageSetup{english}{ type=corollary,   Name-sg={Cor.},   name-sg={Cor.},   Name-pl={Cors.},   name-pl={Cors.} }
+\zcLanguageSetup{english}{ type=definition,  Name-sg={Def.},   name-sg={Def.},   Name-pl={Defs.},   name-pl={Defs.} }
+\zcLanguageSetup{english}{ type=remark,      Name-sg={Rem.},   name-sg={Rem.},   Name-pl={Rems.},   name-pl={Rems.} }
+\zcLanguageSetup{english}{ type=postulate,   Name-sg={Post.},  name-sg={Post.},  Name-pl={Posts.},  name-pl={Posts.} }
+\zcLanguageSetup{english}{ type=statement,   Name-sg={Stmt.},  name-sg={Stmt.},  Name-pl={Stmts.},  name-pl={Stmts.} }
+\zcLanguageSetup{english}{ type=economics,   Name-sg={Econ.},  name-sg={Econ.},  Name-pl={Econ.},   name-pl={Econ.} }
+\zcLanguageSetup{english}{ type=epistemology,Name-sg={Epist.}, name-sg={Epist.}, Name-pl={Epist.},  name-pl={Epist.} }
+\zcLanguageSetup{english}{ type=gateway,     Name-sg={Gw.},    name-sg={Gw.},    Name-pl={Gws.},    name-pl={Gws.} }
+
+\zcLanguageSetup{english}{ type=ruling,   Name-sg={Ruling},  name-sg={ruling},
+                          Name-pl={Rulings}, name-pl={rulings} }
+\zcLanguageSetup{english}{ type=evidence, Name-sg={Ev.}, name-sg={Ev.},
+                          Name-pl={Ev.}, name-pl={Ev.} }
+
+\setcounter{section}{-1}
+
+\setversion{v@VERSION@}
+\newcommand{\docdraft}{@DRAFT@}
+
+\begin{document}
+
+\subfile{parts/front}
+
+
+\subfile{parts/partA}
+\subfile{parts/partB}
+\subfile{parts/gateways}
+\subfile{parts/partC}
+\subfile{parts/partD}
+\subfile{parts/partE}
+\subfile{parts/partF}
+\subfile{parts/partG}
+\subfile{parts/coda}
+
+\subfile{parts/appendices}
+
+\clearpage
+\part*{The index of the tag namespace}
+\addcontentsline{toc}{part}{The index of the tag namespace}
+\input{data/ftoo_index.tex}
+
+\clearpage
+\part*{References}
+\addcontentsline{toc}{part}{References}
+\printbibliography[heading=none]
+
+\end{document}

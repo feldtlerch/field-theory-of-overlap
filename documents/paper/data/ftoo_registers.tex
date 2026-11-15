@@ -1,0 +1,217 @@
+
+
+\FtooBranch{stochastic}
+
+
+
+\PostConstant{c:Gstar}{ \DimTyped }
+  { goods~vectors~to~public~lengths;~the~inverse~face~reads~covectors~---~one~
+    posting,~two~faces.~⚠NO~SCALAR~DIMENSION:~the~metric~is~a~FAMILY~of~
+    linear~maps~and~carries~the~per-sector~conversions~
+    $[\,W\sb{\bullet}\sp{2}/W\sb{a}W\sb{b}\,]$~entry-wise.~The~squared~public~
+    length~is~the~dimension~of~the~scalar~the~metric~YIELDS,~and~posting~it~
+    here~said~the~metric~IS~that~scalar }
+  { J:anchor }
+
+\PostConstant{c:exch}{ \Wnode{i} \Wnode{j}[-1] }
+  { j's~own~welfare~scalar~into~i's;~no~no-arbitrage~imposed }
+  { c:exch }
+
+\PostConstant{c:kappa0}{ \Wpub[-1] \Wnode{i} }
+  { the~belonging~radius:~caring~per~unit~of~anchored~length }
+  { f:couple }
+
+\PostConstant[generate]{c:q}{ \Wpub \Wgood{a}[-1] }
+  { the~log's~own~reading~axis }
+  { B:record~---~published~per~entry,~criticizable }
+
+\PostConstant{c:Wstar}{ \Wpub }
+  { rent~into~surplus:~the~open/seal~threshold,~b/a }
+  { f:opp }
+
+\PostConstant{c:tau}{ \Time }
+  { will~into~connection:~the~forward's~maturity,~the~densification~time }
+  { f:acc~/~P:nonorm }
+
+\PostConstant{c:W0}{ \Wpub }
+  { claim~into~connection:~the~score's~achievement-scale }
+  { P:nonorm }
+
+\PostConstant{c:Npool}{ \Cnt }
+  { witnesses~into~density:~the~pool~normalizer }
+  { f:eff~/~B:salience }
+
+\PostConstant{c:burn}{ \Wpub \Cnt[-1] }
+  { burned~cost~into~anchored~witness:~proof-of-work~as~span~recruitment }
+  { bd:fab-power~/~B:salience }
+
+\PostConstant{c:mu}{ \Time[-1] }
+  { atrophy:~the~coupling's~own~decay~---~the~norm's~posted~law~of~motion }
+  { dyn:polar }
+
+\PostConstant{c:Da}{ \Time[-1] }
+  { ambient~noise:~background~acquaintance~held~against~atrophy~---~the~floor~
+    $\ambientcoupling=\sqrt{\,n\ambientD/\atrophy\,}$~is~derived,~not~posted~
+    (dyn:floor) }
+  { dyn:polar }
+
+\HoldConstant[generate]{c:lam}{ \Wnode{i} \Wgood{a}[-1] }
+  { the~held~weighting }
+  { never~posted }
+
+\PostConstant[generate]{c:nu}{ \Wnode{i}[-1] \Time[-1] }
+  { baseline~converter~---~estimable~as~a~global~elasticity~by~the~
+    identification~scheme's~own~method~(maint:ident),~with~a~stated~bias~
+    direction:~on~the~funded~side~it~never~over-credits~virtue }
+  { op:vmoral~---~⚠the~DIMENSION~is~typed~and~posted;~what~stays~open~is~the~
+    CALIBRATION,~which~is~a~different~axis~and~is~recorded~separately.~
+    Scheduled:~settled~by~measurement,~or~never }
+
+
+\DeclareMetricPair{Gstar}
+
+
+\RegisterVariance{\caringcovector}{covector}
+\RegisterVariance{\feelingcovector}{covector}
+\RegisterVariance{\selfweight}{covector}
+\RegisterVariance{\outcomevector}{vector}
+\RegisterVariance{\outcomechange}{vector}
+\RegisterVariance{\outcomechangebare}{vector}
+\RegisterVariance{\surplus}{vector}
+\RegisterVariance{\refperturbation}{vector}
+\RegisterVariance{\comov}{operator}
+\RegisterVariance{\comovfield}{operator}
+
+
+\DeclareQuantity{\alignstand}{2}{ dim={\One}, variance=scalar, spends={c:Gstar}, dynamics-forbidden-under={scalar} }
+  { \sigma\sb{\edgeto{#1}{#2}} }
+
+\DeclareQuantity{\alignevent}{2}{ dim={\One}, variance=scalar, spends={c:Gstar} }
+  { \sigma\sp{\mathrm{ev}}\sb{\edgeto{#1}{#2}} }
+
+\DeclareQuantity{\felttotal}{2}{ dim={\Wnode{@1}}, variance=scalar, spends={} }
+  { r\sb{\currencyto{#1}{#2}} }
+
+\DeclareQuantity{\feltstake}{2}{ dim={\Wnode{@1}}, variance=scalar, spends={} }
+  { \lvert r\sb{\currencyto{#1}{#2}} \rvert }
+
+\DeclareQuantity{\capgate}{2}{ dim={\One}, variance=scalar, spends={c:Gstar} }
+  { \lVert \comov{#1}{#2} \rVert\sb{\mathrm{op},G\sb{\star}} }
+
+\DeclareQuantity{\realizedstake}{2}{ dim={\Wpub}, variance=scalar, spends={c:Gstar} }
+  { \lVert \applyop{\comov{#1}{#2}}{\outcomechange{#2}} \rVert\sb{G\sb{\star}} }
+
+\DeclareQuantity{\feltsign}{2}{ dim={\One}, variance=scalar, spends={} }
+  { \operatorname{sign} r\sb{\currencyto{#1}{#2}} }
+
+\DeclareQuantity{\holdingtyped}{2}{ dim={\One}, variance=scalar, spends={c:Gstar,c:kappa0} }
+  { h\sb{\pairindex{#1}{#2}} }
+
+\DeclareQuantity{\logaxis}{1}{ dim={\Wpub \Wgood{@1}[-1]}, variance=covector, spends={c:q} }
+  { \mathbf q\sb{#1} }
+
+\DeclareQuantity{\settlement}{1}{ dim={\Wpub}, variance=scalar, spends={c:q} }
+  { \mathbf q\transpose \outcomechange{#1} }
+
+\DeclareQuantity{\gensym}{0}{ dim={\Time[-1]}, variance=operator, spends={} }
+  { A\sb{\mathrm S} }
+
+\DeclareQuantity{\genskew}{0}{ dim={\Time[-1]}, variance=operator, spends={} }
+  { A\sb{\mathrm K} }
+
+\DeclareQuantity{\noisediff}{0}{ dim={\Time[-1]}, variance=scalar, spends={} }
+  { D }
+
+\DeclareQuantity{\spiralpitch}{0}{ dim={\One}, variance=scalar, spends={} }
+  { \varpi }
+
+\DeclareQuantity{\boundaryfactor}{0}{ dim={\One}, variance=scalar, spends={} }
+  { \phi\sb{\partial} }
+
+\DeclareQuantity{\bendslope}{0}{ dim={\One}, variance=scalar, spends={} }
+  { m\sb{\phi} }
+
+\DeclareQuantity{\loopcurrent}{0}{ dim={\Time[-1]}, variance=scalar, spends={c:Gstar}, branches={stochastic} }
+  { \symcal{J}\sb{\mathrm{loop}} }
+
+\DeclareQuantity{\decayderived}{0}{ dim={\Time[-1]}, variance=scalar, spends={}, branches={stochastic} }
+  { \noisediff\,(n-1) }
+
+\DeclareQuantity{\respderived}{0}{ dim={\Time[-1]}, variance=scalar, spends={}, branches={stochastic} }
+  { \noisediff\,n }
+
+\DeclareQuantity{\atrophy}{0}{ dim={\Time[-1]}, variance=scalar, spends={}, branches={stochastic} }
+  { \mu\sb{\kappa} }
+
+\DeclareQuantity{\ambientD}{0}{ dim={\Time[-1]}, variance=scalar, spends={}, branches={stochastic} }
+  { D\sb{\mathrm a} }
+
+\DeclareQuantity{\willvec}{0}{ dim={\Time[-1]}, variance=vector, spends={}, branches={stochastic} }
+  { \mathbf c }
+
+\DeclareQuantity{\edgeprice}{2}{ dim={\Wnode{@1}}, variance=scalar, spends={c:exch,c:kappa0,c:lam} }
+  { \pi\sb{\pairindex{#1}{#2}} }
+
+
+
+\PostEvidence{ev:decay-occ}
+  { the~wobble~of~held~edges~forces~a~positive~diffusion,~and~with~it~a~
+    positive~derived~decay~(\ftag*{dyn:gamma}).~A~zero-decay~world~makes~
+    occupancy~vacuous,~held-for-free;~the~trembling~film~is~the~non-circular~
+    warrant~that~it~is~not~our~world. }
+
+\PostEvidence{ev:knee-rate}
+  { release~departs~at~full~slope,~so~the~rate~reading~is~a~measured~upper~
+    bound~every~release~experiment~tightens,~squeezed~stationarily~by~the~
+    trembling~curve~(\ftag*{cor:tremble:curve})~---~and~settled~in~arrears,~
+    priced~in~a~private~currency~(\ftag*{J:power}). }
+
+\PostEvidence{ev:resid-ex}
+  { the~residual~is~uncorrelated~with~the~exogenous~formation~scale~where~
+    honest,~which~is~the~identification~condition~the~proposition~posts~
+    (\ftag*{maint:ident}). }
+
+\PostEvidence{ev:resid-opp}
+  { ``opposes~the~reward~gradient''~is~therefore~a~population-level~finding~the~
+    field~could~fail,~not~a~definitional~truth~(\ftag*{maint:ident}). }
+
+\PostEvidence{ev:afriat-conv}
+  { revealed~preference,~read~as~the~converter~principle's~boundary~case. }
+
+\PostEvidence{ev:tremble-conv}
+  { the~residue~is~the~unspent~set~---~the~principle's~prediction,~met~at~the~
+    held~edge. }
+
+
+
+\PostBranchBreakage
+  { eq:J:occ~(the~boxed~identity:~effective~will~equals~decay~times~the~fixed~
+    alignment) }
+  { holds~(statistical~rewording) }
+  { \textbf{breaks}:~no~linear~decay~to~balance }
+  { holds }
+\PostBranchBreakage
+  { eq:dyn:flow~decay~term }
+  { holds }
+  { rewrite~via~the~boundary~factor }
+  { holds~+~posted~range~constant }
+\PostBranchBreakage
+  { the~founding~factor:~drift~efficiency~$(n-1)/n$~under~a~weak~hold~
+    (dyn:moment) }
+  { exact~(the~sphere's~uniform~measure) }
+  { moot:~decay~itself~pole-vanishing,~no~uniform~lapse~measure }
+  { absent:~the~scalar~flow~is~its~own~exact~law }
+\PostBranchBreakage
+  { the~coupling's~law~of~motion~(dyn:polar):~the~floor,~the~scramble,~
+    reactivation~decay,~above-curve~wobble~---~and~lapse~polarizes~at~two~goods~
+    (dyn:reconcile) }
+  { posted:~the~minimal~linear~completion;~the~sphere~world~is~its~
+    frozen-coupling~gauge }
+  { native:~amplitude~death~is~this~branch's~own~definition }
+  { absent:~no~vector~beneath~the~primitive~bounded~lean }
+\PostBranchBreakage
+  { standing~cosine~in~\emph{typed}~dynamics~displays~
+    (\string\DisplayClass{dynamics}~+~\string\alignstand) }
+  { legal }
+  { legal }
+  { \textbf{error}~---~legacy-set~displays~sit~outside~the~guard~(tbl:verify) }

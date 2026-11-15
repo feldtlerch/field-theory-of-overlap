@@ -89,7 +89,15 @@ fn w04_actual_production_identity_collision_and_restoration() {
     fs::write(&path, bytes).unwrap();
     let local = load_markdown_files(&directory).unwrap();
     assert_eq!(
-        local.mints().last().unwrap().label,
+        local
+            .mints()
+            .iter()
+            .find(|mint| matches!(
+                &mint.site,
+                LabelSite::Markdown { file, .. } if file == "docs/weld-collision.md"
+            ))
+            .unwrap()
+            .label,
         NodeId::LangevinCoefficientOne.semantic_name()
     );
     let output = Command::new("python3")

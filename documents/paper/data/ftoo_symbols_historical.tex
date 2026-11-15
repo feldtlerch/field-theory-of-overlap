@@ -1,0 +1,1333 @@
+
+\ExplSyntaxOn
+
+
+\NewDocumentCommand
+  { \outcomespace }
+  {  }
+  {
+    \ensuremath{\symcal{W}}
+  }
+
+
+\NewDocumentCommand
+  { \dualspace }
+  {  }
+  {
+    \ensuremath{\outcomespace\sp{\ast}}
+  }
+
+
+\NewDocumentCommand
+  { \readout }
+  {  }
+  {
+    \ensuremath{\symcal{M}}
+  }
+
+
+\NewDocumentCommand
+  { \falsereadout }
+  {  }
+  {
+    \ensuremath{\widetilde{\readout}}
+  }
+
+
+\NewDocumentCommand
+  { \outcomevector }
+  { m }
+  {
+    \ensuremath{\mathbf{u}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \outcomechange }
+  { m }
+  {
+    \ensuremath{\Delta\mathbf{u}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \selfweight }
+  { m }
+  {
+    \ensuremath{\lambda\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \coupling }
+  { m m }
+  {
+    \ensuremath{\kappa\sb{\pairindex{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \anchormetric }
+  {  }
+  {
+    \ensuremath{G\sb{\star}}
+  }
+
+
+\NewDocumentCommand
+  { \holding }
+  { m m }
+  {
+    \ensuremath{h\sb{\pairindex{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \holdingdef }
+  { m m }
+  {
+    \ensuremath{\frac{\positivepart{\ipGcov{\caringcovector{#1}{#2}}{\feelingcovector{#2}}}}{\normGcov{\feelingcovector{#2}}\,\belongingradiusof{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \holdingcosform }
+  { m m }
+  {
+    \ensuremath{\alignment{#1}{#2}\sp{+}\,\frac{\coupling{#1}{#2}}{\belongingradiusof{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \belongingradiusof }
+  { m }
+  {
+    \ensuremath{\kappa\sb{0,#1}}
+  }
+
+
+\NewDocumentCommand
+  { \currency }
+  { m m }
+  {
+    \ensuremath{e\sb{\currencyto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \parconverter }
+  { m m }
+  {
+    \ensuremath{\mathbf{1}\sb{\currencyto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \holonomy }
+  { m m m }
+  {
+    \ensuremath{H\sb{\tripleindex{#1}{#2}{#3}}}
+  }
+
+
+\NewDocumentCommand
+  { \extself }
+  { m }
+  {
+    \ensuremath{u\sb{#1}\sp{\mathrm{self}}}
+  }
+
+
+\NewDocumentCommand
+  { \foldterm }
+  { m m }
+  {
+    \ensuremath{\holding{#1}{#2}\,\currency{#1}{#2}\,\privatewelfare{#2}}
+  }
+
+
+\NewDocumentCommand
+  { \foldchangeterm }
+  { m m }
+  {
+    \ensuremath{\holding{#1}{#2}\,\currency{#1}{#2}\,\selfweight{#2}\transpose\outcomechange{#2}}
+  }
+
+
+\NewDocumentCommand
+  { \effdensity }
+  { o }
+  {
+    \ensuremath{\delta\sp{\mathrm{eff}}\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \countanch }
+  {  }
+  {
+    \ensuremath{N\sb{\mathrm{anch}}}
+  }
+
+
+\NewDocumentCommand
+  { \countauth }
+  {  }
+  {
+    \ensuremath{N\sb{\mathrm{auth}}}
+  }
+
+
+\NewDocumentCommand
+  { \countpool }
+  {  }
+  {
+    \ensuremath{N\sb{\mathrm{pool}}}
+  }
+
+
+\NewDocumentCommand
+  { \willnet }
+  {  }
+  {
+    \ensuremath{\omega\sb{\mathrm{net}}}
+  }
+
+
+\NewDocumentCommand
+  { \willrec }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{rec}}}
+  }
+
+
+\NewDocumentCommand
+  { \willanti }
+  {  }
+  {
+    \ensuremath{\omega\sp{-}}
+  }
+
+
+\NewDocumentCommand
+  { \willsever }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{sev}}}
+  }
+
+
+\NewDocumentCommand
+  { \willeff }
+  {  }
+  {
+    \ensuremath{\omega\sb{\mathrm{eff}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignrate }
+  {  }
+  {
+    \ensuremath{\dot{\sigma}}
+  }
+
+
+\NewDocumentCommand
+  { \alignfixed }
+  {  }
+  {
+    \ensuremath{\sigma\sp{\star}}
+  }
+
+
+\NewDocumentCommand
+  { \Abessel }
+  {  }
+  {
+    \ensuremath{A\sb{n}}
+  }
+
+
+\NewDocumentCommand
+  { \leanbare }
+  {  }
+  {
+    \ensuremath{\sigma}
+  }
+
+
+\NewDocumentCommand
+  { \will }
+  {  }
+  {
+    \ensuremath{\omega}
+  }
+
+
+\NewDocumentCommand
+  { \surplus }
+  {  }
+  {
+    \ensuremath{\Delta W}
+  }
+
+
+\NewDocumentCommand
+  { \bendfn }
+  {  }
+  {
+    \ensuremath{\phi}
+  }
+
+
+\NewDocumentCommand
+  { \frameloading }
+  {  }
+  {
+    \ensuremath{Z}
+  }
+
+
+\NewDocumentCommand
+  { \hingeA }
+  {  }
+  {
+    \ensuremath{a}
+  }
+
+
+\NewDocumentCommand
+  { \accountability }
+  {  }
+  {
+    \ensuremath{A}
+  }
+
+
+\NewDocumentCommand
+  { \idcov }
+  {  }
+  {
+    \ensuremath{\Omega}
+  }
+
+
+\NewDocumentCommand
+  { \rewardfield }
+  {  }
+  {
+    \ensuremath{R}
+  }
+
+
+\NewDocumentCommand
+  { \sharedgoods }
+  {  }
+  {
+    \ensuremath{\outcomespace}
+  }
+
+
+\NewDocumentCommand
+  { \outcomechangebare }
+  {  }
+  {
+    \ensuremath{\Delta\mathbf{u}}
+  }
+
+
+\NewDocumentCommand
+  { \heldweight }
+  {  }
+  {
+    \ensuremath{\lambda}
+  }
+
+
+\NewDocumentCommand
+  { \privatewelfare }
+  { m }
+  {
+    \ensuremath{\selfweight{#1}\transpose\outcomevector{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \ownwelfarechange }
+  { m }
+  {
+    \ensuremath{\Delta w\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \ownwelfarechangedef }
+  { m }
+  {
+    \ensuremath{\selfweight{#1}\transpose\outcomechange{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \comovcomp }
+  { m m m m }
+  {
+    \ensuremath{S\sp{#3#4}\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignment }
+  { m m }
+  {
+    \ensuremath{\sigma\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \lean }
+  { m m }
+  {
+    \ensuremath{\alignment{#1}{#2}}
+  }
+
+
+\NewDocumentCommand
+  { \alignmentbare }
+  {  }
+  {
+    \ensuremath{\leanbare}
+  }
+
+
+\NewDocumentCommand
+  { \alignrateof }
+  { m }
+  {
+    \ensuremath{\dot{\sigma}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \alignfact }
+  {  }
+  {
+    \ensuremath{\sigma\sp{\mathrm{fact}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignint }
+  {  }
+  {
+    \ensuremath{\sigma\sp{\mathrm{int}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignanch }
+  {  }
+  {
+    \ensuremath{\sigma\sp{\mathrm{anch}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignfactof }
+  { m m }
+  {
+    \ensuremath{\sigma\sp{\mathrm{fact}}\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignintof }
+  { m m }
+  {
+    \ensuremath{\sigma\sp{\mathrm{int}}\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignanchof }
+  { m m }
+  {
+    \ensuremath{\sigma\sp{\mathrm{anch}}\sb{\edgeto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \aligndefect }
+  { m }
+  {
+    \ensuremath{\sigma\sb{#1,\mathrm{def}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignall }
+  { m }
+  {
+    \ensuremath{\sigma\sb{\edgeto{#1}{\cdot}}}
+  }
+
+
+\NewDocumentCommand
+  { \alignpair }
+  { m m }
+  {
+    \ensuremath{\sigma\sb{\pairindex{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \assignweight }
+  { m m }
+  {
+    \ensuremath{w\sb{\pairindex{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \caringdef }
+  { m m }
+  {
+    \ensuremath{\selfweight{#1}\transpose\comov{#1}{#2}}
+  }
+
+
+\NewDocumentCommand
+  { \feelingcovector }
+  { m }
+  {
+    \ensuremath{\selfweight{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \livedreturn }
+  { m m }
+  {
+    \ensuremath{r\sb{\currencyto{#1}{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \livedreturndef }
+  { m m }
+  {
+    \ensuremath{\ip{\caringcovector{#1}{#2}}{\outcomechange{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \accountablestake }
+  { m m }
+  {
+    \ensuremath{\normG{\comov{#1}{#2}\,\outcomechange{#2}}}
+  }
+
+
+\NewDocumentCommand
+  { \accountablestakeof }
+  { m m m }
+  {
+    \ensuremath{\normG{\comov{#1}{#2}\,#3}}
+  }
+
+
+\NewDocumentCommand
+  { \enemysurplus }
+  {  }
+  {
+    \ensuremath{\rho\sb{\mathrm{enemy}}}
+  }
+
+
+\NewDocumentCommand
+  { \selfsurplus }
+  {  }
+  {
+    \ensuremath{\surplus\sb{\mathrm{self}}}
+  }
+
+
+\NewDocumentCommand
+  { \refperturbation }
+  {  }
+  {
+    \ensuremath{\bar{\mathbf{u}}}
+  }
+
+
+\NewDocumentCommand
+  { \rewardpotential }
+  {  }
+  {
+    \ensuremath{D}
+  }
+
+
+\NewDocumentCommand
+  { \attenuation }
+  {  }
+  {
+    \ensuremath{\eta}
+  }
+
+
+\NewDocumentCommand
+  { \countreader }
+  {  }
+  {
+    \ensuremath{N\sb{\mathrm{rdr}}}
+  }
+
+
+\NewDocumentCommand
+  { \countof }
+  { o }
+  {
+    \ensuremath{N\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \countanchrate }
+  {  }
+  {
+    \ensuremath{\dot{N}\sb{\mathrm{anch}}}
+  }
+
+
+\NewDocumentCommand
+  { \countauthrate }
+  {  }
+  {
+    \ensuremath{\dot{N}\sb{\mathrm{auth}}}
+  }
+
+
+\NewDocumentCommand
+  { \willexpand }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{exp}}}
+  }
+
+
+\NewDocumentCommand
+  { \willvirtue }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{vir}}}
+  }
+
+
+\NewDocumentCommand
+  { \willenlarge }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{enl}}}
+  }
+
+
+\NewDocumentCommand
+  { \willrestrain }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{res}}}
+  }
+
+
+\NewDocumentCommand
+  { \ambientcoupling }
+  {  }
+  {
+    \ensuremath{\kappa\sb{\infty}}
+  }
+
+
+\NewDocumentCommand
+  { \willdecay }
+  {  }
+  {
+    \ensuremath{\gamma\sigma}
+  }
+
+
+\NewDocumentCommand
+  { \suscept }
+  {  }
+  {
+    \ensuremath{\chi\sb{\omega}}
+  }
+
+
+\NewDocumentCommand
+  { \eigval }
+  { o }
+  {
+    \ensuremath{\lambda\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \biforce }
+  {  }
+  {
+    \ensuremath{\beta}
+  }
+
+
+\NewDocumentCommand
+  { \hingeB }
+  {  }
+  {
+    \ensuremath{b}
+  }
+
+
+\NewDocumentCommand
+  { \Wstar }
+  {  }
+  {
+    \ensuremath{W\sp{\star}}
+  }
+
+
+\NewDocumentCommand
+  { \horizon }
+  {  }
+  {
+    \ensuremath{\tau}
+  }
+
+
+\NewDocumentCommand
+  { \welfarescale }
+  {  }
+  {
+    \ensuremath{W\sb{0}}
+  }
+
+
+\NewDocumentCommand
+  { \biographylength }
+  {  }
+  {
+    \ensuremath{T\sb{\mathrm{bio}}}
+  }
+
+
+\NewDocumentCommand
+  { \fundinggap }
+  {  }
+  {
+    \ensuremath{G\sb{\mathrm{fund}}}
+  }
+
+
+\NewDocumentCommand
+  { \nonreprfrac }
+  {  }
+  {
+    \ensuremath{V}
+  }
+
+
+\NewDocumentCommand
+  { \reprboundary }
+  {  }
+  {
+    \ensuremath{\symcal{B}\sb{\mathrm{rep}}}
+  }
+
+
+\NewDocumentCommand
+  { \edgeload }
+  {  }
+  {
+    \ensuremath{I}
+  }
+
+
+\NewDocumentCommand
+  { \cyclicshift }
+  {  }
+  {
+    \ensuremath{P}
+  }
+
+
+\NewDocumentCommand
+  { \rootofunity }
+  {  }
+  {
+    \ensuremath{\zeta}
+  }
+
+
+\NewDocumentCommand
+  { \jacgrowth }
+  {  }
+  {
+    \ensuremath{\alpha}
+  }
+
+
+\NewDocumentCommand
+  { \jaccouple }
+  {  }
+  {
+    \ensuremath{\beta}
+  }
+
+
+\NewDocumentCommand
+  { \verdictstack }
+  { m }
+  {
+    \ensuremath{\mathbf{v}(#1)}
+  }
+
+
+\NewDocumentCommand
+  { \standing }
+  { m }
+  {
+    \ensuremath{\verdictstack{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \readerverdict }
+  { m m }
+  {
+    \ensuremath{v\sb{#1}(#2)}
+  }
+
+
+\NewDocumentCommand
+  { \meanverdict }
+  { m }
+  {
+    \ensuremath{\bar{v}(#1)}
+  }
+
+
+\NewDocumentCommand
+  { \orthverdict }
+  { m }
+  {
+    \ensuremath{\mathbf{v}\sp{\perp}(#1)}
+  }
+
+
+\NewDocumentCommand
+  { \profile }
+  {  }
+  {
+    \ensuremath{\mathbf{P}}
+  }
+
+
+\NewDocumentCommand
+  { \traitsigma }
+  {  }
+  {
+    \ensuremath{T\sb{\sigma}}
+  }
+
+
+\NewDocumentCommand
+  { \traitdensity }
+  {  }
+  {
+    \ensuremath{T\sb{\delta}}
+  }
+
+
+\NewDocumentCommand
+  { \traitwill }
+  {  }
+  {
+    \ensuremath{T\sb{\omega}}
+  }
+
+
+\NewDocumentCommand
+  { \traitdirection }
+  {  }
+  {
+    \ensuremath{T\sb{\mathrm{dir}}}
+  }
+
+
+\NewDocumentCommand
+  { \traitnarration }
+  {  }
+  {
+    \ensuremath{T\sb{\mathrm{nar}}}
+  }
+
+
+\NewDocumentCommand
+  { \traitbuilding }
+  {  }
+  {
+    \ensuremath{T\sb{\mathrm{bld}}}
+  }
+
+
+\NewDocumentCommand
+  { \traitrestraint }
+  {  }
+  {
+    \ensuremath{T\sb{\mathrm{res}}}
+  }
+
+
+\NewDocumentCommand
+  { \recoveryfact }
+  {  }
+  {
+    \ensuremath{\mu}
+  }
+
+
+\NewDocumentCommand
+  { \recoveryfactof }
+  { m }
+  {
+    \ensuremath{\mu\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \reports }
+  {  }
+  {
+    \ensuremath{x}
+  }
+
+
+\NewDocumentCommand
+  { \incidence }
+  {  }
+  {
+    \ensuremath{\mathsf{A}}
+  }
+
+
+\NewDocumentCommand
+  { \reconstruct }
+  { m m }
+  {
+    \ensuremath{\widehat{\Delta u}\sb{#1}\sp{(#2)}}
+  }
+
+
+\NewDocumentCommand
+  { \frameloadingint }
+  {  }
+  {
+    \ensuremath{Z\sb{\mathrm{int}}}
+  }
+
+
+\NewDocumentCommand
+  { \frameoffsets }
+  {  }
+  {
+    \ensuremath{\theta}
+  }
+
+
+\NewDocumentCommand
+  { \frameoffsetof }
+  { O{\ell} }
+  {
+    \ensuremath{\theta\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \groupoffset }
+  { m m }
+  {
+    \ensuremath{\theta\sb{#1,#2}}
+  }
+
+
+\NewDocumentCommand
+  { \residuals }
+  {  }
+  {
+    \ensuremath{\varepsilon}
+  }
+
+
+\NewDocumentCommand
+  { \reportcov }
+  {  }
+  {
+    \ensuremath{\widetilde{\Sigma}}
+  }
+
+
+\NewDocumentCommand
+  { \anchorprior }
+  {  }
+  {
+    \ensuremath{B}
+  }
+
+
+\NewDocumentCommand
+  { \idvariance }
+  {  }
+  {
+    \ensuremath{\sigma\sb{\mathrm{id}}\sp{2}}
+  }
+
+
+\NewDocumentCommand
+  { \anchorvariance }
+  { O{\ell} }
+  {
+    \ensuremath{b\sb{#1}\sp{2}}
+  }
+
+
+\NewDocumentCommand
+  { \precision }
+  { o }
+  {
+    \ensuremath{\symcal{I}\IfValueT{#1}{(#1)}}
+  }
+
+
+\NewDocumentCommand
+  { \precisionof }
+  { m }
+  {
+    \ensuremath{\symcal{I}(#1)}
+  }
+
+
+\NewDocumentCommand
+  { \woodburyJ }
+  {  }
+  {
+    \ensuremath{J}
+  }
+
+
+\NewDocumentCommand
+  { \woodburyd }
+  {  }
+  {
+    \ensuremath{d}
+  }
+
+
+\NewDocumentCommand
+  { \framegram }
+  {  }
+  {
+    \ensuremath{\mathsf{G}}
+  }
+
+
+\NewDocumentCommand
+  { \witnessgram }
+  {  }
+  {
+    \ensuremath{K}
+  }
+
+
+\NewDocumentCommand
+  { \coeffvec }
+  {  }
+  {
+    \ensuremath{\mathbf{a}}
+  }
+
+
+\NewDocumentCommand
+  { \cleanreads }
+  { o }
+  {
+    \ensuremath{\symcal{D}\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \infopool }
+  { o }
+  {
+    \ensuremath{N\sb{\mathrm{info}\IfValueT{#1}{,#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \effectivereads }
+  { o }
+  {
+    \ensuremath{N\sp{\mathrm{eff}}\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \inverseinfopool }
+  { o }
+  {
+    \ensuremath{\varrho\IfValueT{#1}{\sb{#1}}}
+  }
+
+
+\NewDocumentCommand
+  { \anchorprecision }
+  { O{\ell} }
+  {
+    \ensuremath{p\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \anchorflux }
+  { O{\ell} }
+  {
+    \ensuremath{\Phi\sb{#1}\sp{\mathrm{anch}}}
+  }
+
+
+\NewDocumentCommand
+  { \anchorlapse }
+  {  }
+  {
+    \ensuremath{\gamma\sb{\mathrm{anch}}}
+  }
+
+
+\NewDocumentCommand
+  { \audiencediversity }
+  {  }
+  {
+    \ensuremath{\widehat{L}}
+  }
+
+
+\NewDocumentCommand
+  { \ncomponents }
+  {  }
+  {
+    \ensuremath{\mathsf{c}}
+  }
+
+
+\NewDocumentCommand
+  { \equiinterest }
+  {  }
+  {
+    \ensuremath{c}
+  }
+
+
+\NewDocumentCommand
+  { \witnessreport }
+  { m }
+  {
+    \ensuremath{\operatorname{report}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \witnesscolour }
+  { m }
+  {
+    \ensuremath{\operatorname{colour}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \colourestimate }
+  { m m }
+  {
+    \ensuremath{\widehat{\operatorname{colour}}\sb{#1}\sp{(#2)}}
+  }
+
+
+\NewDocumentCommand
+  { \witnessstake }
+  { m }
+  {
+    \ensuremath{\stake\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \colourreport }
+  { m }
+  {
+    \ensuremath{\operatorname{report}\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \colourgain }
+  { m }
+  {
+    \ensuremath{g\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \colourgainfamily }
+  {  }
+  {
+    \ensuremath{g}
+  }
+
+
+\NewDocumentCommand
+  { \meancolourgain }
+  {  }
+  {
+    \ensuremath{\bar{g}}
+  }
+
+
+\NewDocumentCommand
+  { \meansqcolourgain }
+  {  }
+  {
+    \ensuremath{\overline{g\sp{2}}}
+  }
+
+
+\NewDocumentCommand
+  { \varcolourgain }
+  {  }
+  {
+    \ensuremath{\operatorname{Var}(g)}
+  }
+
+
+\NewDocumentCommand
+  { \colourspan }
+  {  }
+  {
+    \ensuremath{\Xi}
+  }
+
+
+\NewDocumentCommand
+  { \colouramplitude }
+  {  }
+  {
+    \ensuremath{C\sb{\mathrm{col}}}
+  }
+
+
+\NewDocumentCommand
+  { \spanregressordesign }
+  {  }
+  {
+    \ensuremath{X\sb{\mathrm{span}}}
+  }
+
+
+\NewDocumentCommand
+  { \spannoise }
+  { m }
+  {
+    \ensuremath{\varepsilon\sb{#1}}
+  }
+
+
+\NewDocumentCommand
+  { \spannoisevariance }
+  {  }
+  {
+    \ensuremath{\sigma\sb{\varepsilon}\sp{2}}
+  }
+
+
+\NewDocumentCommand
+  { \spandensity }
+  {  }
+  {
+    \ensuremath{\delta\sp{\mathrm{eff}}\sb{\mathrm{span}}}
+  }
+
+
+\NewDocumentCommand
+  { \verificationcost }
+  {  }
+  {
+    \ensuremath{c\sb{\mathrm{ver}}}
+  }
+
+
+\NewDocumentCommand
+  { \burncost }
+  {  }
+  {
+    \ensuremath{B\sb{0}}
+  }
+
+
+\NewDocumentCommand
+  { \honestburnrate }
+  {  }
+  {
+    \ensuremath{\dot{B}\sb{\mathrm{hon}}}
+  }
+
+
+\NewDocumentCommand
+  { \fabricationburnrate }
+  {  }
+  {
+    \ensuremath{\dot{B}\sb{\mathrm{fab}}}
+  }
+
+
+\NewDocumentCommand
+  { \colourcoordinate }
+  {  }
+  {
+    \ensuremath{\chi}
+  }
+
+
+\NewDocumentCommand
+  { \moralvelocity }
+  {  }
+  {
+    \ensuremath{M\sp{\mathrm{vel}}}
+  }
+
+
+\NewDocumentCommand
+  { \moralnull }
+  {  }
+  {
+    \ensuremath{M\sp{\mathrm{null}}}
+  }
+
+
+\NewDocumentCommand
+  { \pairing }
+  { m m }
+  {
+    \ensuremath{\ip{#1}{#2}}
+  }
+
+
+\ExplSyntaxOff

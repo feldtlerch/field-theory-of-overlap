@@ -1,0 +1,1180 @@
+\documentclass[../main]{subfiles}
+\begin{document}
+
+\clearpage
+\part*{Appendices}
+\addcontentsline{toc}{part}{Appendices}
+\appendix
+
+\begin{center}\itshape
+  The body states; the appendices check. Each entry is a verification an objecting reader
+  can run; none is load-bearing for a result above.
+\end{center}
+\bigskip
+
+\section{Recovery}
+\label{app:recovery}
+\auditnote{The recovery appendix quantifies the null-verdict wall. Its estimates are about a
+single $\anchormetric$-scalar externality and do not create a portable certification.}
+
+The estimand is a scalar externality recovered on one anchor:
+\begin{align}
+  &\recoveryfact &=& \ \normG{\outcomechange{k}}
+    \quad \dimwelfare
+    &:& \eqtag{recov:estimand}{estimand}
+\end{align}
+
+\begin{remark}[\hdr{recov:factor}]
+  Reports satisfy
+  \begin{equation}
+    \reports=\incidence\recoveryfact+\frameloading\frameoffsets+\residuals.
+    \label{eq:recov:reports}
+  \end{equation}
+  For a single-subject certificate, $\incidence=\mathbf 1$. The residual covariance is
+  \begin{equation}
+    \reportcov=\idcov+\frameloading\anchorprior\frameloading\transpose,
+    \label{eq:recov:covsplit}
+  \end{equation}
+  with $\idcov,\anchorprior,\reportcov:\dimpublicwelfaresq$. The GLS precision is
+  \begin{equation}
+    \precisionof{\recoveryfact}=\mathbf 1\transpose\reportcov\sp{-1}\mathbf 1
+    \qquad \dimpublicwelfareinvsq.
+    \label{eq:recov:gls}
+  \end{equation}
+  The split $\reportcov=\idcov+\frameloading\anchorprior\frameloading\transpose$ is
+  anchor-relative: the data alone do not decide which correlation is idiosyncratic and which
+  is common-mode.
+\end{remark}
+
+\begin{proposition}[\hdr{recov:sat}]\grade{feas}
+  Set
+  \begin{align}
+    \woodburyJ &= \mathbf 1\transpose\idcov\sp{-1}\mathbf 1
+      \label{eq:recov:woodJ}\\
+    \woodburyd &= \frameloading\transpose\idcov\sp{-1}\mathbf 1
+      \label{eq:recov:woodd}\\
+    \framegram &= \frameloading\transpose\idcov\sp{-1}\frameloading.
+      \label{eq:recov:woodG}
+  \end{align}
+  Then Woodbury gives
+  \begin{equation}
+    \boxed{
+      \precisionof{\recoveryfact}
+      =\woodburyJ-\woodburyd\transpose
+      (\anchorprior\sp{-1}+\framegram)\sp{-1}\woodburyd.
+    }
+    \label{eq:recov:sat}
+  \end{equation}
+  For one routed block,
+  \begin{equation}
+    \precision\sb{\ell}
+    =\frac{\mathbf 1\transpose\idcov\sb{\ell}\sp{-1}\mathbf 1}
+      {1+\anchorvariance\,\mathbf 1\transpose\idcov\sb{\ell}\sp{-1}\mathbf 1}.
+    \label{eq:recov:block}
+  \end{equation}
+  Define
+  \begin{align}
+    \cleanreads[\ell]
+      &:=\idvariance\,\mathbf 1\transpose\idcov\sb{\ell}\sp{-1}\mathbf 1
+      \qquad \dimcount
+      \label{eq:recov:cleanreads}\\
+    \infopool[\ell]
+      &:=\frac{\idvariance}{\anchorvariance}
+      \qquad \dimcount.
+      \label{eq:recov:infopool}
+  \end{align}
+  Then effective reads saturate at the anchor information pool:
+  \begin{align}
+    &\effectivereads[\ell] &=& \ \frac{\cleanreads[\ell]}{1+\cleanreads[\ell]/\infopool[\ell]}
+      &:& \eqtag{recov:effreads}{saturation}\\
+    &\precision\sb{\ell} &=& \ \frac{\effectivereads[\ell]}{\idvariance}
+      \label{eq:recov:effprecision}
+  \end{align}
+  Readers buy down idiosyncrasy; anchors set the cap.
+\end{proposition}
+
+The covering condition carries its own handle, \handle{recov:cover}: the frames span the
+constant vector, $\mathbf 1\in\operatorname{col}(\frameloading)$.
+
+\begin{proposition}[\hdr{recov:blocks}]\grade{feas}
+  For orthogonal routed blocks,
+  \begin{equation}
+    \precisionof{\recoveryfact}
+    =\sum_\ell\frac{\effectivereads[\ell]}{\idvariance}
+    \to
+    \sum_\ell\frac{1}{\anchorvariance}.
+    \label{eq:recov:blocksum}
+  \end{equation}
+  For overlapping frames, under the covering condition
+  (\ftag*{recov:cover}) $\mathbf 1\in\operatorname{col}(\frameloading)$,
+  \begin{equation}
+    \boxed{
+      \precision\sb{\max}
+      =\min_{\coeffvec:\frameloading\coeffvec=\mathbf 1}
+        \coeffvec\transpose\anchorprior\sp{-1}\coeffvec
+      =\mathbf 1\transpose
+        \pinv{\frameloading\anchorprior\frameloading\transpose}\mathbf 1.
+    }
+    \label{eq:recov:ceiling}
+  \end{equation}
+  If $\mathbf 1\notin\operatorname{col}(\frameloading)$, some component is not
+  anchor-confounded and precision can grow without the finite ceiling.
+\end{proposition}
+
+\begin{remark}[\hdr{recov:span}]
+  In the one-colour linear corner
+  \begin{equation}
+    \witnessreport{w}
+      =
+      \recoveryfact+\colourgain{w}\colouramplitude+\spannoise{w},
+    \label{eq:recov:spanmodel}
+  \end{equation}
+  recovery of $\recoveryfact$ is governed by $\colourspan$. The covering condition
+  $\onesvector\in\operatorname{col}(\frameloadingint)$ is the one-colour confound in this
+  corner: a nonzero constant $\colourgain{w}$ makes the intercept and colour-amplitude
+  indistinguishable. Opposed colours, or the zero-colour corner, remove that particular
+  confound. Heterogeneous stakes replace $\colourgain{w}$ by the GLS loading proportional to
+  the witness's colour-loading and recover the saturation law \ftag{recov:sat}. Thus
+  $\colourspan$ is the quantitative face of the block-orthogonality named by \ftag{recov:blocks},
+  not a replacement for the full covariance model.
+\end{remark}
+
+\begin{insight}[\hdr{recov:ext}]\grade{feas}
+  Independent anchors are extensive for truth; readers are intensive once the cap binds.
+\end{insight}
+
+\begin{proposition}[\hdr{recov:route}]\grade{feas}
+  Effective routed clean reads are
+  \begin{equation}
+    \cleanreads[\ell]
+    =\idvariance\,\mathbf 1\transpose\idcov\sb{\ell}\sp{-1}\mathbf 1.
+    \label{eq:recov:route}
+  \end{equation}
+  In a concrete corner,
+  \begin{equation}
+    \cleanreads[\ell]=\sum_w\eta_w q_{\ell w},
+    \qquad
+    \sum_\ell q_{\ell w}\le1.
+    \label{eq:recov:routecorner}
+  \end{equation}
+\end{proposition}
+
+\begin{insight}[\hdr{recov:split}]\grade{feas}
+  Credibility routes. Unbias and independence weigh:
+  \begin{align}
+    \text{credibility} &\Rightarrow \text{routing}
+      \label{eq:recov:split-cred}\\
+    \text{unbias + independence} &\Rightarrow \idcov\sb{\ell}.
+      \label{eq:recov:split-unbias}
+  \end{align}
+\end{insight}
+
+\begin{remark}[\hdr{recov:Lhat}]
+  \begin{align}
+    \audiencediversity
+      &=\frac{\left(\sum_i s_i(Q)\right)^2}{\sum_i s_i(Q)^2}
+      \label{eq:recov:lhat}\\
+    Q_{rw} &=\positivepart{\lean{r}{w}}.
+      \label{eq:recov:Q}
+  \end{align}
+  But $\audiencediversity\neq\text{true anchor count}$.
+\end{remark}
+
+\begin{theorem}[\hdr{recov:null}]\grade{nec}
+  Let $\frameloadingint$ be internally pinned frames. If
+  \begin{equation}
+    \mathbf 1\in\operatorname{col}(\frameloadingint),
+    \label{eq:recov:covering}
+  \end{equation}
+  then there is $\coeffvec$ with $\frameloadingint\coeffvec=\mathbf 1$. The transformation
+  \begin{equation}
+    (\recoveryfact,\frameoffsets)
+    \mapsto
+    (\recoveryfact+t,\frameoffsets-t\coeffvec)
+    \label{eq:recov:reparam}
+  \end{equation}
+  leaves
+  \begin{equation}
+    \reports=\mathbf 1\recoveryfact+\frameloadingint\frameoffsets+\residuals
+    \label{eq:recov:invariant}
+  \end{equation}
+  unchanged. Therefore $\recoveryfact$ is non-identified.
+\end{theorem}
+
+\begin{remark}[\hdr{recov:scope}]
+  The non-identification is necessary inside the additive frame-offset model; the model
+  itself is feasible.
+\end{remark}
+
+\begin{insight}[\hdr{recov:victim}]\grade{feas}
+  Silence routes to the contested anchor: absent external access, the victim's report is
+  another internally framed observation, not a portable certificate.
+\end{insight}
+
+\begin{proposition}[\hdr{recov:ancill}]\grade{feas}
+  Since
+  \begin{equation}
+    \effectivereads[\ell]
+    =\frac{\cleanreads[\ell]\infopool[\ell]}
+      {\cleanreads[\ell]+\infopool[\ell]},
+    \label{eq:recov:effharm}
+  \end{equation}
+  its margins are
+  \begin{equation}
+    \frac{\partial\effectivereads[\ell]}{\partial\cleanreads[\ell]}
+    =\frac{\infopool[\ell]^2}{(\cleanreads[\ell]+\infopool[\ell])^2}
+    \to0,
+    \label{eq:recov:margclean}
+  \end{equation}
+  while
+  \begin{equation}
+    \frac{\partial\effectivereads[\ell]}{\partial\infopool[\ell]}
+    =\frac{\cleanreads[\ell]^2}{(\cleanreads[\ell]+\infopool[\ell])^2}
+    \to1.
+    \label{eq:recov:marginfo}
+  \end{equation}
+  Another reader dies at the margin; an independent anchor moves the cap. The limits
+  name their regime: the reader margin dies where readers are abundant, and the anchor
+  margin approaches one only in the anchor-\emph{scarce} corner --- with anchors
+  abundant it dies the same way. The defensible sentence is symmetric: the margin of
+  whichever factor is scarce stays high.
+\end{proposition}
+
+\begin{proposition}[\hdr{recov:ceil}]\grade{feas}
+  Under covering, any one-place certificate is bounded by the anchor ceiling
+  \begin{equation}
+    \precision\sb{\mathrm{certificate}}
+    \le
+    \mathbf 1\transpose
+    \pinv{\frameloading\anchorprior\frameloading\transpose}\mathbf 1.
+    \label{eq:recov:certceil}
+  \end{equation}
+  This is a supporting prohibition, not a flagship falsifier; the falsifiable standing
+  lives in the skew sector (\ftag{dyn:pitchpair}, \ftag{dyn:rot}).
+\end{proposition}
+
+\begin{remark}[\hdr{recov:auditor}]
+  Testing the ceiling requires independently varying readers and anchors. Therefore the test
+  requires an external auditor.
+\end{remark}
+
+\begin{theorem}[\hdr{recov:compare}]\grade{feas}
+  For multiple subjects,
+  \begin{equation}
+    x_e=\mu_{k(e)}+z_e\transpose\frameoffsets+\varepsilon_e.
+    \label{eq:recov:compare}
+  \end{equation}
+  Build the bipartite graph whose nodes are subjects $k$ and frames $\ell$, with an edge when
+  subject $k$ is observed through frame $\ell$. Then
+  \begin{equation}
+    \boxed{
+      \begin{gathered}
+      \mu_k-\mu_{k'}\text{ is identified}
+      \quad\Longleftrightarrow\quad\\
+      k,k'\text{ lie in the same connected component}.
+      \end{gathered}
+    }
+    \label{eq:recov:component}
+  \end{equation}
+  Absolute levels remain unidentified up to one constant per component.
+  The result is the two-way fixed-effects connectedness condition
+  \parencite{a:akm}, transported: subjects for workers, frames for firms, and the
+  same moral --- contrasts identify within a connected component, levels never.
+\end{theorem}
+
+\begin{remark}[\hdr{recov:groupframe}]
+  If offsets are group-keyed as $\groupoffset{\ell}{g(k)}$, cross-group contrasts require
+  bridge anchors.
+\end{remark}
+
+\begin{remark}[\hdr{recov:contrast}]
+  A contrast is two-place. A certificate is one-place. Comparative recovery does not revive
+  the portable verdict.
+\end{remark}
+
+\begin{proposition}[\hdr{recov:anchorflow}]\grade{feas}
+  Let
+  \begin{equation}
+    \anchorprecision:=b\sb{\ell}\sp{-2}
+    \qquad \dimpublicwelfareinvsq.
+    \label{eq:recov:anchorprec}
+  \end{equation}
+  Write
+  \begin{equation}
+    \dot p_\ell=\anchorflux-\anchorlapse p_\ell.
+    \label{eq:recov:anchorode}
+  \end{equation}
+  At rest, $\anchorflux=\anchorlapse p_\ell^\star$. Without maintenance,
+  \begin{equation}
+    p_\ell(t)=p_\ell(0)e^{-\anchorlapse t}.
+    \label{eq:recov:anchordecay}
+  \end{equation}
+\end{proposition}
+
+\begin{insight}[\hdr{recov:hold}]\grade{feas}
+  Anchor precision is held by maintenance, not merely observed.
+\end{insight}
+
+\begin{insight}[\hdr{recov:held}]\grade{feas}
+  A verdict is held, not had.
+\end{insight}
+
+\begin{theorem}[\hdr{recov:gap}]\grade{nec}
+  The recovery appendix asks for three independence objects --- the witness Gram;
+  $\idcov$ versus $\frameloading\anchorprior\frameloading\transpose$; and
+  $\audiencediversity$ versus true anchors --- and all reduce to the same external wall.
+\end{theorem}
+
+\begin{statement}{}{One anchor gap}
+  Witness independence, reader covariance split, and anchor count are \ftag{J:anchor}
+  at three levels --- \ftag{recov:gap}, read in one line.
+\end{statement}
+
+
+\clearpage
+\section{The dimensional log, and the concordance}
+\label{app:log}
+
+\subsection{The \texorpdfstring{\ftag*{g:knock}}{g:knock} log}
+\label{subsec:log:knock}
+Every cross-dimensional identity the document refuses, with the mismatch that kills it.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The \ftag*{g:knock} log}{tbl:log:knock}
+  \begin{tabularx}{\textwidth}{@{} l L L @{}}
+    \toprule
+    \textbf{sentence} & \textbf{claimed identity} & \textbf{killed by} \\
+    \midrule
+    \ftag*{nrm:grid} & good $=$ virtue & $\dimwelfare\neq\dimrate$ \\
+    \ftag*{nrm:grid} & good $=$ wise & time-index, not dimension (legal only on the positive held orthant) \\
+    \ftag*{f:rew} & rent $=$ surplus & $\dimratio\neq\dimwelfare$ \\
+    \ftag*{f:acc} & the charge $=$ alignment
+      & $\dimwelfare\neq\dimratio$ --- the \textbf{charge}
+        $\normG{\comovfield\,\outcomechangebare}$ is a magnitude; the gate
+        (\ftag*{f:cap}) is $\dimratio$ by construction and vanishes only at the seal ---
+        gate on capacity, charge on realization, price neither on the lean \\
+    \ftag*{pr:woven} & credible $=$ wise & $\dimratio\neq\dimwelfare$ --- entailment, not identity \\
+    \ftag*{bd:rep} & $\mathcal B_{\text{rep}}=$ fab-line & $\dimratio\neq\dimcountrate$ \\
+    \ftag*{op:afriat} & $\ker\text{Afriat}=\ker\readout$ & equal only on $\alignrate=0$ \\
+    cross-node welfare sum & $\dimnodewelfare{i}+\dimnodewelfare{j}$ without $\currency{i}{j}$
+      & missing person-converter \\
+    density $=$ count & $\intensivegrade=\countgrade$ & extensivity grading \\
+    flat holonomy at $0$ & $\holonomy{i}{j}{k}=0$ & multiplicative holonomy is flat at $\holonomy{i}{j}{k}=1$ \\
+    telos & good $=$ wise & \textbf{legal}: positive holding makes the positive orthant diagonal \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The last row is the one place an identity is \emph{granted}, and only because the time-index
+collapses, not because a dimension is crossed. One further refusal is not a \ftag{g:knock} but a
+\ftag{g:split}: inclusion $\ne$ exposure (\ftag{nrm:incl}/\ftag{nrm:expo}) is $\dimwelfare$-signed
+against $\dimwelfare$-absolute --- same dimension, split by sign --- so it is logged below, not
+here. The audit must not claim a dimensional kill where a sign-split does the work.
+
+\clearpage
+\subsection{The \texorpdfstring{\ftag*{g:split}}{g:split} log}
+\label{subsec:log:split}
+
+Same-dimension conflations the document refuses by a finer reading, caught not by dimension
+but by reduction or mechanism.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The \ftag*{g:split} log}{tbl:log:split}
+  \begin{tabularx}{\textwidth}{@{} L l L @{}}
+    \toprule
+    \textbf{conflation} & \textbf{split by} & \textbf{reading} \\
+    \midrule
+    alignment / stake & \ftag*{op:cos} / \ftag*{f:stake}
+      & direction vs.\ magnitude, one operator \\
+    inclusion / exposure & \ftag*{nrm:incl} / \ftag*{nrm:expo}
+      & $\dimwelfare$ signed vs.\ absolute \\
+    felt zero / net zero & \ftag*{f:feltzero} / \ftag*{f:ambiv}
+      & $\caringcovector{i}{j}=0$ (off-manifold) vs.\ $\caringcovector{i}{j}\perp\feelingcovector{j}$ \\
+    holding / currency / content & $\holding{i}{j}$ / $\currency{i}{j}$ / $\feelingcovector{j}$
+      & belongs / booked-by / measured-by \\
+    count / density & $N$ / $\effdensity$ & $\dimcount$ vs.\ $\dimratio$ \\
+    funding type / sign / support / threshold & \ftag*{nrm:funding} & four modalities \\
+    weight / overlap / self-measure & \ftag*{nrm:assign} / \ftag*{op:cos} / $\selfweight{i}$
+      & the hip \\
+    felt / realized stake & \ftag*{f:felt} / \ftag*{f:stake}
+      & metric-free pairing vs.\ anchored $\anchormetric$ act-magnitude \\
+    reliability $\to$ four factors
+      & \ftag*{bf:ind} \ftag*{bf:unb} \ftag*{bf:cred} \ftag*{bf:mot}
+      & four directed edges \\
+    independence as one thing & \ftag*{f:eff} / \ftag*{pr:span}
+      & not-a-copy vs.\ not-a-clique \\
+    anchor sink & \ftag*{snk:anch-t} / \ftag*{snk:anch-G}
+      & timing $\dimtime$ vs.\ anchor $\anchormetric$, one sink read two ways \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Concordance E --- the departure-spine}
+\label{subsec:log:concordance}
+The scholar's membrane sorted not by section but by \emph{how} economics stops. One shape: it
+builds outward from the funded interior and halts, each time, at a different face of one wall.
+The table is generated from the boxes themselves --- one row per \registername{[econ]} box, grouped
+by departure code.
+
+\GenerateConcordanceE
+
+\noindent The one joint no antecedent touches is \ftag{J:occ}: economics has no result that the
+still center is \emph{occupied}. The nearest, warm-glow giving \parencite{a:andreoni}, is a
+consumed state, not a held rate --- the empty preimage is itself the finding.
+
+\clearpage
+\section{The visible-label index}
+\label{app:index}
+
+The glossary is the index a reader binds against; the labels in the body are its keys. The
+primitive is the operator $\comov{i}{j}$, read through its standing cosine
+$\leanbare=\cos\angle(\caringcovector{i}{j},\feelingcovector{j})$ (\ftag*{op:cos}), its
+felt total \quoted{$\felttotal{i}{j}$} (\ftag*{f:felt}), its capacity gate
+\quoted{$\capgate{i}{j}$} (\ftag*{f:cap}), and its realized stake
+\quoted{$\realizedstake{i}{j}$} (\ftag*{f:stake}); the
+spine of the normative register is
+$\extself{i}=\privatewelfare{i}+\sum_j\foldterm{i}{j}$, and the spine of belief is
+$\effdensity=\countanch/\countpool$ (\ftag*{f:eff}). The registers, with
+their dimensional homes:
+
+\begin{xltabular}{\textwidth}{@{}
+    >{\bfseries\RaggedRight}p{0.14\textwidth}
+    >{\hsize=1.35\hsize}L
+    >{\hsize=0.65\hsize}L @{}}
+  \toprule
+  \textbf{\normalfont register} & \textbf{\normalfont tags} & \textbf{\normalfont gloss} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Generators & \ftaglist{gen:obj, gen:will, gen:grade, gen:ext, gen:alph, gen:goods, gen:trich}
+    & object, will, grading, extensivity, alphabet, shared goods; the one fact is
+      \ftag*{epi:fact}, boxed first at \zcref{eq:gen:fact} \\
+  \addlinespace
+  Posits & \ftaglist{gen:will, epi:conv, epi:shadow, epi:fact}
+    & the two typed posits, the instrument shadow, its operational form \\
+  \addlinespace
+  Fields & \ftaglist{f:stake, f:couple, f:felt, f:feltmag, f:feltsign, f:cap, f:split, f:ceiling, f:Ncount, f:defector, f:reach, f:eff, f:holonomy, f:local,
+    f:path, f:acc, f:rew, f:surplus, f:opp, f:ambiv, f:feltzero, f:sealed}
+    & the operator, its readings, counts and the two constituents they are built from,
+      density, holonomy, accountability, reward, the zeros \\
+  \addlinespace
+  Will & \ftaglist{w:signed, w:torque, w:faces, w:con, w:rec, w:sev, w:anti, w:net, w:exp,
+    w:vir, w:enl, w:res}
+    & the signed forcing term, its privacy, and its faces \\
+  \addlinespace
+  Dynamics & \ftaglist{dyn:flow, dyn:lapse, dyn:gamma, dyn:formclose, dyn:bend, dyn:bif,
+    dyn:tri, dyn:sub, dyn:seed, dyn:spont, dyn:moment, dyn:exact, dyn:response, dyn:jac,
+    dyn:rot, dyn:stand}
+    & flow, the derived decay, the trichotomy, the exact map and its two constants,
+      Jacobian, the spectral pair \\
+  \addlinespace
+  Maintenance & \ftaglist{maint:knee, maint:ident}
+    & the stock rival bounded; the will identified \\
+  \addlinespace
+  Skew sector & \ftaglist{dyn:split, dyn:sym, dyn:skew, dyn:polar, dyn:reconcile, dyn:floor,
+    dyn:scramble, dyn:radial, dyn:release, dyn:pitch, dyn:precess,
+    dyn:loop, dyn:pitchpair, dyn:whereskew}
+    & the generator split; the coupling's law, its floor and its two spends; release,
+      pitch, precession, loop currents; the localization diagnostic \\
+  \addlinespace
+  Readout & \ftaglist{op:read, op:cos, op:cosev, op:vel, op:null, op:vmoral, op:recess, op:afriat, op:L}
+    & the map, its projections, the two cosines, the baseline, the two recessions \\
+  \addlinespace
+  Normative & \ftaglist{nrm:assign, nrm:self, nrm:floor, nrm:nodepl, nrm:martyr, nrm:annex, nrm:incl, nrm:public, nrm:expo, nrm:grid, nrm:good,
+    nrm:modest, nrm:wise, nrm:int, nrm:anch, nrm:anchmetric, nrm:anchbase, nrm:telos, nrm:wedge}
+    & weight, the two self-boundaries --- funding and self-description --- and the
+      located axiom, the grid, the modest-good corner, the anchors, the
+      telos and the martyr wedge \\
+  \addlinespace
+  Per-reader & \ftaglist{pr:report, pr:colour, pr:info, pr:woven, pr:verdict, pr:stand, pr:agg,
+    pr:forge, pr:scope, bf:factors}
+    & the coloured report, the functional, the null projection, the wall
+      operationalized; colour-span split below \\
+  \addlinespace
+  Colour-span & \ftaglist{pr:gain, pr:span, pr:span-ident, pr:deltaspan,
+    pr:detach, bd:fab-power}
+    & witness colour, bracketing, span-weighted recovery, fabrication power \\
+  \addlinespace
+  Appendices & \ftaglist{app:recovery}
+    & the recovery appendix, type-checking the verdict axis \\
+  \addlinespace
+  \quad recovery & \ftaglist{recov:estimand, recov:factor, recov:sat, recov:effreads, recov:cover,
+    recov:blocks, recov:split, recov:span, recov:Lhat, recov:route, recov:null, recov:scope,
+    recov:ancill, recov:ceil, recov:auditor,
+    recov:compare, recov:groupframe, recov:contrast, recov:anchorflow, recov:gap}
+    & estimand, saturation, ceilings, identification, anchor wall (the boxed
+      one-line reading of \ftag*{recov:gap} carries no tag of its own) \\
+  \addlinespace
+  Belief-factors & \ftaglist{bf:ind, bf:unb, bf:cred, bf:mot}
+    & independence, unbias, credibility, motivation \\
+  \addlinespace
+  Constants, posted & \ftaglist{c:Wstar, c:tau, c:W0, c:Npool, c:burn, c:kappa0, c:exch, c:q,
+    c:mu, c:Da}
+    & the leaked exchange-rates (\ftag*{P:leak}); \ftag*{c:q} the log's published axis;
+      \ftag*{c:mu}, \ftag*{c:Da} the coupling's own law \\
+  \addlinespace
+  \quad anchored & \ftaglist{c:Gstar}
+    & the metric on $\dualspace$, present wherever a tidy $\dimratio$ appears \\
+  \addlinespace
+  \quad open & \ftaglist{c:nu}
+    & the one open debt: the baseline converter, granted at \ftag*{op:vmoral},
+      scheduled by the identification scheme's method, settled by measurement or
+      never \\
+  \addlinespace
+  Held, never posted & $\selfweight{i}$
+    & kept against decay (\ftag*{ten:self}), dark, the price that funds every other \\
+  \addlinespace
+  Profile & \ftaglist{P:vec, P:sig, P:dens, P:will, P:dir, P:nar, P:bld, P:res, P:nonorm, P:order,
+    P:anti}; gates \ftaglist{gate:G1}--\ftag*{gate:G4}
+    & the trait-point, its non-norm, the antichain, the four gates \\
+  \addlinespace
+  Boundaries & \ftaglist{bd:rep, bd:fab, bd:edge, bd:G, bd:V}
+    & the ratio and the rate; the gated edge \\
+  \addlinespace
+  Joints & \ftaglist{J:read, J:occ, J:power, J:tremble, J:seal, J:broker, J:anchor, J:hip,
+    J:triage}
+    & readability, occupancy and its price, the trembling identity, the toll-keeper and
+      the broker's two products, the anchor, the hip \\
+  \addlinespace
+  Insights & \ftaglist{f:pool, nrm:funding, pr:silence, pr:equi,
+    recov:ext, recov:victim, recov:hold, recov:held}
+    & count pooling, funding type, the silencing, equi-interest, recovery holdings \\
+  \addlinespace
+  Statements & \ftaglist{art:directive, nrm:incl-expo, mod:facets,
+    P:axes, P:akrasia, mod:branch, mod:drifts, mod:recruit}
+    & the boxed prose results, the branch statement, the both-drifts reading and the
+      recruitment reading among them; four more are restatement or interpretation and
+      carry no tag \\
+  \addlinespace
+  Scales & ---
+    & the gate-stride at four depths: \zcref{tbl:scales}, authoritative; its four
+      rows are locators, not referents \\
+  \addlinespace
+  Sinks & \ftaglist{snk:ker, snk:anch} (split \ftaglist{snk:anch-t, snk:anch-G})
+    \ftaglist{snk:two}; ground \ftaglist{src:nd}
+    & unreadable-now, settled-later, the two feet, the non-dimensional ground \\
+  \addlinespace
+  Tenants & \ftaglist{ten:res, ten:fid, ten:sev, ten:self, ten:toll, ten:spite, ten:lapse,
+    ten:deon}; typing \ftaglist{deon:open, deon:test}
+    & the still center's occupants: the toll pair split by funding, the deontic
+      straddling --- and typed open-loop, refutable never verifiable \\
+  \addlinespace
+  Gaits & \ftaglist{g:split, g:gate, g:sign, g:knock, g:proj, g:rec}; discipline \ftaglist{mod:reg}
+    & the six moves: the document's whole repertoire --- and the register rule:
+      silence marks the unavailable, never the forbidden \\
+  \addlinespace
+  Roots & $\{\,$\ftag*{gen:alph}, \ftag*{epi:conv}$\,\}\perp\{\,$\ftag*{gen:obj},
+    \ftag*{gen:will}$\,\}$, anchors $\{\,$\ftag*{c:Gstar}, $\lambda\,\}$
+    & content as argument, modality as taint; the evidential back-edges
+      (\ftag*{ev:decay-occ}, \ftag*{ev:knee-rate}, \ftag*{ev:resid-ex},
+      \ftag*{ev:resid-opp},
+      \ftag*{ev:afriat-conv}, \ftag*{ev:tremble-conv}) warrant the
+      posits from downstream, every one posted at \zcref{tbl:ev} \\
+  \addlinespace
+  Registers, generated & \ftaglist{tbl:ledger, tbl:rulings, tbl:branches, tbl:equivalences,
+    tbl:ev}
+    & projections of the one registry: constants, rulings, branch prices, identities,
+      back-edges \\
+  \addlinespace
+  Virtues & \virtuelist{wonder, beauty, goodness, kindness, love, wisdom, truth, health}
+    & the eight welded words, each anchored at its formal weld \\
+  \addlinespace
+  Refrains & ---
+    & the plain breath-lines: prose, carrying no tag; the one the cosine
+      appendix points back at is at \zcref{sec:say:direction} \\
+  \addlinespace
+  Membranes & \ftagfam{e:*} (scholar, with \ftag*{e:dmp} the heart's aligns-with vs.\
+    opposes-$\nabla\rewardfield$ departure), \ftag*{epist:duhem} (the one foil the framework
+    meets at the floor rather than annexes, at \ftag*{op:recess})
+    & the two loose membranes \\
+\end{xltabular}
+
+\clearpage
+\section{The degenerate corners, and the four scales}
+\label{app:corners}
+
+\subsection{The corners}
+\label{subsec:corners:corners}
+The full theory recovers a degenerate corner on each restricted domain --- a consistency
+check on one object by \ftag{g:rec}, not a genealogy of versions.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The degenerate corners}{tbl:corners}
+  \begin{tabularx}{\textwidth}{@{} l L @{}}
+    \toprule
+    \textbf{restriction} & \textbf{recovers} \\
+    \midrule
+    sealed-only (no ambivalence, no felt-zero)
+      & the scalar field; coupling and alignment co-vanish; \ftag*{f:acc} reduces to
+        $\leanbare(1+\effdensity)$ on the support where $\leanbare$ is defined \\
+    \addlinespace
+    single-reader & the per-reader field collapses to one verdict; \ftag*{f:acc} the local
+      approximation \\
+    \addlinespace
+    colour $=0$ & the report logs $\outcomechange{k}$ bare; the four belief-factors collapse to
+      $(1-\leanbare)$ \\
+    \addlinespace
+    no-Sybil & $\effdensity$ computable; \gradeword{cont-anch} results become \gradeword{feas} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A form that does not reduce to its corner is wrong on the restricted domain --- the
+reduction-strut catching commission.
+
+\subsection{The gate-stride, four scales}
+\label{subsec:corners:scales}
+The motif $X=g\cdot f$ recurs identically --- the animal's one stride. The on/off is $g$, a
+magnitude vanishing structurally; $f$ is two-sided from \zcref{tbl:sc:bif} through \zcref{tbl:sc:edge}
+(at \zcref{tbl:sc:acc} the amplifier $1+\effdensity\ge1$ never vanishes, so the gate is $g$ alone).
+This table is the \emph{authoritative} scale ledger: \ftag*{bd:edge} is \zcref{tbl:sc:edge}.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The gate-stride, four scales}{tbl:scales}
+  \begin{tabularx}{\textwidth}{@{} c l L L @{}}
+    \toprule
+    \textbf{scale} & \textbf{result} & \textbf{$g$ (the on/off)} & \textbf{$f$} \\
+    \midrule
+    \gatescalerow{tbl:sc:acc} & \ftag*{f:acc}
+      & capacity gate ($=0$ iff $S{=}0$) & $1+\effdensity$ (amplifier, floor $1$) \\
+    \addlinespace
+    \gatescalerow{tbl:sc:bif} & \ftag*{dyn:bif} & formation rate & margin over $\decayrate$ \\
+    \addlinespace
+    \gatescalerow{tbl:sc:info} & \ftag*{pr:info} & unbias & credibility \\
+    \addlinespace
+    \gatescalerow{tbl:sc:edge} & \ftag*{bd:edge} & funding gap & non-representable fraction \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The trivial root ($g=0$: zero stake, no reward, slanted witness, self-funded) is always
+present; the non-trivial root is always threshold-gated. One stride, four depths --- which is
+why the residual is invariant: same stride, same blind spot, same forgery-of-the-genuine at
+every level.
+
+\clearpage
+\section{Phase portraits, and the prohibition}
+\label{app:portraits}
+The phase behaviour of \ftag{dyn:flow}, by the shape of $\bendfn$ and the structure of the coupling.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Phase portraits of the flow}{tbl:portraits}
+  \begin{tabularx}{\textwidth}{@{} l >{\hsize=.6\hsize}L >{\hsize=1.4\hsize}L @{}}
+    \toprule
+    & \textbf{condition} & \textbf{regime} \\
+    \midrule
+    \appblockrow{app:port:concave} & concave $\bendfn$ & transcritical bifurcation, will-as-subsidy \\
+    \appblockrow{app:port:sigmoid} & sigmoidal $\bendfn$,\ $\biforce>\beta_{\text{sn}}=2\decayrate\bendslope$
+      & saddle-node, bistable, will-as-seed; separatrix located \\
+    \appblockrow{app:port:deadseam} & $\normG{\surplus}\to0$
+      & the dead seam, $\alignrate=\willvirtue-\willdecay$ --- the moral null where the baselines
+        coincide \\
+    \appblockrow{app:port:blindrate} & $\bendfn'(0),\bendfn''(0)$
+      & the \ftag*{dyn:bif}-unreadable rate, blind at a point by \ftag*{epi:fact} \\
+    \appblockrow{app:port:flywheel} & the $\delta$-axis flywheel
+      & increasing returns in the density of independent witnessing, driven by
+        \zcref{B:record}$+$\zcref{B:relevance} ---
+        anchored only \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\appblock{app:port:spectrum}{the coupling and the spectrum.}The derivation graph is a DAG; the
+dynamical graph carries one feedback loop, $\leanbare\leftrightarrow\effdensity$, and \ftag{dyn:rot}
+lives on it. The Jacobian is $DF=\alpha I+\beta P$, with spectrum split into a growth and a
+rotation part at \zcref{eq:dyn:stand}:
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Coupling structure and spectrum}{tbl:coupling}
+  \begin{tabularx}{\textwidth}{@{} l L @{}}
+    \toprule
+    \textbf{coupling} & \textbf{spectrum and regime} \\
+    \midrule
+    directed & a complex pair $\to$ rotating cycles (\ftag*{dyn:rot}) \\
+    symmetric & real spectrum $\to$ standing only (\ftag*{dyn:stand}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent\emph{Symmetric witness-coupling $\Rightarrow$ real spectrum $\Rightarrow$ no rotating
+wave; in the first-order, instantaneous model a travelling phase-wave certifies directed
+coupling.} The prohibition is \gradeword{nec} by
+the spectral theorem alone --- real-symmetric implies real spectrum for any real
+$\alpha,\beta$, so no anchored magnitude rescues a rotating mode from a symmetric coupling.
+
+\medskip
+\appblock{app:port:fabline}{the fabrication line as a phase boundary}in (anchor-supply rate,
+fabrication budget):
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The fabrication line}{tbl:fabline}
+  \begin{tabularx}{\textwidth}{@{} l L @{}}
+    \toprule
+    \textbf{region} & \textbf{state} \\
+    \midrule
+    below (anchors outpace fabrication) & the sealed cell holds; the harm-forward settles \\
+    above (fabrication outpaces anchors) & the funded fake is stable (\ftag*{bd:fab}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\clearpage
+\section{The cosine and the stake}
+\label{app:cosine}
+\auditnote{Inductive audit: the alignment $\leanbare$ is a normalization, and a normalization
+divides out a magnitude. Nothing here is load-bearing above; the load-bearing core is pulled
+into the body (\ftag{op:cos}, \ftag{f:opp}, \ftag{dyn:flow}), and this is the type-check run on the
+primitive.}
+
+\appblock{app:cos:covectors}{two covectors, one dual space.}Outcome-space is graded,
+$\outcomespace=\bigoplus_a\dimgood{a}$, each component incommensurable.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The objects on an edge}{tbl:cosine:covectors}
+  \begin{tabularx}{\textwidth}{@{} L l l L @{}}
+    \toprule
+    \textbf{object} & \textbf{symbol} & \textbf{dim} & \textbf{status} \\
+    \midrule
+    self-weighting & $\selfweight{i}$ & $\dimnodepergood{i}{a}$
+      & held, dark to its holder, kernel-maintained (\ftag*{snk:ker}) \\
+    co-movement & $\comovcomp{i}{j}{a}{b}$ & $\dimgoodratio{a}{b}$ & state-traffic, known \\
+    caring covector & $\caringcovector{i}{j}=\caringdef{i}{j}$ & $\dimnodepergood{i}{b}$ & derived \\
+    feeling covector & $\feelingcovector{j}$ & $\dimnodepergood{j}{b}$ & known \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Their shared dimension is what makes a co-movement askable: $i$'s induced caring and $j$'s
+self-valuation are comparable, or there is no edge to read.
+
+\medskip
+\appblock{app:cos:cosine}{$\leanbare$ is a cosine.}
+\begin{equation}
+  \lean{i}{j}=\quoted{\frac{\ipGcov{\caringcovector{i}{j}}{\feelingcovector{j}}}
+    {\normGcov{\caringcovector{i}{j}}\,\normGcov{\feelingcovector{j}}}}
+    =\cos\angle(\caringcovector{i}{j},\,\feelingcovector{j}),\qquad\dimratio,\quad
+    \text{defined where }\caringcovector{i}{j}\neq0.
+  \label{eq:cosine:def}
+\end{equation}
+($\anchormetric$ on $\dualspace$ is commensuration data, folded into the held bundle
+$(\selfweight{i},\anchormetric)$.) The alignment is dimensionless because it has divided out $\quoted{\normGcov{\caringcovector{i}{j}}}$.
+Normalization to $\dimratio$ \emph{is} the erasure of magnitude.
+
+\medskip
+\appblock{app:cos:stakemag}{stake is the divided-out magnitude.}The \ftag{g:knock} of
+good\,$\dimwelfare$ $\neq$ virtue\,$\dimrate$:
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Stake $\neq$ alignment}{tbl:cosine:stake}
+  \begin{tabularx}{\textwidth}{@{} L l l @{}}
+    \toprule
+    \textbf{quantity} & \textbf{symbol} & \textbf{dim} \\
+    \midrule
+    accountable stake & $\accountablestake{i}{j}$ & $\dimwelfare$ \\
+    alignment & $\leanbare=\cos$ & $\dimratio$ \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A stake read off $\leanbare$ extracts a $\dimwelfare$ from a $\dimratio$; the cosine has divided
+the norm out, so no magnitude remains in view. The refrain of this fact rides its
+theorem in the body (\zcref{sec:say:direction}, at \ftag{f:split}).
+
+\appblock{app:cos:acctstake}{accountability is the stake.}The cosine's zero factors; the norm's
+does not.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The vanishings}{tbl:cosine:zeros}
+  \begin{tabularx}{\textwidth}{@{} l l L @{}}
+    \toprule
+    \textbf{vanishes} & \textbf{condition} & \textbf{reading} \\
+    \midrule
+    $\leanbare=0$ & $\caringcovector{i}{j}\perp\feelingcovector{j},\ \caringcovector{i}{j}\neq0$ & ambivalence (\ftag*{f:ambiv}) \\
+    $\leanbare$ undefined & $\caringcovector{i}{j}=0$ & the apparent stranger (\ftag*{f:feltzero}) \\
+    $\accountability=0$ & $\opnormG{\comov{i}{j}}=0$ & the seal, $\comovfield=0$ --- the genuine stranger \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The ambivalent tie holds $\quoted{\normGcov{\caringcovector{i}{j}}}>0$ and is fully accountable,
+$\partial_{\effdensity}\accountability|_{\leanbare=0,\,\caringcovector{i}{j}\neq0}>0$ --- density manufactures
+accountability across it; sealing is the norm-zero $\opnormG{\comovfield}=0$ alone.
+
+\medskip
+\appblock{app:cos:dividends}{two dividends.}
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The two dividends}{tbl:cosine:dividends}
+  \begin{tabularx}{\textwidth}{@{} l L @{}}
+    \toprule
+    \textbf{dividend} & \textbf{content} \\
+    \midrule
+    (a) the gate reads $\dimratio$
+      & $\accountability$ gates on the operator norm, anchored lengths compared top and
+        bottom, so the gate is dimensionless with no reference perturbation posted;
+        $\anchormetric$ present wherever a tidy $\dimratio$ accountability appears \\
+    \addlinespace
+    (b) the wall is anchored
+      & the capacity $\opnormG{\comovfield}$ is invariant under
+        \emph{both} weightings; the coupling $\coupling{i}{j}$ drifts with $i$'s own $\selfweight{i}$
+        and is bounded above by it --- only the anchored operator magnitude resists both
+        drifts, at the honest cost of leaning on $\anchormetric$ (\ftag*{J:anchor}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\noindent Building the wall on direction (the cosine) or on felt stake (private
+$\selfweight{i}$) would let a party dissolve its own accountability by re-weighting; only the
+anchored operator magnitude resists both drifts. Accountability \emph{must} be an anchored
+magnitude.
+
+\medskip
+\appblock{app:cos:inclexpo}{inclusion and exposure, one magnitude split by sign.}Inclusion folds
+by \emph{their} measure (signed, $\foldterm{i}{j}$); exposure gates on the absolute
+stake ($\accountablestake{i}{j}$, sign-blind).
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Inclusion vs.\ exposure}{tbl:cosine:inclexpo}
+  \begin{tabularx}{\textwidth}{@{} l C C @{}}
+    \toprule
+    \textbf{configuration} & \textbf{inclusion} & \textbf{exposure} \\
+    \midrule
+    stranger & $0$ & $0$ \\
+    child & large & large \\
+    frenemy ($\leanbare\approx0$ net, large stake) & $\to0$ & large \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The pure cosine fold would divide $\quoted{\normGcov{\caringcovector{i}{j}}}$ out and fold a faint tie as fully as a deep
+one; the aligned-stake fold keeps the magnitude, so the self carries the intensity of its
+holdings. The frenemy is the wedge --- answerable-to, not part-of.
+
+\medskip
+\appblock{app:cos:propagation}{the $\anchormetric$ propagation.}Because \ftag{dyn:flow} is
+\gradeword{cont-anch}, everything computed \emph{from} the flow inherits anchor-relativity --- the
+numerical magnitudes and thresholds first, and with them orthogonality and the sign of an
+anchored contraction, each of which may change with the metric.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The $\anchormetric$ propagation}{tbl:cosine:propagation}
+  \begin{tabularx}{\textwidth}{@{} L l @{}}
+    \toprule
+    \textbf{computed from flow} & \textbf{tag} \\
+    \midrule
+    \ftag*{dyn:bif} threshold, \see{sec:flow} basins, \zcref{eq:fixed:beta} $\beta$-margin & \gradeword{cont-anch} (magnitude/threshold) \\
+    \ftag*{J:occ} occupancy $\willeff=\decayrate\alignfixed$ (held $\Rightarrow$ occupied) & \gradeword{nec} --- existence, metric-free \\
+    \ftag*{dyn:rot} spectral prohibition & \gradeword{nec} --- sign of the real part, invariant \\
+    sign of $\alignfact$ (alliance/enmity) & \gradeword{cont-anch} --- flips under a change of $\anchormetric$ \\
+    ambivalence \ftag*{f:ambiv} ($\caringcovector{i}{j}\perp\feelingcovector{j}$) & \gradeword{cont-anch} --- orthogonality is a metric fact \\
+    felt-zero $\caringcovector{i}{j}=0$ & \gradeword{cont-comm} --- metric-free but private-$\selfweight{i}$-relative \\
+    sealed $\comovfield=0$ & \gradeword{nec} --- depends on nothing \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Numerical magnitudes and thresholds obtained through $\anchormetric$ are anchor-relative, and
+orthogonality and the sign of an anchored contraction may change with the metric too. What
+remains anchor-invariant is the structural distinction between a zero and a nonzero operator,
+together with the existence and vanishing claims that use no metric at all: the seal
+$\comovfield=0$, and the one-sidedness of the accountability gate (\ftag{f:acc}), which vanishes
+iff the edge is sealed, in every metric --- while the gate's own magnitude, built on the
+operator norm, spends $\anchormetric$ and is \gradeword{cont-anch} with the rest. Felt-zero is a
+third case and neither of the first two: metric-free, and relative to the private weight
+(\gradeword{cont-comm}). One partition, two anchors --- $\selfweight{i}$
+within, $\anchormetric$ public: the firewall re-derived from the sweep. The heart is anchored;
+the still center it fills is not.
+
+\clearpage
+\section{The method's self-limit}
+\label{app:self-limit}
+\auditnote{Inductive, not a record: why the audit cannot close, read from the gait structure
+alone.}
+
+The struts catch \emph{commission}. Each checks whether \emph{what is present} is right.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The struts catch commission}{tbl:self:struts}
+  \begin{tabularx}{\textwidth}{@{} l L l @{}}
+    \toprule
+    \textbf{strut} & \textbf{catches} & \textbf{blind to} \\
+    \midrule
+    \ftag*{g:knock} & a form that equates two dimensions & omission \\
+    \ftag*{g:proj} & a form that claims signal in the null space & omission \\
+    \ftag*{g:rec} & a form wrong on a restricted domain & omission \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A form that omits a real channel --- that logs $\outcomechange{k}$ bare where a colour was present, or
+reads the cosine where a stake was meant --- reduces fine and contradicts no mechanism. It is
+missing something, and missing is invisible to recovery-and-fidelity: the un-coloured report
+reduces perfectly and violates nothing; it simply lacks the colour. So the strut-set passes
+incomplete forms, and completeness is supplied only by a reader bringing the missing channel.
+The cosine appendix (\zcref{app:cosine}) is this completion enacted: the stake-magnitude is a real channel that reduced fine
+and contradicted no mechanism wherever only the alignment was read --- an omission the struts
+pass and a reader supplies, now on file directly above.
+
+Pushed to its limit, the audit's prongs are structurally dual to the framework's own.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{Audit prong $\leftrightarrow$ framework prong}{tbl:self:duality}
+  \begin{tabularx}{\textwidth}{@{} l l @{}}
+    \toprule
+    \textbf{audit prong} & \textbf{framework prong} \\
+    \midrule
+    the dimensional check & the type-check \\
+    reduction & the spot/forward recovery \\
+    projection & the image/kernel split \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Their terminus is therefore the framework's: the last thing a strut would have to read is a
+\emph{rate held at rest} (\ftag{snk:ker}), which no instrument reads at an instant, or a
+\emph{future not yet settled} (\ftag{snk:anch}), which no instrument settles now. Neither is in
+any strut's reach. Hence:
+
+\emph{the audit terminates at the two feet and admits no formal closure} (\ftag{snk:two});
+\emph{no formalism contains the reading; no instrument reads the future.}
+
+The document's own last verdict --- including this one --- is therefore a reading, real within
+its anchor, settled, if ever, in arrears. That includes the type-posits of its own primitives:
+\ftag{gen:will} is $\dimrate$ on a warrant collected at the data layer (\ftag{ev:knee-rate}) and
+transmitted at \ftag{J:occ}, in arrears by \ftag{snk:anch-t}
+--- temporal only, not anchor-relative, so every \gradeword{nec} result is quarantined from the
+self-application. The will-is-a-rate posit is itself a \ftag{ten:fid}: stated at the start, held
+continuously against the reader's decay-into-doubt, corroborated only by watching it dissipate
+without reserve. The discipline that watches each grand sentence for an unaudited identity is
+kept; the claim that it could ever be \emph{completed} is exactly what the two feet forbid.
+
+\clearpage
+\section{The exchange-rate ledger, and the registers}
+\label{app:ledger}
+\handle*{c:Wstar}\handle*{c:tau}\handle*{c:W0}%
+\handle*{c:Npool}\handle*{c:kappa0}\handle*{c:burn}%
+\handle*{c:mu}\handle*{c:Da}%
+The dimensioned constants the framework posts, one per scalarization --- none a fact, each a
+value-choice made visible by the type-check (\ftag{P:leak}). The table is a projection of
+the one registry the preamble declares: a ledger/registry disagreement is unwritable,
+because both render from the same store.
+
+\GenerateLedger
+
+That \ftag*{f:acc} appears as a clean $\dimratio$ is itself a spend of $\anchormetric$: the
+gate is the operator norm, anchored lengths compared top and bottom, and the alignment
+$\leanbare$ inside the reward is already a cosine, a magnitude divided by its own norm.
+Every tidy ratio in the document has divided out a dimensioned price; the deepest,
+$\anchormetric$, is the one a scalar primitive hides by never writing the magnitude down.
+The type-check keeps the price from passing as a measurement. The held weighting
+$\selfweight{i}$ is the one exchange-rate never posted but \emph{kept} --- dark to its
+holder, settled by a life, the price that funds every other (\ftag{c:lam} on the ledger:
+held, site ``never posted'').
+
+\subsection{The rulings register}
+\label{subsec:ledger:rulings}
+A type system that must decide must show its decisions; a checker that smuggles theses is
+the disease it treats. Each row anchors its key, so the body cites rulings by tag.
+The register is empty: no ruling is posted. The register renders anyway --- an empty
+table is a statement, and a missing one is silence.
+
+\GenerateRulings
+
+\subsection{The verification contract}
+\label{subsec:ledger:verify}
+What each mechanism certifies, and what it does not. This is an implementation
+boundary, not a theorem and not an interpretive result, so it carries a structural
+label and no semantic key: nothing in the theory turns on it, and a reader auditing
+the document needs it stated in one place. No silent caps --- what is certified and
+what is not are stated in the same breath.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The verification contract: what is checked, and what is
+    not}{tbl:verify}
+  \begin{tabularx}{\textwidth}{@{} l L L @{}}
+    \toprule
+    \textbf{mechanism} & \textbf{certifies} & \textbf{does not certify} \\
+    \midrule
+    reproduction & this paper and its explainer regenerate byte for byte from a
+      fixed, listed set of inputs & truth, empirical adequacy, or completeness \\
+    \addlinespace
+    addressing & every printed tag, reference and bibliography entry resolves to
+      its target & that a tag names a certified object \\
+    \addlinespace
+    typed layer & ledger and registers render from one set of declarations; in
+      typed results, a grade above the recorded spends, an undeclared constant, or a
+      sum or comparison across dimensions stops the build & prose and displays set in
+      the legacy layer; ordinary unregistered algebra \\
+    \addlinespace
+    human review & names, scope, interpretation, presentation & mechanical
+      reproducibility by itself \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Two scoping facts belong with the row for the typed layer, because they say what
+that row means. A DEFINITION deposits nothing: naming a metric-dependent object is
+free, the spend deferred into the name and cashed at every later assertion, so a
+definition environment audits at the ceiling while the asserting prose after it pays.
+And a subsection grade grades the subsection's OWN running prose: a result environment
+audits at its own grain and its spends are consumed there, so a \texttt{nec} subsection
+may contain results graded lower without the grade avalanching upward.
+
+The legacy symbol layer deposits nothing: prose set in it audits vacuously, and
+\verb|\RegisterVariance| supplies variance heads only, so dimensions stay loudly
+unregistered there. The flagship dynamics displays (\zcref{eq:dyn:flow} and the
+threshold family) are set in that layer, and the branch guard arms only at typed
+call sites, of which the dynamics currently carry none.
+
+\subsection{The branch-breakage ledger}
+\label{subsec:ledger:branches}
+The trilemma's prices, posted (\ftag{mod:branch}): every site that survives only under some
+branches, so that nobody chooses a branch without reading its price.
+
+\GenerateBranchLedger
+
+\subsection{The equivalence register}
+\label{subsec:ledger:equiv}
+Posted identity claims: one object under two names is declared, glossed, and audited by
+readers, never silently forked.
+
+\GenerateEquivalences
+
+\subsection{The evidential register}
+\label{subsec:ledger:evidence}
+Derivation is a DAG; evidence is not. The two basins meet once, at the flow
+(\ftag{gen:basins}), and their contact is WARRANT rather than entailment: every
+back-edge is posted here, and an edge this register does not carry is an edge the
+document does not lean on.
+
+\GenerateEvidence
+
+\subsection{The shapes register}
+\label{subsec:ledger:shapes}
+A dimension checker cannot catch a functional form: two shapes with one dimension are
+one type and two theories. Every load-bearing shape choice is therefore posted here,
+with its site and its priced alternative --- the register the baseline's own repair
+proved necessary, since a semantic type error can pass every exponent check
+(\ftag{op:vmoral}).
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The shapes register}{tbl:shapes}
+  \begin{tabularx}{\textwidth}{@{} >{\hsize=0.9\hsize}L l >{\hsize=1.1\hsize}L @{}}
+    \toprule
+    \textbf{shape} & \textbf{site} & \textbf{status; priced alternative} \\
+    \midrule
+    sigmoidal bend, zero at zero, convex near the origin & \ftag*{dyn:bend}
+      & chosen; any other bend re-prices every boundary through its own
+        $\psi$ \\
+    \addlinespace
+    linear mean decay & \ftag*{dyn:gamma}
+      & derived, not chosen: the sphere's degree-one eigenvalue \\
+    \addlinespace
+    isotropic scalar diffusion & \ftag*{mod:branch}
+      & chosen; anisotropy is read by the detailed-balance biconditional
+        failing (\ftag*{dyn:loop}) and by off-curve trembling \\
+    \addlinespace
+    linear atrophy, additive isotropic ambient noise & \ftag*{dyn:polar}
+      & minimal completion; multiplicative noise and nonlinear atrophy are
+        priced alternatives, policed by the radial cross-check
+        (\ftag*{dyn:ttax}) \\
+    \addlinespace
+    the baseline as a trajectory, not a forcing & \ftag*{op:vmoral}
+      & forced: the forcing form mints virtue from drift --- the register's
+        founding exhibit \\
+    \addlinespace
+    the funded pull entering the motion where the will enters it
+      & \ftag*{mod:drifts}
+      & chosen; the additive-pull alternative is priced on the \emph{sign}
+        rather than the magnitude, near the poles and in the founding regime \\
+    \addlinespace
+    the anchored tally ranging over recruited witnesses, motivation the gate
+      & \ftag*{mod:recruit}
+      & chosen; the positional alternative leaves the count untouched and moves
+        the cartel's deterrent collapse off the density and onto the
+        credibility of reports \\
+    \addlinespace
+    a global linear baseline elasticity & \ftag*{c:nu}
+      & scheduled; per-node heterogeneity the priced alternative \\
+    \addlinespace
+    the rival's need-shape & \ftag*{nrm:nodepl}
+      & the prioritarian's posted converter --- a shape only this register
+        catches \\
+    \addlinespace
+    the quench cost functional & \ftag*{J:seal-floor}
+      & robust: absolute and quadratic costs agree at twice-critical
+        damping \\
+    \addlinespace
+    the reference geometry: three goods, unit diffusion, one representative
+      bend & \ftag*{dyn:response}
+      & where every worked numeric in the document lives \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{The debts register}
+\label{subsec:ledger:debts}
+A named debt is not a flaw; an unnamed one is. The status of every debt the document
+posts, in one place: discharged, scheduled, scoped, or open.
+
+\begin{table}[htbp]
+  \centering
+  \captiontag{The debts register}{tbl:debts}
+  \begin{tabularx}{\textwidth}{@{} >{\hsize=0.9\hsize}L >{\hsize=1.1\hsize}L @{}}
+    \toprule
+    \textbf{debt} & \textbf{status} \\
+    \midrule
+    the will's warrant & discharged to the data layer: measured decay, release
+      knee, identified residual (\ftag*{ev:decay-occ}, \ftag*{ev:knee-rate},
+      \ftag*{ev:resid-ex}, \ftag*{ev:resid-opp}; \ftag*{maint:ident}) \\
+    \addlinespace
+    the stock rival & bounded, never excluded (\ftag*{maint:knee}) --- a standing
+      bound every release experiment tightens \\
+    \addlinespace
+    the coupling's law of motion & discharged: posted, with its floor and its two
+      spends (\ftag*{dyn:polar}) \\
+    \addlinespace
+    the baseline converter & scheduled: estimable as a global elasticity, with a
+      stated bias direction (\ftag*{c:nu}) \\
+    \addlinespace
+    the deontic's scope & scoped: in as a term, out as a target; refutable, never
+      verifiable (\ftag*{deon:open}, \ftag*{deon:test}) \\
+    \addlinespace
+    the boundary axiom & located and priced, undischargeable in principle
+      (\ftag*{nrm:nodepl}) \\
+    \addlinespace
+    the profile typings & open: the narration coordinate's motivation, and the
+      antichain's by-type against by-ignorance split (\ftag*{P:nonorm},
+      \ftag*{P:order}) \\
+    \addlinespace
+    construct validity & open --- the largest front: whether the anchored
+      observables are measurable at all (\ftag*{pr:scope}) \\
+    \addlinespace
+    the visible-label index & discharged: the index of the tag namespace, in the back
+      matter, glosses kept by hand \\
+    \addlinespace
+    the companion explainer & open: its claims await re-scoping to the paper's
+      corners \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\end{document}

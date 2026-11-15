@@ -2834,6 +2834,7 @@ fn reader_fixture_book_state(
     let markdown = ftoo_manifest::check_markdown_sources(sources).unwrap();
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
     let mut events = registry::load(&registry::read(&root).unwrap()).unwrap();
+    events.truncate(1); // This fixture exercises the weld decision and two local records.
     let located = |value: &str| ftoo_manifest::LocatedString {
         value: value.into(),
         site: input::site("fixture-registry.toml"),
