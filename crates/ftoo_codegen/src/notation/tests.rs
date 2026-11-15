@@ -557,7 +557,7 @@ fn support_required_batch_protocol_frames_keep_full_streams_and_restore_a_valid_
     let fixture = Fixture::new();
     let support = fixture.support();
     let adapter = support.root.join("tmp/protocol.cjs");
-    let handshake = b"22.16.0\n0.16.22\n";
+    let handshake = b"22.16.0\n0.19.1\n";
     let mut valid = handshake.to_vec();
     valid.extend(frame(0, 0, b"<math>x</math>"));
     let mut cases = vec![];
@@ -758,9 +758,10 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
         crate::telemetry::counter("notation.process_starts", 1);
         crate::telemetry::counter("notation.version_probes", 1);
         let mut stdout = child.stdout.take().unwrap();
-        let mut handshake = [0; 16];
+        let expected = b"22.16.0\n0.19.1\n";
+        let mut handshake = vec![0; expected.len()];
         stdout.read_exact(&mut handshake).unwrap();
-        evidence.push((handshake.to_vec(), b"22.16.0\n0.16.22\n".to_vec()));
+        evidence.push((handshake, expected.to_vec()));
         support.observe()?;
         Ok((child, stdout))
     }
@@ -832,7 +833,7 @@ fn support_required_batch_protocol_request_boundaries_and_utf8_restore() {
     let fixture = Fixture::new();
     let support = fixture.support();
     let entry = support.root.join("tmp/distribution.js");
-    crate::support_bracket::mutation::write(&entry, "module.exports = { version: '0.16.22', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
+    crate::support_bracket::mutation::write(&entry, "module.exports = { version: '0.19.1', ParseError: class extends Error {}, renderToString: () => { globalThis.seen = (globalThis.seen || 0) + 1; return '<math>' + globalThis.seen + '</math>'; } };").unwrap();
     let (evidence, statuses) = support
         .scope_with_inputs(
             &support::repository().join("tools/notation/check.cjs"),
@@ -1089,21 +1090,21 @@ fn support_configuration_and_protocol_are_exact() {
         ),
         (
             0,
-            b"22.16.0\n0.16.22".to_vec(),
+            b"22.16.0\n0.19.1".to_vec(),
             vec![],
             true,
             ProtocolReason::InvalidVersionResponse,
         ),
         (
             0,
-            b"22.16.0\n0.16.22\nextra\n".to_vec(),
+            b"22.16.0\n0.19.1\nextra\n".to_vec(),
             vec![],
             true,
             ProtocolReason::InvalidVersionResponse,
         ),
         (
             0,
-            b"v22.16.0\n0.16.22\n".to_vec(),
+            b"v22.16.0\n0.19.1\n".to_vec(),
             vec![],
             true,
             ProtocolReason::InvalidVersionResponse,
@@ -1121,16 +1122,16 @@ fn support_configuration_and_protocol_are_exact() {
     }
     for (bytes, component, expected, actual) in [
         (
-            "22.15.0\n0.16.22\n",
+            "22.15.0\n0.19.1\n",
             AdapterComponent::Runtime,
             "22.16.0",
             "22.15.0",
         ),
         (
-            "22.16.0\n0.16.21\n",
+            "22.16.0\n0.19.0\n",
             AdapterComponent::KaTeX,
-            "0.16.22",
-            "0.16.21",
+            "0.19.1",
+            "0.19.0",
         ),
     ] {
         exact_adapter(
@@ -1143,8 +1144,8 @@ fn support_configuration_and_protocol_are_exact() {
         );
     }
     assert_eq!(
-        katex::classify(output(0, b"22.16.0\n0.16.22\n", &[]), true).unwrap(),
-        Ok("22.16.0\n0.16.22\n".into())
+        katex::classify(output(0, b"22.16.0\n0.19.1\n", &[]), true).unwrap(),
+        Ok("22.16.0\n0.19.1\n".into())
     );
     assert_eq!(
         katex::classify(output(512, b"complete parse error", &[]), false).unwrap(),
@@ -1384,7 +1385,7 @@ fn digest_schema_and_provenance_are_exact() {
         );
     }
     let inventory = support::inventory(support::DIGESTS).unwrap();
-    assert_eq!(inventory.packages.len(), 219);
+    assert_eq!(inventory.packages.len(), 237);
     assert_eq!(
         inventory.runtimes["linux-x64"],
         "8142d37c6f2f372ef040419e7a111a6baf17df89f8078d02447d6c639ae20c1d"
@@ -1405,16 +1406,16 @@ fn digest_path_byte_order_refuses_first_pair_and_restores() {
     let admitted = support::inventory(support::DIGESTS).unwrap();
     for (from, to, previous, current) in [
         (
-            133,
             135,
-            "node_modules/katex/src/environments/cd.js",
-            "node_modules/katex/src/environments.js",
+            137,
+            "node_modules/katex/src/environments/cd.ts",
+            "node_modules/katex/src/environments.ts",
         ),
         (
-            146,
-            192,
-            "node_modules/katex/src/functions/verb.js",
-            "node_modules/katex/src/functions.js",
+            149,
+            196,
+            "node_modules/katex/src/functions/verb.ts",
+            "node_modules/katex/src/functions.ts",
         ),
     ] {
         let mut changed = original.clone();
@@ -1453,7 +1454,7 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
     let support = fixture.support();
     assert_eq!(
         katex::invoke(&support, None).unwrap(),
-        Ok("22.16.0\n0.16.22\n".into())
+        Ok("22.16.0\n0.19.1\n".into())
     );
     assert!(
         katex::invoke(&support, Some("α"))
@@ -1472,7 +1473,7 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
             "package-lock.json",
             SupportCopy::Lockfile,
             support::LOCK,
-            1094,
+            1098,
         ),
     ] {
         let file = fixture.root.join("packages").join(name);
@@ -1520,18 +1521,18 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
     for (name, expected, actual) in [
         (
             "packages/node_modules/katex/dist/katex.js",
-            "8f1f4fb1080439c012bb8fddf424fa253e9144ab4cdd7dc0eae0e92cd04a5e33",
-            "5b31ed9174171dd8d94617604c7ac0d620b8a8623bf0a1db2b80e4a05dc5b903",
+            "8f4f4efac9e80863b0ef9946c004928ad3bd33bbbeabcc8531c605c82a1bb545",
+            "093a5b28c31fecbc69b450d40a8be9479d1d9f14048a91c09037d57c887dafdd",
         ),
         (
             "packages/node_modules/katex/package.json",
-            "bd6430ca96592a055393a1ce980925162da3d40cd0231813d41ef0c56daacd91",
-            "e567ce8fd5bd5b5cf7d8832b052a732a98432d6b870b734517d3e03e0273b117",
+            "b4f886cca569791ed1c44ccc02e40885163fe53d45251b00f0a5b584b925b9e6",
+            "aeb7347a640f552fe64f37d084fd92035bb51131b0b3ab3d650fea5c24a4a1b4",
         ),
         (
             "packages/node_modules/commander/index.js",
-            "d4f8af488a7a08cd71df8503fcc3e5f2fd61e9b26eb368ecd5cc8159862cde3f",
-            "d7cbe63dbdc73c6d3c39617002ea6ae83d4660e5d54ecf3c75ba68e6dd516311",
+            "732a09a62a766dabc012a5edc592c2f9866f1a2028763b9319e44ac0313e3225",
+            "44df95a9dbd54acaa51c50267a512e5fc1c9f54ca04f06c7cb8a149628077ad5",
         ),
         (
             "runtime/bin/node",
@@ -1608,7 +1609,7 @@ fn support_required_every_invocation_rechecks_copies_hashes_and_postprocess_byte
             .contains("<math")
     );
     exact_adapter(
-        katex::invoke_with(&support, true, || Ok(output(0, b"22.15.0\n0.16.22\n", &[])))
+        katex::invoke_with(&support, true, || Ok(output(0, b"22.15.0\n0.19.1\n", &[])))
             .unwrap_err(),
         NotationAdapterFault::VersionMismatch {
             component: AdapterComponent::Runtime,
@@ -1649,9 +1650,9 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
     let hidden = packages.join("node_modules/.package-lock.json");
     let original = fs::read(&hidden).unwrap();
     let value: serde_json::Value = serde_json::from_slice(&original).unwrap();
-    let commander = r#"{"engines":{"node":">= 12"},"integrity":"sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==","license":"MIT","resolved":"https://registry.npmjs.org/commander/-/commander-8.3.0.tgz","version":"8.3.0"}"#;
+    let commander = r#"{"engines":{"node":">=22.12.0"},"integrity":"sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==","license":"MIT","resolved":"https://registry.npmjs.org/commander/-/commander-15.1.0.tgz","version":"15.1.0"}"#;
     let mut changed = value.clone();
-    changed["packages"]["node_modules/commander"]["version"] = "8.3.1".into();
+    changed["packages"]["node_modules/commander"]["version"] = "15.1.1".into();
     crate::support_bracket::mutation::write(&hidden, serde_json::to_vec(&changed).unwrap())
         .unwrap();
     let result = katex::invoke_with(&support, true, || {
@@ -1667,7 +1668,7 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
             changed: vec![InstalledPackageChange {
                 package: "node_modules/commander".into(),
                 expected: commander.into(),
-                actual: commander.replace("\"version\":\"8.3.0\"", "\"version\":\"8.3.1\""),
+                actual: commander.replace("\"version\":\"15.1.0\"", "\"version\":\"15.1.1\""),
             }],
         }),
     );
@@ -1691,7 +1692,7 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
         },
     );
     let mut changed = value.clone();
-    changed["packages"]["node_modules/commander"]["version"] = 8.into();
+    changed["packages"]["node_modules/commander"]["version"] = 15.into();
     exact_integrity(
         support::installed(&hidden, &serde_json::to_vec(&changed).unwrap()).unwrap_err(),
         SupportIntegrityFault::InstalledTreeMismatch {
@@ -1701,7 +1702,7 @@ fn support_required_installed_record_and_file_inventory_are_complete() {
             changed: vec![InstalledPackageChange {
                 package: "node_modules/commander".into(),
                 expected: commander.into(),
-                actual: commander.replace("\"version\":\"8.3.0\"", "\"version\":8"),
+                actual: commander.replace("\"version\":\"15.1.0\"", "\"version\":15"),
             }],
         },
     );

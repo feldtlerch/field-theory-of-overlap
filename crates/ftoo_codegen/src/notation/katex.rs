@@ -415,7 +415,7 @@ fn batch_transport(
     Ok(results)
 }
 
-pub(super) const KATEX_VERSION: &str = "0.16.22";
+pub(super) const KATEX_VERSION: &str = "0.19.1";
 fn protocol(output: Output, reason: ProtocolReason) -> NotationAdapterFault {
     NotationAdapterFault::Protocol {
         status: output.status.code(),
