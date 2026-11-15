@@ -26,3 +26,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |012|The weld: equal address sets across a unit's texts|accepted|
 |013|Workspace norms: edition, lints, toolchain|accepted|
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted|
+|015|Open questions are records|accepted|
