@@ -1,7 +1,7 @@
 # One version setting, read by both documents.
 [version]
-VERSION = '0.5.0'
-DRAFT = 'fifth draft'
+VERSION = '0.6.0-dev'
+DRAFT = 'sixth draft'
 
 [english]
 MAINFONT = 'TeX Gyre Pagella'
