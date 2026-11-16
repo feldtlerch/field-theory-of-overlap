@@ -14,7 +14,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |---|--------|-----|
 |001|The authority is a closed typed graph|accepted|
 |002|Four-axis status and declared coverage|accepted|
-|003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016|
+|003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
 |005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted|
@@ -27,4 +27,5 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |013|Workspace norms: edition, lints, toolchain|accepted|
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016|
 |015|Open questions are records|accepted|
-|016|Admission and native document renderings|accepted|
+|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017|
+|017|Screen rendering contracts|accepted|
