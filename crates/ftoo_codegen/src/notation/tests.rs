@@ -2864,7 +2864,8 @@ fn committed_adapter_and_ci_pins_are_fixed() {
     assert!(ci.contains("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"));
     assert!(ci.contains("name: bounded smoke — support-dependent suites require the full battery"));
     assert!(ci.contains("test --workspace --locked -- --skip support_required"));
-    assert!(ci.contains("unshare --user --map-root-user --net"));
+    assert!(ci.contains("unshare --user --map-user=$(id -u) --map-group=$(id -g) --net"));
+    assert!(!ci.contains("--map-root-user"));
     let workflows = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.github/workflows");
     for entry in std::fs::read_dir(workflows).unwrap() {
         let path = entry.unwrap().path();

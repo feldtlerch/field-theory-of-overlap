@@ -19,7 +19,8 @@ jobs:
           set -eu
           # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor.
           # Permit namespace creation only through unshare; tests remain the
-          # runner user outside their private user and network namespaces.
+          # runner user inside and outside their private namespaces so file
+          # permission checks are not bypassed by namespace-root capabilities.
           cat > "$RUNNER_TEMP/ftoo-smoke-unshare" <<'POLICY'
           abi <abi/4.0>,
           include <tunables/global>
@@ -29,7 +30,7 @@ jobs:
           POLICY
           sudo apparmor_parser --replace "$RUNNER_TEMP/ftoo-smoke-unshare"
           original="$(readlink /proc/self/ns/net)"
-          unshare --user --map-root-user --net sh -c 'test "$(readlink /proc/self/ns/net)" != "$1"' sh "$original"
+          unshare --user --map-user=$(id -u) --map-group=$(id -g) --net sh -c 'test "$(readlink /proc/self/ns/net)" != "$1"' sh "$original"
       - name: fmt
         env:
           CARGO_NET_OFFLINE: 'true'
@@ -41,11 +42,11 @@ jobs:
       - name: support-independent tests
         env:
           CARGO_NET_OFFLINE: 'true'
-        run: time unshare --user --map-root-user --net "$HOME/.cargo/bin/cargo" test --workspace --locked -- --skip support_required
+        run: time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net "$HOME/.cargo/bin/cargo" test --workspace --locked -- --skip support_required
       - name: labels
         env:
           CARGO_NET_OFFLINE: 'true'
         run: |
           set -eu
-          time unshare --user --map-root-user --net python3 -I tools/check_labels.py --self-test
-          time unshare --user --map-root-user --net python3 -I tools/check_labels.py
+          time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net python3 -I tools/check_labels.py --self-test
+          time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net python3 -I tools/check_labels.py
