@@ -33,3 +33,59 @@ Every named destination must land on its labelled page. Any auxiliary/PDF page d
 Every shipped occurrence must be visible on its recorded page. Any missing or surplus visible occurrence, including a clipped occurrence, refuses; no shipped page occurrence is exempt from the visible count.
 
 `inputs.json` records only the tracked byte-input hashes. Checking requires its exact canonical bytes to match the fresh receipt, and reports the first differing entry. On a PDF mismatch the work area retains expected and actual PDFs, all auxiliary snapshots, byte windows between cycles and a comparison report naming changed inputs. Two PDF blobs add their actual changed bytes to history before compression; unchanged blobs are reused.
+
+## Comparison and shared-passage evidence
+
+Keep comparison evidence outside tracked inputs. Before replacing authored text, retain both complete PDFs and `inputs.json`, their SHA256 hashes, the source revision, support locks and the successful empty-work release-check log. A replacement intended to leave the PDFs unchanged is checked by byte equality with the parent PDFs; any other replacement is compared page by page as below, and in both cases identical inputs must still reproduce identical bytes. Record any receipt differences by input path and hash.
+
+The release check retains raw page text, bookmarks and the shipped identity ledger. To capture independent baseline text and destination intervals, set `CHECK_WORK` to the `--work` directory of a successful `paper check --release` and `EVIDENCE` to an absent evidence directory, then run the following at the repository root in the typesetting environment. Page numbers below are physical, one-based PDF pages; the final boundary is one past the last page. Co-located destinations share a boundary, and each interval includes its complete start page but excludes its end page. Retain the auxiliary labels as well as outline anchors so unbookmarked targets remain visible.
+
+```sh
+python3 - <<'PY'
+import hashlib, json, os, pathlib, shutil, sys
+sys.path.insert(0, str(pathlib.Path('tools/paper').resolve()))
+from pdf_text import Pdf
+from ledger import auxiliary
+work = pathlib.Path(os.environ['CHECK_WORK'])
+out = pathlib.Path(os.environ['EVIDENCE'])
+out.mkdir(parents=True, exist_ok=False)
+for name, job in [('paper', 'main'), ('explainer', 'main_explainer')]:
+    source = work / (name + '.pdf')
+    shutil.copyfile(source, out / source.name)
+    pdf = Pdf(source)
+    pages, bookmarks = pdf.pages(), pdf.bookmarks()
+    labels = auxiliary(work / 'paper', job)
+    anchors = sorted({r['anchor'] for r in bookmarks + list(labels.values()) if r.get('anchor')})
+    destinations = {a: pdf.destination(a) for a in anchors}
+    missing = sorted(a for a, p in destinations.items() if p is None or not 1 <= p <= len(pages))
+    assert not missing, missing
+    boundaries = sorted({1, len(pages) + 1, *destinations.values()})
+    intervals = [{'start': a, 'end': b, 'anchors': sorted(k for k, p in destinations.items() if p == a)}
+                 for a, b in zip(boundaries, boundaries[1:])]
+    for suffix, value in [('pages', pages), ('bookmarks', bookmarks), ('labels', labels),
+                          ('destinations', destinations), ('intervals', intervals)]:
+        (out / (name + '-' + suffix + '.json')).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    for number, page in enumerate(pages, 1):
+        (out / f'{name}-page-{number:03}.txt').write_text(page, encoding='utf-8')
+shutil.copyfile('generated/paper/inputs.json', out / 'inputs.json')
+shutil.copyfile(work / 'identity-ledger.json', out / 'identity-ledger.json')
+manifest = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.iterdir())}
+(out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+PY
+```
+
+Run the same extraction at the candidate's repository root, with `CHECK_WORK` set to the candidate's own release-check work directory and `EVIDENCE` to a second absent directory, and keep each side's `identity-ledger.json`, which records every printed handle and locator with its anchor and target page. Align intervals by their shared destination names, retaining split, merged, missing and new boundaries explicitly; never silently pair different targets by page number. Retain raw page, interval and ledger diffs before classifying differences. Inspect both sides of every moved boundary and the adjoining pages, including the initial and final intervals. Extracted text does not show glyph placement, so a changed formula, a destination moved within a page or a link whose printed text is unchanged needs the ledger diff or page review; missing targets, duplicated targets or lost words require investigation even when normalized text appears equal.
+
+The comparison sheet may classify, outside literal, formula, handle and number spans, whitespace and line breaks without word changes, discretionary hyphenation confirmed against the source spelling, U+0027 versus U+2019 apostrophes, a source triple hyphen versus an em dash, and nonbreaking source spaces versus ordinary spaces. These are review classifications, not blanket text substitutions: retain the raw difference and its context. Never normalize away changes to formulas, reader handles, citation keys, numbers or words. Pagination and derived locators require page review; theory, counts, status and accepted-passage changes require their own explicit acceptance records.
+
+Search all declared sources and all extracted pages of both complete documents for each selected refrain, joining whitespace and equating apostrophes for discovery only. Retain every source occurrence's file, one-based line interval, zero-based UTF-8 byte interval and exact bytes, including the surrounding style wrapper and target. Compare the source and output occurrence counts; a source-only search cannot establish delivered coverage. Record the mint row, permanent reader binding and incoming references, with one native owner and a quotation-use in the other document rather than two authored units or duplicate mints.
+
+For each selected source file, record every row of `layout-pins.toml` with its exact line addresses in `reader-hooks.tex`, and every `label-mints.tsv` row that names the file, even where the address is distant from the replacement. Pins hash whole files, and both records address lines: after the replacement every hook address and mint row must still hold its target, which keeping the replaced span's line count preserves, and every affected whole-file hash is renewed together. Check the selected byte intervals against every bound interval in `self-description.json` as the release check does: locate each anchor, use recorded end minus start as its length, and verify SHA256 before testing overlap. A byte-offset shift alone requires no acceptance edit; changed bound text needs renewed acceptance by its named renewal acceptor before replacement.
+
+The acceptance sheet identifies baseline and candidate hashes, the physical PDF pages containing each replacement and incoming reference, and the adjoining boundary pages, and it identifies by path and hash any generated fragment or screen rendering the change produces. An independent page reviewer sees the byte and raw-text comparisons, destinations, pins and unchanged bound-passage checks; an independent screen reviewer sees the shared text compared with each rendering, public anchors, each quotation-use's link to its destination, escaping and the missing- and duplicate-target controls. Record appointments and actual acceptances separately; reproduction does not appoint a reviewer, and the author of a change never accepts it. Approval of theory changes stays with the project's owner.
+
+## Self-contained screen footprint evidence
+
+Use only the locked notation support and typesetting bundle for a resource probe. Measure unmodified font files individually by filename, version, byte length and SHA256, retain their actual licence texts and notices, and distinguish font licences from the mathematics software licence. Missing resources or licence texts remain explicitly unmeasured or unavailable; do not infer permission from a package name. Treat font subsetting as modification for review. Measure the locked mathematics style sheet and account for base64 expansion and data-URL overhead when embedding fonts.
+
+Pass representative fully expanded expressions, without document-specific macros and with Unicode symbols where the pinned renderer accepts them, one per run on standard input to `"$FTOO_NOTATION_SUPPORT/runtime/bin/node" tools/notation/check.cjs --expression "$FTOO_NOTATION_SUPPORT/packages/node_modules/katex/dist/katex.js"` (exit 0 returns HTML and MathML, 2 a parse-error message, 3 a setup failure). Retain each input, returned HTML/MathML bytes, exit status and byte length, with an invalid-expression control. This adapter uses strict, untrusted inline mathematics; its measurements do not establish complete-document rendering, display layout or accessibility. Record the expression inventory boundary, multiplicities, sample selection and uncertainty in projecting each document's prose, markup, mathematics, styles and embedded resources. Compare the proposed 8,388,608-byte budget per HTML file with the existing 16,777,216-byte document artifact limit; neither is a measured document size. Report an estimated overrun before any packaging choice is made, and remeasure complete output before acceptance.
