@@ -1,0 +1,2 @@
+Name table ID 0
+Copyright 2006-2018 for TeX Gyre extensions by B. Jackowski, J.M. Nowacki, et al. (on behalf of TeX USERS GROUPS). Vietnamese characters were added by Han The Thanh.
