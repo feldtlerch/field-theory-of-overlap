@@ -1,0 +1,6 @@
+[binaries]
+python3 = '@PYTHON3@'
+cargo = '@CARGO@'
+rustc = '@RUSTC@'
+node = '@NODE@'
+ninja = '@NINJA@'

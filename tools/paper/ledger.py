@@ -8,7 +8,9 @@ from common import read, require, timed, write
 from identities import bindings
 from pdf_text import Pdf
 
-INPUTS = ['tools/paper/ledger.py', 'tools/paper/identities.py', 'tools/paper/pdf_text.py']
+INPUTS = ['tools/paper/ledger.py', 'tools/paper/identities.py', 'tools/paper/pdf_text.py',
+          'generated/manifest.json', 'registry/documentary-tags.toml',
+          'documents/paper-build/label-mints.tsv']
 LEAK = re.compile(r'\b[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)+', re.I)
 
 

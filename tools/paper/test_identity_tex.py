@@ -9,6 +9,8 @@ from ledger import leaks
 from pdf_text import Pdf
 
 LEAK_FIXTURE = 'tools/paper/fixtures/leak-control.tex'
+INPUTS = ['tools/paper/test_identity_tex.py', 'tools/paper/fixtures/leak-control.tex', 'tools/paper/common.py',
+          'tools/paper/identities.py', 'tools/paper/ledger.py', 'tools/paper/pdf_text.py']
 PREAMBLE = r'''\documentclass{article}
 \usepackage{amsmath,hyperref}
 \ExplSyntaxOn

@@ -1,0 +1,3 @@
+option('support', type: 'string', value: '', description: 'Absolute prepared support directory')
+option('cargo_target_dir', type: 'string', value: '', description: 'Absolute Cargo target directory outside the source checkout')
+option('cargo_home', type: 'string', value: '', description: 'Absolute preseeded offline Cargo home')

@@ -129,6 +129,12 @@ type Result<T> = std::result::Result<T, PaperFault>;
 type Snapshot = BTreeMap<String, Vec<u8>>;
 const OUTPUTS: [(&str, &str); 2] = [("main", "paper.pdf"), ("main_explainer", "explainer.pdf")];
 const RECEIPT: &str = "generated/paper/inputs.json";
+const PAIR_FILES: [&str; 4] = [
+    "paper.pdf",
+    "explainer.pdf",
+    "inputs.json",
+    "identity-ledger.json",
+];
 
 fn bytes(path: &Path) -> Result<Vec<u8>> {
     fs::read(path).map_err(|e| PaperFault::Input(format!("{}: {e}", path.display())))
@@ -518,6 +524,105 @@ fn check_receipt(expected: &Value, actual: &Value) -> Result<()> {
     Ok(())
 }
 
+fn collect_files(root: &Path, dir: &Path, rows: &mut BTreeMap<String, String>) -> Result<()> {
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if path.is_dir() {
+            collect_files(root, &path, rows)?;
+        } else if path.is_file() {
+            let name = path.strip_prefix(root).map_err(|e| e.to_string())?;
+            rows.insert(
+                name.to_string_lossy().into_owned(),
+                hex(&Sha256::digest(bytes(&path)?)),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn check_built(built: &Path) -> Result<Value> {
+    let record: Value =
+        serde_json::from_slice(&bytes(&built.join("pair.json"))?).map_err(|e| e.to_string())?;
+    let private = record["private_dir"]
+        .as_str()
+        .ok_or("Missing pair private directory")?;
+    if private.contains('/') || private == "." || private == ".." {
+        return Err("Invalid pair private directory".into());
+    }
+    let outputs = record["outputs"]
+        .as_object()
+        .ok_or("Missing pair outputs")?;
+    for (name, hash) in outputs {
+        if !PAIR_FILES.contains(&name.as_str()) {
+            return Err(format!("Unknown pair output: {name}").into());
+        }
+        if hex(&Sha256::digest(bytes(&built.join(name))?))
+            != hash.as_str().ok_or("Invalid pair hash")?
+        {
+            return Err(format!("Pair output differs: {name}").into());
+        }
+    }
+    if outputs.len() != PAIR_FILES.len() {
+        return Err("Incomplete pair outputs".into());
+    }
+    let work = record["work"]
+        .as_object()
+        .ok_or("Missing pair work membership")?;
+    let work_root = built.join(private).join("work");
+    let mut actual = BTreeMap::new();
+    collect_files(&work_root, &work_root, &mut actual)?;
+    if actual.len() != work.len()
+        || actual
+            .iter()
+            .any(|(name, hash)| work.get(name).and_then(Value::as_str) != Some(hash))
+    {
+        return Err("Pair work evidence differs".into());
+    }
+    serde_json::from_slice(&bytes(&built.join("inputs.json"))?).map_err(|e| e.to_string().into())
+}
+
+fn produce(root: &Path, support: &Path, work: &Path, output: &Path) -> Result<()> {
+    if let Some(private) = work.parent() {
+        let previous = private.join("work.previous");
+        if previous.exists() {
+            fs::remove_dir_all(&previous).map_err(|e| e.to_string())?;
+        }
+        if work.exists() {
+            fs::rename(work, previous).map_err(|e| e.to_string())?;
+        }
+    }
+    build(root, support, work)?;
+    publish(work, output)
+}
+
+fn publish(work: &Path, output: &Path) -> Result<()> {
+    let mut work_files = BTreeMap::new();
+    collect_files(work, work, &mut work_files)?;
+    let mut outputs = BTreeMap::new();
+    for name in PAIR_FILES {
+        outputs.insert(name, hex(&Sha256::digest(bytes(&work.join(name))?)));
+    }
+    let private = work.parent().ok_or("Missing private work parent")?;
+    if private.parent() != Some(output) {
+        return Err("Private work must be inside pair output directory".into());
+    }
+    let private_name = private
+        .file_name()
+        .ok_or("Missing private directory name")?
+        .to_string_lossy();
+    let completion = json!({"private_dir":private_name,"outputs":outputs,"work":work_files});
+    fs::create_dir_all(output).map_err(|e| e.to_string())?;
+    for name in PAIR_FILES {
+        let staged = private.join(format!("{name}.next"));
+        fs::copy(work.join(name), &staged).map_err(|e| e.to_string())?;
+        fs::rename(staged, output.join(name)).map_err(|e| e.to_string())?;
+    }
+    let staged = private.join("pair.json.next");
+    save(&staged, &completion)?;
+    fs::rename(staged, output.join("pair.json")).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 struct Request {
     operation: String,
     root: PathBuf,
@@ -532,7 +637,7 @@ fn request(args: &[OsString]) -> Result<Request> {
         .to_str()
         .ok_or("Non-UTF8 command")?
         .to_owned();
-    if !["generate", "check"].contains(&operation.as_str()) {
+    if !["generate", "check", "produce", "publish"].contains(&operation.as_str()) {
         return Err("Unknown paper command".into());
     }
     let mut values = BTreeMap::new();
@@ -543,7 +648,15 @@ fn request(args: &[OsString]) -> Result<Request> {
             continue;
         }
         let key = arg.to_str().ok_or("Non-UTF8 option")?;
-        if !["--repository", "--support", "--work"].contains(&key) {
+        if ![
+            "--repository",
+            "--support",
+            "--work",
+            "--built",
+            "--output-dir",
+        ]
+        .contains(&key)
+        {
             return Err(format!("Unknown option {key}").into());
         }
         if values
@@ -573,22 +686,73 @@ fn request(args: &[OsString]) -> Result<Request> {
 /// Returns a located input, subprocess, fixed-point or byte-comparison failure.
 pub fn run(args: &[OsString]) -> Result<()> {
     let req = request(args)?;
-    if req.release {
+    let built = req.values.contains_key("--built");
+    if req.release && !built {
         release::inputs(&req.root)?;
-        release::part(
-            "printed identities",
-            command_output(
-                Command::new("python3")
-                    .current_dir(&req.root)
-                    .args(["-B", "tools/paper/identities.py"])
-                    .arg(&req.root)
-                    .arg("--release"),
-            ),
-        )?;
     }
-    let work = PathBuf::from(req.values.get("--work").ok_or("Clean work area required")?);
+    if req.release || built {
+        if !req.release {
+            check_reading_acceptance(&req.root)?;
+        }
+        if req.release {
+            release::part("registry", registry::check(&req.root))?;
+        } else {
+            registry::check(&req.root)?;
+        }
+        let mut identities = Command::new("python3");
+        identities
+            .current_dir(&req.root)
+            .args(["-B", "tools/paper/identities.py"])
+            .arg(&req.root);
+        if req.release {
+            identities.arg("--release");
+            release::part("printed identities", command_output(&mut identities))?;
+        } else {
+            command_output(&mut identities)?;
+        }
+    }
+    if let Some(built) = req.values.get("--built") {
+        if req.operation != "check" {
+            return Err("Built pair is only valid for check".into());
+        }
+        let built = PathBuf::from(built);
+        let receipt = check_built(&built)?;
+        return if req.release {
+            release::check(&req.root, &built, &receipt)
+        } else {
+            compare(&req.root, &built, &receipt)
+        };
+    }
+    let mut work = PathBuf::from(req.values.get("--work").ok_or("Clean work area required")?);
+    if ["produce", "publish"].contains(&req.operation.as_str()) && !work.is_absolute() {
+        work = std::env::current_dir()
+            .map_err(|e| e.to_string())?
+            .join(work);
+    }
     if !work.is_absolute() {
         return Err("Work area must be absolute".into());
+    }
+    if ["produce", "publish"].contains(&req.operation.as_str()) {
+        let mut output = PathBuf::from(
+            req.values
+                .get("--output-dir")
+                .ok_or("Pair output directory required")?,
+        );
+        if !output.is_absolute() {
+            output = std::env::current_dir()
+                .map_err(|e| e.to_string())?
+                .join(output);
+        }
+        if req.operation == "publish" {
+            return publish(&work, &output);
+        }
+        let support = req
+            .values
+            .get("--support")
+            .cloned()
+            .or_else(|| std::env::var_os("FTOO_ASSEMBLY_SUPPORT"))
+            .ok_or("Pinned support required")?;
+        return produce(&req.root, &PathBuf::from(support), &work, &output);
     }
     let support = req
         .values
