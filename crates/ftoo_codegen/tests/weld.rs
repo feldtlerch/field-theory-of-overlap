@@ -16,14 +16,17 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let rust_book = ftoo_manifest::addressing(&graph).unwrap();
     let before = ftoo_manifest::Snapshot::capture(&graph);
     let statuses = ftoo_manifest::NodeId::ALL.map(|id| graph.status(id));
+    // Repository-wide totals come from the label check's shared harvest;
+    // committed-unit expectations remain fixed.
+    let labels = ftoo_codegen::check_label_files(&root, &book).unwrap();
     let expected = WeldCheckSummary {
         units: 4,
         texts: 4,
         tag_sites: 3,
         rust_mints: 4,
-        markdown_mints: 139,
+        markdown_mints: labels.markdown_mints,
         unit_mints: 4,
-        markdown_citations: 138,
+        markdown_citations: labels.markdown_citations,
         rust_citations: 8,
         unit_citation_sites: 1,
         mention_sites: 0,

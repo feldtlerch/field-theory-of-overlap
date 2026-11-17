@@ -17,7 +17,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
 |005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014|
-|006|Generated artifacts are byte-gated; generate and check share one path|accepted|
+|006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent changes are governed by 018|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
 |009|Process: signed reviewed bites, each layer with its validator|accepted|
@@ -29,3 +29,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017|
 |017|Screen rendering contracts|accepted|
+|018|Docs-only gate inherits document bytes through input equivalence|accepted|

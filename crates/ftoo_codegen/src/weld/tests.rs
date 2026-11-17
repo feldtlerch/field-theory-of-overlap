@@ -624,6 +624,9 @@ fn w13_actual_file_set_matrix_restores_every_mutation() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let baseline = check_weld_files(&root, &book).unwrap();
+    // Repository-wide totals come from the label check's shared harvest;
+    // fixed fixtures and the added-record case below pin harvest behavior.
+    let labels = crate::check_label_files(&root, &book).unwrap();
     assert_eq!(
         baseline,
         WeldCheckSummary {
@@ -631,9 +634,9 @@ fn w13_actual_file_set_matrix_restores_every_mutation() {
             texts: 2,
             tag_sites: 2,
             rust_mints: 4,
-            markdown_mints: 141,
+            markdown_mints: labels.markdown_mints,
             unit_mints: 1,
-            markdown_citations: 138,
+            markdown_citations: labels.markdown_citations,
             rust_citations: 8,
             unit_citation_sites: 2,
             mention_sites: 0,
@@ -670,6 +673,23 @@ fn w13_actual_file_set_matrix_restores_every_mutation() {
         assert_eq!(snapshot(&root), saved);
         assert_eq!(check_weld_files(&root, &book).unwrap(), baseline);
     }
+    let record = root.join("docs/weld-added-record.md");
+    fs::write(
+        &record,
+        "# Record · `rec:fixture:added`\n\nSee (`sec:fixture:target`).\n",
+    )
+    .unwrap();
+    assert_eq!(
+        check_weld_files(&root, &book).unwrap(),
+        WeldCheckSummary {
+            markdown_mints: baseline.markdown_mints + 1,
+            markdown_citations: baseline.markdown_citations + 1,
+            ..baseline
+        }
+    );
+    fs::remove_file(record).unwrap();
+    assert_eq!(snapshot(&root), saved);
+    assert_eq!(check_weld_files(&root, &book).unwrap(), baseline);
     fs::remove_dir_all(root).unwrap();
 }
 
