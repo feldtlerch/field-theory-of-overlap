@@ -11,3 +11,7 @@ publish = false
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
+
+# Optimize SHA-256 in test builds: one support hash takes about 46 s without it and 6 s with it.
+[profile.dev.package.sha2]
+opt-level = 3
