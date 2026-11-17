@@ -331,15 +331,15 @@ fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
             ),
             (
                 RuleId::M054,
-                "Every declared document has one ordered skeleton, every skeleton names a declared document, and every admitted unit occurs exactly once in its associated document's skeleton within the assembly bounds.",
+                "Every declared document has one ordered skeleton, every skeleton names a declared document, and every admitted unit occurs exactly once in its associated document's skeleton within the assembly bounds. A quotation child names an existing unit owned by another document with text in every language the quoting document requires, and adds no membership.",
                 "The complete skeleton and admitted unit corpora, including heading positions.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M055,
-                "Document emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text.",
-                "Both document targets and their generated notation and addressing support.",
+                "Markdown and LaTeX emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text. A fragment target emits each non-heading position in its document as one TeX macro line with a plain-text body and refuses any other unit body. Every generated artifact path is unique. A selected target without an emitter, or a Markdown or LaTeX target of a document with a quotation position, refuses.",
+                "Every selected document target and its generated notation and addressing support.",
                 RuleState::Enforced,
                 None
             ),

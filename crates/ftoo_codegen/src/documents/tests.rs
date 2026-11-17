@@ -748,9 +748,17 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
     let corpus = crate::load_unit_sources(
         crate::UnitSource {
             file: "units/documents.toml".into(),
-            bytes: input::read(&root, "units/documents.toml")?,
+            bytes: b"schema = 1\n[documents.main]\nrequired-languages = [\"en\"]\n".to_vec(),
         },
-        input::sources(&root, &input::discover(&root, "units/statements", false)?)?,
+        input::sources(
+            &root,
+            &[
+                "units/statements/first-value.toml".into(),
+                "units/statements/overview.toml".into(),
+                "units/statements/value-context.toml".into(),
+                "units/statements/value-table.toml".into(),
+            ],
+        )?,
     )?;
     let site = |file: &str, path: Vec<ftoo_manifest::PathPart>| UnitSite {
         file: file.into(),
@@ -930,6 +938,197 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
     }
     Ok(())
 }
+
+#[test]
+fn quotation_use_requires_an_existing_unit_owned_by_another_document()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ftoo_manifest::{AssemblyInputFault, SkeletonChild};
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: input::read(&root, "units/documents.toml")?,
+    };
+    let statements = input::sources(&root, &input::discover(&root, "units/statements", false)?)?;
+    let corpus = crate::load_unit_sources(declaration.clone(), statements.clone())?;
+    let skeleton_sources =
+        input::sources(&root, &input::discover(&root, "units/skeletons", false)?)?;
+    let mut drafts = input::skeletons(&skeleton_sources)?;
+    let (unit_sites, owner_sites) = super::metadata(&statements);
+    let document_sites = super::document_sites(&corpus);
+    let checked = ftoo_manifest::check_skeletons(
+        &corpus,
+        &drafts,
+        &unit_sites,
+        &owner_sites,
+        &document_sites,
+    )
+    .map_err(|errors| format!("{errors:?}"))?;
+    assert_eq!(checked.documents()["paper-pilot"].len(), 2);
+    assert_eq!(checked.documents()["explainer-pilot"].len(), 2);
+    assert!(!checked.documents()["paper-pilot"][1].quotation());
+    assert!(checked.documents()["explainer-pilot"][1].quotation());
+    let selected = crate::units::toml::selected_targets(&declaration)
+        .map_err(|errors| format!("{errors:?}"))?;
+    let mut checked_fragments = 0;
+    for (document, positions) in checked.documents() {
+        if !selected[document].contains(&DocumentOutput::Fragment) {
+            continue;
+        }
+        for language in &corpus.documents()[document] {
+            for position in positions
+                .iter()
+                .filter(|position| position.depth().is_none())
+            {
+                let unit = corpus
+                    .units()
+                    .iter()
+                    .find(|unit| unit.label().as_str() == position.unit())
+                    .unwrap();
+                let block = plan::Block {
+                    pending_names: BTreeMap::new(),
+                    displays: BTreeMap::new(),
+                    unit: position.unit().into(),
+                    depth: position.depth(),
+                    quotation: position.quotation(),
+                    site: position.site().clone(),
+                    runs: vec![plan::Inline::Text(unit.texts()[language].text().into())],
+                };
+                let path = format!(
+                    "generated/documents/{}/{}.tex",
+                    document,
+                    position.unit().replace(':', "-")
+                );
+                assert_eq!(
+                    input::read(&root, &path)?,
+                    fragment_line(&block)?.into_bytes()
+                );
+                checked_fragments += 1;
+            }
+        }
+    }
+    assert!(checked_fragments > 0);
+    let mut multilingual_declaration = input::read(&root, "units/documents.toml")?;
+    let declaration_text = String::from_utf8(multilingual_declaration)?;
+    multilingual_declaration = declaration_text
+        .replacen(
+            "[documents.explainer-pilot]\nrequired-languages = [\"en\"]",
+            "[documents.explainer-pilot]\nrequired-languages = [\"en\", \"fr\"]",
+            1,
+        )
+        .into_bytes();
+    let mut multilingual_statements = statements.clone();
+    multilingual_statements
+        .iter_mut()
+        .find(|source| source.file.ends_with("pilot-explainer-heading.toml"))
+        .unwrap()
+        .bytes
+        .extend_from_slice(b"fr = \"Extrait explicatif\"\n");
+    let multilingual = crate::load_unit_sources(
+        crate::UnitSource {
+            file: "units/documents.toml".into(),
+            bytes: multilingual_declaration,
+        },
+        multilingual_statements,
+    )?;
+    let language_errors = ftoo_manifest::check_skeletons(
+        &multilingual,
+        &drafts,
+        &unit_sites,
+        &owner_sites,
+        &document_sites,
+    )
+    .unwrap_err();
+    assert!(language_errors.iter().any(|error| matches!(
+        &error.fault, AssemblyInputFault::MissingQuotationLanguage { label, language }
+        if label == "sec:say:direction" && language == "fr"
+    )));
+    let explainer = drafts
+        .iter_mut()
+        .find(|draft| draft.document.value == "explainer-pilot")
+        .unwrap();
+    let SkeletonChild::Quotation(quoted) = &mut explainer.sections[0].children[0] else {
+        panic!("quotation fixture")
+    };
+    quoted.value = "sec:missing:quotation".into();
+    let errors = ftoo_manifest::check_skeletons(
+        &corpus,
+        &drafts,
+        &unit_sites,
+        &owner_sites,
+        &document_sites,
+    )
+    .unwrap_err();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        matches!(&errors[0].fault, AssemblyInputFault::UnknownUnit { label, .. } if label == "sec:missing:quotation")
+    );
+    let explainer = drafts
+        .iter_mut()
+        .find(|draft| draft.document.value == "explainer-pilot")
+        .unwrap();
+    let SkeletonChild::Quotation(quoted) = &mut explainer.sections[0].children[0] else {
+        panic!("quotation fixture")
+    };
+    quoted.value = "sec:pilot:explainer-excerpt".into();
+    let errors = ftoo_manifest::check_skeletons(
+        &corpus,
+        &drafts,
+        &unit_sites,
+        &owner_sites,
+        &document_sites,
+    )
+    .unwrap_err();
+    assert_eq!(errors.len(), 1);
+    assert!(
+        matches!(&errors[0].fault, AssemblyInputFault::WrongQuotationOwner { label, .. } if label == "sec:pilot:explainer-excerpt")
+    );
+    Ok(())
+}
+#[test]
+fn fragment_macro_follows_planned_quotation() {
+    let mut block = plan::Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: "sec:fixture:refrain".into(),
+        depth: None,
+        quotation: false,
+        site: input::site("units/statements/fixture.toml"),
+        runs: vec![plan::Inline::Text("Refrain.".into())],
+    };
+    assert_eq!(fragment_macro(&block), "refrain");
+    block.quotation = true;
+    assert_eq!(fragment_macro(&block), "paperrefrain");
+    assert_eq!(fragment_text(&block).unwrap(), "Refrain.");
+    block.runs.push(plan::Inline::Text("More.".into()));
+    assert!(fragment_text(&block).is_err());
+    let plan = plan::DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        blocks: vec![block],
+    };
+    assert!(format!("{:?}", unsupported_html(&plan)).contains("html"));
+    assert!(refuse_quoted_screen_targets(&plan, &[DocumentOutput::Fragment]).is_ok());
+    for target in [DocumentOutput::Markdown, DocumentOutput::Latex] {
+        let DocumentError::Assembly(errors) =
+            refuse_quoted_screen_targets(&plan, &[target]).unwrap_err()
+        else {
+            panic!("quotation target refusal")
+        };
+        assert_eq!(errors.diagnostics()[0].rule, RuleId::M055);
+        assert_eq!(errors.diagnostics()[0].stage, AssemblyStage::Emission);
+    }
+}
+#[test]
+fn fragment_path_collisions_refuse_before_publication() {
+    let artifact = DocumentArtifact {
+        path: "generated/documents/main/sec-a-b-c.tex".into(),
+        bytes: b"one".to_vec(),
+        origins: Vec::new(),
+        emissions: Vec::new(),
+    };
+    assert!(unique_artifact_paths(&[artifact.clone(), artifact]).is_err());
+}
 #[test]
 fn wrong_owner_retains_the_actual_document_literal_and_restores()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -1062,7 +1261,7 @@ skeleton={document='main',sections=[{heading='sec:fixture:first',children=[{kind
             site: AssemblySite::Source(site),
             fault: AssemblyFault::UnknownToken {
                 value: "other".into(),
-                expected: vec!["unit".into(), "section".into()],
+                expected: vec!["unit".into(), "quotation".into(), "section".into()],
             },
         }])
         .unwrap(),
@@ -1827,6 +2026,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
             displays: BTreeMap::new(),
             unit: "sec:coefficients:overview".into(),
             depth: Some(1),
+            quotation: false,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Coefficient ".into()),

@@ -1,0 +1,10 @@
+schema = 1
+
+[skeleton]
+document = "paper-pilot"
+
+[[skeleton.sections]]
+heading = "sec:pilot:paper-excerpt"
+children = [
+  { kind = "unit", unit = "sec:say:direction" }
+]

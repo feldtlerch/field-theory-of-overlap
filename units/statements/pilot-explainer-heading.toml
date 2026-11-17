@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:pilot:explainer-excerpt"
+document = "explainer-pilot"
+math = {}
+
+[unit.texts]
+en = "Explainer excerpt: direction refrain"

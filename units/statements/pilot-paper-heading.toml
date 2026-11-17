@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:pilot:paper-excerpt"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "Paper excerpt: direction refrain"

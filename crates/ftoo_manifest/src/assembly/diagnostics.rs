@@ -7,6 +7,14 @@ pub enum DocumentTarget {
     Markdown,
     Latex,
 }
+/// The closed set of document outputs selected by a declaration.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum DocumentOutput {
+    Fragment,
+    Markdown,
+    Latex,
+    Html,
+}
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum AssemblyStage {
     Source,
@@ -148,6 +156,14 @@ pub enum AssemblyInputFault {
         actual: String,
         declared_at: UnitSite,
     },
+    WrongQuotationOwner {
+        label: String,
+        document: String,
+    },
+    MissingQuotationLanguage {
+        label: String,
+        language: String,
+    },
     UnknownMathCommand {
         command: String,
     },
@@ -286,7 +302,9 @@ pub(super) fn sort(diagnostics: &mut [AssemblyInputDiagnostic]) {
             AssemblyInputFault::UnknownSkeletonDocument { .. } => 4,
             AssemblyInputFault::UnknownUnit { .. } => 5,
             AssemblyInputFault::UnitMultiplicity { .. } => 6,
-            AssemblyInputFault::WrongOwner { .. } => 7,
+            AssemblyInputFault::WrongOwner { .. }
+            | AssemblyInputFault::WrongQuotationOwner { .. }
+            | AssemblyInputFault::MissingQuotationLanguage { .. } => 7,
             AssemblyInputFault::UnknownMathCommand { .. } => 8,
             AssemblyInputFault::MathArguments { .. } => 9,
             AssemblyInputFault::MathSyntax { .. } => 10,

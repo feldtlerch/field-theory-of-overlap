@@ -204,6 +204,10 @@ fn section(
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Unit(position(fields[1], count)?))
                 }
+                "quotation" => {
+                    let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
+                    Ok(SkeletonChild::Quotation(position(fields[1], count)?))
+                }
                 "section" => section(child, true, depth + 1, count).map(SkeletonChild::Section),
                 _ => {
                     let mut site = discriminator.site;
@@ -214,7 +218,7 @@ fn section(
                         AssemblySite::Source(site),
                         AssemblyFault::UnknownToken {
                             value: discriminator.value,
-                            expected: vec!["unit".into(), "section".into()],
+                            expected: vec!["unit".into(), "quotation".into(), "section".into()],
                         },
                     ))
                 }
@@ -294,13 +298,13 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
             None
         };
         if let Some(kind) = &kind {
-            if kind.value != "unit" && kind.value != "section" {
+            if kind.value != "unit" && kind.value != "quotation" && kind.value != "section" {
                 if unknown.is_none() {
                     unknown = Some(kind.clone());
                 }
                 continue;
             }
-            if kind.value == "unit" {
+            if kind.value == "unit" || kind.value == "quotation" {
                 let fields = toml::fixed(node, &["kind", "unit"])?;
                 toml::string(fields[1])?;
                 continue;
@@ -421,7 +425,7 @@ fn unknown_kind(value: LocatedString) -> super::AssemblyDiagnostic {
         site: AssemblySite::Source(site),
         fault: AssemblyFault::UnknownToken {
             value: value.value,
-            expected: vec!["unit".into(), "section".into()],
+            expected: vec!["unit".into(), "quotation".into(), "section".into()],
         },
     }
 }

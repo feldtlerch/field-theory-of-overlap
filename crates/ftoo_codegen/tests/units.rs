@@ -10,16 +10,20 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
     assert_eq!(
         check_unit_files(&root, &book).unwrap(),
         UnitCheckSummary {
-            documents: 1,
-            units: 4,
-            texts: 4,
+            documents: 3,
+            units: 7,
+            texts: 7,
             tag_sites: 3
         }
     );
     let corpus = load_unit_files(&root).unwrap();
     assert_eq!(
         corpus.documents(),
-        &std::collections::BTreeMap::from([("main".to_owned(), vec!["en".to_owned()])])
+        &std::collections::BTreeMap::from([
+            ("main".to_owned(), vec!["en".to_owned()]),
+            ("paper-pilot".to_owned(), vec!["en".to_owned()]),
+            ("explainer-pilot".to_owned(), vec!["en".to_owned()]),
+        ])
     );
     assert_eq!(
         corpus
@@ -31,10 +35,17 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             ("sec:coefficients:first-value", "main"),
             ("sec:coefficients:overview", "main"),
             ("sec:coefficients:value-context", "main"),
-            ("sec:coefficients:value-table", "main")
+            ("sec:coefficients:value-table", "main"),
+            ("sec:pilot:explainer-excerpt", "explainer-pilot"),
+            ("sec:pilot:paper-excerpt", "paper-pilot"),
+            ("sec:say:direction", "paper-pilot")
         ]
     );
-    let first = &corpus.units()[0];
+    let first = corpus
+        .units()
+        .iter()
+        .find(|u| u.label().as_str() == "sec:coefficients:first-value")
+        .unwrap();
     assert_eq!(
         first.texts().keys().map(String::as_str).collect::<Vec<_>>(),
         ["en"]
@@ -59,7 +70,11 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             .collect::<Vec<_>>(),
         vec![("value", Some(46..58), Some(1))]
     );
-    let second = &corpus.units()[2];
+    let second = corpus
+        .units()
+        .iter()
+        .find(|u| u.label().as_str() == "sec:coefficients:value-context")
+        .unwrap();
     assert_eq!(
         second
             .texts()

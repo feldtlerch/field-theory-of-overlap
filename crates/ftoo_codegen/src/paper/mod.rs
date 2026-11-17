@@ -390,9 +390,19 @@ fn invoke(plan: &Value, work: &Path, job: &str, cycle: u64) -> Result<Value> {
     println!("{row}");
     Ok(row)
 }
-fn validate_output(work: &Path, job: &str) -> Result<()> {
+fn validate_output(work: &Path, job: &str, cycle: u64) -> Result<()> {
     let log = String::from_utf8(bytes(&work.join("paper").join(format!("{job}.log")))?)
         .map_err(|e| e.to_string())?;
+    let diagnostic = log.to_ascii_lowercase();
+    let stream = String::from_utf8(bytes(&work.join(format!("{job}-{cycle}.txt")))?)
+        .map_err(|e| e.to_string())?;
+    if diagnostic.contains("multiply defined")
+        || stream.lines().any(|line| {
+            line.starts_with("warning: Object @") && line.ends_with(" already defined.")
+        })
+    {
+        return Err(format!("Duplicate label or named output object: {job}").into());
+    }
     if log.lines().any(|s| s.starts_with('!'))
         || log.contains("undefined references")
         || log.contains("undefined citations")
@@ -437,7 +447,7 @@ fn build(root: &Path, support: &Path, work: &Path) -> Result<Value> {
         save(&work.join("passes.json"), &json!(passes))?;
         if fixed_point(previous.as_ref(), &current, cycle, cap)? {
             for (job, name) in OUTPUTS {
-                validate_output(work, job)?;
+                validate_output(work, job, cycle)?;
                 let data = bytes(&work.join("paper").join(format!("{job}.pdf")))?;
                 fs::write(work.join(name), data).map_err(|e| e.to_string())?;
             }
@@ -633,11 +643,20 @@ fn request(args: &[OsString]) -> Result<Request> {
     let mut iter = args.iter();
     let operation = iter
         .next()
-        .ok_or("Expected generate or check")?
+        .ok_or("Expected generate, check or documents operation")?
         .to_str()
         .ok_or("Non-UTF8 command")?
         .to_owned();
-    if !["generate", "check", "produce", "publish"].contains(&operation.as_str()) {
+    if ![
+        "generate",
+        "check",
+        "produce",
+        "publish",
+        "documents-generate",
+        "documents-check",
+    ]
+    .contains(&operation.as_str())
+    {
         return Err("Unknown paper command".into());
     }
     let mut values = BTreeMap::new();
@@ -680,6 +699,59 @@ fn request(args: &[OsString]) -> Result<Request> {
         release,
     })
 }
+fn require_notation_support(value: Option<&std::ffi::OsStr>) -> Result<()> {
+    if value.is_none() {
+        return Err("Notation support required".into());
+    }
+    Ok(())
+}
+fn assembly_support(req: &Request) -> Result<crate::NativeSupport> {
+    let path = req
+        .values
+        .get("--support")
+        .cloned()
+        .or_else(|| std::env::var_os("FTOO_ASSEMBLY_SUPPORT"))
+        .map(PathBuf::from);
+    crate::NativeSupport::resolve(&req.root, path.as_deref())
+        .map_err(|error| PaperFault::Input(crate::DocumentError::Native(error).to_string()))
+}
+fn run_documents(req: &Request) -> Result<()> {
+    if req.release {
+        return Err("Release flag applies only to the paper pair".into());
+    }
+    if req.values.contains_key("--work") {
+        return Err("Documents commands take no work area".into());
+    }
+    let assembly = assembly_support(req)?;
+    require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
+    if req.operation == "documents-generate" {
+        crate::generate_documents(&req.root, &assembly)
+            .map(|_| ())
+            .map_err(|error| PaperFault::Input(error.to_string()))
+    } else {
+        crate::check_documents(&req.root, &assembly)
+            .map(|_| ())
+            .map_err(|error| PaperFault::Input(error.to_string()))
+    }
+}
+fn check_release_documents(req: &Request) -> Result<PathBuf> {
+    let assembly = assembly_support(req)?;
+    require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
+    crate::check_documents(&req.root, &assembly)
+        .map_err(|error| PaperFault::Input(error.to_string()))?;
+    Ok(assembly.directory().to_path_buf())
+}
+fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathBuf> {
+    release_support
+        .or_else(|| {
+            req.values
+                .get("--support")
+                .cloned()
+                .or_else(|| std::env::var_os("FTOO_ASSEMBLY_SUPPORT"))
+                .map(PathBuf::from)
+        })
+        .ok_or_else(|| "Pinned support required".into())
+}
 /// Run the explicit whole-paper command and support-required byte gate.
 ///
 /// # Errors
@@ -687,6 +759,14 @@ fn request(args: &[OsString]) -> Result<Request> {
 pub fn run(args: &[OsString]) -> Result<()> {
     let req = request(args)?;
     let built = req.values.contains_key("--built");
+    if req.operation.starts_with("documents-") {
+        return run_documents(&req);
+    }
+    let release_support = if req.release {
+        Some(check_release_documents(&req)?)
+    } else {
+        None
+    };
     if req.release && !built {
         release::inputs(&req.root)?;
     }
@@ -754,13 +834,8 @@ pub fn run(args: &[OsString]) -> Result<()> {
             .ok_or("Pinned support required")?;
         return produce(&req.root, &PathBuf::from(support), &work, &output);
     }
-    let support = req
-        .values
-        .get("--support")
-        .cloned()
-        .or_else(|| std::env::var_os("FTOO_ASSEMBLY_SUPPORT"))
-        .ok_or("Pinned support required")?;
-    let built = build(&req.root, &PathBuf::from(support), &work);
+    let support = pair_support(&req, release_support)?;
+    let built = build(&req.root, &support, &work);
     let receipt = if req.release {
         release::part("paper byte gate", built)?
     } else {

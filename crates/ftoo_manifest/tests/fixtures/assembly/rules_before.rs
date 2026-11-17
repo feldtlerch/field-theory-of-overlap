@@ -274,8 +274,8 @@
     },
     RuleSpec {
         number: RuleId::M040,
-        statement: "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar.",
-        scope: "Document language declarations and all associated statement-unit texts.",
+        statement: "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar. A document's optional targets list is a nonempty set of distinct values from fragment, markdown, latex and html, and defaults to markdown and latex.",
+        scope: "Document language and target declarations and all associated statement-unit texts.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

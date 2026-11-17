@@ -81,6 +81,22 @@ def paper_record(args):
     replace_if_changed(pathlib.Path(args.output), canonical(value))
 
 
+def documents_record(args):
+    repo = pathlib.Path(args.repository)
+    paths = [repo / 'units/documents.toml', *sorted((repo / 'units/skeletons').glob('*.toml')),
+             *sorted((repo / 'units/statements').glob('*.toml')),
+             *sorted((repo / 'generated/documents').glob('**/*'))]
+    value = {str(path.relative_to(repo)): digest(path) for path in paths if path.is_file()}
+    replace_if_changed(pathlib.Path(args.output), canonical(value))
+
+
+def documents_check(args):
+    binary = pathlib.Path(args.binary).resolve()
+    subprocess.run([str(binary), 'documents-check', '--repository', args.repository,
+                    '--support', args.support], check=True)
+    replace_if_changed(pathlib.Path(args.output), b'documents checked\n')
+
+
 def t40_record(args):
     repo = pathlib.Path(args.repository)
     value = {'inputs': python_closure(repo, 'tools/paper/meson_t40.py')}
@@ -154,15 +170,18 @@ def codegen(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('paper-record', 't40-record', 'rust-record', 'codegen'))
+    parser.add_argument('action', choices=('paper-record', 'documents-record',
+                                          'documents-check', 't40-record', 'rust-record', 'codegen'))
     parser.add_argument('--repository', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--support')
     parser.add_argument('--cargo-target-dir')
     parser.add_argument('--cargo-home')
     parser.add_argument('--record')
+    parser.add_argument('--binary')
     args = parser.parse_args()
-    {'paper-record': paper_record, 't40-record': t40_record,
+    {'paper-record': paper_record, 'documents-record': documents_record,
+     'documents-check': documents_check, 't40-record': t40_record,
      'rust-record': rust_record, 'codegen': codegen}[args.action](args)
 
 

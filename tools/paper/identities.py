@@ -20,7 +20,7 @@ def holds(line, key):
 
 def label_mints(repo):
     rows = [line.split('\t') for line in read(repo/'documents/paper-build/label-mints.tsv').splitlines() if not line.startswith('#')]
-    require(len(rows) == 664, 'M063: label mint row count differs')
+    require(len(rows) == 663, 'M063: label mint row count differs')
     require(all(len(row) == 3 and KEY.fullmatch(row[0]) and
                 re.fullmatch(r'documents/paper/[A-Za-z0-9_./-]+\.tex', row[1]) and '..' not in row[1].split('/') and
                 row[2].isdecimal() and int(row[2]) > 0 for row in rows), 'M063: malformed label mint row')

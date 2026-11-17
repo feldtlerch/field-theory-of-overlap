@@ -63,6 +63,14 @@ pub enum AssemblyFault {
         actual: String,
         declared_at: UnitSite,
     },
+    WrongQuotationOwner {
+        label: String,
+        document: String,
+    },
+    MissingQuotationLanguage {
+        label: String,
+        language: String,
+    },
     UnknownMathCommand {
         command: String,
     },
@@ -200,7 +208,9 @@ impl AssemblyFault {
             Self::UnknownSkeletonDocument { .. } => 4,
             Self::UnknownUnit { .. } => 5,
             Self::UnitMultiplicity { .. } => 6,
-            Self::WrongOwner { .. } => 7,
+            Self::WrongOwner { .. }
+            | Self::WrongQuotationOwner { .. }
+            | Self::MissingQuotationLanguage { .. } => 7,
             Self::UnknownMathCommand { .. } => 8,
             Self::MathArguments { .. } => 9,
             Self::MathSyntax { .. } => 10,
@@ -384,6 +394,12 @@ impl From<ftoo_manifest::AssemblyInputFault> for AssemblyFault {
                 actual,
                 declared_at,
             },
+            F::WrongQuotationOwner { label, document } => {
+                Self::WrongQuotationOwner { label, document }
+            }
+            F::MissingQuotationLanguage { label, language } => {
+                Self::MissingQuotationLanguage { label, language }
+            }
             F::UnknownMathCommand { command } => Self::UnknownMathCommand { command },
             F::MathArguments {
                 command,

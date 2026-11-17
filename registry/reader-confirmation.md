@@ -1,6 +1,6 @@
 # Paper reader bindings · `dec:reader:confirmed-tags`
 
-Each admission binds the exact spelling to the object minted at that label in the paper sources, located in `documents/paper-build/label-mints.tsv`. Alias decisions print an existing paper spelling and admit nothing.
+Each admission binds the exact spelling to the object minted at that label, located in `documents/paper-build/label-mints.tsv` for paper sources or by its unit id for native units. Alias decisions print an existing paper spelling and admit nothing.
 
 | Source key | Confirmed spelling | Decision |
 |---|---|---|

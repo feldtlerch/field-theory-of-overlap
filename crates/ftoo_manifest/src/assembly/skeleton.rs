@@ -19,12 +19,14 @@ pub struct SkeletonSection {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SkeletonChild {
     Unit(LocatedString),
+    Quotation(LocatedString),
     Section(SkeletonSection),
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SkeletonPosition {
     unit: String,
     depth: Option<usize>,
+    quotation: bool,
     site: UnitSite,
 }
 impl SkeletonPosition {
@@ -35,6 +37,10 @@ impl SkeletonPosition {
     #[must_use]
     pub const fn depth(&self) -> Option<usize> {
         self.depth
+    }
+    #[must_use]
+    pub const fn quotation(&self) -> bool {
+        self.quotation
     }
     #[must_use]
     pub const fn site(&self) -> &UnitSite {
@@ -130,9 +136,9 @@ pub fn check_skeletons<'a>(
             .sections
             .iter()
             .rev()
-            .map(|s| (Some(s), &s.heading, Some(1)))
+            .map(|s| (Some(s), &s.heading, Some(1), false))
             .collect();
-        while let Some((section, location, depth)) = stack.pop() {
+        while let Some((section, location, depth, quotation)) = stack.pop() {
             if depth.is_some_and(|d| d > 6) {
                 return Err(vec![diagnostic(
                     document,
@@ -158,24 +164,31 @@ pub fn check_skeletons<'a>(
                 )]);
             }
             positions += 1;
-            references
-                .entry(location.value.clone())
-                .or_default()
-                .push(location.site.clone());
-            reference(corpus, document, location, owner_sites, &mut errors);
+            if quotation {
+                quotation_reference(corpus, document, location, &mut errors);
+            } else {
+                references
+                    .entry(location.value.clone())
+                    .or_default()
+                    .push(location.site.clone());
+                reference(corpus, document, location, owner_sites, &mut errors);
+            }
             blocks.push(SkeletonPosition {
                 unit: location.value.clone(),
                 depth,
+                quotation,
                 site: location.site.clone(),
             });
             if let Some(section) = section {
                 for child in section.children.iter().rev() {
                     match child {
-                        SkeletonChild::Unit(unit) => stack.push((None, unit, None)),
+                        SkeletonChild::Unit(unit) => stack.push((None, unit, None, false)),
+                        SkeletonChild::Quotation(unit) => stack.push((None, unit, None, true)),
                         SkeletonChild::Section(section) => stack.push((
                             Some(section),
                             &section.heading,
                             Some(depth.unwrap_or(0) + 1),
+                            false,
                         )),
                     }
                 }
@@ -196,6 +209,59 @@ pub fn check_skeletons<'a>(
     } else {
         super::diagnostics::sort(&mut errors);
         Err(errors)
+    }
+}
+fn quotation_reference(
+    corpus: &LanguageCheckedUnits,
+    document: &str,
+    location: &LocatedString,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Some(unit) = corpus
+        .units()
+        .iter()
+        .find(|u| u.label().as_str() == location.value)
+    else {
+        errors.push(diagnostic(
+            document,
+            Some(&location.value),
+            &location.site,
+            Fault::UnknownUnit {
+                label: location.value.clone(),
+                available: corpus
+                    .units()
+                    .iter()
+                    .map(|u| u.label().as_str().into())
+                    .collect(),
+            },
+        ));
+        return;
+    };
+    if unit.document() == document {
+        errors.push(diagnostic(
+            document,
+            Some(&location.value),
+            &location.site,
+            Fault::WrongQuotationOwner {
+                label: location.value.clone(),
+                document: document.into(),
+            },
+        ));
+    }
+    if let Some(languages) = corpus.documents().get(document) {
+        for language in languages {
+            if !unit.texts().contains_key(language) {
+                errors.push(diagnostic(
+                    document,
+                    Some(&location.value),
+                    &location.site,
+                    Fault::MissingQuotationLanguage {
+                        label: location.value.clone(),
+                        language: language.clone(),
+                    },
+                ));
+            }
+        }
     }
 }
 fn reference(

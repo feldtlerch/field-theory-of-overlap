@@ -825,8 +825,8 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M040,
-            "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar.",
-            "Document language declarations and all associated statement-unit texts.",
+            "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar. A document's optional targets list is a nonempty set of distinct values from fragment, markdown, latex and html, and defaults to markdown and latex.",
+            "Document language and target declarations and all associated statement-unit texts.",
         ),
         (
             RuleId::M041,

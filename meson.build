@@ -18,11 +18,14 @@ if path_check.returncode() != 0
   error('PATH must resolve the configured Meson, Ninja, Python, Cargo, Rust and Node programs')
 endif
 support = get_option('support')
+notation_support = get_option('notation_support')
 cargo_target_dir = get_option('cargo_target_dir')
 cargo_home = get_option('cargo_home')
-if not support.startswith('/') or not cargo_target_dir.startswith('/') or not cargo_home.startswith('/')
-  error('support, cargo_target_dir and cargo_home must be absolute')
+if not support.startswith('/') or not notation_support.startswith('/') or not cargo_target_dir.startswith('/') or not cargo_home.startswith('/')
+  error('support, notation_support, cargo_target_dir and cargo_home must be absolute')
 endif
+notation_env = environment()
+notation_env.set('FTOO_NOTATION_SUPPORT', notation_support)
 source = meson.project_source_root()
 adapter = source / 'tools/paper/meson_adapter.py'
 t40 = source / 'tools/paper/meson_t40.py'
@@ -42,8 +45,18 @@ codegen = custom_target('codegen', build_subdir: 'bin', input: rust_record, outp
   command: [python, adapter, 'codegen', '--repository', source,
     '--cargo-target-dir', cargo_target_dir, '--cargo-home', cargo_home,
     '--record', '@INPUT@', '--output', '@OUTPUT@'])
+run_target('documents-generate', command: [codegen, 'documents-generate',
+  '--repository', source, '--support', support], env: notation_env)
+documents_record = custom_target('documents-record', output: 'documents-record.json',
+  command: [python, adapter, 'documents-record', '--repository', source,
+    '--output', '@OUTPUT@'], build_always_stale: true)
+documents_verified = custom_target('documents-verified',
+  input: [documents_record, codegen], output: 'documents.checked',
+  command: [python, adapter, 'documents-check', '--repository', source,
+    '--support', support, '--record', '@INPUT0@', '--binary', '@INPUT1@',
+    '--output', '@OUTPUT@'], env: notation_env)
 pair = custom_target('pair', build_subdir: 'paper',
-  input: [paper_record, codegen],
+  input: [paper_record, documents_verified, codegen],
   output: ['paper.pdf', 'explainer.pdf', 'inputs.json', 'identity-ledger.json', 'pair.json'],
   command: [codegen, 'produce', '--repository', source, '--support', support,
     '--work', '@PRIVATE_DIR@/work', '--output-dir', '@OUTDIR@'],
@@ -65,6 +78,7 @@ support_env = environment()
 support_env.set('CARGO_TARGET_DIR', cargo_target_dir)
 support_env.set('CARGO_HOME', cargo_home)
 support_env.set('FTOO_ASSEMBLY_SUPPORT', support)
+support_env.set('FTOO_NOTATION_SUPPORT', notation_support)
 test('unit', cargo, args: ['test', '--locked', '--offline', '--workspace', '--no-fail-fast',
   '--', '--skip', 'support_required'], suite: 'unit', timeout: 0,
   is_parallel: false, env: cargo_env, workdir: source)
@@ -75,8 +89,9 @@ test('byte-gate', codegen, args: ['check', '--repository', source,
   '--built', meson.current_build_dir() / 'paper'],
   depends: pair, suite: 'product', timeout: 60, is_parallel: false, workdir: source)
 test('live-release', codegen, args: ['check', '--release', '--repository', source,
-  '--built', meson.current_build_dir() / 'paper'],
-  depends: pair, suite: 'product', timeout: 300, is_parallel: false, workdir: source)
+  '--support', support, '--built', meson.current_build_dir() / 'paper'],
+  depends: pair, suite: 'product', timeout: 300, is_parallel: false,
+  env: notation_env, workdir: source)
 test('evidence-T40', python, args: [t40, 'evidence', '--input', t40_assert],
   depends: t40_assert, suite: 'product', timeout: 60, is_parallel: false)
 test('graph-content', python, args: [source / 'tools/paper/meson_graph.py', 'G1',

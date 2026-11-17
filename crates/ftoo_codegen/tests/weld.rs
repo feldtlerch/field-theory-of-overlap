@@ -20,12 +20,12 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     // committed-unit expectations remain fixed.
     let labels = ftoo_codegen::check_label_files(&root, &book).unwrap();
     let expected = WeldCheckSummary {
-        units: 4,
-        texts: 4,
+        units: 7,
+        texts: 7,
         tag_sites: 3,
         rust_mints: 4,
         markdown_mints: labels.markdown_mints,
-        unit_mints: 4,
+        unit_mints: 7,
         markdown_citations: labels.markdown_citations,
         rust_citations: 8,
         unit_citation_sites: 1,
@@ -50,7 +50,10 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             "sec:coefficients:first-value",
             "sec:coefficients:overview",
             "sec:coefficients:value-context",
-            "sec:coefficients:value-table"
+            "sec:coefficients:value-table",
+            "sec:pilot:explainer-excerpt",
+            "sec:pilot:paper-excerpt",
+            "sec:say:direction"
         ]
     );
     let first = &welded.units()[0].languages()[0];

@@ -1,6 +1,70 @@
 use super::*;
 
 #[test]
+fn output_diagnostics_refuse_duplicate_labels_and_destinations() {
+    let scratch = Scratch::new();
+    let paper = scratch.0.join("paper");
+    fs::create_dir_all(&paper).unwrap();
+    fs::write(paper.join("main.blg"), b"clean").unwrap();
+    fs::write(scratch.0.join("main-2.txt"), b"clean").unwrap();
+    fs::write(
+        paper.join("main.log"),
+        "LaTeX Warning: Label `sec:say:direction' multiply defined.",
+    )
+    .unwrap();
+    assert_eq!(
+        validate_output(&scratch.0, "main", 2),
+        Err(PaperFault::Input(
+            "Duplicate label or named output object: main".into()
+        ))
+    );
+    fs::write(
+        paper.join("main.log"),
+        b"Output written without diagnostics",
+    )
+    .unwrap();
+    fs::write(
+        scratch.0.join("main-2.txt"),
+        b"warning: Object @same-destination already defined.\n",
+    )
+    .unwrap();
+    assert_eq!(
+        validate_output(&scratch.0, "main", 2),
+        Err(PaperFault::Input(
+            "Duplicate label or named output object: main".into()
+        ))
+    );
+    fs::write(scratch.0.join("main-2.txt"), b"clean").unwrap();
+    validate_output(&scratch.0, "main", 2).unwrap();
+}
+
+#[test]
+fn documents_commands_refuse_work_and_missing_support() {
+    let scratch = Scratch::new();
+    let work = scratch.0.join("absent");
+    assert_eq!(
+        run(&["documents-check".into(), "--release".into()])
+            .unwrap_err()
+            .to_string(),
+        "Release flag applies only to the paper pair"
+    );
+    assert_eq!(
+        run(&[
+            "documents-check".into(),
+            "--work".into(),
+            work.into_os_string(),
+        ])
+        .unwrap_err()
+        .to_string(),
+        "Documents commands take no work area"
+    );
+    assert_eq!(
+        require_notation_support(None).unwrap_err().to_string(),
+        "Notation support required"
+    );
+}
+
+#[test]
 fn reading_acceptance_locates_bytes_and_reports_complete_faults() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     check_reading_acceptance(&root).unwrap();

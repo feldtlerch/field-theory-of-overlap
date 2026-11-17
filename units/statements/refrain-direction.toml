@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:say:direction"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "Direction tells which way two fates lean, never how much fate there is to lean."

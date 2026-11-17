@@ -806,8 +806,10 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             .map(DocumentArtifact::path)
             .collect::<Vec<_>>(),
         [
+            "generated/documents/explainer-pilot/sec-say-direction.tex",
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",
+            "generated/documents/paper-pilot/sec-say-direction.tex",
             "generated/notation.tex",
             "generated/addressing.tex"
         ]
@@ -841,14 +843,22 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             ftoo_manifest::Evidence::Deferred
         );
     }
-    for artifact in &prepared.artifacts()[..2] {
+    for artifact in prepared
+        .artifacts()
+        .iter()
+        .filter(|artifact| artifact.path().starts_with("generated/documents/main/"))
+    {
         retained_seed_header(
             std::str::from_utf8(artifact.bytes())?,
             artifact.path().as_bytes().ends_with(b".tex"),
         );
     }
     let coverage = "Coverage declaration: explicit-partial. Closed world: referents=false; relations=false; audit=true. Evidence context: retained audit accepted.";
-    for artifact in &prepared.artifacts()[..2] {
+    for artifact in prepared
+        .artifacts()
+        .iter()
+        .filter(|artifact| artifact.path().starts_with("generated/documents/main/"))
+    {
         let text = std::str::from_utf8(artifact.bytes())?;
         assert_eq!(
             text.lines()
@@ -1115,6 +1125,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
             displays: BTreeMap::new(),
             unit: "sec:fixture:heading".into(),
             depth: Some(1),
+            quotation: false,
             site: input::site("units/statements/fixture.toml"),
             runs: vec![
                 plan::Inline::Text("Before ".into()),
@@ -1198,6 +1209,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 displays: BTreeMap::new(),
                 unit: format!("sec:fixture:{name}"),
                 depth: (name == "a").then_some(1),
+                quotation: false,
                 site: input::site(&format!("units/statements/{name}.toml")),
                 runs: vec![plan::Inline::Text(name.to_uppercase())],
             })
@@ -1318,6 +1330,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
             displays: BTreeMap::new(),
             unit: "sec:fixture:unit".into(),
             depth: None,
+            quotation: false,
             site: input::site("units/statements/fixture.toml"),
             runs: ["first", "second", "first"]
                 .into_iter()
@@ -1362,6 +1375,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             displays: BTreeMap::new(),
             unit: "sec:fixture:paragraph".into(),
             depth: None,
+            quotation: false,
             site: site.clone(),
             runs: vec![
                 plan::Inline::Tag {
@@ -1704,6 +1718,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     displays: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth,
+                    quotation: false,
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
@@ -1718,6 +1733,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     pending_names: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth: None,
+                    quotation: false,
                     site: origin.clone(),
                     runs: std::mem::take(&mut plan.blocks[0].runs),
                     displays: BTreeMap::new(),
@@ -1727,6 +1743,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     pending_names: BTreeMap::new(),
                     unit: "sec:fixture:unit".into(),
                     depth: None,
+                    quotation: false,
                     site: input::site("units/displays/fixture.toml"),
                     runs: vec![plan::Inline::Text("Cell.".into())],
                     displays: BTreeMap::new(),

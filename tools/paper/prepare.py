@@ -9,9 +9,13 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime, digest
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex"]
 SOURCES = 'documents/paper/'
 BUILD = 'documents/paper-build/'
+FRAGMENTS = (
+    ('documents/paper/parts/partA.tex', 184, 184, 'generated/documents/paper-pilot/sec-say-direction.tex', 'sec:say:direction'),
+    ('documents/paper/explainer/explainer.tex', 319, 320, 'generated/documents/explainer-pilot/sec-say-direction.tex', 'sec:say:direction'),
+)
 
 
 def hook_addresses(hooks):
@@ -73,6 +77,46 @@ def check_layout_targets(repository):
     require(pinned == addresses, 'Layout hook addresses differ from pins: unpinned '+str(sorted(addresses-pinned))+', unused '+str(sorted(pinned-addresses)))
 
 
+def declared_fragments(repository, rows):
+    """Validate the bounded source slots and return their replacement first lines."""
+    replacements = {}
+    bodies = set()
+    for source, first, last, fragment, unit in FRAGMENTS:
+        require(source in rows and first > 0 and last >= first, 'Fragment source declaration differs: '+source)
+        lines = (repository/source).read_bytes().splitlines(keepends=True)
+        require(last <= len(lines) and lines[first-1] == ('% generated: '+unit+'\n').encode(),
+                'Fragment marker/declaration differs: '+source+':'+str(first))
+        require(all(line == b'%\n' for line in lines[first:last]), 'Fragment padding differs: '+source)
+        data = (repository/fragment).read_bytes()
+        expected_macro = b'paperrefrain' if source.startswith('documents/paper/explainer/') else b'refrain'
+        prefix = b'\\'+expected_macro+b'{'+unit.encode()+b'}{'
+        require(data.startswith(prefix) and data.endswith(b'}\n') and data.count(b'\n') == 1,
+                'Fragment label/declaration differs: '+fragment)
+        body = data[len(prefix):-2]
+        require(body and b'{' not in body and b'}' not in body, 'Fragment body differs: '+fragment)
+        bodies.add(b' '.join(body.split()))
+        replacements[(source, first)] = data
+    for source in rows:
+        data = (repository/source).read_bytes()
+        for match in re.finditer(rb'\\(?:paper)?refrain\{([^}]*)\}\{([^}]*)\}', data, re.S):
+            label, body = match.groups()
+            require(label not in {unit.encode() for *_, unit in FRAGMENTS}
+                    and b' '.join(body.split()) not in bodies,
+                    'Authored refrain duplicates a declared fragment: '+source)
+        for *_, unit in FRAGMENTS:
+            require(not re.search(rb'\\label\{'+re.escape(unit.encode())+rb'\}', data),
+                    'Authored mint duplicates a declared fragment: '+source)
+    declared = {(source, first) for source, first, *_ in FRAGMENTS}
+    require(len(declared) == len(FRAGMENTS), 'Duplicate fragment slot')
+    require(all(fragment in INPUTS for _, _, _, fragment, _ in FRAGMENTS),
+            'Declared fragment absent from receipt inputs')
+    for source in rows:
+        for number, line in enumerate((repository/source).read_bytes().splitlines(), 1):
+            require(not re.match(rb'\s*%\s*generated\s*:', line) or (source, number) in declared,
+                    'Undeclared fragment marker: '+source+':'+str(number))
+    return replacements
+
+
 def prepare(repository, support, work):
     root = repository/'documents/paper-build'
     require(not work.exists(), 'Work directory must not exist')
@@ -80,6 +124,7 @@ def prepare(repository, support, work):
     require(len(rows) == 26 and len(set(rows)) == 26, 'Closed list must have 26 distinct paths')
     require(all(p.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(p).parts for p in rows), 'Closed list path escapes paper root')
     check_layout_targets(repository)
+    fragments = declared_fragments(repository, rows)
     settings, lock, engine, bundle = runtime(repository, support)
     locked = {f['member']:f['sha256'] for f in lock['bundle']['files']}
     sources = b'\n'.join((repository/d).read_bytes() for d in rows)
@@ -94,6 +139,11 @@ def prepare(repository, support, work):
         target = work/pathlib.Path(dest).relative_to(SOURCES)
         target.parent.mkdir(parents=True,exist_ok=True)
         shutil.copyfile(repository/dest,target)
+    for (source, first), data in fragments.items():
+        target = work/pathlib.Path(source).relative_to(SOURCES)
+        lines = target.read_bytes().splitlines(keepends=True)
+        lines[first-1] = data
+        target.write_bytes(b''.join(lines))
     shutil.copyfile(root/'compat.tex',work/'compat.tex')
     emit(repository, work)
     templates = tomllib.loads(read(root/'templates.toml'))

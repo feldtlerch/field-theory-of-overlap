@@ -1,7 +1,7 @@
 use super::UnitSource;
 use ftoo_manifest::{
-    DocumentDraft, DocumentEntryDraft, LocatedEntryDraft, LocatedString, PathPart, RuleId,
-    ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitFault, UnitSite, UnitStage,
+    DocumentDraft, DocumentEntryDraft, DocumentOutput, LocatedEntryDraft, LocatedString, PathPart,
+    RuleId, ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitFault, UnitSite, UnitStage,
 };
 use std::{collections::BTreeMap, ops::Range};
 use toml_edit::{Document, Item, TableLike, Value};
@@ -294,6 +294,90 @@ fn entries(node: &Node) -> Result<BTreeMap<String, LocatedEntryDraft>, Box<UnitD
         })
         .collect()
 }
+fn targets(table: &Node) -> Result<Vec<DocumentOutput>, Box<UnitDiagnostic>> {
+    let field = table
+        .fields
+        .iter()
+        .find(|(key, _, _)| key == "targets")
+        .map(|(_, _, value)| value);
+    let Some(field) = field else {
+        return Ok(vec![DocumentOutput::Markdown, DocumentOutput::Latex]);
+    };
+    let array = typed(field, ShapeKind::Array)?;
+    let mut selected = Vec::new();
+    for node in &array.elements {
+        let value = string(node)?;
+        let target = match value.value.as_str() {
+            "fragment" => DocumentOutput::Fragment,
+            "markdown" => DocumentOutput::Markdown,
+            "latex" => DocumentOutput::Latex,
+            "html" => DocumentOutput::Html,
+            _ => {
+                return Err(error(
+                    RuleId::M040,
+                    UnitStage::Metadata,
+                    value.site,
+                    UnitFault::UnknownToken {
+                        value: value.value,
+                        expected: vec![
+                            "fragment".into(),
+                            "markdown".into(),
+                            "latex".into(),
+                            "html".into(),
+                        ],
+                    },
+                ));
+            }
+        };
+        if selected.contains(&target) {
+            return Err(error(
+                RuleId::M040,
+                UnitStage::Metadata,
+                value.site,
+                UnitFault::UnknownToken {
+                    value: value.value,
+                    expected: vec!["distinct document targets".into()],
+                },
+            ));
+        }
+        selected.push(target);
+    }
+    if selected.is_empty() {
+        return Err(error(
+            RuleId::M040,
+            UnitStage::Metadata,
+            array.site.clone(),
+            UnitFault::UnknownToken {
+                value: "empty targets".into(),
+                expected: vec![
+                    "fragment".into(),
+                    "markdown".into(),
+                    "latex".into(),
+                    "html".into(),
+                ],
+            },
+        ));
+    }
+    Ok(selected)
+}
+pub(crate) fn selected_targets(
+    source: &UnitSource,
+) -> Result<BTreeMap<String, Vec<DocumentOutput>>, ftoo_manifest::UnitErrors> {
+    let result: Result<BTreeMap<String, Vec<DocumentOutput>>, Box<UnitDiagnostic>> = (|| {
+        let text = encoding(source)?;
+        let tree = parse(&source.file, text)?;
+        numeric(&tree, text)?;
+        shape_inner(&tree, text, true)?;
+        let root = fixed(&tree, &["schema", "documents"])?;
+        dynamic(root[1])?
+            .into_iter()
+            .map(|(name, _, table)| Ok((name.clone(), targets(table)?)))
+            .collect()
+    })();
+    result.map_err(|error: Box<UnitDiagnostic>| {
+        ftoo_manifest::UnitErrors::from_diagnostics(vec![*error]).expect("one diagnostic")
+    })
+}
 pub(super) enum Draft {
     Documents(DocumentDraft),
     Unit(Box<UnitDraft>),
@@ -320,13 +404,24 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
     if declarations {
         let mut documents = BTreeMap::new();
         for (name, key_site, table) in dynamic(root[1])? {
-            let fields = fixed(table, &["required-languages"])?;
+            let selected = table.fields.iter().any(|(key, _, _)| key == "targets");
+            let fields = if selected {
+                fixed(table, &["required-languages", "targets"])?
+            } else {
+                fixed(table, &["required-languages"]).map_err(|mut error| {
+                    if let UnitFault::UnknownField { expected, .. } = &mut error.fault {
+                        expected.push("targets".into());
+                    }
+                    error
+                })?
+            };
             let array = typed(fields[0], ShapeKind::Array)?;
             let required_languages = array
                 .elements
                 .iter()
                 .map(string)
                 .collect::<Result<Vec<_>, _>>()?;
+            targets(table)?;
             documents.insert(
                 name.clone(),
                 DocumentEntryDraft {

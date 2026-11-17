@@ -2,3 +2,12 @@ schema = 1
 
 [documents.main]
 required-languages = ["en"]
+targets = ["markdown", "latex"]
+
+[documents.paper-pilot]
+required-languages = ["en"]
+targets = ["fragment"]
+
+[documents.explainer-pilot]
+required-languages = ["en"]
+targets = ["fragment"]

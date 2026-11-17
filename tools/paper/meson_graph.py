@@ -14,9 +14,16 @@ python = find_program('python3')
 record = custom_target('record', output: 'record.json', build_always_stale: true,
   command: [python, meson.project_source_root() / 'step.py', 'record',
     meson.project_source_root() / 'source.txt', '@OUTPUT@'])
-producer = custom_target('producer', input: record, output: 'product.txt',
+document_record = custom_target('document-record', output: 'document-record.json',
+  build_always_stale: true,
+  command: [python, meson.project_source_root() / 'step.py', 'record',
+    meson.project_source_root() / 'document.txt', '@OUTPUT@'])
+document_check = custom_target('document-check', input: document_record,
+  output: 'documents.checked', command: [python, meson.project_source_root() / 'step.py',
+    'verify', '@INPUT@', '@OUTPUT@'])
+producer = custom_target('producer', input: [record, document_check], output: 'product.txt',
   command: [python, meson.project_source_root() / 'step.py', 'produce',
-    '@INPUT@', '@OUTPUT@'])
+    '@INPUT0@', '@OUTPUT@'])
 consumer = custom_target('consumer', input: producer, output: 'verdict.txt',
   command: [python, meson.project_source_root() / 'step.py', 'consume',
     '@INPUT@', '@OUTPUT@'])
@@ -31,6 +38,11 @@ source = pathlib.Path(source)
 output = pathlib.Path(output)
 if action == 'record':
     data = hashlib.sha256(source.read_bytes()).hexdigest().encode()
+elif action == 'verify':
+    source.read_bytes()
+    data = b'documents checked\\n'
+    with (output.parent / 'document-check.calls').open('a') as log:
+        log.write('verify\\n')
 elif action == 'produce':
     data = source.read_bytes()
     with (output.parent / 'producer.calls').open('a') as log:
@@ -101,6 +113,7 @@ def fixture(parent, publish=None):
     (source / 'meson.build').write_text(FIXTURE + extra)
     (source / 'step.py').write_text(STEP)
     (source / 'source.txt').write_text('alpha')
+    (source / 'document.txt').write_text('first')
     run('meson', 'setup', str(build), str(source), '--backend=ninja', '--wrap-mode=nodownload')
     return source, build
 
@@ -121,6 +134,12 @@ def g1(parent, adapter, cargo_home):
     print('G1 first and repeated calls:', first, second)
     print('G1 dry-run:', dry.stdout.strip(), dry.stderr.strip())
     assert first == second == (1, 1), 'Unchanged record restarted a producer'
+    document = source / 'document.txt'
+    document.write_text('second')
+    compile(build)
+    assert count(build / 'document-check.calls') == 2
+    assert count(build / 'producer.calls') == 1
+    print('Changed document: check reran; producer stayed at one call')
     item = source / 'source.txt'
     old = item.stat()
     item.write_text('alpha')

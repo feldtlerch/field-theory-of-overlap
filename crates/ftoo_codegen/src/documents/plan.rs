@@ -704,6 +704,7 @@ pub(super) struct Block {
     pub displays: BTreeMap<DocumentTarget, DisplayBody>,
     pub unit: String,
     pub depth: Option<usize>,
+    pub quotation: bool,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
 }
@@ -929,6 +930,7 @@ impl Coverage {
             displays: BTreeMap::new(),
             unit: String::new(),
             depth: None,
+            quotation: false,
             site: self.site.clone(),
             runs: self.runs.clone(),
         }
@@ -1390,6 +1392,7 @@ pub(super) fn build(
                     displays: bodies,
                     unit: position.unit().into(),
                     depth: position.depth(),
+                    quotation: position.quotation(),
                     site: metadata[position.unit()].clone(),
                     runs,
                 };
@@ -2077,6 +2080,7 @@ pub(super) fn display_plans(
                 pending_names: BTreeMap::new(),
                 unit: unit.label().as_str().into(),
                 depth: None,
+                quotation: false,
                 site: region.site(&region.source().site),
                 runs,
                 displays: BTreeMap::new(),
@@ -2801,6 +2805,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
     let mut block = Block {
         unit: unit.label().as_str().into(),
         depth: None,
+        quotation: false,
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),

@@ -20,10 +20,14 @@ mod tests;
 pub use artifacts::{check_documents, generate_documents};
 pub use diagnostics::*;
 use ftoo_manifest::{
-    AssemblySite, AssemblyStage, DocumentTarget, RuleId, SourceAnchor, SourceOrigin, UnitSite,
+    AssemblySite, AssemblyStage, DocumentOutput, DocumentTarget, RuleId, SourceAnchor,
+    SourceOrigin, UnitSite,
 };
 pub use native_support::NativeSupport;
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocumentArtifact {
@@ -236,6 +240,8 @@ pub(crate) fn prepare_context(
     let statements = input::sources(root, &statement_files)?;
     let corpus = crate::load_unit_sources(declaration.clone(), statements.clone())
         .map_err(DocumentError::Units)?;
+    let selected = crate::units::toml::selected_targets(&declaration)
+        .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
     let markdown = crate::load_markdown_files(root).map_err(DocumentError::Labels)?;
     neutral(&markdown, true, AssemblyStage::Source)?;
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
@@ -329,7 +335,7 @@ pub(crate) fn prepare_context(
     drop(admission);
     crate::notation::with_preparation(effective.as_ref(), &catalogue, |notation| {
         let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
-        let artifacts = render_artifacts(root, &support, &book, &plans, notation)?;
+        let artifacts = render_artifacts(root, &support, &book, &selected, &plans, notation)?;
         let mut prepared = finish_snapshot(
             root,
             inputs,
@@ -438,10 +444,12 @@ fn metadata(
     (metadata, owners)
 }
 
+#[allow(clippy::too_many_lines)] // Selected outputs and shared support remain in one preparation scope.
 fn render_artifacts(
     root: &Path,
     support: &NativeSupport,
     book: &ftoo_manifest::AddressBook<'_>,
+    selected: &BTreeMap<String, Vec<DocumentOutput>>,
     plans: &[plan::DocumentPlan],
     notation: &crate::RenderableNotation<'_, '_, '_>,
 ) -> Result<Vec<DocumentArtifact>, DocumentError> {
@@ -451,41 +459,71 @@ fn render_artifacts(
         let mut artifacts = Vec::new();
         for plan in plans {
             document_size(plan)?;
-            let md = markdown::render(plan);
-            let tex = latex::render(plan);
-            plan::check_emission(plan, &md, DocumentTarget::Markdown)?;
-            plan::check_emission(plan, &tex, DocumentTarget::Latex)?;
-            let md_path = format!("generated/documents/{}/{}.md", plan.document, plan.language);
-            let checked =
-                ftoo_manifest::check_markdown_sources(vec![ftoo_manifest::MarkdownSource {
-                    file: md_path.clone(),
-                    bytes: md.as_bytes().to_vec(),
-                }])
-                .map_err(|e| DocumentError::Labels(crate::LabelFileError::Source(e)))?;
-            neutral(&checked, false, AssemblyStage::Emission)?;
-            native::consume_plan(
-                support,
-                &lock,
-                &tex,
-                notation.declarations(),
-                &addressing,
-                plan,
-            )?;
-            artifacts.push(DocumentArtifact {
-                path: md_path,
-                bytes: md.into_bytes(),
-                origins: plan.origins(DocumentTarget::Markdown),
-                emissions: plan.records(DocumentTarget::Markdown),
-            });
-            artifacts.push(DocumentArtifact {
-                path: format!(
-                    "generated/documents/{}/{}.tex",
-                    plan.document, plan.language
-                ),
-                bytes: tex.into_bytes(),
-                origins: plan.origins(DocumentTarget::Latex),
-                emissions: plan.records(DocumentTarget::Latex),
-            });
+            let targets = &selected[&plan.document];
+            refuse_quoted_screen_targets(plan, targets)?;
+            for target in targets {
+                match target {
+                    DocumentOutput::Markdown => {
+                        let md = markdown::render(plan);
+                        plan::check_emission(plan, &md, DocumentTarget::Markdown)?;
+                        let path =
+                            format!("generated/documents/{}/{}.md", plan.document, plan.language);
+                        let checked = ftoo_manifest::check_markdown_sources(vec![
+                            ftoo_manifest::MarkdownSource {
+                                file: path.clone(),
+                                bytes: md.as_bytes().to_vec(),
+                            },
+                        ])
+                        .map_err(|e| DocumentError::Labels(crate::LabelFileError::Source(e)))?;
+                        neutral(&checked, false, AssemblyStage::Emission)?;
+                        artifacts.push(DocumentArtifact {
+                            path,
+                            bytes: md.into_bytes(),
+                            origins: plan.origins(DocumentTarget::Markdown),
+                            emissions: plan.records(DocumentTarget::Markdown),
+                        });
+                    }
+                    DocumentOutput::Latex => {
+                        let tex = latex::render(plan);
+                        plan::check_emission(plan, &tex, DocumentTarget::Latex)?;
+                        native::consume_plan(
+                            support,
+                            &lock,
+                            &tex,
+                            notation.declarations(),
+                            &addressing,
+                            plan,
+                        )?;
+                        artifacts.push(DocumentArtifact {
+                            path: format!(
+                                "generated/documents/{}/{}.tex",
+                                plan.document, plan.language
+                            ),
+                            bytes: tex.into_bytes(),
+                            origins: plan.origins(DocumentTarget::Latex),
+                            emissions: plan.records(DocumentTarget::Latex),
+                        });
+                    }
+                    DocumentOutput::Fragment => {
+                        for block in plan.blocks.iter().filter(|block| block.depth.is_none()) {
+                            let source = fragment_line(block)?;
+                            artifacts.push(DocumentArtifact {
+                                path: format!(
+                                    "generated/documents/{}/{}.tex",
+                                    plan.document,
+                                    block.unit.replace(':', "-")
+                                ),
+                                bytes: source.into_bytes(),
+                                origins: Vec::new(),
+                                emissions: Vec::new(),
+                            });
+                        }
+                    }
+                    DocumentOutput::Html => {
+                        return Err(unsupported_html(plan));
+                    }
+                }
+            }
         }
         consume_sweep(support, &lock, notation, &addressing)?;
         artifacts.push(DocumentArtifact {
@@ -500,6 +538,7 @@ fn render_artifacts(
             origins: Vec::new(),
             emissions: Vec::new(),
         });
+        unique_artifact_paths(&artifacts)?;
         for artifact in &artifacts {
             if artifact.bytes.len() > 16_777_216 {
                 return Err(failure(
@@ -520,6 +559,98 @@ fn render_artifacts(
         }
         Ok(artifacts)
     })
+}
+
+fn refuse_quoted_screen_targets(
+    plan: &plan::DocumentPlan,
+    targets: &[DocumentOutput],
+) -> Result<(), DocumentError> {
+    if let Some(block) = plan.blocks.iter().find(|block| block.quotation)
+        && targets
+            .iter()
+            .any(|target| matches!(target, DocumentOutput::Markdown | DocumentOutput::Latex))
+    {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(block.site.clone()),
+            AssemblyFault::UnknownToken {
+                value: block.unit.clone(),
+                expected: vec!["quotation emitter".into()],
+            },
+        ));
+    }
+    Ok(())
+}
+
+fn unique_artifact_paths(artifacts: &[DocumentArtifact]) -> Result<(), DocumentError> {
+    let mut paths = BTreeSet::new();
+    for artifact in artifacts {
+        if !paths.insert(&artifact.path) {
+            return Err(failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Generated {
+                    path: artifact.path.clone(),
+                    bytes: 0..0,
+                    origins: artifact.origins.clone(),
+                },
+                AssemblyFault::UnknownToken {
+                    value: artifact.path.clone(),
+                    expected: vec!["unique document artifact path".into()],
+                },
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn fragment_macro(block: &plan::Block) -> &'static str {
+    if block.quotation {
+        "paperrefrain"
+    } else {
+        "refrain"
+    }
+}
+
+fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
+    let text = fragment_text(block)?;
+    let macro_name = fragment_macro(block);
+    Ok(format!(
+        "\\{macro_name}{{{}}}{{{}}}\n",
+        block.unit,
+        latex::text(text)
+    ))
+}
+
+fn fragment_text(block: &plan::Block) -> Result<&str, DocumentError> {
+    let ([plan::Inline::Text(text)], true) = (block.runs.as_slice(), block.displays.is_empty())
+    else {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(block.site.clone()),
+            AssemblyFault::UnknownToken {
+                value: block.unit.clone(),
+                expected: vec!["plain refrain text".into()],
+            },
+        ));
+    };
+    Ok(text)
+}
+
+fn unsupported_html(plan: &plan::DocumentPlan) -> DocumentError {
+    failure(
+        RuleId::M055,
+        AssemblyStage::Emission,
+        AssemblySite::Inventory {
+            path: format!("units/documents.toml: {}", plan.document),
+        },
+        AssemblyFault::UnknownToken {
+            value: "html".into(),
+            expected: vec!["implemented document output".into()],
+        },
+    )
 }
 
 fn document_sites(corpus: &ftoo_manifest::LanguageCheckedUnits) -> BTreeMap<String, UnitSite> {

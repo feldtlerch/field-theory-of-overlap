@@ -14,7 +14,7 @@
     "documents/paper/data/ftoo_symbols.tex": "a0c098eb7da53ddb444196429c215c6583181db64528f68a8a74735c15c463bc",
     "documents/paper/data/ftoo_symbols_historical.tex": "c0cac6e1456e2fe721b4df7e589f1d67994839e97286bd1d7fa50a9652816392",
     "documents/paper/econ_membrane.tex": "121ff6fab50cc019885e3325a10b58d670b1394ec23134941f2ff88bb28b3aa4",
-    "documents/paper/explainer/explainer.tex": "c39ae3803a9c4a1948e62ab63c66c8980630b2363e92ea20634632e1c3f3481c",
+    "documents/paper/explainer/explainer.tex": "a8ca75b7f0f831444a52db7df9250870b53fc897ede55b5f8c88aa9335b8e593",
     "documents/paper/explainer_displayskips.tex": "a8f5592f4b1de4e3e09ad42318490904a57b73608d9385422fb80193fa0de3c8",
     "documents/paper/explainer_strings_english.tex": "d926a1e396152163876e5f9fbabb4674710381cc8ce679581007023a807d4ca5",
     "documents/paper/ftoo_typed_tools.tex": "3d1ddc89bd5565b61ce44d926d2961290789bdbea7e056732e4a54a3e0102a57",
@@ -26,7 +26,7 @@
     "documents/paper/parts/coda.tex": "c4887be4f06d0689fc31df5ab47fa37b6a245e7cae743f9c0188ec13705313f3",
     "documents/paper/parts/front.tex": "ecefe970be164c3005a1e947ff8a05127d986f2c2449d1f781ff304faf00a8b2",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
-    "documents/paper/parts/partA.tex": "30e74040f7a980daf12f59d9c8a2cf1259610ec48460b71429054ccef4b9dc19",
+    "documents/paper/parts/partA.tex": "9fea274486142abe38b8f4cd42d3b57e86ad2b1a6a7062b584e4afcf3a906dbf",
     "documents/paper/parts/partB.tex": "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219",
     "documents/paper/parts/partC.tex": "9b1fe2d0b67c87523bb0ed9707121aba20df16093db723c03ab9c7bbb4552e7c",
     "documents/paper/parts/partD.tex": "c5519a962001ff44e69f9d1b04bf8b33d892168b685d6c6c0899d348c1c36a34",
@@ -34,11 +34,13 @@
     "documents/paper/parts/partF.tex": "a017f767a7e4ca1e75cd20d279c1d18cc3dac1cfccbc5340ece6e8680c400d6b",
     "documents/paper/parts/partG.tex": "a6eef59fe8fffd302e4de5c53e325bc43439b53de181cd207c0a00fe28466269",
     "documents/paper/references.bib": "280fcfc82c0b4c49c152542b18d1cfd430b1bdbadda6207ffb3ee37f3021f003",
+    "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
+    "generated/documents/paper-pilot/sec-say-direction.tex": "5a6c5258c14720ead07f6ad4d4fbbce4ee0c0979cfcb8a8f9977d961d5b30c22",
     "tools/assembly/native-lock.toml": "4d483a627b55c1d8eabefbcdbd8c5422bffa4344787ed9e772f9c4c46190f284",
     "tools/paper/bibroute.py": "2670cbf7a3fe5dbd78cf984201e5e6d09826748e370ed2ceb13529e150834b95",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
-    "tools/paper/identities.py": "aecd5497098625ff94b8f1c2892829ad64e82185a09a8daa9df486a880ce69f0",
+    "tools/paper/identities.py": "e4fae3e3279423d1c39749bcd9c30148f61d00b66965c9d5a79af05609fa036a",
     "tools/paper/inputs.py": "04b65bf5e937021383819ab1516c090232fc208a27d8171ee124f05c5aa82333",
-    "tools/paper/prepare.py": "d1b4290a05649d0c2397c3f224794d9e6ff952b5ef0d7c4f4301d363a65acabb"
+    "tools/paper/prepare.py": "494ac685be39837158ccb073709ffd8d589196e21ab5395c249febf2fe8517cc"
   }
 }

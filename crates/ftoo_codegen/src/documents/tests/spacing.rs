@@ -40,6 +40,7 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
             displays: BTreeMap::new(),
             unit: "sec:fixture:spacing".into(),
             depth,
+            quotation: false,
             site: site(),
             runs: vec![
                 insertion(citation),

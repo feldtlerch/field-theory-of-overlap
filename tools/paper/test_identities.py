@@ -9,10 +9,81 @@ import tomllib
 from common import read, write, timed
 from identities import bindings, holds
 from ledger import leaks, occurrence_differences, ledger_binding, check_destination
-from prepare import prepare, check_layout_targets, versioned, paper_master
+from prepare import prepare, check_layout_targets, declared_fragments, versioned, paper_master, FRAGMENTS
 
 
 class Identities(unittest.TestCase):
+    def test_committed_fragments_match_native_text(self):
+        source=pathlib.Path(__file__).resolve().parents[2]
+        texts={}
+        for path in sorted((source/'units/statements').glob('*.toml')):
+            unit=tomllib.loads(read(path))['unit']
+            texts[unit['id']]=unit['texts']['en']
+        for *_, fragment, unit in FRAGMENTS:
+            self.assertIn('{'+texts[unit]+'}',read(source/fragment))
+
+    def test_declared_fragment_slots_refuse_label_marker_and_authored_copy(self):
+        source=pathlib.Path(__file__).resolve().parents[2]
+        for name in ['generated/documents/paper-pilot/sec-say-direction.tex',
+                     'generated/documents/explainer-pilot/sec-say-direction.tex']:
+            target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(source/name,target)
+        rows=read(source/'documents/paper-build/sources.tsv').splitlines()
+        self.assertEqual(len(declared_fragments(self.root,rows)),2)
+        fragment='generated/documents/explainer-pilot/sec-say-direction.tex'
+        original=read(self.root/fragment)
+        write(self.root/fragment,original.replace('sec:say:direction','sec:say:other'))
+        with self.assertRaisesRegex(ValueError,'Fragment label/declaration differs'):
+            declared_fragments(self.root,rows)
+        write(self.root/fragment,original)
+        marker='documents/paper/explainer/explainer.tex'
+        self.replace(marker,'% generated: sec:say:direction','% generated: sec:say:other')
+        with self.assertRaisesRegex(ValueError,'Fragment marker/declaration differs'):
+            declared_fragments(self.root,rows)
+        self.replace(marker,'% generated: sec:say:other','% generated: sec:say:direction')
+        with (self.root/marker).open('a') as output:
+            output.write('% generated: sec:say:other\n')
+        with self.assertRaisesRegex(ValueError,'Undeclared fragment marker'):
+            declared_fragments(self.root,rows)
+        self.replace(marker,'% generated: sec:say:other\n','')
+        with (self.root/marker).open('a') as output:
+            output.write('  % generated: sec:say:other\n')
+        with self.assertRaisesRegex(ValueError,'Undeclared fragment marker'):
+            declared_fragments(self.root,rows)
+        self.replace(marker,'  % generated: sec:say:other\n','')
+        with (self.root/marker).open('a') as output:
+            output.write('\\paperrefrain{}{Direction tells which way two fates lean, never how much fate there is to lean.}\n')
+        with self.assertRaisesRegex(ValueError,'Authored refrain duplicates'):
+            declared_fragments(self.root,rows)
+
+    def test_fragment_padding_body_mint_and_source_declaration_refuse(self):
+        source=pathlib.Path(__file__).resolve().parents[2]
+        for name in ['generated/documents/paper-pilot/sec-say-direction.tex',
+                     'generated/documents/explainer-pilot/sec-say-direction.tex']:
+            target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(source/name,target)
+        rows=read(source/'documents/paper-build/sources.tsv').splitlines()
+        marker='documents/paper/explainer/explainer.tex'
+        self.replace(marker,'% generated: sec:say:direction\n%\n',
+                     '% generated: sec:say:direction\n% padding\n')
+        with self.assertRaisesRegex(ValueError,'Fragment padding differs'):
+            declared_fragments(self.root,rows)
+        self.replace(marker,'% generated: sec:say:direction\n% padding\n',
+                     '% generated: sec:say:direction\n%\n')
+        fragment='generated/documents/explainer-pilot/sec-say-direction.tex'
+        original=read(self.root/fragment)
+        write(self.root/fragment,original.replace('Direction tells','{Direction tells'))
+        with self.assertRaisesRegex(ValueError,'Fragment body differs'):
+            declared_fragments(self.root,rows)
+        write(self.root/fragment,original)
+        with (self.root/marker).open('a') as output:
+            output.write('\\label{sec:say:direction}\n')
+        with self.assertRaisesRegex(ValueError,'Authored mint duplicates'):
+            declared_fragments(self.root,rows)
+        self.replace(marker,'\\label{sec:say:direction}\n','')
+        with self.assertRaisesRegex(ValueError,'Fragment source declaration differs'):
+            declared_fragments(self.root,[row for row in rows if row != marker])
+
     def layout_fixture(self):
         source=pathlib.Path(__file__).resolve().parents[2]
         for name in ['documents/paper-build/layout-pins.toml', 'documents/paper-build/sources.tsv',

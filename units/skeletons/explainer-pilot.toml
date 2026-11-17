@@ -1,0 +1,10 @@
+schema = 1
+
+[skeleton]
+document = "explainer-pilot"
+
+[[skeleton.sections]]
+heading = "sec:pilot:explainer-excerpt"
+children = [
+  { kind = "quotation", unit = "sec:say:direction" }
+]

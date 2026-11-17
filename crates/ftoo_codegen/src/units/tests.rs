@@ -58,6 +58,63 @@ fn assert_fault(declaration: &str, statement: &str, expected: UnitDiagnostic) {
     assert_eq!(load(declaration, statement), Err(errors(vec![expected])));
 }
 #[test]
+fn selected_document_targets_are_closed_and_default_only_when_omitted() {
+    let selected = DECLARATION.replace(
+        "required-languages = ['en']",
+        "required-languages = ['en']\ntargets = ['fragment']",
+    );
+    assert_eq!(
+        toml::selected_targets(&source("units/documents.toml", &selected)).unwrap()["main"],
+        vec![ftoo_manifest::DocumentOutput::Fragment]
+    );
+    assert_eq!(
+        toml::selected_targets(&source("units/documents.toml", DECLARATION)).unwrap()["main"],
+        vec![
+            ftoo_manifest::DocumentOutput::Markdown,
+            ftoo_manifest::DocumentOutput::Latex
+        ]
+    );
+    let invalid = selected.replace("'fragment'", "'other'");
+    let mut target_site = location(
+        "units/documents.toml",
+        &["documents", "main", "targets"],
+        span(&invalid, "'other'"),
+    );
+    target_site.path.push(PathPart::Index(0));
+    assert_fault(
+        &invalid,
+        STATEMENT,
+        diagnostic(
+            RuleId::M040,
+            UnitStage::Metadata,
+            None,
+            None,
+            target_site,
+            UnitFault::UnknownToken {
+                value: "other".into(),
+                expected: vec![
+                    "fragment".into(),
+                    "markdown".into(),
+                    "latex".into(),
+                    "html".into(),
+                ],
+            },
+        ),
+    );
+    for (value, expected) in [
+        ("['fragment', 'fragment']", "distinct document targets"),
+        ("[]", "empty targets"),
+    ] {
+        let declaration = selected.replace("['fragment']", value);
+        let error =
+            toml::selected_targets(&source("units/documents.toml", &declaration)).unwrap_err();
+        assert!(format!("{error:?}").contains(expected));
+    }
+    let misspelled = selected.replace("targets =", "target =");
+    let error = toml::selected_targets(&source("units/documents.toml", &misspelled)).unwrap_err();
+    assert!(format!("{error:?}").contains("targets"));
+}
+#[test]
 fn u04_shape_context_four_discriminating_cases() {
     for (original, replacement, path, unit, language) in [
         (
@@ -620,7 +677,7 @@ fn u04_declaration_missing_extra_fields() {
             "schema=1\ndocuments={main={required-languages=['en'],extra=1}}",
             vec!["documents", "main", "extra"],
             "extra",
-            vec!["required-languages"],
+            vec!["required-languages", "targets"],
         ),
     ] {
         assert_fault(

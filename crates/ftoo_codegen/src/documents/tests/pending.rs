@@ -54,6 +54,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
         displays: BTreeMap::new(),
         unit: "sec:fixture:pending".into(),
         depth: None,
+        quotation: false,
         site: site("block"),
         runs: vec![
             run("alias-first", vec![alias.clone(), one.clone()]),
@@ -79,6 +80,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
                     displays: BTreeMap::new(),
                     unit: block.unit.clone(),
                     depth: None,
+                    quotation: false,
                     site: site(name),
                     runs: vec![run(name, vec![three.clone(), one.clone()])],
                 }],
@@ -260,6 +262,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             displays: BTreeMap::new(),
             unit: "sec:fixture:pending".into(),
             depth: (shape == 0).then_some(1),
+            quotation: false,
             site: site.clone(),
             runs: vec![math(), plan::Inline::Text(" and ".into()), math()],
         };
@@ -277,6 +280,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
                             displays: BTreeMap::new(),
                             unit: block.unit.clone(),
                             depth: None,
+                            quotation: false,
                             site: site.clone(),
                             runs: vec![math()],
                         }],

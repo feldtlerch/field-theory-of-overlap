@@ -41,6 +41,7 @@ fn context_graph(
         displays: BTreeMap::new(),
         unit: UNIT.into(),
         depth: None,
+        quotation: false,
         site: site.clone(),
         runs: runs(0, unit, "en", &welded, &BTreeMap::new()),
     };
@@ -1577,6 +1578,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
         let mut block = Block {
             unit: UNIT.into(),
             depth: None,
+            quotation: false,
             site: site.clone(),
             runs: vec![Inline::Text("Caption.".into())],
             pending_names: BTreeMap::new(),
