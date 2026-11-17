@@ -657,6 +657,33 @@ impl Snapshot {
         })
     }
 
+    fn check_entries(directory: &HeldDirectory) -> Result<(), Fault> {
+        if directory.entries.len() < 4096 {
+            return directory
+                .entries
+                .iter()
+                .try_for_each(|entry| Self::compare_entry(directory, entry, &entry.name));
+        }
+        // Join in entry order so the first changed member keeps its diagnosis.
+        std::thread::scope(|scope| {
+            let mut tasks = Vec::new();
+            for entries in directory
+                .entries
+                .chunks(directory.entries.len().div_ceil(8))
+            {
+                tasks.push(scope.spawn(move || {
+                    entries
+                        .iter()
+                        .try_for_each(|entry| Self::compare_entry(directory, entry, &entry.name))
+                }));
+            }
+            for task in tasks {
+                task.join().expect("metadata check thread panicked")?;
+            }
+            Ok(())
+        })
+    }
+
     fn streamed_check(&self) -> Result<(), Mismatch> {
         for directory in &self.directories {
             let actual = SupportIdentity::from(
@@ -684,16 +711,12 @@ impl Snapshot {
                     if entry.name.as_c_str() != name {
                         return Err(Mismatch::Order);
                     }
-                    Self::compare_entry(directory, entry, name)?;
                 }
                 if expected.next().is_some() {
                     return Err(Mismatch::Order);
                 }
-            } else {
-                for entry in &directory.entries {
-                    Self::compare_entry(directory, entry, &entry.name)?;
-                }
             }
+            Self::check_entries(directory)?;
         }
         Ok(())
     }
