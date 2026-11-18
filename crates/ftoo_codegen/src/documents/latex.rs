@@ -57,7 +57,7 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
                 .len(),
             );
         }
-        size = size.saturating_add(inline_size(&block.runs));
+        size = size.saturating_add(prose_inline_size(&block.runs));
         size = size.saturating_add(2);
         if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Latex) {
             size = size
@@ -74,7 +74,7 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
     }
     size.saturating_add("\\end{document}\n".len())
 }
-fn text_size(source: &str) -> usize {
+fn sized(source: &str, prose: bool) -> usize {
     source
         .chars()
         .map(|c| match c {
@@ -82,11 +82,21 @@ fn text_size(source: &str) -> usize {
             '{' | '}' | '%' | '#' | '$' | '&' | '_' => 2,
             '^' => r"\textasciicircum{}".len(),
             '~' => r"\textasciitilde{}".len(),
+            '’' if prose => 1,
             _ => c.len_utf8(),
         })
         .fold(0, usize::saturating_add)
 }
 pub(super) fn text(source: &str) -> String {
+    escaped(source, false)
+}
+pub(super) fn prose_text(source: &str) -> String {
+    escaped(source, true)
+}
+fn text_size(source: &str) -> usize {
+    sized(source, false)
+}
+fn escaped(source: &str, prose: bool) -> String {
     let mut output = String::new();
     for c in source.chars() {
         match c {
@@ -100,6 +110,7 @@ pub(super) fn text(source: &str) -> String {
             '_' => output.push_str(r"\_"),
             '^' => output.push_str(r"\textasciicircum{}"),
             '~' => output.push_str(r"\textasciitilde{}"),
+            '’' if prose => output.push('\''),
             _ => output.push(c),
         }
     }
@@ -138,7 +149,7 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
                 _ => r"{\noindent\textbf{",
             });
         }
-        inline(&mut output, &block.runs);
+        prose_inline(&mut output, &block.runs);
         if let Some(depth) = block.depth {
             output.push_str(if depth == 6 { "}\\par}" } else { "}" });
         }
@@ -161,6 +172,12 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
 }
 
 pub(super) fn inline(output: &mut String, runs: &[Inline]) {
+    emit_inline(output, runs, false);
+}
+pub(super) fn prose_inline(output: &mut String, runs: &[Inline]) {
+    emit_inline(output, runs, true);
+}
+fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
     let mut commented = false;
     for run in runs {
         if matches!(run, Inline::Text(value) if value.is_empty()) {
@@ -175,7 +192,7 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                 } else {
                     value
                 };
-                output.push_str(&text(value));
+                output.push_str(&escaped(value, prose));
             }
             Inline::Tag {
                 handle,
@@ -213,6 +230,12 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
 }
 
 pub(super) fn inline_size(runs: &[Inline]) -> usize {
+    sized_inline(runs, false)
+}
+pub(super) fn prose_inline_size(runs: &[Inline]) -> usize {
+    sized_inline(runs, true)
+}
+fn sized_inline(runs: &[Inline], prose: bool) -> usize {
     let mut size: usize = 0;
     let mut commented = false;
     for run in runs {
@@ -223,9 +246,9 @@ pub(super) fn inline_size(runs: &[Inline]) -> usize {
         let count = match run {
             Inline::Text(value) => {
                 if previous_comment && let Some(rest) = value.strip_prefix(' ') {
-                    text_size(rest).saturating_add(r"\space{}".len())
+                    sized(rest, prose).saturating_add(r"\space{}".len())
                 } else {
-                    text_size(value)
+                    sized(value, prose)
                 }
             }
             Inline::Tag {

@@ -330,6 +330,12 @@ pub(super) fn check_sweep_pending(source: &str, entries: &[crate::PendingEntry])
 // commands emit a nonblank token; comments discard their endline. Explicit
 // control spaces expand independently of the input processor's blank state.
 fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
+    recover_tex(body, false)
+}
+fn recover_prose_latex(body: &str) -> Option<Vec<Recovered>> {
+    recover_tex(body, true)
+}
+fn recover_tex(body: &str, prose: bool) -> Option<Vec<Recovered>> {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
@@ -418,7 +424,8 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
                     line = TexLine::NewLine;
                 }
             } else {
-                text.push(c);
+                // Straight prose apostrophes share the TeX spelling of curved ones until admission narrows.
+                text.push(if prose && c == '\'' { '’' } else { c });
                 line = TexLine::MidLine;
             }
             at += c.len_utf8();
@@ -428,13 +435,26 @@ fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
     (!output.iter().any(literal_recovered)).then_some(output)
 }
 fn expected_runs(block: &Block, target: DocumentTarget) -> Vec<Recovered> {
+    expected_runs_in_context(block, target, false)
+}
+fn expected_prose_runs(block: &Block, target: DocumentTarget) -> Vec<Recovered> {
+    expected_runs_in_context(block, target, true)
+}
+fn expected_runs_in_context(block: &Block, target: DocumentTarget, prose: bool) -> Vec<Recovered> {
     block
         .runs
         .iter()
         .filter_map(|run| {
             Some(match run {
                 Inline::Text(text) if text.is_empty() => return None,
-                Inline::Text(text) => Recovered::Text(text.clone()),
+                Inline::Text(text) => {
+                    // Recovery compares reader characters while legacy straight prose remains admitted.
+                    Recovered::Text(if prose && target == DocumentTarget::Latex {
+                        text.replace('\'', "’")
+                    } else {
+                        text.clone()
+                    })
+                }
                 Inline::Tag {
                     handle,
                     label,
@@ -575,7 +595,7 @@ pub(super) fn check_emission(
         let recovered = framed.and_then(|body| recover_block(body, block, target));
         if let Some(recovered) = recovered {
             let mut actual = recovered_records(block, &recovered, &records, target);
-            if actual == records && recovered != expected_runs(block, target) {
+            if actual == records && recovered != expected_prose_runs(block, target) {
                 actual[0].value = chunk.into();
             }
             if actual != records
@@ -1934,7 +1954,19 @@ impl DocumentPlan {
                 language: self.language.clone(),
                 target,
                 occurrence: None,
-                value: block.runs.iter().map(canonical_run).collect(),
+                value: {
+                    // Only prose text shares apostrophe spellings; handles and mentions stay literal.
+                    block
+                        .runs
+                        .iter()
+                        .map(|run| match run {
+                            Inline::Text(text) if target == DocumentTarget::Latex => {
+                                text.replace('\'', "’")
+                            }
+                            _ => canonical_run(run),
+                        })
+                        .collect::<String>()
+                },
                 site: block.site.clone(),
             });
             for run in &block.runs {
@@ -2522,7 +2554,7 @@ fn recover_block(body: &str, block: &Block, target: DocumentTarget) -> Option<Ve
         } else {
             Some(body)
         };
-        framed.and_then(recover_latex)
+        framed.and_then(recover_prose_latex)
     }
 }
 
@@ -2924,7 +2956,7 @@ fn recover_display_block(
     let caption_count = records.iter().position(|r| r.kind == EmissionKind::Body)?;
     let recovered = recover_block(caption, block, target)?;
     let mut result = recovered_records(block, &recovered, &records[..caption_count], target);
-    if recovered != expected_runs(block, target) && result == records[..caption_count] {
+    if recovered != expected_prose_runs(block, target) && result == records[..caption_count] {
         result[0].value = caption.into();
     }
     if display.is_empty() {
@@ -3054,7 +3086,7 @@ fn recover_display_block(
         }];
         region_records.extend(expected);
         let actual = recovered_records(region, &recovered, &region_records, target);
-        changed |= recovered != expected_runs(region, target);
+        changed |= recovered != expected_prose_runs(region, target);
         uses.extend(actual.into_iter().skip(1));
     }
     if changed {

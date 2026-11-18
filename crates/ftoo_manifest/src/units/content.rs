@@ -79,6 +79,17 @@ pub(super) fn scan_limited(
             continue;
         }
         if c != '@' {
+            if matches!(c, '\'' | '’')
+                && let Some((next, following)) = chars.peek()
+                && matches!(*following, '\'' | '’')
+            {
+                return Err(AssemblyScanFault::Content(Box::new((
+                    at(source, start, *next + following.len_utf8(), None),
+                    UnitFault::UnsupportedTextCharacter {
+                        value: format!("{c}{following}"),
+                    },
+                ))));
+            }
             if matches!(c, '$' | '\\' | '<' | '>') || (c.is_control() && !matches!(c, '\t' | '\n'))
             {
                 return Err(AssemblyScanFault::Content(Box::new((

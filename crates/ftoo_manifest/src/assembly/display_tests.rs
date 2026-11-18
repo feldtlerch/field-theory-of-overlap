@@ -289,11 +289,25 @@ fn display_inline_failures_keep_nested_fault_and_region_path() {
     assert_eq!(
         *parse_display_body(DisplayKind::Table, DocumentTarget::Markdown, &source(text))
             .unwrap_err(),
-        (expected, fault.clone())
+        (expected.clone(), fault.clone())
     );
     assert_eq!(
         fault.to_string(),
         "DisplayInline { cause: UnsupportedTextCharacter { value: \"$\" } }"
+    );
+    let text = "| A |\n| --- |\n| ’’ |";
+    expected.decoded = Some(16..22);
+    assert_eq!(
+        *parse_display_body(DisplayKind::Table, DocumentTarget::Markdown, &source(text))
+            .unwrap_err(),
+        (
+            expected,
+            AssemblyInputFault::DisplayInline {
+                cause: UnitFault::UnsupportedTextCharacter {
+                    value: "’’".into()
+                },
+            },
+        )
     );
 }
 #[test]

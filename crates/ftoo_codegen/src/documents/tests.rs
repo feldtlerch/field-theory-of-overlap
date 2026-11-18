@@ -54,6 +54,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             (" word", r"\space{}word"),
             (".", "."),
             (" .", r"\space{}."),
+            ("’s", "'s"),
             ("", ""),
         ] {
             let runs = vec![
@@ -62,9 +63,9 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
                 Inline::Text(following.into()),
             ];
             let mut output = String::new();
-            latex::inline(&mut output, &runs);
+            latex::prose_inline(&mut output, &runs);
             assert_eq!(output, format!("{prefix}{expected}"));
-            assert_eq!(latex::inline_size(&runs), output.len());
+            assert_eq!(latex::prose_inline_size(&runs), output.len());
         }
         let runs = vec![
             insertion(),
@@ -88,7 +89,7 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
         );
         assert_eq!(latex::inline_size(&runs), output.len());
         // A new region cannot inherit the previous region's comment boundary.
-        latex::inline(&mut output, &[Inline::Text(" next".into())]);
+        latex::prose_inline(&mut output, &[Inline::Text(" next".into())]);
         assert!(output.ends_with("\n next"));
     }
 }
@@ -1009,6 +1010,29 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         }
     }
     assert!(checked_fragments > 0);
+    let closing = "The record can watch the hand's tremor turning. It cannot see what the righting is paid in.";
+    for (document, macro_name) in [
+        ("paper-pilot", "refrain"),
+        ("explainer-pilot", "paperrefrain"),
+    ] {
+        let path = format!("generated/documents/{document}/sec-coda-record-limit.tex");
+        assert_eq!(
+            input::read(&root, &path)?,
+            format!("\\{macro_name}{{sec:coda:record-limit}}{{{closing}}}\n").into_bytes(),
+        );
+        let annotated = input::read(
+            &root,
+            &format!("generated/documents/{document}/en.labels.md"),
+        )?;
+        let reader = input::read(&root, &format!("generated/documents/{document}/en.md"))?;
+        let annotated = std::str::from_utf8(&annotated)?;
+        assert_eq!(
+            markdown::erase_annotations(annotated),
+            Ok(String::from_utf8(reader.clone())?)
+        );
+        assert!(std::str::from_utf8(&reader)?.contains("hand’s tremor"));
+        assert!(!std::str::from_utf8(&reader)?.contains("hand&#39;s"));
+    }
     let mut multilingual_declaration = input::read(&root, "units/documents.toml")?;
     let declaration_text = String::from_utf8(multilingual_declaration)?;
     multilingual_declaration = declaration_text
@@ -1087,6 +1111,125 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
     Ok(())
 }
 #[test]
+fn typography_apostrophe_contexts() {
+    let site = input::site("units/statements/typography.toml");
+    let block = |unit: &str, depth, text: &str| plan::Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: unit.into(),
+        depth,
+        quotation: false,
+        site: site.clone(),
+        runs: vec![plan::Inline::Text(text.into())],
+    };
+    let mut document = plan::DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
+        blocks: vec![
+            block("sec:fixture:heading", Some(1), "The hand’s turn"),
+            block(
+                "sec:fixture:body",
+                None,
+                "The hand’s tremor and the hand's turn.",
+            ),
+        ],
+    };
+    document.coverage.declaration = "Coverage’s claim.".into();
+    document.blocks[1].runs.push(plan::Inline::Mention {
+        text: "Reader's code".into(),
+        site: site.clone(),
+    });
+    document.blocks[1].runs.push(plan::Inline::Tag {
+        handle: "O'Neil".into(),
+        label: "def:fixture:person".into(),
+        token: "u0-t0".into(),
+        site: site.clone(),
+    });
+    document.blocks[1]
+        .runs
+        .push(plan::Inline::Text("’s turn.".into()));
+    document.blocks[1].displays.insert(
+        DocumentTarget::Latex,
+        plan::DisplayBody {
+            source: "one-cell table".into(),
+            layout: ftoo_manifest::DisplayLayout::Table {
+                columns: vec!["l".into()],
+                rows: vec![vec![0]],
+                rules: vec![],
+            },
+            regions: vec![block("sec:fixture:body", None, "The hand’s cell.")],
+            site: site.clone(),
+        },
+    );
+    let emitted = latex::render(&document);
+    assert!(emitted.contains("\\section*{The hand's turn}"));
+    assert!(emitted.contains("The hand's tremor and the hand's turn."));
+    assert!(emitted.contains("The hand's cell."));
+    assert!(emitted.contains("Coverage’s claim."));
+    assert!(emitted.contains("\\texttt{Reader's code}"));
+    assert!(emitted.contains("% label def:fixture:person\n's turn."));
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let mut pending_block = block("sec:fixture:pending", None, "");
+    pending_block.runs = vec![plan::Inline::Math {
+        definition_site: site.clone(),
+        key: "value".into(),
+        markdown: "x’s".into(),
+        latex: "x’s".into(),
+        pending: vec![crate::PendingEntry::fixture(
+            ftoo_manifest::DefinitionId::CoefficientOne,
+            0,
+            "x’s",
+            vec![ftoo_manifest::PendingReason::FormulationProposed {
+                object: ftoo_manifest::NodeId::LangevinCoefficientOne,
+            }],
+            vec![],
+        )],
+        site: site.clone(),
+    }];
+    pending_block
+        .map_pending(&book, 0, "fixture", "en")
+        .unwrap();
+    let pending_wording = super::pending::paragraph(&pending_block, "en", DocumentTarget::Latex);
+    assert!(pending_wording.contains("\\(x’s\\)"));
+    assert_eq!(latex::size(&document), emitted.len());
+    assert_eq!(
+        plan::check_emission(&document, &emitted, DocumentTarget::Latex),
+        Ok(())
+    );
+    let altered = emitted.replacen("hand's turn", "handx turn", 1);
+    let fault = plan::check_emission(&document, &altered, DocumentTarget::Latex).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("prose recovery refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    let AssemblySite::Generated { path, bytes, .. } = &diagnostic.site else {
+        panic!("generated prose site");
+    };
+    assert_eq!(path, "generated/documents/fixture/en.tex");
+    let start = altered.find("% unit sec:fixture:heading").unwrap();
+    let end = altered.find("% unit sec:fixture:body").unwrap();
+    assert_eq!(*bytes, start..end);
+    let AssemblyFault::EmissionMismatch {
+        missing,
+        unexpected,
+        changed,
+    } = &diagnostic.fault
+    else {
+        panic!("prose emission mismatch");
+    };
+    assert_eq!(missing.as_slice(), []);
+    assert_eq!(unexpected.as_slice(), []);
+    assert_eq!(changed.len(), 1);
+    assert_eq!(changed[0].expected.kind, EmissionKind::Heading);
+    assert_eq!(changed[0].expected.site, site);
+    assert_eq!(changed[0].expected.value, "The hand’s turn");
+    assert_eq!(changed[0].actual.value, "The handx turn");
+}
+
+#[test]
 fn fragment_macro_follows_planned_quotation() {
     let mut block = plan::Block {
         pending_names: BTreeMap::new(),
@@ -1101,6 +1244,22 @@ fn fragment_macro_follows_planned_quotation() {
     block.quotation = true;
     assert_eq!(fragment_macro(&block), "paperrefrain");
     assert_eq!(fragment_text(&block).unwrap(), "Refrain.");
+    for source in ["A { brace", "A } brace", "A ^ mark", "A ~ mark"] {
+        block.runs = vec![plan::Inline::Text(source.into())];
+        assert_eq!(
+            fragment_text(&block),
+            Err(failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Source(block.site.clone()),
+                AssemblyFault::UnknownToken {
+                    value: block.unit.clone(),
+                    expected: vec!["brace-free plain refrain text".into()],
+                },
+            ))
+        );
+    }
+    block.runs = vec![plan::Inline::Text("Refrain.".into())];
     block.runs.push(plan::Inline::Text("More.".into()));
     assert!(fragment_text(&block).is_err());
     let mut plan = plan::DocumentPlan {

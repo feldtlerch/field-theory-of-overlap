@@ -16,7 +16,7 @@ Not yet converted: earlier material is omitted from this excerpt.
 Not yet converted: intervening material is omitted from this excerpt.
 
 <!-- unit sec:coda:record-limit document paper-pilot language en -->
-<p align="center"><a id="sec-crecord--limit"></a><em>The record can watch the hand&#39;s tremor turning. It cannot see what the righting is paid in.</em></p>
+<p align="center"><a id="sec-crecord--limit"></a><em>The record can watch the hand’s tremor turning. It cannot see what the righting is paid in.</em></p>
 <p align="right">sec:record&#45;limit<!-- label sec:coda:record-limit --></p>
 
 Not yet converted: later material is omitted from this excerpt.

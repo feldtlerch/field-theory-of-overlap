@@ -454,7 +454,7 @@ fn support_required_native_comment_glue_matches_authored_controls()
                 });
             }
             let mut emitted = String::new();
-            latex::inline(&mut emitted, &runs);
+            latex::prose_inline(&mut emitted, &runs);
             for (open, close) in [
                 ("\\section*{", "}\n"),
                 ("", "\n\n"),

@@ -102,7 +102,7 @@ pub(super) fn render(body: &DisplayBody, target: DocumentTarget) -> String {
                     super::markdown::inline(&mut output, &body.regions[index].runs);
                 }
                 DocumentTarget::Latex => {
-                    super::latex::inline(&mut output, &body.regions[index].runs);
+                    super::latex::prose_inline(&mut output, &body.regions[index].runs);
                 }
             },
         }
@@ -116,7 +116,7 @@ pub(super) fn size(body: &DisplayBody, target: DocumentTarget) -> usize {
             Part::Structure(value) => value.len(),
             Part::Region(index) => match target {
                 DocumentTarget::Markdown => super::markdown::inline_size(&body.regions[index].runs),
-                DocumentTarget::Latex => super::latex::inline_size(&body.regions[index].runs),
+                DocumentTarget::Latex => super::latex::prose_inline_size(&body.regions[index].runs),
             },
         })
         .fold(0, usize::saturating_add)

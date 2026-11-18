@@ -16,7 +16,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |002|Four-axis status and declared coverage|accepted|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
-|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014|
+|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent docs-only changes are governed by 018 and ordinary paper-pair reuse by 019|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
@@ -32,3 +32,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
+|021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause|

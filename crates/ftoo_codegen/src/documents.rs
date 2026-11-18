@@ -645,7 +645,7 @@ fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
     Ok(format!(
         "\\{macro_name}{{{}}}{{{}}}\n",
         block.unit,
-        latex::text(text)
+        latex::prose_text(text)
     ))
 }
 
@@ -662,6 +662,18 @@ fn fragment_text(block: &plan::Block) -> Result<&str, DocumentError> {
             },
         ));
     };
+    let emitted = latex::prose_text(text);
+    if emitted.contains('{') || emitted.contains('}') {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(block.site.clone()),
+            AssemblyFault::UnknownToken {
+                value: block.unit.clone(),
+                expected: vec!["brace-free plain refrain text".into()],
+            },
+        ));
+    }
     Ok(text)
 }
 

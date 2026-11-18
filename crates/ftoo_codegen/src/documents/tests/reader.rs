@@ -685,6 +685,38 @@ fn mixed_quotation_and_owned_anchor_use_the_owned_handle() {
 fn excerpt_roles_recover_gaps_and_refuse_an_encoded_label_anchor() {
     let plan = excerpt_plan();
     let known = ["sec:say:direction", "sec:coda:record-limit"];
+    let mut typography = excerpt_plan();
+    typography.blocks[2].runs = vec![Inline::Text("The hand’s turn.".into())];
+    let (typographic, _) = super::super::markdown::emit(&typography, &known).unwrap();
+    for spelling in ["'", "&#39;"] {
+        let altered = typographic.replacen("hand’s", &format!("hand{spelling}"), 1);
+        let fault = check_emission(&typography, &altered, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("screen recovery refusal");
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        let AssemblySite::Generated { path, bytes, .. } = &diagnostic.site else {
+            panic!("annotated screen site");
+        };
+        assert_eq!(path, "generated/documents/paper-pilot/en.labels.md");
+        let start = altered.find("<!-- unit sec:coda:record-limit").unwrap();
+        let end = start + altered[start..].find("\n\n").unwrap();
+        assert_eq!(*bytes, start..end);
+        let AssemblyFault::EmissionMismatch {
+            missing,
+            unexpected,
+            changed,
+        } = &diagnostic.fault
+        else {
+            panic!("screen text mismatch");
+        };
+        assert_eq!(missing.as_slice(), []);
+        assert_eq!(unexpected.as_slice(), []);
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].expected.kind, EmissionKind::Paragraph);
+        assert_eq!(changed[0].expected.value, "The hand’s turn.");
+        assert_eq!(changed[0].actual.value, "The hand' turn.");
+    }
     let (annotated, reader) = super::super::markdown::emit(&plan, &known).unwrap();
     assert_eq!(
         super::super::markdown::erase_annotations(&annotated),

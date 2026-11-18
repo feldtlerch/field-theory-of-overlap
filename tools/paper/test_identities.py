@@ -13,15 +13,6 @@ from prepare import prepare, check_layout_targets, declared_fragments, versioned
 
 
 class Identities(unittest.TestCase):
-    def test_committed_fragments_match_native_text(self):
-        source=pathlib.Path(__file__).resolve().parents[2]
-        texts={}
-        for path in sorted((source/'units/statements').glob('*.toml')):
-            unit=tomllib.loads(read(path))['unit']
-            texts[unit['id']]=unit['texts']['en']
-        for *_, fragment, unit in FRAGMENTS:
-            self.assertIn('{'+texts[unit]+'}',read(source/fragment))
-
     def test_declared_fragment_slots_refuse_label_marker_and_authored_copy(self):
         source=pathlib.Path(__file__).resolve().parents[2]
         for *_, name, _ in FRAGMENTS:

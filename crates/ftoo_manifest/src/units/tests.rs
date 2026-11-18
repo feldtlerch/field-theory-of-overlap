@@ -110,6 +110,34 @@ fn w07_every_forbidden_span_character_and_opaque_mention_payload() {
 }
 
 #[test]
+fn typography_apostrophe_runs() {
+    for text in ["The hand’s turn.", "The hand's turn."] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = text.into();
+        assert!(admit_unit_drafts(documents, units).is_ok());
+    }
+    for pair in ["’’", "’'", "'’", "''"] {
+        let (documents, mut units) = fixtures();
+        let text = format!("The hand{pair}s turn.");
+        units[0].texts.get_mut("en").unwrap().value.value = text.clone();
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        let mut location = site("statement.toml", &["unit", "texts", "en"]);
+        let start = "The hand".len();
+        location.decoded = Some(start..start + pair.len());
+        assert_eq!(
+            error.diagnostics(),
+            [expected(
+                RuleId::M041,
+                UnitStage::Content,
+                Some("en"),
+                location,
+                UnitFault::UnsupportedTextCharacter { value: pair.into() },
+            )]
+        );
+    }
+}
+
+#[test]
 fn w08_text_mints_are_forbidden_and_spans_do_not_supply_prose() {
     for label in [
         "sec:coefficients:first-value",

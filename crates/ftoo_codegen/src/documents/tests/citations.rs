@@ -770,13 +770,13 @@ fn reader_citation_handle_encoding_and_independent_recovery_are_exact() {
             |book, _, _, mut block| {
                 block.map_citations(book, "main", "en").unwrap();
                 let mut native = String::new();
-                latex::inline(&mut native, &block.runs);
+                latex::prose_inline(&mut native, &block.runs);
                 assert_eq!(
                     native,
                     format!("See \\FtdocTag{{{encoded}}}{{u0-c0}}% cite {LABEL}\n.")
                 );
                 assert_eq!(
-                    recover_latex(&native),
+                    recover_prose_latex(&native),
                     Some(vec![
                         Recovered::Text("See ".into()),
                         Recovered::Citation {
