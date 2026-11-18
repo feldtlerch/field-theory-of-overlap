@@ -808,6 +808,8 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
         [
             "generated/documents/explainer-pilot/sec-say-direction.tex",
             "generated/documents/explainer-pilot/sec-coda-record-limit.tex",
+            "generated/documents/explainer-pilot/en.labels.md",
+            "generated/documents/explainer-pilot/en.md",
             "generated/documents/main/en.labels.md",
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",

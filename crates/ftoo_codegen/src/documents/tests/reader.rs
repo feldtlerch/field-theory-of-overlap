@@ -153,11 +153,38 @@ fn excerpt_plan() -> DocumentPlan {
         handle: handle.into(),
         bound_label: bound_label.into(),
         fragment: public_fragment(&plan, &site, handle).unwrap(),
+        quotation: None,
         site: site.clone(),
         binding_site: None,
     })
     .collect();
     plan.screen = Some(ScreenPlan { gaps, refrains });
+    plan
+}
+
+fn quoted_excerpt_plan() -> DocumentPlan {
+    let mut plan = excerpt_plan();
+    plan.document = "explainer-pilot".into();
+    plan.blocks[0].unit = "sec:pilot:explainer-excerpt".into();
+    for (block, refrain) in plan
+        .blocks
+        .iter_mut()
+        .skip(1)
+        .zip(plan.screen.as_mut().unwrap().refrains.iter_mut())
+    {
+        block.quotation = true;
+        let owner_document = "paper-pilot".to_owned();
+        let language = "en".to_owned();
+        let fragment = refrain.fragment.clone();
+        refrain.quotation = Some(ScreenQuotation {
+            owner_document: owner_document.clone(),
+            language: language.clone(),
+            reader_path: format!("generated/documents/{owner_document}/{language}.md"),
+            href: format!("../{owner_document}/{language}.md#{fragment}"),
+            fragment,
+            owner_site: refrain.site.clone(),
+        });
+    }
     plan
 }
 
@@ -352,6 +379,305 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
     )
     .unwrap();
     assert!(french.screen.is_none());
+
+    let quoted = || {
+        let mut plan = excerpt_plan();
+        plan.document = "explainer-pilot".into();
+        plan.blocks[0].unit = "sec:pilot:explainer-excerpt".into();
+        for block in plan.blocks.iter_mut().skip(1) {
+            block.quotation = true;
+        }
+        plan.screen = None;
+        plan
+    };
+    let selected_missing = BTreeMap::from([
+        (
+            "paper-pilot".into(),
+            vec![ftoo_manifest::DocumentOutput::Fragment],
+        ),
+        (
+            "explainer-pilot".into(),
+            vec![
+                ftoo_manifest::DocumentOutput::Fragment,
+                ftoo_manifest::DocumentOutput::Markdown,
+            ],
+        ),
+    ]);
+    let mut missing_plans = [excerpt_plan(), quoted()];
+    missing_plans[0].screen = None;
+    let fault = plan_screens(
+        &mut missing_plans,
+        &selected_missing,
+        &book,
+        &skeletons,
+        &document_sites,
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("missing owner target refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.rule, RuleId::M055);
+    assert_eq!(diagnostic.document.as_deref(), Some("explainer-pilot"));
+    assert_eq!(diagnostic.language.as_deref(), Some("en"));
+    assert_eq!(diagnostic.target, Some(DocumentTarget::Markdown));
+    assert_eq!(
+        diagnostic.site,
+        AssemblySite::Source(skeletons.documents()["explainer-pilot"][1].site().clone())
+    );
+    assert_eq!(
+        diagnostic.fault,
+        AssemblyFault::MissingMarkdownOwnerTarget {
+            owner: "paper-pilot".into(),
+            language: "en".into(),
+            unit: "sec:say:direction".into(),
+            owner_site: document_sites["paper-pilot"].clone(),
+        }
+    );
+
+    let selected_both = BTreeMap::from([
+        (
+            "paper-pilot".into(),
+            vec![
+                ftoo_manifest::DocumentOutput::Fragment,
+                ftoo_manifest::DocumentOutput::Markdown,
+            ],
+        ),
+        (
+            "explainer-pilot".into(),
+            vec![
+                ftoo_manifest::DocumentOutput::Fragment,
+                ftoo_manifest::DocumentOutput::Markdown,
+            ],
+        ),
+    ]);
+    let mut plans = [excerpt_plan(), quoted()];
+    plans[0].screen = None;
+    plan_screens(
+        &mut plans,
+        &selected_both,
+        &book,
+        &skeletons,
+        &document_sites,
+    )
+    .unwrap();
+    let screen = plans[1].screen.as_ref().unwrap();
+    assert_eq!(screen.refrains.len(), 2);
+    assert!(
+        screen
+            .refrains
+            .iter()
+            .all(|refrain| refrain.quotation.is_some())
+    );
+    assert_eq!(
+        screen.refrains[0].quotation.as_ref().unwrap().href,
+        "../paper-pilot/en.md#sec-cwhich--way"
+    );
+    assert_eq!(
+        screen.refrains[1].quotation.as_ref().unwrap().href,
+        "../paper-pilot/en.md#sec-crecord--limit"
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // One quotation example pins link recovery against its owned destinations.
+fn quoted_excerpt_recovers_links_and_owner_anchors() {
+    let quoted = quoted_excerpt_plan();
+    let owned = excerpt_plan();
+    let known = ["sec:say:direction", "sec:coda:record-limit"];
+    let (annotated, reader) = super::super::markdown::emit(&quoted, &known).unwrap();
+    assert_eq!(
+        check_emission(&quoted, &annotated, DocumentTarget::Markdown),
+        Ok(())
+    );
+    assert_eq!(
+        super::super::markdown::erase_annotations(&annotated),
+        Ok(reader.clone())
+    );
+    let leaked_href = reader.replacen("#sec-cwhich--way", "#sec-csay-cdirection", 1);
+    let start = leaked_href.find("sec-csay-cdirection").unwrap();
+    let range = start..start + "sec-csay-cdirection".len();
+    assert_eq!(
+        super::super::markdown::check_reader(&quoted, &leaked_href, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/explainer-pilot/en.md".into(),
+                bytes: range.clone(),
+                origins: quoted.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::ReaderLabelLiteral {
+                value: "sec:say:direction".into(),
+                bytes: range,
+            },
+        ))
+    );
+    let (owner_annotated, _) = super::super::markdown::emit(&owned, &known).unwrap();
+    assert_eq!(
+        check_emission(&owned, &owner_annotated, DocumentTarget::Markdown),
+        Ok(())
+    );
+
+    for (old, new) in [
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../other-pilot/en.md#sec-cwhich--way",
+        ),
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../paper-pilot/en.md#sec-cother",
+        ),
+    ] {
+        let changed_source = annotated.replacen(old, new, 1);
+        let fault = check_emission(&quoted, &changed_source, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("quotation recovery refusal");
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        assert_eq!(diagnostic.rule, RuleId::M055);
+        let AssemblySite::Generated { path, bytes, .. } = &diagnostic.site else {
+            panic!("quotation artifact site");
+        };
+        assert_eq!(path, "generated/documents/explainer-pilot/en.labels.md");
+        let start = changed_source.find("<!-- unit sec:say:direction").unwrap();
+        let end = start + changed_source[start..].find("\n\n").unwrap();
+        assert_eq!(*bytes, start..end);
+        let AssemblyFault::EmissionMismatch {
+            missing,
+            unexpected,
+            changed,
+        } = &diagnostic.fault
+        else {
+            panic!("quotation record refusal");
+        };
+        assert_eq!(changed.as_slice(), []);
+        assert_eq!(missing.len(), 1);
+        assert_eq!(unexpected.len(), 1);
+        assert!(
+            matches!(&missing[0].kind, EmissionKind::QuotationLink { owner_document, fragment, .. } if owner_document == "paper-pilot" && fragment == "sec-cwhich--way")
+        );
+        assert_eq!(missing[0].value, old);
+        assert!(
+            matches!(&unexpected[0].kind, EmissionKind::QuotationLink { owner_document, fragment, .. } if owner_document == "other-pilot" && fragment == "sec-cwhich--way" || owner_document == "paper-pilot" && fragment == "sec-cother")
+        );
+        assert_eq!(unexpected[0].value, new);
+    }
+    for (old, new, fault_kind) in [
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../paper-pilot/en.labels.md#sec-cwhich--way",
+            "invalid",
+        ),
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../paper-pilot/en.pdf#sec-cwhich--way",
+            "invalid",
+        ),
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../other-pilot/en.md#sec-cwhich--way",
+            "destination",
+        ),
+        (
+            "../paper-pilot/en.md#sec-cwhich--way",
+            "../paper-pilot/en.md#sec-cother",
+            "handle",
+        ),
+    ] {
+        let changed_reader = reader.replacen(old, new, 1);
+        let fault =
+            super::super::markdown::check_reader(&quoted, &changed_reader, &known).unwrap_err();
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("reader link refusal");
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        let AssemblySite::Generated { path, bytes, .. } = &diagnostic.site else {
+            panic!("reader artifact site");
+        };
+        assert_eq!(path, "generated/documents/explainer-pilot/en.md");
+        let expected_range = if fault_kind == "handle" {
+            let start = changed_reader.find(new).unwrap() + new.len() + 2;
+            start..start + "sec:which&#45;way".len()
+        } else {
+            changed_reader.find(new).unwrap()..changed_reader.find(new).unwrap() + new.len()
+        };
+        assert_eq!(*bytes, expected_range);
+        assert!(match (&diagnostic.fault, fault_kind) {
+            (AssemblyFault::InvalidQuotationHref { href }, "invalid") => href == new,
+            (AssemblyFault::QuotationDestinationMismatch { href, expected }, "destination") =>
+                href == new && expected == old,
+            (AssemblyFault::QuotationHandleMismatch { fragment, .. }, "handle") =>
+                fragment == "sec-cother",
+            _ => false,
+        });
+    }
+
+    let anchor = "<a id=\"sec-cwhich--way\"></a>";
+    let absent = owner_annotated.replacen(anchor, "", 1);
+    let duplicate = owner_annotated.replacen(anchor, &format!("{anchor}{anchor}"), 1);
+    for (source, missing_anchor) in [(&absent, true), (&duplicate, false)] {
+        let fault = check_emission(&owned, source, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("owner anchor refusal");
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        let AssemblySite::Generated { path, .. } = &diagnostic.site else {
+            panic!("owner artifact site");
+        };
+        assert_eq!(path, "generated/documents/paper-pilot/en.labels.md");
+        let AssemblyFault::EmissionMismatch {
+            missing,
+            unexpected,
+            changed,
+        } = &diagnostic.fault
+        else {
+            panic!("anchor inventory refusal");
+        };
+        assert_eq!(changed.as_slice(), []);
+        let records = if missing_anchor { missing } else { unexpected };
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            records[0].kind,
+            EmissionKind::PublicAnchor {
+                fragment: "sec-cwhich--way".into()
+            }
+        );
+        assert_eq!(records[0].value, "sec-cwhich--way");
+    }
+}
+
+#[test]
+fn mixed_quotation_and_owned_anchor_use_the_owned_handle() {
+    let mut plan = quoted_excerpt_plan();
+    plan.blocks[2].quotation = false;
+    plan.screen.as_mut().unwrap().refrains[1].quotation = None;
+    let known = ["sec:say:direction", "sec:coda:record-limit"];
+    let (_, reader) = super::super::markdown::emit(&plan, &known).unwrap();
+    assert_eq!(
+        super::super::markdown::check_reader(&plan, &reader, &known),
+        Ok(())
+    );
+    let wrong = reader.replacen("id=\"sec-crecord--limit\"", "id=\"sec-cwhich--way\"", 1);
+    let start = wrong.find("id=\"sec-cwhich--way\"").unwrap() + "id=\"".len();
+    let range = start..start + "sec-cwhich--way".len();
+    assert_eq!(
+        super::super::markdown::check_reader(&plan, &wrong, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/explainer-pilot/en.md".into(),
+                bytes: range,
+                origins: plan.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::PublicAnchorMismatch {
+                fragment: "sec-cwhich--way".into(),
+                handle: "sec:which-way".into(),
+                expected: "sec:record-limit".into(),
+            },
+        ))
+    );
 }
 
 #[test]

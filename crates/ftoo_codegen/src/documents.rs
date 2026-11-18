@@ -591,9 +591,10 @@ fn refuse_quoted_screen_targets(
     targets: &[DocumentOutput],
 ) -> Result<(), DocumentError> {
     if let Some(block) = plan.blocks.iter().find(|block| block.quotation)
-        && targets
-            .iter()
-            .any(|target| matches!(target, DocumentOutput::Markdown | DocumentOutput::Latex))
+        && targets.iter().any(|target| {
+            *target == DocumentOutput::Latex
+                || (*target == DocumentOutput::Markdown && plan.screen.is_none())
+        })
     {
         return Err(failure(
             RuleId::M055,

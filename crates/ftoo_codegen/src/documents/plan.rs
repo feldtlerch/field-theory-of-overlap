@@ -635,17 +635,39 @@ fn excerpt_unit(source: &str) -> Option<(&str, &str, &str, &str)> {
     (key == "document" && language_key == "language" && fields.next().is_none())
         .then_some((unit, document, language, body))
 }
-fn excerpt_refrain(source: &str) -> Option<(String, String, String, String)> {
-    let rest = source.strip_prefix("<p align=\"center\"><a id=\"")?;
-    let (fragment, rest) = rest.split_once("\"></a><em>")?;
-    let (text, rest) = rest.split_once("</em></p>\n<p align=\"right\">")?;
-    let (handle, rest) = rest.split_once("<!-- label ")?;
+fn excerpt_refrain(source: &str) -> Option<(String, Vec<String>, String, String, RefrainRole)> {
+    let mut rest = source.strip_prefix("<p align=\"center\">")?;
+    let mut anchors = Vec::new();
+    while let Some(after) = rest.strip_prefix("<a id=\"") {
+        let (fragment, tail) = after.split_once("\"></a>")?;
+        anchors.push(fragment.into());
+        rest = tail;
+    }
+    let rest = rest.strip_prefix("<em>")?;
+    let (prose, rest) = rest.split_once("</em></p>\n<p align=\"right\">")?;
+    if let Some((handle, tail)) = rest.split_once("<!-- label ") {
+        let label = tail.strip_suffix(" --></p>")?;
+        return Some((
+            excerpt_text(prose)?,
+            anchors,
+            excerpt_text(handle)?,
+            label.into(),
+            RefrainRole::Owned,
+        ));
+    }
+    if !anchors.is_empty() {
+        return None;
+    }
+    let rest = rest.strip_prefix("<a href=\"")?;
+    let (href, rest) = rest.split_once("\">")?;
+    let (handle, rest) = rest.split_once("</a><!-- cite ")?;
     let label = rest.strip_suffix(" --></p>")?;
     Some((
-        excerpt_text(text)?,
-        fragment.into(),
+        excerpt_text(prose)?,
+        vec![href.into()],
         excerpt_text(handle)?,
         label.into(),
+        RefrainRole::Quoted,
     ))
 }
 #[allow(clippy::too_many_lines)] // The excerpt's ordered blocks and their source ranges form one recovery pass.
@@ -715,22 +737,40 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     site: block.site.clone(),
                 });
                 if index > 0 {
-                    if let Some((_, fragment, handle, label)) = excerpt_refrain(body) {
+                    if let Some((_, destinations, handle, label, role)) = excerpt_refrain(body) {
                         let site = screen.refrains[index - 1].site.clone();
-                        actual.push(EmissionRecord {
-                            kind: EmissionKind::PublicAnchor {
-                                fragment: fragment.clone(),
-                            },
-                            unit: unit.into(),
-                            language: language.into(),
-                            target: DocumentTarget::Markdown,
-                            occurrence: Some(refrain_index),
-                            value: fragment,
-                            site: site.clone(),
-                        });
+                        for destination in destinations {
+                            let kind = if role == RefrainRole::Quoted {
+                                let (owner, language, fragment, _) = parse_public_href(
+                                    &destination,
+                                )
+                                .unwrap_or(("", "", "", String::new()));
+                                EmissionKind::QuotationLink {
+                                    owner_document: owner.into(),
+                                    language: language.into(),
+                                    reader_path: format!(
+                                        "generated/documents/{owner}/{language}.md"
+                                    ),
+                                    fragment: fragment.into(),
+                                }
+                            } else {
+                                EmissionKind::PublicAnchor {
+                                    fragment: destination.clone(),
+                                }
+                            };
+                            actual.push(EmissionRecord {
+                                kind,
+                                unit: unit.into(),
+                                language: language.into(),
+                                target: DocumentTarget::Markdown,
+                                occurrence: Some(refrain_index),
+                                value: destination,
+                                site: site.clone(),
+                            });
+                        }
                         actual.push(EmissionRecord {
                             kind: EmissionKind::RefrainHandle {
-                                role: RefrainRole::Owned,
+                                role,
                                 handle: handle.clone(),
                                 bound_label: label,
                             },
@@ -1453,8 +1493,18 @@ pub(super) struct ScreenRefrain {
     pub handle: String,
     pub bound_label: String,
     pub fragment: String,
+    pub quotation: Option<ScreenQuotation>,
     pub site: UnitSite,
     pub binding_site: Option<UnitSite>,
+}
+#[derive(Clone, Debug)]
+pub(super) struct ScreenQuotation {
+    pub owner_document: String,
+    pub language: String,
+    pub reader_path: String,
+    pub fragment: String,
+    pub href: String,
+    pub owner_site: UnitSite,
 }
 pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentError> {
     let Some(screen) = &plan.screen else {
@@ -1462,6 +1512,9 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
     };
     let mut seen = BTreeSet::new();
     for refrain in &screen.refrains {
+        if refrain.quotation.is_some() {
+            continue;
+        }
         if !seen.insert(&refrain.fragment) {
             return Err(screen_failure(
                 plan,
@@ -1527,7 +1580,6 @@ pub(super) fn check_excerpt_shape(
         && plan.blocks[0].depth == Some(1)
         && plan.blocks[1..].iter().all(|block| {
             block.depth.is_none()
-                && !block.quotation
                 && block.displays.is_empty()
                 && matches!(block.runs.as_slice(), [Inline::Text(_)])
         });
@@ -1604,6 +1656,69 @@ pub(super) fn inverse_fragment(fragment: &str) -> Option<String> {
     (!handle.is_empty() && encode_fragment(&handle).ok().as_deref() == Some(fragment))
         .then_some(handle)
 }
+pub(super) fn parse_public_href(href: &str) -> Option<(&str, &str, &str, String)> {
+    if !href.bytes().all(|byte| {
+        byte.is_ascii_lowercase()
+            || byte.is_ascii_digit()
+            || matches!(byte, b'-' | b'.' | b'/' | b'#')
+    }) {
+        return None;
+    }
+    let (path, fragment) = href.split_once('#')?;
+    let (owner, filename) = path.strip_prefix("../")?.split_once('/')?;
+    let language = filename.strip_suffix(".md")?;
+    let component = |value: &str| {
+        value.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+            && !value.ends_with('-')
+            && !value.contains("--")
+    };
+    (component(owner) && component(language))
+        .then(|| inverse_fragment(fragment).map(|handle| (owner, language, fragment, handle)))?
+}
+fn public_href(
+    plan: &DocumentPlan,
+    site: &UnitSite,
+    owner: &str,
+    language: &str,
+    fragment: &str,
+) -> Result<String, DocumentError> {
+    let href = format!("../{owner}/{language}.md#{fragment}");
+    if parse_public_href(&href).is_none() {
+        return Err(screen_failure(
+            plan,
+            site,
+            AssemblyFault::InvalidQuotationHref { href },
+        ));
+    }
+    Ok(href)
+}
+#[derive(Clone)]
+struct OwnedDestination {
+    document: String,
+    refrain: ScreenRefrain,
+}
+fn missing_markdown_owner(
+    plan: &DocumentPlan,
+    site: &UnitSite,
+    owner: &str,
+    unit: &str,
+    document_sites: &BTreeMap<String, UnitSite>,
+) -> DocumentError {
+    screen_failure(
+        plan,
+        site,
+        AssemblyFault::MissingMarkdownOwnerTarget {
+            owner: owner.into(),
+            language: plan.language.clone(),
+            unit: unit.into(),
+            owner_site: document_sites[owner].clone(),
+        },
+    )
+}
+#[allow(clippy::too_many_lines)] // Both passes share checked ownership and destination identities.
 pub(super) fn plan_screens(
     plans: &mut [DocumentPlan],
     selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
@@ -1611,7 +1726,9 @@ pub(super) fn plan_screens(
     skeletons: &CheckedSkeletons<'_>,
     document_sites: &BTreeMap<String, UnitSite>,
 ) -> Result<(), DocumentError> {
-    for plan in plans {
+    let mut owned = BTreeMap::<(String, String), OwnedDestination>::new();
+    let mut anchors = BTreeSet::new();
+    for plan in plans.iter() {
         let targets = &selected[&plan.document];
         if !targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
             || !targets.contains(&ftoo_manifest::DocumentOutput::Fragment)
@@ -1629,6 +1746,81 @@ pub(super) fn plan_screens(
                 },
             ));
         }
+        for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            if block.quotation {
+                continue;
+            }
+            let site = positions[index].site();
+            let target = ftoo_manifest::AddressTarget::Documentary(block.unit.clone());
+            let handle = book.reader_identity(target).map_err(|fault| {
+                screen_failure(
+                    plan,
+                    site,
+                    AssemblyFault::ReaderIdentity {
+                        target: fault.target,
+                        reason: fault.reason,
+                        candidates: fault.candidates,
+                    },
+                )
+            })?;
+            let fragment = public_fragment(plan, site, &handle)?;
+            if !anchors.insert((
+                plan.document.clone(),
+                plan.language.clone(),
+                fragment.clone(),
+            )) {
+                return Err(screen_failure(
+                    plan,
+                    site,
+                    AssemblyFault::DuplicatePublicAnchor { fragment },
+                ));
+            }
+            let binding_site = book
+                .common_descriptors()
+                .find(|descriptor| descriptor.handle() == handle.as_str())
+                .and_then(|descriptor| match descriptor.origin() {
+                    ftoo_manifest::CommonOrigin::Documentary { admitted_at, .. } => {
+                        Some(admitted_at.clone())
+                    }
+                    ftoo_manifest::CommonOrigin::Theory(_) => None,
+                });
+            let refrain = ScreenRefrain {
+                handle,
+                bound_label: block.unit.clone(),
+                fragment,
+                quotation: None,
+                site: site.clone(),
+                binding_site,
+            };
+            let duplicate_fragment = refrain.fragment.clone();
+            if owned
+                .insert(
+                    (block.unit.clone(), plan.language.clone()),
+                    OwnedDestination {
+                        document: plan.document.clone(),
+                        refrain,
+                    },
+                )
+                .is_some()
+            {
+                return Err(screen_failure(
+                    plan,
+                    site,
+                    AssemblyFault::DuplicatePublicAnchor {
+                        fragment: duplicate_fragment,
+                    },
+                ));
+            }
+        }
+    }
+    for plan in plans.iter_mut() {
+        let targets = &selected[&plan.document];
+        if !targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
+            || !targets.contains(&ftoo_manifest::DocumentOutput::Fragment)
+        {
+            continue;
+        }
+        let positions = &skeletons.documents()[&plan.document];
         let mut gaps = Vec::new();
         for index in 0..plan.blocks.len() {
             let position = if index == 0 {
@@ -1649,35 +1841,76 @@ pub(super) fn plan_screens(
         }
         let mut refrains = Vec::new();
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            let target = ftoo_manifest::AddressTarget::Documentary(block.unit.clone());
-            let handle = book.reader_identity(target).map_err(|fault| {
-                screen_failure(
+            let source_document = skeletons
+                .corpus()
+                .units()
+                .iter()
+                .find(|unit| unit.label().as_str() == block.unit)
+                .expect("checked skeleton unit")
+                .document();
+            if !block.quotation && source_document != plan.document {
+                return Err(screen_failure(
                     plan,
                     positions[index].site(),
-                    AssemblyFault::ReaderIdentity {
-                        target: fault.target,
-                        reason: fault.reason,
-                        candidates: fault.candidates,
+                    AssemblyFault::ExcerptShape {
+                        document: plan.document.clone(),
+                        positions: plan.blocks.len(),
                     },
-                )
-            })?;
-            let fragment = public_fragment(plan, positions[index].site(), &handle)?;
-            let binding_site = book
-                .common_descriptors()
-                .find(|descriptor| descriptor.handle() == handle.as_str())
-                .and_then(|descriptor| match descriptor.origin() {
-                    ftoo_manifest::CommonOrigin::Documentary { admitted_at, .. } => {
-                        Some(admitted_at.clone())
-                    }
-                    ftoo_manifest::CommonOrigin::Theory(_) => None,
+                ));
+            }
+            if block.quotation
+                && (!selected.get(source_document).is_some_and(|targets| {
+                    targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
+                }) || !skeletons.corpus().documents()[source_document].contains(&plan.language))
+            {
+                return Err(missing_markdown_owner(
+                    plan,
+                    positions[index].site(),
+                    source_document,
+                    &block.unit,
+                    document_sites,
+                ));
+            }
+            let Some(destination) = owned.get(&(block.unit.clone(), plan.language.clone())) else {
+                return Err(missing_markdown_owner(
+                    plan,
+                    positions[index].site(),
+                    source_document,
+                    &block.unit,
+                    document_sites,
+                ));
+            };
+            if destination.document != source_document {
+                return Err(missing_markdown_owner(
+                    plan,
+                    positions[index].site(),
+                    source_document,
+                    &block.unit,
+                    document_sites,
+                ));
+            }
+            let mut refrain = destination.refrain.clone();
+            if block.quotation {
+                let reader_path =
+                    format!("generated/documents/{source_document}/{}.md", plan.language);
+                let href = public_href(
+                    plan,
+                    positions[index].site(),
+                    source_document,
+                    &plan.language,
+                    &refrain.fragment,
+                )?;
+                refrain.quotation = Some(ScreenQuotation {
+                    owner_document: source_document.into(),
+                    language: plan.language.clone(),
+                    reader_path,
+                    fragment: refrain.fragment.clone(),
+                    href,
+                    owner_site: destination.refrain.site.clone(),
                 });
-            refrains.push(ScreenRefrain {
-                handle,
-                bound_label: block.unit.clone(),
-                fragment,
-                site: positions[index].site().clone(),
-                binding_site,
-            });
+                refrain.site = positions[index].site().clone();
+            }
+            refrains.push(refrain);
         }
         plan.screen = Some(ScreenPlan { gaps, refrains });
         check_public_anchors(plan)?;
@@ -1757,20 +1990,41 @@ impl DocumentPlan {
             {
                 if index > 0 {
                     let refrain = &screen.refrains[index - 1];
-                    records.push(EmissionRecord {
-                        kind: EmissionKind::PublicAnchor {
-                            fragment: refrain.fragment.clone(),
-                        },
-                        unit: block.unit.clone(),
-                        language: self.language.clone(),
-                        target,
-                        occurrence: Some(index - 1),
-                        value: refrain.fragment.clone(),
-                        site: refrain.site.clone(),
-                    });
+                    if let Some(quotation) = &refrain.quotation {
+                        records.push(EmissionRecord {
+                            kind: EmissionKind::QuotationLink {
+                                owner_document: quotation.owner_document.clone(),
+                                language: quotation.language.clone(),
+                                reader_path: quotation.reader_path.clone(),
+                                fragment: quotation.fragment.clone(),
+                            },
+                            unit: block.unit.clone(),
+                            language: self.language.clone(),
+                            target,
+                            occurrence: Some(index - 1),
+                            value: quotation.href.clone(),
+                            site: refrain.site.clone(),
+                        });
+                    } else {
+                        records.push(EmissionRecord {
+                            kind: EmissionKind::PublicAnchor {
+                                fragment: refrain.fragment.clone(),
+                            },
+                            unit: block.unit.clone(),
+                            language: self.language.clone(),
+                            target,
+                            occurrence: Some(index - 1),
+                            value: refrain.fragment.clone(),
+                            site: refrain.site.clone(),
+                        });
+                    }
                     records.push(EmissionRecord {
                         kind: EmissionKind::RefrainHandle {
-                            role: RefrainRole::Owned,
+                            role: if refrain.quotation.is_some() {
+                                RefrainRole::Quoted
+                            } else {
+                                RefrainRole::Owned
+                            },
                             handle: refrain.handle.clone(),
                             bound_label: refrain.bound_label.clone(),
                         },
@@ -1826,13 +2080,22 @@ impl DocumentPlan {
                             site,
                         })
                         .collect::<Vec<_>>()
-                } else if matches!(record.kind, EmissionKind::RefrainHandle { .. }) {
+                } else if matches!(
+                    &record.kind,
+                    EmissionKind::RefrainHandle { .. } | EmissionKind::QuotationLink { .. }
+                ) {
+                    let quotation_link = matches!(&record.kind, EmissionKind::QuotationLink { .. });
                     let mut sites = vec![record.site];
                     if let Some(screen) = &self.screen
                         && let Some(index) = record.occurrence
-                        && let Some(binding) = &screen.refrains[index].binding_site
                     {
-                        sites.push(binding.clone());
+                        if let Some(binding) = &screen.refrains[index].binding_site {
+                            sites.push(binding.clone());
+                        }
+                        if quotation_link && let Some(quotation) = &screen.refrains[index].quotation
+                        {
+                            sites.push(quotation.owner_site.clone());
+                        }
                     }
                     sites
                         .into_iter()

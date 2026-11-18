@@ -18,6 +18,8 @@ document_record = custom_target('document-record', output: 'document-record.json
   build_always_stale: true,
   command: [python, meson.project_source_root() / 'step.py', 'record',
     meson.project_source_root() / 'generated/documents/main/en.md',
+    meson.project_source_root() / 'generated/documents/explainer-pilot/en.labels.md',
+    meson.project_source_root() / 'generated/documents/explainer-pilot/en.md',
     meson.project_source_root() / 'generated/documents/paper-pilot/en.labels.md',
     meson.project_source_root() / 'generated/documents/paper-pilot/en.md', '@OUTPUT@'])
 document_check = custom_target('document-check', input: document_record,
@@ -118,6 +120,9 @@ def fixture(parent, publish=None):
     (source / 'source.txt').write_text('alpha')
     (source / 'generated/documents/main').mkdir(parents=True)
     (source / 'generated/documents/main/en.md').write_text('first')
+    (source / 'generated/documents/explainer-pilot').mkdir(parents=True)
+    (source / 'generated/documents/explainer-pilot/en.labels.md').write_text('first')
+    (source / 'generated/documents/explainer-pilot/en.md').write_text('first')
     (source / 'generated/documents/paper-pilot').mkdir(parents=True)
     (source / 'generated/documents/paper-pilot/en.labels.md').write_text('first')
     (source / 'generated/documents/paper-pilot/en.md').write_text('first')
@@ -141,7 +146,7 @@ def g1(parent, adapter, cargo_home):
     print('G1 first and repeated calls:', first, second)
     print('G1 dry-run:', dry.stdout.strip(), dry.stderr.strip())
     assert first == second == (1, 1), 'Unchanged record restarted a producer'
-    document = source / 'generated/documents/paper-pilot/en.labels.md'
+    document = source / 'generated/documents/explainer-pilot/en.labels.md'
     document.write_text('second')
     compile(build)
     assert count(build / 'document-check.calls') == 2

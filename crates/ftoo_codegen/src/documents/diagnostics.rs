@@ -38,6 +38,23 @@ pub enum AssemblyFault {
         handle: String,
         expected: String,
     },
+    MissingMarkdownOwnerTarget {
+        owner: String,
+        language: String,
+        unit: String,
+        owner_site: UnitSite,
+    },
+    InvalidQuotationHref {
+        href: String,
+    },
+    QuotationHandleMismatch {
+        fragment: String,
+        handle: String,
+    },
+    QuotationDestinationMismatch {
+        href: String,
+        expected: String,
+    },
     MarkdownRoleMismatch {
         offset: usize,
     },
@@ -234,6 +251,10 @@ impl AssemblyFault {
             Self::InvalidPublicAnchor { .. } => 40,
             Self::UnterminatedPublicAnchor { .. } => 42,
             Self::PublicAnchorMismatch { .. } => 41,
+            Self::MissingMarkdownOwnerTarget { .. } => 43,
+            Self::InvalidQuotationHref { .. } => 44,
+            Self::QuotationHandleMismatch { .. } => 45,
+            Self::QuotationDestinationMismatch { .. } => 46,
             Self::MarkdownRoleMismatch { .. } => 35,
             Self::ReaderLabelLiteral { .. } => 34,
             Self::ReaderIdentity { .. } => 31,
@@ -613,6 +634,12 @@ pub enum EmissionKind {
         handle: String,
         bound_label: String,
     },
+    QuotationLink {
+        owner_document: String,
+        language: String,
+        reader_path: String,
+        fragment: String,
+    },
     PublicAnchor {
         fragment: String,
     },
@@ -641,6 +668,7 @@ pub enum EmissionKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RefrainRole {
     Owned,
+    Quoted,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GapPosition {

@@ -10,4 +10,4 @@ targets = ["fragment", "markdown"]
 
 [documents.explainer-pilot]
 required-languages = ["en"]
-targets = ["fragment"]
+targets = ["fragment", "markdown"]

@@ -1103,7 +1103,7 @@ fn fragment_macro_follows_planned_quotation() {
     assert_eq!(fragment_text(&block).unwrap(), "Refrain.");
     block.runs.push(plan::Inline::Text("More.".into()));
     assert!(fragment_text(&block).is_err());
-    let plan = plan::DocumentPlan {
+    let mut plan = plan::DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
@@ -1112,15 +1112,39 @@ fn fragment_macro_follows_planned_quotation() {
     };
     assert!(format!("{:?}", unsupported_html(&plan)).contains("html"));
     assert!(refuse_quoted_screen_targets(&plan, &[DocumentOutput::Fragment]).is_ok());
-    for target in [DocumentOutput::Markdown, DocumentOutput::Latex] {
-        let DocumentError::Assembly(errors) =
-            refuse_quoted_screen_targets(&plan, &[target]).unwrap_err()
-        else {
-            panic!("quotation target refusal")
-        };
-        assert_eq!(errors.diagnostics()[0].rule, RuleId::M055);
-        assert_eq!(errors.diagnostics()[0].stage, AssemblyStage::Emission);
-    }
+    plan.screen = Some(plan::ScreenPlan {
+        gaps: vec![],
+        refrains: vec![],
+    });
+    assert_eq!(
+        refuse_quoted_screen_targets(&plan, &[DocumentOutput::Markdown]),
+        Ok(())
+    );
+    assert_eq!(
+        refuse_quoted_screen_targets(&plan, &[DocumentOutput::Latex]),
+        Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(plan.blocks[0].site.clone()),
+            AssemblyFault::UnknownToken {
+                value: "sec:fixture:refrain".into(),
+                expected: vec!["quotation emitter".into()],
+            },
+        ))
+    );
+    plan.screen = None;
+    assert_eq!(
+        refuse_quoted_screen_targets(&plan, &[DocumentOutput::Markdown]),
+        Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(plan.blocks[0].site.clone()),
+            AssemblyFault::UnknownToken {
+                value: "sec:fixture:refrain".into(),
+                expected: vec!["quotation emitter".into()],
+            },
+        ))
+    );
 }
 #[test]
 fn fragment_path_collisions_refuse_before_publication() {

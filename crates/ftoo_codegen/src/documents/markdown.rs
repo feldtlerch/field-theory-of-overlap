@@ -129,16 +129,33 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
                 block.unit, plan.document, plan.language
             )
             .expect("string write");
-            write!(
-                output,
-                "<p align=\"center\"><a id=\"{}\"></a><em>",
-                refrain.fragment
-            )
-            .expect("string write");
+            if refrain.quotation.is_some() {
+                output.push_str("<p align=\"center\"><em>");
+            } else {
+                write!(
+                    output,
+                    "<p align=\"center\"><a id=\"{}\"></a><em>",
+                    refrain.fragment
+                )
+                .expect("string write");
+            }
             inline(&mut output, &block.runs);
             output.push_str("</em></p>\n<p align=\"right\">");
-            output.push_str(&text(&refrain.handle));
-            writeln!(output, "<!-- label {} --></p>\n", refrain.bound_label).expect("string write");
+            if let Some(quotation) = &refrain.quotation {
+                write!(
+                    output,
+                    "<a href=\"{}\">{}</a>",
+                    quotation.href,
+                    text(&refrain.handle)
+                )
+                .expect("string write");
+                writeln!(output, "<!-- cite {} --></p>\n", refrain.bound_label)
+                    .expect("string write");
+            } else {
+                output.push_str(&text(&refrain.handle));
+                writeln!(output, "<!-- label {} --></p>\n", refrain.bound_label)
+                    .expect("string write");
+            }
         }
         writeln!(
             output,
@@ -341,11 +358,13 @@ pub(super) fn check_reader(
                 || !ftoo_manifest::reader_label_literals(&handle).is_empty()
             {
                 select_leak(&mut leak, start..end, &handle);
-            } else if let Some(refrain) = plan
-                .screen
-                .as_ref()
-                .and_then(|screen| screen.refrains.get(index))
-                && handle != refrain.handle
+            } else if let Some(refrain) = plan.screen.as_ref().and_then(|screen| {
+                screen
+                    .refrains
+                    .iter()
+                    .filter(|refrain| refrain.quotation.is_none())
+                    .nth(index)
+            }) && handle != refrain.handle
             {
                 return Err(role_failure(
                     plan,
@@ -368,9 +387,120 @@ pub(super) fn check_reader(
             AssemblyFault::ReaderLabelLiteral { value, bytes },
         ));
     }
+    check_quotation_links(plan, reader, known_labels)?;
     // Erasure produces the reader from the four generated comment forms, so
     // repeating erasure cannot independently check equality. Any comment
     // opener remaining in the reader is refused before publication.
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)] // One link check binds its syntax, printed handle and planned destination.
+fn check_quotation_links(
+    plan: &DocumentPlan,
+    reader: &str,
+    known_labels: &[&str],
+) -> Result<(), DocumentError> {
+    let quotations: Vec<_> = plan
+        .screen
+        .iter()
+        .flat_map(|screen| &screen.refrains)
+        .filter_map(|refrain| refrain.quotation.as_ref().map(|quote| (refrain, quote)))
+        .collect();
+    for (index, (at, prefix)) in reader.match_indices("href=\"").enumerate() {
+        let start = at + prefix.len();
+        let tag_end = reader[start..].find('>').map(|offset| start + offset);
+        let end = reader[start..].find('"').map(|offset| start + offset);
+        let Some(end) = end.filter(|end| tag_end.is_none_or(|tag_end| *end < tag_end)) else {
+            return Err(role_failure(
+                plan,
+                false,
+                start..tag_end.unwrap_or(reader.len()),
+                AssemblyFault::InvalidQuotationHref {
+                    href: reader[start..tag_end.unwrap_or(reader.len())].into(),
+                },
+            ));
+        };
+        let href = &reader[start..end];
+        let Some((_, _, fragment, decoded_handle)) = super::plan::parse_public_href(href) else {
+            return Err(role_failure(
+                plan,
+                false,
+                start..end,
+                AssemblyFault::InvalidQuotationHref { href: href.into() },
+            ));
+        };
+        let fragment_start = start + href.find('#').expect("parsed href") + 1;
+        let fragment_range = fragment_start..end;
+        if known_labels
+            .iter()
+            .any(|label| decoded_handle.contains(label))
+            || !ftoo_manifest::reader_label_literals(&decoded_handle).is_empty()
+        {
+            return Err(role_failure(
+                plan,
+                false,
+                fragment_range.clone(),
+                AssemblyFault::ReaderLabelLiteral {
+                    value: decoded_handle,
+                    bytes: fragment_range,
+                },
+            ));
+        }
+        let Some((refrain, quotation)) = quotations.get(index) else {
+            return Err(role_failure(
+                plan,
+                false,
+                start..end,
+                AssemblyFault::InvalidQuotationHref { href: href.into() },
+            ));
+        };
+        if !reader[..at].ends_with("<a ") || !reader[end..].starts_with("\">") {
+            return Err(role_failure(
+                plan,
+                false,
+                start..end,
+                AssemblyFault::InvalidQuotationHref { href: href.into() },
+            ));
+        }
+        let text_start = end + 2;
+        let Some(close) = reader[text_start..]
+            .find("</a>")
+            .map(|offset| text_start + offset)
+        else {
+            return Err(role_failure(
+                plan,
+                false,
+                text_start..reader.len(),
+                AssemblyFault::QuotationHandleMismatch {
+                    fragment: fragment.into(),
+                    handle: reader[text_start..].into(),
+                },
+            ));
+        };
+        let printed = &reader[text_start..close];
+        if printed != text(&decoded_handle) || decoded_handle != refrain.handle {
+            return Err(role_failure(
+                plan,
+                false,
+                text_start..close,
+                AssemblyFault::QuotationHandleMismatch {
+                    fragment: fragment.into(),
+                    handle: printed.into(),
+                },
+            ));
+        }
+        if href != quotation.href {
+            return Err(role_failure(
+                plan,
+                false,
+                start..end,
+                AssemblyFault::QuotationDestinationMismatch {
+                    href: href.into(),
+                    expected: quotation.href.clone(),
+                },
+            ));
+        }
+    }
     Ok(())
 }
 
