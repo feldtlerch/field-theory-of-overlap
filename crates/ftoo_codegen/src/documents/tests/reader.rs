@@ -1,5 +1,6 @@
 use super::*;
 use ftoo_manifest::{NodeId, ReaderIdentityPosition};
+use std::{fs, path::Path};
 
 #[test]
 fn reader_diagnostics_sort_families_before_owners_and_indices() {
@@ -91,6 +92,7 @@ fn plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {
         document: "fixture".into(),
         language: "en".into(),
         coverage: Coverage::build(book, "Coverage.", "fixture", "en").unwrap(),
+        screen: None,
         blocks: vec![Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
@@ -108,6 +110,447 @@ fn render(plan: &DocumentPlan, target: DocumentTarget) -> String {
     } else {
         super::super::markdown::render(plan)
     }
+}
+
+fn excerpt_plan() -> DocumentPlan {
+    let site = super::super::input::site("units/skeletons/paper-pilot.toml");
+    let block = |unit: &str, text: &str, depth| Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: unit.into(),
+        depth,
+        quotation: false,
+        site: site.clone(),
+        runs: vec![Inline::Text(text.into())],
+    };
+    let mut coverage = Coverage::fixture("Coverage.", "Slice.");
+    coverage.audit = vec![vec![Inline::Text("Audit scope: bounded.".into())]];
+    let mut plan = DocumentPlan {
+        document: "paper-pilot".into(),
+        language: "en".into(),
+        coverage,
+        blocks: vec![
+            block("sec:pilot:paper-excerpt", "Paper excerpt", Some(1)),
+            block("sec:say:direction", "Direction text.", None),
+            block("sec:coda:record-limit", "Closing text.", None),
+        ],
+        screen: None,
+    };
+    let gaps = [
+        GapPosition::Before,
+        GapPosition::Between,
+        GapPosition::After,
+    ]
+    .into_iter()
+    .map(|position| screen_gap(&plan, &site, position).unwrap())
+    .collect();
+    let refrains = [
+        ("sec:say:direction", "sec:which-way"),
+        ("sec:coda:record-limit", "sec:record-limit"),
+    ]
+    .into_iter()
+    .map(|(bound_label, handle)| ScreenRefrain {
+        handle: handle.into(),
+        bound_label: bound_label.into(),
+        fragment: public_fragment(&plan, &site, handle).unwrap(),
+        site: site.clone(),
+        binding_site: None,
+    })
+    .collect();
+    plan.screen = Some(ScreenPlan { gaps, refrains });
+    plan
+}
+
+#[test]
+fn excerpt_fragments_are_invertible_and_screen_refusals_are_located() {
+    let plan = excerpt_plan();
+    let site = super::super::input::site("units/skeletons/paper-pilot.toml");
+    for (handle, fragment) in [
+        ("sec:which-way", "sec-cwhich--way"),
+        ("B:belief", "-ub-cbelief"),
+        ("b:belief", "b-cbelief"),
+        ("gate:G1", "gate-c-ug1"),
+        ("sec:-c-u", "sec-c--c--u"),
+    ] {
+        assert_eq!(public_fragment(&plan, &site, handle), Ok(fragment.into()));
+        assert_eq!(inverse_fragment(fragment), Some(handle.into()));
+    }
+    for fragment in ["-", "-u", "-u1", "-x", "SEC-cname"] {
+        assert_eq!(inverse_fragment(fragment), None);
+    }
+    let fault = public_fragment(&plan, &site, "bad_name").unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("screen refusal");
+    };
+    assert_eq!(errors.diagnostics().len(), 1);
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.rule, RuleId::M055);
+    assert_eq!(diagnostic.stage, AssemblyStage::Emission);
+    assert_eq!(diagnostic.document.as_deref(), Some("paper-pilot"));
+    assert_eq!(diagnostic.language.as_deref(), Some("en"));
+    assert_eq!(diagnostic.target, Some(DocumentTarget::Markdown));
+    assert_eq!(diagnostic.site, AssemblySite::Source(site.clone()));
+    assert_eq!(
+        diagnostic.fault,
+        AssemblyFault::UnsupportedPublicHandle {
+            handle: "bad_name".into(),
+            character: '_',
+            offset: 3,
+        }
+    );
+
+    let mut incomplete = excerpt_plan();
+    incomplete.blocks.truncate(1);
+    let fault = check_excerpt_shape(&incomplete, &site).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("screen refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.site, AssemblySite::Source(site));
+    assert_eq!(
+        diagnostic.fault,
+        AssemblyFault::ExcerptShape {
+            document: "paper-pilot".into(),
+            positions: 1,
+        }
+    );
+
+    let mut duplicate = excerpt_plan();
+    let first = duplicate.screen.as_ref().unwrap().refrains[0]
+        .fragment
+        .clone();
+    duplicate.screen.as_mut().unwrap().refrains[1].fragment = first.clone();
+    let fault = check_public_anchors(&duplicate).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("duplicate anchor refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.rule, RuleId::M055);
+    assert_eq!(
+        diagnostic.site,
+        AssemblySite::Source(duplicate.screen.as_ref().unwrap().refrains[1].site.clone())
+    );
+    assert_eq!(
+        diagnostic.fault,
+        AssemblyFault::DuplicatePublicAnchor { fragment: first }
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // One checked corpus supplies both the selected and fragment-only controls.
+fn screen_planning_derives_gaps_and_requires_language_templates() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let projection = fs::read(root.join("generated/manifest.json")).unwrap();
+    let loaded = ftoo_manifest::load_projection(&projection).unwrap();
+    let book = loaded.addressing().unwrap();
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: super::super::input::read(&root, "units/documents.toml").unwrap(),
+    };
+    let statements = super::super::input::sources(
+        &root,
+        &super::super::input::discover(&root, "units/statements", false).unwrap(),
+    )
+    .unwrap();
+    let corpus = crate::load_unit_sources(declaration, statements.clone()).unwrap();
+    let markdown = crate::load_markdown_files(&root).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let registry_joint = joint
+        .clone()
+        .with_paper_mints(
+            super::super::registry::paper_mint_rows(
+                &super::super::input::read(&root, super::super::registry::PAPER_MINTS).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let book = book
+        .with_documentary(
+            &registry_joint,
+            super::super::registry::load(&super::super::registry::read(&root).unwrap()).unwrap(),
+        )
+        .unwrap();
+    let sources = super::super::input::sources(
+        &root,
+        &super::super::input::discover(&root, "units/skeletons", false).unwrap(),
+    )
+    .unwrap();
+    let (drafts, _) = super::super::input::assembly_sources(&sources, &[]).unwrap();
+    let (metadata, owners) = super::super::metadata(&statements);
+    let document_sites = super::super::document_sites(&corpus);
+    let skeletons =
+        ftoo_manifest::check_skeletons(&corpus, &drafts, &metadata, &owners, &document_sites)
+            .unwrap();
+    let selected = BTreeMap::from([(
+        "paper-pilot".into(),
+        vec![
+            ftoo_manifest::DocumentOutput::Fragment,
+            ftoo_manifest::DocumentOutput::Markdown,
+        ],
+    )]);
+    let mut english = excerpt_plan();
+    english.screen = None;
+    plan_screens(
+        std::slice::from_mut(&mut english),
+        &selected,
+        &book,
+        &skeletons,
+        &document_sites,
+    )
+    .unwrap();
+    assert_eq!(
+        english
+            .screen
+            .as_ref()
+            .unwrap()
+            .gaps
+            .iter()
+            .map(|gap| gap.position)
+            .collect::<Vec<_>>(),
+        [
+            GapPosition::Before,
+            GapPosition::Between,
+            GapPosition::After
+        ]
+    );
+    let mut french = excerpt_plan();
+    french.screen = None;
+    french.language = "fr".into();
+    let fault = plan_screens(
+        std::slice::from_mut(&mut french),
+        &selected,
+        &book,
+        &skeletons,
+        &document_sites,
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("screen refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(
+        diagnostic.site,
+        AssemblySite::Source(document_sites["paper-pilot"].clone())
+    );
+    assert_eq!(diagnostic.language.as_deref(), Some("fr"));
+    assert_eq!(
+        diagnostic.fault,
+        AssemblyFault::MissingScreenTemplates {
+            language: "fr".into()
+        }
+    );
+    let fragment_only = BTreeMap::from([(
+        "paper-pilot".into(),
+        vec![ftoo_manifest::DocumentOutput::Fragment],
+    )]);
+    plan_screens(
+        std::slice::from_mut(&mut french),
+        &fragment_only,
+        &book,
+        &skeletons,
+        &document_sites,
+    )
+    .unwrap();
+    assert!(french.screen.is_none());
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // One screen example pins roles, omissions and their recovery faults.
+fn excerpt_roles_recover_gaps_and_refuse_an_encoded_label_anchor() {
+    let plan = excerpt_plan();
+    let known = ["sec:say:direction", "sec:coda:record-limit"];
+    let (annotated, reader) = super::super::markdown::emit(&plan, &known).unwrap();
+    assert_eq!(
+        super::super::markdown::erase_annotations(&annotated),
+        Ok(reader.clone())
+    );
+    assert_eq!(
+        check_emission(&plan, &annotated, DocumentTarget::Markdown),
+        Ok(())
+    );
+    let envelope_fault = |source: &str| {
+        super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.labels.md".into(),
+                bytes: source.len()..source.len(),
+                origins: plan.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::EmissionMismatch {
+                missing: plan.records(DocumentTarget::Markdown),
+                unexpected: vec![],
+                changed: vec![],
+            },
+        )
+    };
+    let wrong_header = annotated
+        .replacen(
+            "<!-- generated document paper-pilot language en -->\n",
+            "",
+            1,
+        )
+        .replacen("Audit scope: bounded.", "Audit scope: unbounded.", 1);
+    assert_eq!(
+        check_emission(&plan, &wrong_header, DocumentTarget::Markdown),
+        Err(envelope_fault(&wrong_header))
+    );
+    for wrong_ending in [
+        annotated.strip_suffix('\n').unwrap().to_owned(),
+        format!("{annotated}\n"),
+    ] {
+        assert_eq!(
+            check_emission(&plan, &wrong_ending, DocumentTarget::Markdown),
+            Err(envelope_fault(&wrong_ending))
+        );
+    }
+    let mut leaked = excerpt_plan();
+    let site = leaked.screen.as_ref().unwrap().refrains[0].site.clone();
+    let fragment = public_fragment(&leaked, &site, "sec:say:direction").unwrap();
+    leaked.screen.as_mut().unwrap().refrains[0].fragment = fragment.clone();
+    let (_, leaked_reader) = super::super::markdown::render_roles(&leaked).unwrap();
+    let start = leaked_reader.find(&fragment).unwrap();
+    let end = start + fragment.len();
+    assert_eq!(
+        super::super::markdown::emit(&leaked, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.md".into(),
+                bytes: start..end,
+                origins: leaked.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::ReaderLabelLiteral {
+                value: "sec:say:direction".into(),
+                bytes: start..end,
+            }
+        ))
+    );
+
+    let mut mismatched = excerpt_plan();
+    mismatched.screen.as_mut().unwrap().refrains[0].fragment = "sec-cother".into();
+    let (_, mismatch_reader) = super::super::markdown::render_roles(&mismatched).unwrap();
+    let start = mismatch_reader.find("sec-cother").unwrap();
+    let end = start + "sec-cother".len();
+    assert_eq!(
+        super::super::markdown::emit(&mismatched, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.md".into(),
+                bytes: start..end,
+                origins: mismatched.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::PublicAnchorMismatch {
+                fragment: "sec-cother".into(),
+                handle: "sec:other".into(),
+                expected: "sec:which-way".into(),
+            },
+        ))
+    );
+    let noncanonical = reader.replacen("sec-cwhich--way", "sec-cWhich--way", 1);
+    let start = noncanonical.find("sec-cWhich--way").unwrap();
+    let end = start + "sec-cWhich--way".len();
+    assert_eq!(
+        super::super::markdown::check_reader(&plan, &noncanonical, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.md".into(),
+                bytes: start..end,
+                origins: plan.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::InvalidPublicAnchor {
+                fragment: "sec-cWhich--way".into()
+            },
+        ))
+    );
+    let unterminated = reader.replacen("id=\"sec-cwhich--way\"", "id=\"sec-cwhich--way", 1);
+    let start = unterminated.find("id=\"sec-cwhich--way").unwrap() + "id=\"".len();
+    let end = start + "sec-cwhich--way".len();
+    assert_eq!(
+        super::super::markdown::check_reader(&plan, &unterminated, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.md".into(),
+                bytes: start..end,
+                origins: plan.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::UnterminatedPublicAnchor {
+                fragment: "sec-cwhich--way".into()
+            },
+        ))
+    );
+
+    let missing_gap = annotated.replacen(
+        "Not yet converted: intervening material is omitted from this excerpt.\n\n",
+        "",
+        1,
+    );
+    let fault = check_emission(&plan, &missing_gap, DocumentTarget::Markdown).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("gap refusal");
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    let AssemblySite::Generated { path, bytes, .. } = &diagnostic.site else {
+        panic!("generated gap site");
+    };
+    assert_eq!(path, "generated/documents/paper-pilot/en.labels.md");
+    assert!(bytes.start <= missing_gap.find("<!-- unit sec:coda:record-limit").unwrap());
+    let AssemblyFault::EmissionMismatch {
+        missing,
+        unexpected,
+        changed,
+    } = &diagnostic.fault
+    else {
+        panic!("gap inventory refusal");
+    };
+    let expected_gap = plan
+        .records(DocumentTarget::Markdown)
+        .into_iter()
+        .find(|record| {
+            record.kind
+                == EmissionKind::Gap {
+                    index: 1,
+                    position: GapPosition::Between,
+                }
+        })
+        .unwrap();
+    assert_eq!(missing, &[expected_gap]);
+    assert_eq!(unexpected.as_slice(), []);
+    assert_eq!(changed.as_slice(), []);
+
+    let changed_coverage =
+        annotated.replacen("Audit scope: bounded.", "Audit scope: unbounded.", 1);
+    let fault = check_emission(&plan, &changed_coverage, DocumentTarget::Markdown).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("coverage refusal");
+    };
+    assert_eq!(errors.diagnostics()[0].rule, RuleId::M055);
+    let AssemblyFault::EmissionMismatch {
+        missing,
+        unexpected,
+        changed,
+    } = &errors.diagnostics()[0].fault
+    else {
+        panic!("coverage mismatch");
+    };
+    assert_eq!(missing.as_slice(), []);
+    assert_eq!(unexpected.as_slice(), []);
+    assert_eq!(changed.len(), 1);
+    assert_eq!(changed[0].expected.kind, EmissionKind::CoverageSlice);
+    assert_eq!(changed[0].expected.value, "Audit scope: bounded.");
+    assert_eq!(changed[0].actual.value, "Audit scope: unbounded.");
+    let AssemblySite::Generated { path, bytes, .. } = &errors.diagnostics()[0].site else {
+        panic!("generated coverage site");
+    };
+    assert_eq!(path, "generated/documents/paper-pilot/en.labels.md");
+    assert!(bytes.contains(&changed_coverage.find("Audit scope: unbounded.").unwrap()));
 }
 
 #[test]

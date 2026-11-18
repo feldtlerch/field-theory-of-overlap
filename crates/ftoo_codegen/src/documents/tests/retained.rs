@@ -69,6 +69,7 @@ fn retained_selected_outcomes_census_and_scope_are_derived() {
                 "en",
             )
             .unwrap(),
+            screen: None,
             blocks: vec![],
         };
         plan.coverage.audit = runs;
@@ -198,6 +199,7 @@ pub(super) fn outcome_plan(
             "en",
         )
         .unwrap(),
+        screen: None,
         blocks: vec![],
     };
     // The first selected row belongs to the second report outcome. Presentation

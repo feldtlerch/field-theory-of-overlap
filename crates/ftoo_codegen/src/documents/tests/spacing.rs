@@ -35,6 +35,7 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),

@@ -12,6 +12,32 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    UnsupportedPublicHandle {
+        handle: String,
+        character: char,
+        offset: usize,
+    },
+    MissingScreenTemplates {
+        language: String,
+    },
+    ExcerptShape {
+        document: String,
+        positions: usize,
+    },
+    DuplicatePublicAnchor {
+        fragment: String,
+    },
+    InvalidPublicAnchor {
+        fragment: String,
+    },
+    UnterminatedPublicAnchor {
+        fragment: String,
+    },
+    PublicAnchorMismatch {
+        fragment: String,
+        handle: String,
+        expected: String,
+    },
     MarkdownRoleMismatch {
         offset: usize,
     },
@@ -201,6 +227,13 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::UnsupportedPublicHandle { .. } => 36,
+            Self::MissingScreenTemplates { .. } => 37,
+            Self::ExcerptShape { .. } => 38,
+            Self::DuplicatePublicAnchor { .. } => 39,
+            Self::InvalidPublicAnchor { .. } => 40,
+            Self::UnterminatedPublicAnchor { .. } => 42,
+            Self::PublicAnchorMismatch { .. } => 41,
             Self::MarkdownRoleMismatch { .. } => 35,
             Self::ReaderLabelLiteral { .. } => 34,
             Self::ReaderIdentity { .. } => 31,
@@ -575,6 +608,18 @@ impl fmt::Display for AssemblyErrors {
 impl std::error::Error for AssemblyErrors {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmissionKind {
+    RefrainHandle {
+        role: RefrainRole,
+        handle: String,
+        bound_label: String,
+    },
+    PublicAnchor {
+        fragment: String,
+    },
+    Gap {
+        index: usize,
+        position: GapPosition,
+    },
     CoverageDeclaration,
     CoverageSlice,
     ReaderIdentity {
@@ -592,6 +637,16 @@ pub enum EmissionKind {
     Citation(Box<CitationIdentity>),
     Mention,
     Math,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RefrainRole {
+    Owned,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GapPosition {
+    Before,
+    Between,
+    After,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CitationIdentity {

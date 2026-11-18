@@ -1107,6 +1107,7 @@ fn fragment_macro_follows_planned_quotation() {
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![block],
     };
     assert!(format!("{:?}", unsupported_html(&plan)).contains("html"));
@@ -2023,6 +2024,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
         document: "main".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),

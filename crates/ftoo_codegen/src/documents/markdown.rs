@@ -6,6 +6,9 @@ use ftoo_manifest::{AssemblySite, AssemblyStage, DocumentTarget, RuleId};
 use std::fmt::Write;
 use std::ops::Range;
 pub(super) fn size(plan: &DocumentPlan) -> usize {
+    if plan.screen.is_some() {
+        return render(plan).len();
+    }
     let mut size = format!(
         "<!-- generated document {} language {} -->\n{}\n",
         plan.document, plan.language, plan.coverage.declaration
@@ -106,6 +109,46 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
         inline(&mut output, runs);
     }
     output.push_str("\n\n");
+    if let Some(screen) = &plan.screen {
+        let heading = &plan.blocks[0];
+        writeln!(
+            output,
+            "<!-- unit {} document {} language {} -->",
+            heading.unit, plan.document, plan.language
+        )
+        .expect("string write");
+        output.push_str("# ");
+        inline(&mut output, &heading.runs);
+        output.push_str("\n\n");
+        for (index, refrain) in screen.refrains.iter().enumerate() {
+            writeln!(output, "{}\n", text(&screen.gaps[index].message)).expect("string write");
+            let block = &plan.blocks[index + 1];
+            writeln!(
+                output,
+                "<!-- unit {} document {} language {} -->",
+                block.unit, plan.document, plan.language
+            )
+            .expect("string write");
+            write!(
+                output,
+                "<p align=\"center\"><a id=\"{}\"></a><em>",
+                refrain.fragment
+            )
+            .expect("string write");
+            inline(&mut output, &block.runs);
+            output.push_str("</em></p>\n<p align=\"right\">");
+            output.push_str(&text(&refrain.handle));
+            writeln!(output, "<!-- label {} --></p>\n", refrain.bound_label).expect("string write");
+        }
+        writeln!(
+            output,
+            "{}\n",
+            text(&screen.gaps.last().expect("gap").message)
+        )
+        .expect("string write");
+        output.pop();
+        return output;
+    }
     for block in &plan.blocks {
         writeln!(
             output,
@@ -214,6 +257,7 @@ fn role_failure(
     )
 }
 
+#[allow(clippy::too_many_lines)] // Decoded text offsets and public anchors share one reader scan.
 pub(super) fn check_reader(
     plan: &DocumentPlan,
     reader: &str,
@@ -264,6 +308,56 @@ pub(super) fn check_reader(
             let raw_start = offsets[start];
             let raw_end = offsets.get(end).copied().unwrap_or(reader.len());
             select_leak(&mut leak, raw_start..raw_end, label);
+        }
+    }
+    if plan.screen.is_some() {
+        for (index, (at, prefix)) in reader.match_indices("id=\"").enumerate() {
+            let start = at + prefix.len();
+            let tag_end = reader[start..].find('>').map(|offset| start + offset);
+            let end = reader[start..].find('"').map(|offset| start + offset);
+            let Some(end) = end.filter(|end| tag_end.is_none_or(|tag_end| *end < tag_end)) else {
+                let end = tag_end.unwrap_or(reader.len());
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::UnterminatedPublicAnchor {
+                        fragment: reader[start..end].into(),
+                    },
+                ));
+            };
+            let fragment = &reader[start..end];
+            let Some(handle) = super::plan::inverse_fragment(fragment) else {
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::InvalidPublicAnchor {
+                        fragment: fragment.into(),
+                    },
+                ));
+            };
+            if known_labels.iter().any(|label| handle.contains(label))
+                || !ftoo_manifest::reader_label_literals(&handle).is_empty()
+            {
+                select_leak(&mut leak, start..end, &handle);
+            } else if let Some(refrain) = plan
+                .screen
+                .as_ref()
+                .and_then(|screen| screen.refrains.get(index))
+                && handle != refrain.handle
+            {
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::PublicAnchorMismatch {
+                        fragment: fragment.into(),
+                        handle,
+                        expected: refrain.handle.clone(),
+                    },
+                ));
+            }
         }
     }
     if let Some((bytes, value)) = leak {

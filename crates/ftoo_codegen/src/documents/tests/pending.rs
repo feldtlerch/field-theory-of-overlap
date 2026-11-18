@@ -95,6 +95,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![block],
     };
     for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
@@ -294,6 +295,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             document: "fixture".into(),
             language: "en".into(),
             coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+            screen: None,
             blocks: vec![block],
         };
         for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {

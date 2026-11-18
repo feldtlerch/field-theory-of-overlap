@@ -404,6 +404,7 @@ fn plan(block: Block) -> DocumentPlan {
         document: "main".into(),
         language: "en".into(),
         coverage: Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![block],
     }
 }

@@ -780,6 +780,7 @@ fn fixture_plan(kind: DisplayKind, markdown: &str, latex: &str) -> plan::Documen
         document: "main".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             unit: "sec:fixture:caption".into(),

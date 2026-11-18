@@ -428,6 +428,7 @@ pub(super) fn support_required_overfull_boxes_refuse_complete_frames_and_restore
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
@@ -606,6 +607,7 @@ fn exact_sweep_explanation_is_refused_in_a_reader_pending_paragraph() {
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![block],
     };
     let source = latex::render(&plan);

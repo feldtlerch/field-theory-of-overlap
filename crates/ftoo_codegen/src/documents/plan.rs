@@ -1,12 +1,13 @@
 use super::diagnostics::{
     AssemblyDiagnostic, AssemblyErrors, AssemblyFault, DocumentError, EmissionKind, EmissionRecord,
+    GapPosition, RefrainRole,
 };
 use crate::RenderableNotation;
 use ftoo_manifest::{
     AssemblySite, AssemblyStage, CheckedSkeletons, DocumentTarget, MathUseSite, RenderTarget,
     RuleId, SourceOrigin, UnitSite, WeldedUnits,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 #[cfg(test)]
 #[path = "tests/citations.rs"]
 pub(super) mod citation_tests;
@@ -471,6 +472,9 @@ pub(super) fn check_emission(
     target: DocumentTarget,
 ) -> Result<(), DocumentError> {
     check_coverage(plan, source, target)?;
+    if target == DocumentTarget::Markdown && plan.screen.is_some() {
+        return check_excerpt_emission(plan, source);
+    }
     let marker = if target == DocumentTarget::Markdown {
         "<!-- unit "
     } else {
@@ -611,6 +615,197 @@ pub(super) fn check_emission(
         ));
     }
     Ok(())
+}
+fn excerpt_text(source: &str) -> Option<String> {
+    let recovered = recover_markdown(source, std::iter::empty())?;
+    let [Recovered::Text(value)] = recovered.as_slice() else {
+        return None;
+    };
+    Some(value.clone())
+}
+fn excerpt_unit(source: &str) -> Option<(&str, &str, &str, &str)> {
+    let (metadata, body) = source.split_once('\n')?;
+    let fields = metadata.strip_prefix("<!-- unit ")?.strip_suffix(" -->")?;
+    let mut fields = fields.split_ascii_whitespace();
+    let unit = fields.next()?;
+    let key = fields.next()?;
+    let document = fields.next()?;
+    let language_key = fields.next()?;
+    let language = fields.next()?;
+    (key == "document" && language_key == "language" && fields.next().is_none())
+        .then_some((unit, document, language, body))
+}
+fn excerpt_refrain(source: &str) -> Option<(String, String, String, String)> {
+    let rest = source.strip_prefix("<p align=\"center\"><a id=\"")?;
+    let (fragment, rest) = rest.split_once("\"></a><em>")?;
+    let (text, rest) = rest.split_once("</em></p>\n<p align=\"right\">")?;
+    let (handle, rest) = rest.split_once("<!-- label ")?;
+    let label = rest.strip_suffix(" --></p>")?;
+    Some((
+        excerpt_text(text)?,
+        fragment.into(),
+        excerpt_text(handle)?,
+        label.into(),
+    ))
+}
+#[allow(clippy::too_many_lines)] // The excerpt's ordered blocks and their source ranges form one recovery pass.
+fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), DocumentError> {
+    let screen = plan.screen.as_ref().expect("screen plan");
+    let expected = plan.records(DocumentTarget::Markdown);
+    if !envelope(plan, source, DocumentTarget::Markdown) {
+        return Err(emission_failure(
+            plan,
+            DocumentTarget::Markdown,
+            source.len()..source.len(),
+            AssemblyFault::EmissionMismatch {
+                missing: expected,
+                unexpected: vec![],
+                changed: vec![],
+            },
+        ));
+    }
+    let mut actual = Vec::new();
+    let mut first_range = None;
+    let start = source.find("<!-- unit ").unwrap_or(source.len());
+    let mut cursor = start;
+    let mut refrain_index = 0;
+    for chunk in source[start..]
+        .strip_suffix('\n')
+        .expect("checked envelope")
+        .split("\n\n")
+    {
+        let range = cursor..cursor + chunk.len();
+        cursor = range.end + 2;
+        let before = actual.len();
+        if let Some((unit, document, language, body)) = excerpt_unit(chunk) {
+            if document != plan.document {
+                actual.push(unknown_block(
+                    plan,
+                    DocumentTarget::Markdown,
+                    chunk.split_once('\n').map_or(chunk, |(head, _)| head),
+                    chunk,
+                    range.clone(),
+                ));
+                first_range.get_or_insert(range);
+                continue;
+            }
+            if let Some((index, block)) = plan
+                .blocks
+                .iter()
+                .enumerate()
+                .find(|(_, block)| block.unit == unit)
+            {
+                let kind = if index == 0 {
+                    EmissionKind::Heading
+                } else {
+                    EmissionKind::Paragraph
+                };
+                let text = if index == 0 {
+                    body.strip_prefix("# ").and_then(excerpt_text)
+                } else {
+                    excerpt_refrain(body).map(|value| value.0)
+                };
+                actual.push(EmissionRecord {
+                    kind,
+                    unit: unit.into(),
+                    language: language.into(),
+                    target: DocumentTarget::Markdown,
+                    occurrence: None,
+                    value: text.unwrap_or_else(|| body.into()),
+                    site: block.site.clone(),
+                });
+                if index > 0 {
+                    if let Some((_, fragment, handle, label)) = excerpt_refrain(body) {
+                        let site = screen.refrains[index - 1].site.clone();
+                        actual.push(EmissionRecord {
+                            kind: EmissionKind::PublicAnchor {
+                                fragment: fragment.clone(),
+                            },
+                            unit: unit.into(),
+                            language: language.into(),
+                            target: DocumentTarget::Markdown,
+                            occurrence: Some(refrain_index),
+                            value: fragment,
+                            site: site.clone(),
+                        });
+                        actual.push(EmissionRecord {
+                            kind: EmissionKind::RefrainHandle {
+                                role: RefrainRole::Owned,
+                                handle: handle.clone(),
+                                bound_label: label,
+                            },
+                            unit: unit.into(),
+                            language: language.into(),
+                            target: DocumentTarget::Markdown,
+                            occurrence: Some(refrain_index),
+                            value: handle,
+                            site,
+                        });
+                    }
+                    refrain_index += 1;
+                }
+            } else {
+                actual.push(unknown_block(
+                    plan,
+                    DocumentTarget::Markdown,
+                    chunk.split_once('\n').map_or(chunk, |(head, _)| head),
+                    chunk,
+                    range.clone(),
+                ));
+            }
+        } else {
+            let gap_index = refrain_index;
+            let position = if gap_index == 0 {
+                GapPosition::Before
+            } else if gap_index == screen.refrains.len() {
+                GapPosition::After
+            } else {
+                GapPosition::Between
+            };
+            let site = screen
+                .gaps
+                .get(gap_index)
+                .unwrap_or(&screen.gaps[0])
+                .site
+                .clone();
+            actual.push(EmissionRecord {
+                kind: EmissionKind::Gap {
+                    index: gap_index,
+                    position,
+                },
+                unit: String::new(),
+                language: plan.language.clone(),
+                target: DocumentTarget::Markdown,
+                occurrence: Some(gap_index),
+                value: excerpt_text(chunk).unwrap_or_else(|| chunk.into()),
+                site,
+            });
+        }
+        if expected.get(before..actual.len()) != Some(&actual[before..]) {
+            first_range.get_or_insert(range);
+        }
+    }
+    let (mut missing, mut unexpected, mut changed) = (vec![], vec![], vec![]);
+    difference(
+        &expected,
+        &actual,
+        &mut missing,
+        &mut unexpected,
+        &mut changed,
+    );
+    if missing.is_empty() && unexpected.is_empty() && changed.is_empty() {
+        return Ok(());
+    }
+    Err(emission_failure(
+        plan,
+        DocumentTarget::Markdown,
+        first_range.unwrap_or(start..source.len()),
+        AssemblyFault::EmissionMismatch {
+            missing,
+            unexpected,
+            changed,
+        },
+    ))
 }
 fn emission_failure(
     plan: &DocumentPlan,
@@ -1083,7 +1278,13 @@ fn check_coverage(
             separator
         })
         .unwrap_or((rest, ""));
-    check_audit_paragraphs(plan, target, audit_rest, separator)?;
+    check_audit_paragraphs(
+        plan,
+        target,
+        audit_rest,
+        separator,
+        source.len() - audit_rest.len(),
+    )?;
     let block = plan.coverage.block();
     let expected_runs = expected_runs(&block, target);
     let expected = coverage_records(
@@ -1133,6 +1334,7 @@ fn check_audit_paragraphs(
     target: DocumentTarget,
     mut rest: &str,
     separator: &str,
+    mut at: usize,
 ) -> Result<(), DocumentError> {
     for (index, runs) in plan.coverage.audit.iter().enumerate() {
         let ending = if target == DocumentTarget::Markdown && index + 1 == plan.coverage.audit.len()
@@ -1143,6 +1345,8 @@ fn check_audit_paragraphs(
         };
         let (source, next) = rest.split_once(ending).unwrap_or((rest, ""));
         rest = next;
+        let begin = at;
+        at += source.len() + ending.len();
         let mut block = plan.coverage.block();
         block.runs.clone_from(runs);
         let expected = expected_runs(&block, target);
@@ -1214,7 +1418,7 @@ fn check_audit_paragraphs(
             return Err(emission_failure(
                 plan,
                 target,
-                0..source.len(),
+                begin..begin + source.len(),
                 AssemblyFault::EmissionMismatch {
                     missing,
                     unexpected,
@@ -1230,11 +1434,261 @@ pub(super) struct DocumentPlan {
     pub language: String,
     pub coverage: Coverage,
     pub blocks: Vec<Block>,
+    pub screen: Option<ScreenPlan>,
+}
+#[derive(Clone, Debug)]
+pub(super) struct ScreenPlan {
+    pub gaps: Vec<ScreenGap>,
+    pub refrains: Vec<ScreenRefrain>,
+}
+#[derive(Clone, Debug)]
+pub(super) struct ScreenGap {
+    pub position: GapPosition,
+    pub message: String,
+    pub site: UnitSite,
+    pub boundaries: Vec<UnitSite>,
+}
+#[derive(Clone, Debug)]
+pub(super) struct ScreenRefrain {
+    pub handle: String,
+    pub bound_label: String,
+    pub fragment: String,
+    pub site: UnitSite,
+    pub binding_site: Option<UnitSite>,
+}
+pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentError> {
+    let Some(screen) = &plan.screen else {
+        return Ok(());
+    };
+    let mut seen = BTreeSet::new();
+    for refrain in &screen.refrains {
+        if !seen.insert(&refrain.fragment) {
+            return Err(screen_failure(
+                plan,
+                &refrain.site,
+                AssemblyFault::DuplicatePublicAnchor {
+                    fragment: refrain.fragment.clone(),
+                },
+            ));
+        }
+    }
+    Ok(())
+}
+fn screen_failure(plan: &DocumentPlan, site: &UnitSite, fault: AssemblyFault) -> DocumentError {
+    DocumentError::Assembly(
+        AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+            rule: RuleId::M055,
+            stage: AssemblyStage::Emission,
+            document: Some(plan.document.clone()),
+            unit: None,
+            language: Some(plan.language.clone()),
+            target: Some(DocumentTarget::Markdown),
+            site: AssemblySite::Source(site.clone()),
+            fault,
+        }])
+        .expect("one screen fault"),
+    )
+}
+fn gap_template(language: &str, position: GapPosition) -> Option<&'static str> {
+    (language == "en").then_some(match position {
+        GapPosition::Before => "Not yet converted: earlier material is omitted from this excerpt.",
+        GapPosition::Between => {
+            "Not yet converted: intervening material is omitted from this excerpt."
+        }
+        GapPosition::After => "Not yet converted: later material is omitted from this excerpt.",
+    })
+}
+pub(super) fn screen_gap(
+    plan: &DocumentPlan,
+    site: &UnitSite,
+    position: GapPosition,
+) -> Result<ScreenGap, DocumentError> {
+    let Some(message) = gap_template(&plan.language, position) else {
+        return Err(screen_failure(
+            plan,
+            site,
+            AssemblyFault::MissingScreenTemplates {
+                language: plan.language.clone(),
+            },
+        ));
+    };
+    Ok(ScreenGap {
+        position,
+        message: message.into(),
+        site: site.clone(),
+        boundaries: Vec::new(),
+    })
+}
+pub(super) fn check_excerpt_shape(
+    plan: &DocumentPlan,
+    site: &UnitSite,
+) -> Result<(), DocumentError> {
+    let shape = plan.blocks.len() >= 2
+        && plan.blocks[0].depth == Some(1)
+        && plan.blocks[1..].iter().all(|block| {
+            block.depth.is_none()
+                && !block.quotation
+                && block.displays.is_empty()
+                && matches!(block.runs.as_slice(), [Inline::Text(_)])
+        });
+    if shape {
+        Ok(())
+    } else {
+        Err(screen_failure(
+            plan,
+            site,
+            AssemblyFault::ExcerptShape {
+                document: plan.document.clone(),
+                positions: plan.blocks.len(),
+            },
+        ))
+    }
+}
+pub(super) fn public_fragment(
+    plan: &DocumentPlan,
+    site: &UnitSite,
+    handle: &str,
+) -> Result<String, DocumentError> {
+    encode_fragment(handle).map_err(|(character, offset)| {
+        screen_failure(
+            plan,
+            site,
+            AssemblyFault::UnsupportedPublicHandle {
+                handle: handle.into(),
+                character,
+                offset,
+            },
+        )
+    })
+}
+fn encode_fragment(handle: &str) -> Result<String, (char, usize)> {
+    let mut fragment = String::new();
+    if handle.is_empty() {
+        return Err(('\0', 0));
+    }
+    for (offset, scalar) in handle.char_indices() {
+        match scalar {
+            'a'..='z' | '0'..='9' => fragment.push(scalar),
+            '-' => fragment.push_str("--"),
+            ':' => fragment.push_str("-c"),
+            'A'..='Z' => {
+                fragment.push_str("-u");
+                fragment.push(scalar.to_ascii_lowercase());
+            }
+            _ => return Err((scalar, offset)),
+        }
+    }
+    Ok(fragment)
+}
+pub(super) fn inverse_fragment(fragment: &str) -> Option<String> {
+    let mut handle = String::new();
+    let mut chars = fragment.chars().peekable();
+    while let Some(scalar) = chars.next() {
+        match scalar {
+            'a'..='z' | '0'..='9' => handle.push(scalar),
+            '-' => match chars.next()? {
+                '-' => handle.push('-'),
+                'c' => handle.push(':'),
+                'u' => {
+                    let letter = chars.next()?;
+                    if !letter.is_ascii_lowercase() {
+                        return None;
+                    }
+                    handle.push(letter.to_ascii_uppercase());
+                }
+                _ => return None,
+            },
+            _ => return None,
+        }
+    }
+    (!handle.is_empty() && encode_fragment(&handle).ok().as_deref() == Some(fragment))
+        .then_some(handle)
+}
+pub(super) fn plan_screens(
+    plans: &mut [DocumentPlan],
+    selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
+    book: &ftoo_manifest::AddressBook<'_>,
+    skeletons: &CheckedSkeletons<'_>,
+    document_sites: &BTreeMap<String, UnitSite>,
+) -> Result<(), DocumentError> {
+    for plan in plans {
+        let targets = &selected[&plan.document];
+        if !targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
+            || !targets.contains(&ftoo_manifest::DocumentOutput::Fragment)
+        {
+            continue;
+        }
+        let positions = &skeletons.documents()[&plan.document];
+        check_excerpt_shape(plan, positions[0].site())?;
+        if gap_template(&plan.language, GapPosition::Before).is_none() {
+            return Err(screen_failure(
+                plan,
+                &document_sites[&plan.document],
+                AssemblyFault::MissingScreenTemplates {
+                    language: plan.language.clone(),
+                },
+            ));
+        }
+        let mut gaps = Vec::new();
+        for index in 0..plan.blocks.len() {
+            let position = if index == 0 {
+                GapPosition::Before
+            } else if index + 1 == plan.blocks.len() {
+                GapPosition::After
+            } else {
+                GapPosition::Between
+            };
+            let mut gap = screen_gap(plan, positions[0].site(), position)?;
+            if index > 0 {
+                gap.boundaries.push(positions[index].site().clone());
+            }
+            if index + 1 < positions.len() {
+                gap.boundaries.push(positions[index + 1].site().clone());
+            }
+            gaps.push(gap);
+        }
+        let mut refrains = Vec::new();
+        for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            let target = ftoo_manifest::AddressTarget::Documentary(block.unit.clone());
+            let handle = book.reader_identity(target).map_err(|fault| {
+                screen_failure(
+                    plan,
+                    positions[index].site(),
+                    AssemblyFault::ReaderIdentity {
+                        target: fault.target,
+                        reason: fault.reason,
+                        candidates: fault.candidates,
+                    },
+                )
+            })?;
+            let fragment = public_fragment(plan, positions[index].site(), &handle)?;
+            let binding_site = book
+                .common_descriptors()
+                .find(|descriptor| descriptor.handle() == handle.as_str())
+                .and_then(|descriptor| match descriptor.origin() {
+                    ftoo_manifest::CommonOrigin::Documentary { admitted_at, .. } => {
+                        Some(admitted_at.clone())
+                    }
+                    ftoo_manifest::CommonOrigin::Theory(_) => None,
+                });
+            refrains.push(ScreenRefrain {
+                handle,
+                bound_label: block.unit.clone(),
+                fragment,
+                site: positions[index].site().clone(),
+                binding_site,
+            });
+        }
+        plan.screen = Some(ScreenPlan { gaps, refrains });
+        check_public_anchors(plan)?;
+    }
+    Ok(())
 }
 impl DocumentPlan {
+    #[allow(clippy::too_many_lines)] // Every target's records retain one source-ordered inventory.
     pub fn records(&self, target: DocumentTarget) -> Vec<EmissionRecord> {
         let mut records = Vec::new();
-        for block in &self.blocks {
+        for (index, block) in self.blocks.iter().enumerate() {
             records.push(EmissionRecord {
                 kind: if block.depth.is_some() {
                     EmissionKind::Heading
@@ -1292,11 +1746,56 @@ impl DocumentPlan {
                         language: self.language.clone(),
                         coverage: self.coverage.clone(),
                         blocks: Vec::new(),
+                        screen: None,
                     };
                     records.extend(region_records(region, &plan, target));
                 }
             }
             records.extend(pending_records(self, block, target));
+            if target == DocumentTarget::Markdown
+                && let Some(screen) = &self.screen
+            {
+                if index > 0 {
+                    let refrain = &screen.refrains[index - 1];
+                    records.push(EmissionRecord {
+                        kind: EmissionKind::PublicAnchor {
+                            fragment: refrain.fragment.clone(),
+                        },
+                        unit: block.unit.clone(),
+                        language: self.language.clone(),
+                        target,
+                        occurrence: Some(index - 1),
+                        value: refrain.fragment.clone(),
+                        site: refrain.site.clone(),
+                    });
+                    records.push(EmissionRecord {
+                        kind: EmissionKind::RefrainHandle {
+                            role: RefrainRole::Owned,
+                            handle: refrain.handle.clone(),
+                            bound_label: refrain.bound_label.clone(),
+                        },
+                        unit: block.unit.clone(),
+                        language: self.language.clone(),
+                        target,
+                        occurrence: Some(index - 1),
+                        value: refrain.handle.clone(),
+                        site: refrain.site.clone(),
+                    });
+                }
+                let gap = &screen.gaps[index];
+                records.push(EmissionRecord {
+                    kind: EmissionKind::Gap {
+                        index,
+                        position: gap.position,
+                    },
+                    unit: String::new(),
+                    language: self.language.clone(),
+                    target,
+                    occurrence: Some(index),
+                    value: gap.message.clone(),
+                    site: gap.site.clone(),
+                });
+            }
         }
         records
     }
@@ -1311,6 +1810,38 @@ impl DocumentPlan {
                         .occurrences
                         .into_iter()
                         .flat_map(|occurrence| [occurrence.definition, occurrence.source])
+                        .collect::<Vec<_>>()
+                } else if let EmissionKind::Gap { index, .. } = record.kind {
+                    std::iter::once(record.site)
+                        .chain(
+                            self.screen
+                                .as_ref()
+                                .into_iter()
+                                .flat_map(|screen| screen.gaps[index].boundaries.iter().cloned()),
+                        )
+                        .map(|site| SourceOrigin {
+                            unit: None,
+                            language: Some(record.language.clone()),
+                            target: Some(target),
+                            site,
+                        })
+                        .collect::<Vec<_>>()
+                } else if matches!(record.kind, EmissionKind::RefrainHandle { .. }) {
+                    let mut sites = vec![record.site];
+                    if let Some(screen) = &self.screen
+                        && let Some(index) = record.occurrence
+                        && let Some(binding) = &screen.refrains[index].binding_site
+                    {
+                        sites.push(binding.clone());
+                    }
+                    sites
+                        .into_iter()
+                        .map(|site| SourceOrigin {
+                            unit: Some(record.unit.clone()),
+                            language: Some(record.language.clone()),
+                            target: Some(target),
+                            site,
+                        })
                         .collect::<Vec<_>>()
                 } else {
                     vec![SourceOrigin {
@@ -1420,6 +1951,7 @@ pub(super) fn build(
                     language: language.clone(),
                     coverage,
                     blocks,
+                    screen: None,
                 });
             }
         }
@@ -2823,6 +3355,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         language: "en".into(),
         coverage: Coverage::fixture("Coverage.", "Slice."),
         blocks: vec![block],
+        screen: None,
     }
 }
 

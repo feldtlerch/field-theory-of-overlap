@@ -334,7 +334,8 @@ pub(crate) fn prepare_context(
         .map_err(|error| DocumentError::Retention(Box::new(error)))?;
     drop(admission);
     crate::notation::with_preparation(effective.as_ref(), &catalogue, |notation| {
-        let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
+        let mut plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
+        plan::plan_screens(&mut plans, &selected, &book, &skeletons, &document_sites)?;
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
         let artifacts = render_artifacts(
             root,

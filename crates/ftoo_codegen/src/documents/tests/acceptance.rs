@@ -813,6 +813,8 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             "generated/documents/main/en.tex",
             "generated/documents/paper-pilot/sec-say-direction.tex",
             "generated/documents/paper-pilot/sec-coda-record-limit.tex",
+            "generated/documents/paper-pilot/en.labels.md",
+            "generated/documents/paper-pilot/en.md",
             "generated/notation.tex",
             "generated/addressing.tex"
         ]
@@ -1127,6 +1129,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
         document: "main".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("a", "b"),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
@@ -1210,6 +1213,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: ["a", "b", "c"]
             .map(|name| plan::Block {
                 pending_names: BTreeMap::new(),
@@ -1333,6 +1337,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
@@ -1378,6 +1383,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         document: "fixture".into(),
         language: "en".into(),
         coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
         blocks: vec![plan::Block {
             pending_names: BTreeMap::new(),
             displays: BTreeMap::new(),
@@ -1721,6 +1727,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                 document: "fixture".into(),
                 language: "en".into(),
                 coverage: plan::Coverage::fixture("Coverage.", "Slice."),
+                screen: None,
                 blocks: vec![plan::Block {
                     pending_names: BTreeMap::new(),
                     displays: BTreeMap::new(),
