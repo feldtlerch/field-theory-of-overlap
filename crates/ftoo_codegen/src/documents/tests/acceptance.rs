@@ -808,6 +808,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
         [
             "generated/documents/explainer-pilot/sec-say-direction.tex",
             "generated/documents/explainer-pilot/sec-coda-record-limit.tex",
+            "generated/documents/main/en.labels.md",
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",
             "generated/documents/paper-pilot/sec-say-direction.tex",
@@ -845,11 +846,10 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             ftoo_manifest::Evidence::Deferred
         );
     }
-    for artifact in prepared
-        .artifacts()
-        .iter()
-        .filter(|artifact| artifact.path().starts_with("generated/documents/main/"))
-    {
+    for artifact in prepared.artifacts().iter().filter(|artifact| {
+        artifact.path().starts_with("generated/documents/main/")
+            && artifact.path() != "generated/documents/main/en.md"
+    }) {
         retained_seed_header(
             std::str::from_utf8(artifact.bytes())?,
             artifact.path().as_bytes().ends_with(b".tex"),
@@ -862,10 +862,15 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
         .filter(|artifact| artifact.path().starts_with("generated/documents/main/"))
     {
         let text = std::str::from_utf8(artifact.bytes())?;
+        let expected = if artifact.path().as_bytes().ends_with(b".md") {
+            format!("{coverage}<br>")
+        } else {
+            coverage.to_owned()
+        };
         assert_eq!(
             text.lines()
                 .find(|line| line.starts_with("Coverage declaration:")),
-            Some(coverage)
+            Some(expected.as_str())
         );
     }
     assert_eq!(prepared.projection(), projection);
@@ -1220,7 +1225,8 @@ fn independent_emission_compares_complete_ordered_blocks() {
     for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
         let (header, a, b, c, tail) = if target == DocumentTarget::Markdown {
             (
-                "<!-- generated document fixture language en -->\nCoverage.\nSlice.\n\n".to_owned(),
+                "<!-- generated document fixture language en -->\nCoverage.<br>\nSlice.\n\n"
+                    .to_owned(),
                 "<!-- unit sec:fixture:a document fixture language en -->\n# A\n\n",
                 "<!-- unit sec:fixture:b document fixture language en -->\nB\n\n",
                 "<!-- unit sec:fixture:c document fixture language en -->\nC\n",
@@ -1280,7 +1286,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 path: format!(
                     "generated/documents/fixture/en.{}",
                     if target == DocumentTarget::Markdown {
-                        "md"
+                        "labels.md"
                     } else {
                         "tex"
                     }
@@ -1553,7 +1559,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         let path = format!(
             "generated/documents/fixture/en.{}",
             if target == DocumentTarget::Markdown {
-                "md"
+                "labels.md"
             } else {
                 "tex"
             }
@@ -1585,7 +1591,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
                 path: format!(
                     "generated/documents/fixture/en.{}",
                     if target == DocumentTarget::Markdown {
-                        "md"
+                        "labels.md"
                     } else {
                         "tex"
                     }
@@ -2034,7 +2040,7 @@ Audit outcomes: \FtdocTag{{v:1}}{{g-audit-0}}% label claim:langevin:coefficient-
         )
     } else {
         format!(
-            "{declaration}\nDeclared slice: v:1<!-- label claim:langevin:coefficient-one-value -->, v:3<!-- label claim:langevin:coefficient-three-value -->.\nAudit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certified; v:3<!-- label claim:langevin:coefficient-three-value -->: certified.\n{scope}\n{axis}\n\n"
+            "{declaration}<br>\nDeclared slice: v:1<!-- label claim:langevin:coefficient-one-value -->, v:3<!-- label claim:langevin:coefficient-three-value -->.<br>\nAudit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certified; v:3<!-- label claim:langevin:coefficient-three-value -->: certified.<br>\n{scope}<br>\n{axis}\n\n"
         )
     };
     let start = source.find("Coverage declaration:").unwrap();

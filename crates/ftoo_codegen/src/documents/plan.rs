@@ -627,7 +627,7 @@ fn emission_failure(
                 plan.document,
                 plan.language,
                 if target == DocumentTarget::Markdown {
-                    "md"
+                    "labels.md"
                 } else {
                     "tex"
                 }
@@ -650,7 +650,7 @@ fn unknown_block(
         plan.document,
         plan.language,
         if target == DocumentTarget::Markdown {
-            "md"
+            "labels.md"
         } else {
             "tex"
         }
@@ -1073,7 +1073,7 @@ fn check_coverage(
     let separator = if target == DocumentTarget::Latex {
         "\n\n"
     } else {
-        "\n"
+        "<br>\n"
     };
     let (declaration, rest) = rest.split_once(separator).unwrap_or(("", rest));
     let (slice, audit_rest) = rest
@@ -1134,8 +1134,14 @@ fn check_audit_paragraphs(
     mut rest: &str,
     separator: &str,
 ) -> Result<(), DocumentError> {
-    for runs in &plan.coverage.audit {
-        let (source, next) = rest.split_once(separator).unwrap_or((rest, ""));
+    for (index, runs) in plan.coverage.audit.iter().enumerate() {
+        let ending = if target == DocumentTarget::Markdown && index + 1 == plan.coverage.audit.len()
+        {
+            if plan.blocks.is_empty() { "\n" } else { "\n\n" }
+        } else {
+            separator
+        };
+        let (source, next) = rest.split_once(ending).unwrap_or((rest, ""));
         rest = next;
         let mut block = plan.coverage.block();
         block.runs.clone_from(runs);

@@ -12,6 +12,9 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    MarkdownRoleMismatch {
+        offset: usize,
+    },
     ReaderLabelLiteral {
         value: String,
         bytes: Range<usize>,
@@ -198,6 +201,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::MarkdownRoleMismatch { .. } => 35,
             Self::ReaderLabelLiteral { .. } => 34,
             Self::ReaderIdentity { .. } => 31,
             Self::DocumentaryTagTarget { .. } => 33,

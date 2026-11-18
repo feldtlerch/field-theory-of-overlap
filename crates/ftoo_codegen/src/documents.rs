@@ -335,7 +335,16 @@ pub(crate) fn prepare_context(
     drop(admission);
     crate::notation::with_preparation(effective.as_ref(), &catalogue, |notation| {
         let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
-        let artifacts = render_artifacts(root, &support, &book, &selected, &plans, notation)?;
+        let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
+        let artifacts = render_artifacts(
+            root,
+            &support,
+            &book,
+            &selected,
+            &plans,
+            notation,
+            &known_labels,
+        )?;
         let mut prepared = finish_snapshot(
             root,
             inputs,
@@ -452,6 +461,7 @@ fn render_artifacts(
     selected: &BTreeMap<String, Vec<DocumentOutput>>,
     plans: &[plan::DocumentPlan],
     notation: &crate::RenderableNotation<'_, '_, '_>,
+    known_labels: &[&str],
 ) -> Result<Vec<DocumentArtifact>, DocumentError> {
     let addressing = runtime::render(book, plans)?;
     let lock = native_support::lock(root)?;
@@ -464,21 +474,35 @@ fn render_artifacts(
             for target in targets {
                 match target {
                     DocumentOutput::Markdown => {
-                        let md = markdown::render(plan);
-                        plan::check_emission(plan, &md, DocumentTarget::Markdown)?;
-                        let path =
+                        let (annotated, reader) = markdown::emit(plan, known_labels)?;
+                        plan::check_emission(plan, &annotated, DocumentTarget::Markdown)?;
+                        let path = format!(
+                            "generated/documents/{}/{}.labels.md",
+                            plan.document, plan.language
+                        );
+                        let reader_path =
                             format!("generated/documents/{}/{}.md", plan.document, plan.language);
                         let checked = ftoo_manifest::check_markdown_sources(vec![
                             ftoo_manifest::MarkdownSource {
                                 file: path.clone(),
-                                bytes: md.as_bytes().to_vec(),
+                                bytes: annotated.as_bytes().to_vec(),
+                            },
+                            ftoo_manifest::MarkdownSource {
+                                file: reader_path.clone(),
+                                bytes: reader.as_bytes().to_vec(),
                             },
                         ])
                         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Source(e)))?;
                         neutral(&checked, false, AssemblyStage::Emission)?;
                         artifacts.push(DocumentArtifact {
                             path,
-                            bytes: md.into_bytes(),
+                            bytes: annotated.into_bytes(),
+                            origins: plan.origins(DocumentTarget::Markdown),
+                            emissions: plan.records(DocumentTarget::Markdown),
+                        });
+                        artifacts.push(DocumentArtifact {
+                            path: reader_path,
+                            bytes: reader.into_bytes(),
                             origins: plan.origins(DocumentTarget::Markdown),
                             emissions: plan.records(DocumentTarget::Markdown),
                         });
@@ -781,7 +805,7 @@ fn document_size(plan: &plan::DocumentPlan) -> Result<(), DocumentError> {
                         plan.document,
                         plan.language,
                         if target == DocumentTarget::Markdown {
-                            "md"
+                            "labels.md"
                         } else {
                             "tex"
                         }

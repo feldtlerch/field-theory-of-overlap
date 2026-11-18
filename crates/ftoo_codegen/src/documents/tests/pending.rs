@@ -214,7 +214,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
                         path: if target == DocumentTarget::Latex {
                             "generated/documents/fixture/en.tex"
                         } else {
-                            "generated/documents/fixture/en.md"
+                            "generated/documents/fixture/en.labels.md"
                         }
                         .into(),
                         bytes: start..reread.len(),
@@ -315,7 +315,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             if target == DocumentTarget::Markdown {
                 let checked =
                     ftoo_manifest::check_markdown_sources(vec![ftoo_manifest::MarkdownSource {
-                        file: "generated/documents/fixture/en.md".into(),
+                        file: "generated/documents/fixture/en.labels.md".into(),
                         bytes: source.as_bytes().to_vec(),
                     }])
                     .unwrap();
@@ -416,7 +416,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
                             if target == DocumentTarget::Latex {
                                 "tex"
                             } else {
-                                "md"
+                                "labels.md"
                             }
                         ),
                         bytes: range,

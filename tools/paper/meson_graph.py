@@ -17,7 +17,7 @@ record = custom_target('record', output: 'record.json', build_always_stale: true
 document_record = custom_target('document-record', output: 'document-record.json',
   build_always_stale: true,
   command: [python, meson.project_source_root() / 'step.py', 'record',
-    meson.project_source_root() / 'document.txt', '@OUTPUT@'])
+    meson.project_source_root() / 'generated/documents/main/en.md', '@OUTPUT@'])
 document_check = custom_target('document-check', input: document_record,
   output: 'documents.checked', command: [python, meson.project_source_root() / 'step.py',
     'verify', '@INPUT@', '@OUTPUT@'])
@@ -113,7 +113,8 @@ def fixture(parent, publish=None):
     (source / 'meson.build').write_text(FIXTURE + extra)
     (source / 'step.py').write_text(STEP)
     (source / 'source.txt').write_text('alpha')
-    (source / 'document.txt').write_text('first')
+    (source / 'generated/documents/main').mkdir(parents=True)
+    (source / 'generated/documents/main/en.md').write_text('first')
     run('meson', 'setup', str(build), str(source), '--backend=ninja', '--wrap-mode=nodownload')
     return source, build
 
@@ -134,12 +135,12 @@ def g1(parent, adapter, cargo_home):
     print('G1 first and repeated calls:', first, second)
     print('G1 dry-run:', dry.stdout.strip(), dry.stderr.strip())
     assert first == second == (1, 1), 'Unchanged record restarted a producer'
-    document = source / 'document.txt'
+    document = source / 'generated/documents/main/en.md'
     document.write_text('second')
     compile(build)
     assert count(build / 'document-check.calls') == 2
     assert count(build / 'producer.calls') == 1
-    print('Changed document: check reran; producer stayed at one call')
+    print('Changed Markdown: check reran; producer stayed at one call')
     item = source / 'source.txt'
     old = item.stat()
     item.write_text('alpha')

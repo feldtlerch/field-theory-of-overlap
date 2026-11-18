@@ -1,5 +1,10 @@
-use super::plan::{DocumentPlan, Inline};
+use super::{
+    diagnostics::{AssemblyFault, DocumentError},
+    plan::{DocumentPlan, Inline},
+};
+use ftoo_manifest::{AssemblySite, AssemblyStage, DocumentTarget, RuleId};
 use std::fmt::Write;
+use std::ops::Range;
 pub(super) fn size(plan: &DocumentPlan) -> usize {
     let mut size = format!(
         "<!-- generated document {} language {} -->\n{}\n",
@@ -7,9 +12,9 @@ pub(super) fn size(plan: &DocumentPlan) -> usize {
     )
     .len()
     .saturating_add(inline_size(&plan.coverage.runs))
-    .saturating_add(2);
+    .saturating_add(6);
     for runs in &plan.coverage.audit {
-        size = size.saturating_add(inline_size(runs)).saturating_add(1);
+        size = size.saturating_add(inline_size(runs)).saturating_add(5);
     }
     for block in &plan.blocks {
         size = size.saturating_add(
@@ -92,12 +97,12 @@ fn code(source: &str) -> String {
 }
 pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = format!(
-        "<!-- generated document {} language {} -->\n{}\n",
+        "<!-- generated document {} language {} -->\n{}<br>\n",
         plan.document, plan.language, plan.coverage.declaration
     );
     inline(&mut output, &plan.coverage.runs);
     for runs in &plan.coverage.audit {
-        output.push('\n');
+        output.push_str("<br>\n");
         inline(&mut output, runs);
     }
     output.push_str("\n\n");
@@ -128,6 +133,160 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
     }
     output.pop();
     output
+}
+
+pub(super) fn render_roles(plan: &DocumentPlan) -> Result<(String, String), DocumentError> {
+    let annotated = render(plan);
+    let reader = erase_annotations(&annotated).map_err(|at| {
+        role_failure(
+            plan,
+            true,
+            at..at + 1,
+            AssemblyFault::MarkdownRoleMismatch { offset: at },
+        )
+    })?;
+    Ok((annotated, reader))
+}
+
+pub(super) fn emit(
+    plan: &DocumentPlan,
+    known_labels: &[&str],
+) -> Result<(String, String), DocumentError> {
+    let roles = render_roles(plan)?;
+    check_reader(plan, &roles.1, known_labels)?;
+    Ok(roles)
+}
+
+pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
+    let mut reader = String::with_capacity(source.len());
+    let mut at = 0;
+    while let Some(relative) = source[at..].find("<!--") {
+        let start = at + relative;
+        reader.push_str(&source[at..start]);
+        let Some(end) = source[start..].find("-->").map(|offset| start + offset + 3) else {
+            return Err(start);
+        };
+        let comment = &source[start..end];
+        if ![
+            "<!-- generated document ",
+            "<!-- unit ",
+            "<!-- label ",
+            "<!-- cite ",
+        ]
+        .iter()
+        .any(|prefix| comment.starts_with(prefix))
+        {
+            return Err(start);
+        }
+        let line = start == 0 || source.as_bytes()[start - 1] == b'\n';
+        at = end;
+        if line {
+            if !source[at..].starts_with('\n') {
+                return Err(start);
+            }
+            at += 1;
+        }
+    }
+    reader.push_str(&source[at..]);
+    Ok(reader)
+}
+
+fn role_failure(
+    plan: &DocumentPlan,
+    annotated: bool,
+    bytes: Range<usize>,
+    fault: AssemblyFault,
+) -> DocumentError {
+    super::failure(
+        RuleId::M055,
+        AssemblyStage::Emission,
+        AssemblySite::Generated {
+            path: format!(
+                "generated/documents/{}/{}{}",
+                plan.document,
+                plan.language,
+                if annotated { ".labels.md" } else { ".md" }
+            ),
+            bytes,
+            origins: plan.origins(DocumentTarget::Markdown),
+        },
+        fault,
+    )
+}
+
+pub(super) fn check_reader(
+    plan: &DocumentPlan,
+    reader: &str,
+    known_labels: &[&str],
+) -> Result<(), DocumentError> {
+    if let Some(at) = reader.find("<!--") {
+        return Err(role_failure(
+            plan,
+            false,
+            at..at + 1,
+            AssemblyFault::MarkdownRoleMismatch { offset: at },
+        ));
+    }
+    let mut decoded = String::with_capacity(reader.len());
+    let mut offsets = Vec::with_capacity(reader.len());
+    let mut at = 0;
+    while at < reader.len() {
+        let tail = &reader[at..];
+        if let Some(rest) = tail.strip_prefix("&#")
+            && let Some(end) = rest.find(';')
+            && let Ok(number) = rest[..end].parse::<u32>()
+            && let Some(value) = char::from_u32(number)
+        {
+            decoded.push(value);
+            offsets.extend(std::iter::repeat_n(at, value.len_utf8()));
+            at += end + 3;
+        } else {
+            let value = tail.chars().next().expect("nonempty tail");
+            decoded.push(value);
+            offsets.extend(std::iter::repeat_n(at, value.len_utf8()));
+            at += value.len_utf8();
+        }
+    }
+    let mut leak = ftoo_manifest::reader_label_literals(&decoded)
+        .into_iter()
+        .map(|range| {
+            let start = offsets[range.start];
+            let end = offsets.get(range.end).copied().unwrap_or(reader.len());
+            (start..end, decoded[range].to_owned())
+        })
+        .next();
+    for &label in known_labels {
+        if let Some(start) = reader.find(label) {
+            select_leak(&mut leak, start..start + label.len(), label);
+        }
+        if let Some(start) = decoded.find(label) {
+            let end = start + label.len();
+            let raw_start = offsets[start];
+            let raw_end = offsets.get(end).copied().unwrap_or(reader.len());
+            select_leak(&mut leak, raw_start..raw_end, label);
+        }
+    }
+    if let Some((bytes, value)) = leak {
+        return Err(role_failure(
+            plan,
+            false,
+            bytes.clone(),
+            AssemblyFault::ReaderLabelLiteral { value, bytes },
+        ));
+    }
+    // Erasure produces the reader from the four generated comment forms, so
+    // repeating erasure cannot independently check equality. Any comment
+    // opener remaining in the reader is refused before publication.
+    Ok(())
+}
+
+fn select_leak(leak: &mut Option<(Range<usize>, String)>, bytes: Range<usize>, value: &str) {
+    if leak
+        .as_ref()
+        .is_none_or(|(known, _)| bytes.start < known.start)
+    {
+        *leak = Some((bytes, value.to_owned()));
+    }
 }
 
 pub(super) fn inline(output: &mut String, runs: &[Inline]) {

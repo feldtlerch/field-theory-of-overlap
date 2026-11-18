@@ -109,6 +109,133 @@ fn render(plan: &DocumentPlan, target: DocumentTarget) -> String {
         super::super::markdown::render(plan)
     }
 }
+
+#[test]
+fn markdown_roles_erase_annotations_and_refuse_decoded_reader_labels() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let base = plan(&book);
+    let known = ["def:langevin:coefficient-one"];
+    let (annotated, reader) = super::super::markdown::emit(&base, &known).unwrap();
+    assert_eq!(
+        super::super::markdown::erase_annotations(&annotated),
+        Ok(reader.clone())
+    );
+    assert!(reader.starts_with("Coverage.<br>\n"));
+    assert!(!reader.contains("<!--"));
+    let mut invalid = plan(&book);
+    invalid.coverage.declaration = "Coverage. <!-- unknown -->".into();
+    let annotated = super::super::markdown::render(&invalid);
+    let at = annotated.find("<!-- unknown -->").unwrap();
+    assert_eq!(
+        super::super::markdown::emit(&invalid, &known),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/fixture/en.labels.md".into(),
+                bytes: at..at + 1,
+                origins: invalid.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::MarkdownRoleMismatch { offset: at }
+        ))
+    );
+
+    let assert_leak = |leaked: &DocumentPlan, spelling: &str, value: &str| {
+        let (_, reader) = super::super::markdown::render_roles(leaked).unwrap();
+        let start = reader.find(spelling).unwrap();
+        let end = start + spelling.len();
+        assert_eq!(
+            super::super::markdown::emit(leaked, &known),
+            Err(super::super::failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Generated {
+                    path: "generated/documents/fixture/en.md".into(),
+                    bytes: start..end,
+                    origins: leaked.origins(DocumentTarget::Markdown),
+                },
+                AssemblyFault::ReaderLabelLiteral {
+                    value: value.into(),
+                    bytes: start..end,
+                }
+            ))
+        );
+    };
+    let mut leaked = plan(&book);
+    leaked.blocks[0].runs = vec![Inline::Text("Body sec:fixture:leak-name.".into())];
+    assert_leak(
+        &leaked,
+        "sec:fixture:leak&#45;name",
+        "sec:fixture:leak-name",
+    );
+
+    let mut colon = plan(&book);
+    colon.coverage.declaration = "Coverage. def:langevin:coefficient-one:".into();
+    assert_leak(
+        &colon,
+        "def:langevin:coefficient-one",
+        "def:langevin:coefficient-one",
+    );
+
+    let mut underscore = plan(&book);
+    underscore.blocks[0].runs = vec![Inline::Text("Body _def:langevin:coefficient-one_.".into())];
+    assert_leak(
+        &underscore,
+        "def:langevin:coefficient&#45;one",
+        "def:langevin:coefficient-one",
+    );
+}
+
+#[test]
+fn support_required_markdown_emission_refuses_a_known_label_beside_a_colon()
+-> Result<(), Box<dyn std::error::Error>> {
+    use super::super::NativeSupport;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = NativeSupport::from_environment(&root).map_err(|error| format!("{error:?}"))?;
+    let graph = ftoo_manifest::seed()?;
+    let book = ftoo_manifest::addressing(&graph)?;
+    let catalogue = ftoo_manifest::notation(&book)?;
+    let mut leaked = plan(&book);
+    leaked.coverage.declaration = "Coverage. def:langevin:coefficient-one:".into();
+    let selected = BTreeMap::from([(
+        "fixture".into(),
+        vec![ftoo_manifest::DocumentOutput::Markdown],
+    )]);
+    let known = ["def:langevin:coefficient-one"];
+    let (_, reader) = super::super::markdown::render_roles(&leaked)?;
+    let start = reader.find(known[0]).unwrap();
+    let end = start + known[0].len();
+    let actual = crate::notation::with_preparation(None, &catalogue, |notation| {
+        super::super::render_artifacts(
+            &root,
+            &support,
+            &book,
+            &selected,
+            std::slice::from_ref(&leaked),
+            notation,
+            &known,
+        )
+    });
+    assert_eq!(
+        actual,
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/fixture/en.md".into(),
+                bytes: start..end,
+                origins: leaked.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::ReaderLabelLiteral {
+                value: known[0].into(),
+                bytes: start..end,
+            }
+        ))
+    );
+    Ok(())
+}
+
 fn identity(target: DocumentTarget, index: usize, object: NodeId, handle: &str) -> EmissionRecord {
     EmissionRecord {
         kind: EmissionKind::ReaderIdentity {
@@ -146,7 +273,7 @@ fn reader_coverage_seed_empty_bytes_sizes_and_complete_mutation_faults() {
             )
         } else {
             format!(
-                "<!-- generated document fixture language en -->\nCoverage.\n{slice}\n\n<!-- unit sec:fixture:reader document fixture language en -->\nBody.\n"
+                "<!-- generated document fixture language en -->\nCoverage.<br>\n{slice}\n\n<!-- unit sec:fixture:reader document fixture language en -->\nBody.\n"
             )
         };
         assert_eq!(source, complete);
@@ -218,7 +345,7 @@ fn reader_coverage_seed_empty_bytes_sizes_and_complete_mutation_faults() {
     let plan = self::plan(&book);
     assert_eq!(
         render(&plan, DocumentTarget::Markdown),
-        "<!-- generated document fixture language en -->\nCoverage.\nDeclared slice: &#40;empty&#41;.\n\n<!-- unit sec:fixture:reader document fixture language en -->\nBody.\n"
+        "<!-- generated document fixture language en -->\nCoverage.<br>\nDeclared slice: &#40;empty&#41;.\n\n<!-- unit sec:fixture:reader document fixture language en -->\nBody.\n"
     );
     assert_eq!(
         render(&plan, DocumentTarget::Latex),

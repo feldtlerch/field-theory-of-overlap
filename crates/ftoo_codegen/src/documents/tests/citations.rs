@@ -488,7 +488,7 @@ fn tag_comment_cannot_become_a_citation_even_with_the_right_handle() {
                             if target == DocumentTarget::Latex {
                                 "tex"
                             } else {
-                                "md"
+                                "labels.md"
                             }
                         ),
                         bytes: altered.find(marker).unwrap()..altered.len(),
@@ -567,7 +567,7 @@ fn recovered_literal_labels_refuse_after_target_decoding_and_restore() {
                             if target == DocumentTarget::Latex {
                                 "tex"
                             } else {
-                                "md"
+                                "labels.md"
                             }
                         ),
                         bytes: altered.find(marker).unwrap()..altered.len(),
@@ -1205,7 +1205,7 @@ fn citation_emission_checks_handles_comments_tokens_and_breaks_independently() {
                             path: format!(
                                 "generated/documents/main/en.{}",
                                 if target == DocumentTarget::Markdown {
-                                    "md"
+                                    "labels.md"
                                 } else {
                                     "tex"
                                 }

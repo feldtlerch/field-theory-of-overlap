@@ -969,7 +969,7 @@ fn display_emission_omission_repetition_and_change_have_complete_inventories() {
                     path: format!(
                         "generated/documents/main/en.{}",
                         if target == DocumentTarget::Markdown {
-                            "md"
+                            "labels.md"
                         } else {
                             "tex"
                         }
@@ -1016,7 +1016,7 @@ fn display_writers_have_independent_full_document_goldens_and_neutral_harvests()
     ] {
         let plan = fixture_plan(kind, md, tex);
         let expected_md = format!(
-            "<!-- generated document main language en -->\nCoverage.\nSlice.\n\n<!-- unit sec:fixture:caption document main language en -->\nRegistered claims.\n\n{md_body}"
+            "<!-- generated document main language en -->\nCoverage.<br>\nSlice.\n\n<!-- unit sec:fixture:caption document main language en -->\nRegistered claims.\n\n{md_body}"
         );
         let expected_tex = format!(
             "{}\\FtdocContext{{main}}{{en}}\n\\begin{{document}}\nCoverage.\n\nSlice.\n\n% unit sec:fixture:caption document main language en\nRegistered claims.\n\n{tex_body}\n\\end{{document}}\n",
@@ -1033,7 +1033,7 @@ fn display_writers_have_independent_full_document_goldens_and_neutral_harvests()
             assert_eq!(plan::check_emission(&plan, source, target), Ok(()));
         }
         let harvest = ftoo_manifest::check_markdown_sources(vec![ftoo_manifest::MarkdownSource {
-            file: "generated/documents/main/en.md".into(),
+            file: "generated/documents/main/en.labels.md".into(),
             bytes: expected_md.into_bytes(),
         }])
         .unwrap();
@@ -1120,7 +1120,7 @@ fn complete_figure_caption_pending_math_and_citation_match_literal_blocks() {
     let mut plan = fixture_plan(DisplayKind::Figure, FIGURE_MD, FIGURE_TEX);
     relation_caption(&mut plan);
     let markdown = concat!(
-        "<!-- generated document main language en -->\nCoverage.\nSlice.\n\n",
+        "<!-- generated document main language en -->\nCoverage.<br>\nSlice.\n\n",
         "<!-- unit sec:coefficients:relation document main language en -->\n",
         r"Relation $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$; see dec:weld<!-- cite dec:weld:equal-address-sets -->.",
         "\n\n> c:1<!-- label def:langevin:coefficient-one --> → c:3<!-- label def:langevin:coefficient-three -->\n",

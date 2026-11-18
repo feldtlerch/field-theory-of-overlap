@@ -2128,7 +2128,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
                     path: format!(
                         "generated/documents/main/en.{}",
                         if target == DocumentTarget::Markdown {
-                            "md"
+                            "labels.md"
                         } else {
                             "tex"
                         }
@@ -2523,7 +2523,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
     use std::io::{Error, ErrorKind};
     let directory = Directory::new();
     let paths = [
-        "generated/documents/main/en.md",
+        "generated/documents/main/en.labels.md",
         "generated/documents/main/en.tex",
         "generated/notation.tex",
         "generated/addressing.tex",
@@ -2697,7 +2697,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
 fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
     let directory = Directory::new();
     let paths = [
-        "generated/documents/main/en.md",
+        "generated/documents/main/en.labels.md",
         "generated/documents/main/en.tex",
         "generated/notation.tex",
         "generated/addressing.tex",
