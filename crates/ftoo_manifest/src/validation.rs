@@ -542,7 +542,7 @@ pub const RULES: [RuleSpec; 72] = [
     RuleSpec {
         number: RuleId::M063,
         statement: "Paper-scoped tag pairs are checked for uniqueness, grammar and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each label-mint row names a line that holds its key, and that evidence validates documentary admissions without entering strict-unit scope.",
-        scope: "The paper's tag lookup with 329 paper spellings, 87 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
+        scope: "The paper's tag lookup with 329 paper spellings, 88 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

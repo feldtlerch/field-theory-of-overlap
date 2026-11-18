@@ -86,14 +86,17 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
 
         let modern = latex::render(plan);
         // Retain historical body bytes, including the two endangered spaces.
-        // Only the later envelope, live-citation and pending-paragraph contracts
-        // are supplied, so their independent refusals cannot mask the spacing.
+        // Current unit indices and the later envelope, live-citation and
+        // pending-paragraph contracts are supplied without masking the spacing.
         let body = &old[old.find("% unit ").unwrap()..];
+        let body = body.replace("u2-t", "u3-t");
+        let body = body.replace("u0-t", "u1-t");
+        let body = body.replace("u3-dlatex", "u4-dlatex");
         let body = body.replace(
             r"\texttt{dec:weld:equal-address-sets}",
-            r"\FtdocTag{dec:weld}{u2-c0}",
+            r"\FtdocTag{dec:weld}{u3-c0}",
         );
-        let body = body.replace("\n\n% unit sec:coefficients:value-table", "\n\nPending notation: \\({c}_{1}\\): retained formulation \\FtdocTag{c:1}{u0-p0-r0}% label def:langevin:coefficient-one\n.\n\n% unit sec:coefficients:value-table");
+        let body = body.replace("\n\n% unit sec:coefficients:value-table", "\n\nPending notation: \\({c}_{1}\\): retained formulation \\FtdocTag{c:1}{u1-p0-r0}% label def:langevin:coefficient-one\n.\n\n% unit sec:coefficients:value-table");
         let candidate = format!("{}{body}", &modern[..modern.find("% unit ").unwrap()]);
         let changed = [
             (

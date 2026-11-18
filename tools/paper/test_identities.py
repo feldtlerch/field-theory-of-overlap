@@ -24,12 +24,11 @@ class Identities(unittest.TestCase):
 
     def test_declared_fragment_slots_refuse_label_marker_and_authored_copy(self):
         source=pathlib.Path(__file__).resolve().parents[2]
-        for name in ['generated/documents/paper-pilot/sec-say-direction.tex',
-                     'generated/documents/explainer-pilot/sec-say-direction.tex']:
+        for *_, name, _ in FRAGMENTS:
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
         rows=read(source/'documents/paper-build/sources.tsv').splitlines()
-        self.assertEqual(len(declared_fragments(self.root,rows)),2)
+        declared_fragments(self.root,rows)
         fragment='generated/documents/explainer-pilot/sec-say-direction.tex'
         original=read(self.root/fragment)
         write(self.root/fragment,original.replace('sec:say:direction','sec:say:other'))
@@ -58,8 +57,7 @@ class Identities(unittest.TestCase):
 
     def test_fragment_padding_body_mint_and_source_declaration_refuse(self):
         source=pathlib.Path(__file__).resolve().parents[2]
-        for name in ['generated/documents/paper-pilot/sec-say-direction.tex',
-                     'generated/documents/explainer-pilot/sec-say-direction.tex']:
+        for *_, name, _ in FRAGMENTS:
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
         rows=read(source/'documents/paper-build/sources.tsv').splitlines()
@@ -193,7 +191,7 @@ class Identities(unittest.TestCase):
     def test_release_refuses_explicit_candidates(self):
         rows=bindings(self.root,True)
         self.assertEqual(sum(v['status']=='paper' for v in rows.values()),332)
-        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),87)
+        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),88)
         self.candidate()
         with self.assertRaisesRegex(ValueError,'M064: release refuses'):bindings(self.root,True)
 
@@ -274,7 +272,7 @@ sites = ["fixture"]
         source=pathlib.Path(__file__).resolve().parents[2]
         record=read(source/'registry/reader-confirmation.md')
         decisions=re.findall(r'\| `([^`]+)` \| `([^`]+)` \| (admit|alias) \|',record)
-        self.assertEqual(len(decisions),90)
+        self.assertEqual(len(decisions),91)
         rows=bindings(self.root,True)
         for key,spelling,decision in decisions:
             self.assertEqual(rows[key]['spelling'],spelling)

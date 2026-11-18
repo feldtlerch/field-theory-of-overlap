@@ -52,6 +52,7 @@ Each admission binds the exact spelling to the object minted at that label, loca
 | `tbl:will:reach` | `tbl:reach` | admit |
 | `app:recovery` | `app:recovery` | admit |
 | `sec:say:direction` | `sec:which-way` | admit |
+| `sec:coda:record-limit` | `sec:record-limit` | admit |
 | `subsec:fixed:exact` | `sec:closure-scope` | admit |
 | `B:belief` | `B:belief` | admit |
 | `B:record` | `B:record` | admit |

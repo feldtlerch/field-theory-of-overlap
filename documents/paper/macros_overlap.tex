@@ -308,8 +308,7 @@
 
 \NewDocumentCommand{\refrain}{m m}{%
   \par\medskip
-  \tl_if_blank:nF {#1} { \phantomsection\ftoolabel{#1} }%
-  \begin{center}{\itshape #2}\end{center}%
+  \begin{center}{\itshape\tl_if_blank:nF {#1}{\leavevmode\phantomsection\ftoolabel{#1}}#2}\end{center}%
   \nobreak\vskip-\medskipamount\smallskip
   \tl_if_blank:nF {#1}
     { \noindent\hfill{\footnotesize\tagdef{#1}}\par }%

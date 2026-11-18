@@ -702,3 +702,11 @@ handle = "xstmt:verdict"
 label = "xstmt:verdict"
 authority-record = "dec:reader:confirmed-tags"
 reason = "Addresses the paper object."
+
+[[events]]
+ordinal = 89
+change = "admit"
+handle = "sec:record-limit"
+label = "sec:coda:record-limit"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper's closing refrain."

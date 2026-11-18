@@ -11,8 +11,8 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         check_unit_files(&root, &book).unwrap(),
         UnitCheckSummary {
             documents: 3,
-            units: 7,
-            texts: 7,
+            units: 8,
+            texts: 8,
             tag_sites: 3
         }
     );
@@ -32,6 +32,7 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             .map(|u| (u.label().as_str(), u.document()))
             .collect::<Vec<_>>(),
         vec![
+            ("sec:coda:record-limit", "paper-pilot"),
             ("sec:coefficients:first-value", "main"),
             ("sec:coefficients:overview", "main"),
             ("sec:coefficients:value-context", "main"),

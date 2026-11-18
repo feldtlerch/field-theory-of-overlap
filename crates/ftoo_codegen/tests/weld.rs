@@ -20,12 +20,12 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     // committed-unit expectations remain fixed.
     let labels = ftoo_codegen::check_label_files(&root, &book).unwrap();
     let expected = WeldCheckSummary {
-        units: 7,
-        texts: 7,
+        units: 8,
+        texts: 8,
         tag_sites: 3,
         rust_mints: 4,
         markdown_mints: labels.markdown_mints,
-        unit_mints: 7,
+        unit_mints: 8,
         markdown_citations: labels.markdown_citations,
         rust_citations: 8,
         unit_citation_sites: 1,
@@ -47,6 +47,7 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             .map(ftoo_manifest::WeldedUnit::unit)
             .collect::<Vec<_>>(),
         [
+            "sec:coda:record-limit",
             "sec:coefficients:first-value",
             "sec:coefficients:overview",
             "sec:coefficients:value-context",
@@ -56,7 +57,7 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             "sec:say:direction"
         ]
     );
-    let first = &welded.units()[0].languages()[0];
+    let first = &welded.units()[1].languages()[0];
     for unit in welded.units() {
         assert_eq!(unit.languages().len(), 1);
     }
@@ -64,13 +65,13 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     assert_eq!(first.labels().members, []);
     assert_eq!(first.mentions(), []);
     assert!(first.citations().is_empty());
-    let heading = &welded.units()[1].languages()[0];
+    let heading = &welded.units()[2].languages()[0];
     assert_eq!(heading.language(), "en");
     assert_eq!(heading.tags().members, []);
     assert_eq!(heading.labels().members, []);
     assert_eq!(heading.mentions(), []);
     assert!(heading.citations().is_empty());
-    let second = &welded.units()[2].languages()[0];
+    let second = &welded.units()[3].languages()[0];
     assert_eq!(second.language(), "en");
     assert_eq!(second.mentions(), []);
     assert_context(second);

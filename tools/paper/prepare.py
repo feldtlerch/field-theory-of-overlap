@@ -9,12 +9,14 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime, digest
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex"]
 SOURCES = 'documents/paper/'
 BUILD = 'documents/paper-build/'
 FRAGMENTS = (
     ('documents/paper/parts/partA.tex', 184, 184, 'generated/documents/paper-pilot/sec-say-direction.tex', 'sec:say:direction'),
     ('documents/paper/explainer/explainer.tex', 319, 320, 'generated/documents/explainer-pilot/sec-say-direction.tex', 'sec:say:direction'),
+    ('documents/paper/parts/coda.tex', 112, 112, 'generated/documents/paper-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
+    ('documents/paper/explainer/explainer.tex', 972, 973, 'generated/documents/explainer-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
 )
 
 

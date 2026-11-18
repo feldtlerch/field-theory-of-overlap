@@ -807,9 +807,11 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             .collect::<Vec<_>>(),
         [
             "generated/documents/explainer-pilot/sec-say-direction.tex",
+            "generated/documents/explainer-pilot/sec-coda-record-limit.tex",
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",
             "generated/documents/paper-pilot/sec-say-direction.tex",
+            "generated/documents/paper-pilot/sec-coda-record-limit.tex",
             "generated/notation.tex",
             "generated/addressing.tex"
         ]
