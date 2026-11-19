@@ -672,14 +672,6 @@ fn reader_citations_keep_both_address_families_and_span_indices() {
                 (DocumentTarget::Latex, latex::render(&plan)),
             ] {
                 assert_eq!(check_emission(&plan, &source, target), Ok(()));
-                assert_eq!(
-                    if target == DocumentTarget::Latex {
-                        latex::size(&plan)
-                    } else {
-                        markdown::size(&plan)
-                    },
-                    source.len()
-                );
             }
         },
     );

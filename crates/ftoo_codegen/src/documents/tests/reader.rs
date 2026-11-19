@@ -110,7 +110,6 @@ fn markdown_math_context_envelopes() {
     );
     super::super::markdown::check_math_admission(&plan).unwrap();
     let (annotated, reader) = super::super::markdown::emit(&plan, &[]).unwrap();
-    assert_eq!(annotated.len(), super::super::markdown::size(&plan));
     assert_eq!(
         reader,
         super::super::markdown::erase_annotations(&annotated).unwrap()
@@ -476,6 +475,164 @@ fn render(plan: &DocumentPlan, target: DocumentTarget) -> String {
     } else {
         super::super::markdown::render(plan)
     }
+}
+
+#[test]
+fn artifact_limit_measures_emitted_bytes() {
+    let limit = 16_777_216;
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let mut exact = plan(&book);
+    exact.blocks[0].runs = vec![Inline::Text("Body 'é.".into())];
+    let baseline = super::super::markdown::render_roles(&exact).unwrap();
+    exact
+        .coverage
+        .declaration
+        .push_str(&"a".repeat(limit - baseline.0.len()));
+    let (annotated, reader) = super::super::markdown::emit(&exact, &[]).unwrap();
+    assert_eq!(annotated.len(), limit);
+    for rendered in [&annotated, &reader] {
+        assert!(rendered.contains("&#39;é"));
+        assert!(
+            rendered
+                .as_bytes()
+                .windows(2)
+                .any(|pair| pair == "é".as_bytes())
+        );
+    }
+
+    exact.coverage.declaration.push('a');
+    let actual = super::super::markdown::emit(&exact, &[]).unwrap_err();
+    assert_eq!(
+        actual,
+        super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/fixture/en.labels.md".into(),
+                bytes: limit..limit + 1,
+                origins: exact.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::Limit {
+                resource: ftoo_manifest::AssemblyResource::DocumentBytes,
+                limit,
+                actual: limit + 1,
+            },
+        )
+    );
+
+    // The annotated role is checked first, so its larger envelope prevents a reader-only boundary in emit.
+    let mut reader_exact = plan(&book);
+    reader_exact.blocks[0].runs = vec![Inline::Text("Body 'é.".into())];
+    let baseline = super::super::markdown::render_roles(&reader_exact).unwrap();
+    reader_exact
+        .coverage
+        .declaration
+        .push_str(&"a".repeat(limit - baseline.1.len()));
+    let (_, reader) = super::super::markdown::render_roles(&reader_exact).unwrap();
+    let path = "generated/documents/fixture/en.md";
+    let origins = reader_exact.origins(DocumentTarget::Markdown);
+    assert_eq!(reader.len(), limit);
+    assert!(reader.contains("&#39;é"));
+    assert_eq!(
+        super::super::check_rendered_bytes(path, reader.as_bytes(), &origins),
+        Ok(())
+    );
+    let mut one_over = reader;
+    one_over.push('a');
+    assert_eq!(
+        super::super::check_rendered_bytes(path, one_over.as_bytes(), &origins),
+        Err(super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: path.into(),
+                bytes: limit..limit + 1,
+                origins,
+            },
+            AssemblyFault::Limit {
+                resource: ftoo_manifest::AssemblyResource::DocumentBytes,
+                limit,
+                actual: limit + 1,
+            },
+        ))
+    );
+}
+
+#[test]
+fn support_required_artifact_limit_measures_emitted_bytes() -> Result<(), Box<dyn std::error::Error>>
+{
+    let limit = 16_777_216;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = super::super::NativeSupport::from_environment(&root)
+        .map_err(|error| format!("{error:?}"))?;
+    let graph = ftoo_manifest::seed()?;
+    let book = ftoo_manifest::addressing(&graph)?;
+    let catalogue = ftoo_manifest::notation(&book)?;
+    let mut selected_plan = plan(&book);
+    selected_plan.coverage.declaration = "a".repeat(limit + 1);
+    let selected = BTreeMap::from([(
+        "fixture".into(),
+        vec![ftoo_manifest::DocumentOutput::Fragment],
+    )]);
+    let artifacts = crate::notation::with_preparation(None, &catalogue, |notation| {
+        super::super::render_artifacts(
+            &root,
+            &support,
+            &book,
+            &selected,
+            std::slice::from_ref(&selected_plan),
+            notation,
+            &[],
+        )
+    })?;
+    assert!(artifacts.iter().any(|artifact| {
+        artifact.path() == "generated/documents/fixture/sec-fixture-reader.tex"
+    }));
+
+    let mut oversize_plan = plan(&book);
+    let baseline = super::super::latex::render(&oversize_plan);
+    let body_len = limit + 1
+        - (baseline.len() - super::super::latex::prose_text("Body.").len())
+        - super::super::latex::prose_text("é#").len();
+    let mut body = String::from("é#");
+    body.push_str(&"a".repeat(body_len));
+    oversize_plan.blocks[0].runs = vec![Inline::Text(body)];
+    let rendered = super::super::latex::render(&oversize_plan);
+    assert_eq!(rendered.len(), limit + 1);
+    assert!(rendered.contains("é\\#"));
+    let origins = oversize_plan.origins(DocumentTarget::Latex);
+    let selected = BTreeMap::from([("fixture".into(), vec![ftoo_manifest::DocumentOutput::Latex])]);
+    let actual = crate::notation::with_preparation(None, &catalogue, |notation| {
+        super::super::render_artifacts(
+            &root,
+            &support,
+            &book,
+            &selected,
+            std::slice::from_ref(&oversize_plan),
+            notation,
+            &[],
+        )
+    })
+    .expect_err("the rendered artifact exceeds the document limit");
+    assert_eq!(
+        actual,
+        super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/fixture/en.tex".into(),
+                bytes: limit..limit + 1,
+                origins,
+            },
+            AssemblyFault::Limit {
+                resource: ftoo_manifest::AssemblyResource::DocumentBytes,
+                limit,
+                actual: limit + 1,
+            },
+        )
+    );
+    Ok(())
 }
 
 fn excerpt_plan() -> DocumentPlan {
@@ -1421,7 +1578,7 @@ fn identity(target: DocumentTarget, index: usize, object: NodeId, handle: &str) 
 }
 #[test]
 #[allow(clippy::too_many_lines)] // Keep complete byte and mutation oracles together.
-fn reader_coverage_seed_empty_bytes_sizes_and_complete_mutation_faults() {
+fn reader_coverage_seed_empty_bytes_and_complete_mutation_faults() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let plan = plan(&book);
@@ -1444,14 +1601,6 @@ fn reader_coverage_seed_empty_bytes_sizes_and_complete_mutation_faults() {
             )
         };
         assert_eq!(source, complete);
-        assert_eq!(
-            source.len(),
-            if target == DocumentTarget::Latex {
-                super::super::latex::size(&plan)
-            } else {
-                super::super::markdown::size(&plan)
-            }
-        );
         assert_eq!(check_emission(&plan, &source, target), Ok(()));
         let expected = identity(target, 0, NodeId::LangevinCoefficientOneValue, "v:1");
         // A changed bound-label comment is not repaired from the handle.
@@ -2536,14 +2685,6 @@ fn retained_premise_reason_has_two_independent_names_and_exact_fragments() {
         );
         let source = render(&plan, target);
         assert_eq!(check_emission(&plan, &source, target), Ok(()));
-        assert_eq!(
-            if target == DocumentTarget::Markdown {
-                super::super::markdown::size(&plan)
-            } else {
-                super::super::latex::size(&plan)
-            },
-            source.len()
-        );
     }
 }
 

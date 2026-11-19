@@ -26,75 +26,11 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 \input{notation.tex}
 \input{addressing.tex}
 ";
-pub(super) fn size(plan: &DocumentPlan) -> usize {
-    let mut size = start(&plan.document, &plan.language).len();
-    size = size
-        .saturating_add(text(&plan.coverage.declaration).len())
-        .saturating_add(2)
-        .saturating_add(inline_size(&plan.coverage.runs))
-        .saturating_add(2);
-    for runs in &plan.coverage.audit {
-        size = size.saturating_add(inline_size(runs)).saturating_add(2);
-    }
-    for block in &plan.blocks {
-        size = size.saturating_add(
-            format!(
-                "% unit {} document {} language {}\n",
-                block.unit, plan.document, plan.language
-            )
-            .len(),
-        );
-        if let Some(depth) = block.depth {
-            size = size.saturating_add(
-                match depth {
-                    1 => r"\section*{}",
-                    2 => r"\subsection*{}",
-                    3 => r"\subsubsection*{}",
-                    4 => r"\paragraph*{}",
-                    5 => r"\subparagraph*{}",
-                    _ => r"{\noindent\textbf{}\par}",
-                }
-                .len(),
-            );
-        }
-        size = size.saturating_add(prose_inline_size(&block.runs));
-        size = size.saturating_add(2);
-        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Latex) {
-            size = size
-                .saturating_add(super::display::size(
-                    body,
-                    ftoo_manifest::DocumentTarget::Latex,
-                ))
-                .saturating_add(1);
-        }
-        size = size.saturating_add(
-            super::pending::paragraph(block, &plan.language, ftoo_manifest::DocumentTarget::Latex)
-                .len(),
-        );
-    }
-    size.saturating_add("\\end{document}\n".len())
-}
-fn sized(source: &str, prose: bool) -> usize {
-    source
-        .chars()
-        .map(|c| match c {
-            '\\' => r"\textbackslash{}".len(),
-            '{' | '}' | '%' | '#' | '$' | '&' | '_' => 2,
-            '^' => r"\textasciicircum{}".len(),
-            '~' => r"\textasciitilde{}".len(),
-            '’' if prose => 1,
-            _ => c.len_utf8(),
-        })
-        .fold(0, usize::saturating_add)
-}
 pub(super) fn text(source: &str) -> String {
     escaped(source, false)
 }
 pub(super) fn prose_text(source: &str) -> String {
     escaped(source, true)
-}
-fn text_size(source: &str) -> usize {
-    sized(source, false)
 }
 fn escaped(source: &str, prose: bool) -> String {
     let mut output = String::new();
@@ -227,53 +163,6 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
             }
         }
     }
-}
-
-pub(super) fn inline_size(runs: &[Inline]) -> usize {
-    sized_inline(runs, false)
-}
-pub(super) fn prose_inline_size(runs: &[Inline]) -> usize {
-    sized_inline(runs, true)
-}
-fn sized_inline(runs: &[Inline], prose: bool) -> usize {
-    let mut size: usize = 0;
-    let mut commented = false;
-    for run in runs {
-        if matches!(run, Inline::Text(value) if value.is_empty()) {
-            continue;
-        }
-        let previous_comment = std::mem::replace(&mut commented, false);
-        let count = match run {
-            Inline::Text(value) => {
-                if previous_comment && let Some(rest) = value.strip_prefix(' ') {
-                    sized(rest, prose).saturating_add(r"\space{}".len())
-                } else {
-                    sized(value, prose)
-                }
-            }
-            Inline::Tag {
-                handle,
-                label,
-                token,
-                ..
-            } => {
-                commented = true;
-                let handle = handle_argument(handle);
-                format!("\\FtdocTag{{{handle}}}{{{token}}}% label {label}\n").len()
-            }
-            Inline::Math { latex, .. } => latex.len().saturating_add(4),
-            Inline::Citation { text, identity, .. } => {
-                commented = true;
-                handle_argument(&identity.handle)
-                    .len()
-                    .saturating_add(identity.token.len())
-                    .saturating_add(format!("\\FtdocTag{{}}{{}}% cite {text}\n").len())
-            }
-            Inline::Mention { text, .. } => text_size(text).saturating_add(r"\texttt{}".len()),
-        };
-        size = size.saturating_add(count);
-    }
-    size
 }
 
 pub(super) fn handle_argument(handle: &str) -> String {

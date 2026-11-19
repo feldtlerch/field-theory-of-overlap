@@ -7,73 +7,6 @@ use super::{
 use ftoo_manifest::{AssemblySite, AssemblyStage, DisplayLayout, DocumentTarget, RuleId, UnitSite};
 use std::fmt::Write;
 use std::ops::Range;
-pub(super) fn size(plan: &DocumentPlan) -> usize {
-    if plan.screen.is_some() {
-        return render(plan).len();
-    }
-    let mut size = format!(
-        "<!-- generated document {} language {} -->\n{}\n",
-        plan.document, plan.language, plan.coverage.declaration
-    )
-    .len()
-    .saturating_add(inline_size(&plan.coverage.runs))
-    .saturating_add(6);
-    for runs in &plan.coverage.audit {
-        size = size.saturating_add(inline_size(runs)).saturating_add(5);
-    }
-    for block in &plan.blocks {
-        size = size.saturating_add(
-            format!(
-                "<!-- unit {} document {} language {} -->\n",
-                block.unit, plan.document, plan.language
-            )
-            .len(),
-        );
-        size = size.saturating_add(block.depth.map_or(0, |d| d + 1));
-        size = size.saturating_add(inline_size(&block.runs));
-        size = size.saturating_add(2);
-        if let Some(body) = block.displays.get(&ftoo_manifest::DocumentTarget::Markdown) {
-            size = size
-                .saturating_add(super::display::size(
-                    body,
-                    ftoo_manifest::DocumentTarget::Markdown,
-                ))
-                .saturating_add(1);
-        }
-        size = size.saturating_add(
-            super::pending::paragraph(
-                block,
-                &plan.language,
-                ftoo_manifest::DocumentTarget::Markdown,
-            )
-            .len(),
-        );
-    }
-    size.saturating_sub(1)
-}
-fn text_size(source: &str) -> usize {
-    source
-        .chars()
-        .map(|c| {
-            if c.is_ascii_punctuation() && !matches!(c, ',' | '.' | ':' | ';' | '?' | '!') {
-                if u32::from(c) < 100 { 5 } else { 6 }
-            } else {
-                c.len_utf8()
-            }
-        })
-        .fold(0, usize::saturating_add)
-}
-fn code_size(source: &str) -> usize {
-    source
-        .chars()
-        .map(|c| match c {
-            '&' | '`' => 5,
-            '<' | '>' => 4,
-            '|' => 6,
-            _ => c.len_utf8(),
-        })
-        .fold(13, usize::saturating_add)
-}
 pub(super) fn text(source: &str) -> String {
     let mut output = String::new();
     for c in source.chars() {
@@ -382,6 +315,20 @@ pub(super) fn emit(
 ) -> Result<(String, String), DocumentError> {
     check_math_admission(plan)?;
     let roles = render_roles(plan)?;
+    let origins = plan.origins(DocumentTarget::Markdown);
+    super::check_rendered_bytes(
+        &format!(
+            "generated/documents/{}/{}.labels.md",
+            plan.document, plan.language
+        ),
+        roles.0.as_bytes(),
+        &origins,
+    )?;
+    super::check_rendered_bytes(
+        &format!("generated/documents/{}/{}.md", plan.document, plan.language),
+        roles.1.as_bytes(),
+        &origins,
+    )?;
     check_reader(plan, &roles.1, known_labels)?;
     Ok(roles)
 }
@@ -703,23 +650,4 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             Inline::Mention { text, .. } => output.push_str(&code(text)),
         }
     }
-}
-
-pub(super) fn inline_size(runs: &[Inline]) -> usize {
-    let mut size: usize = 0;
-    for run in runs {
-        let count = match run {
-            Inline::Text(value) => text_size(value),
-            Inline::Tag { handle, label, .. } => {
-                text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
-            }
-            Inline::Math { markdown, .. } => markdown.len().saturating_add(4),
-            Inline::Citation { text, identity, .. } => {
-                text_size(&identity.handle).saturating_add(format!("<!-- cite {text} -->").len())
-            }
-            Inline::Mention { text, .. } => code_size(text),
-        };
-        size = size.saturating_add(count);
-    }
-    size
 }

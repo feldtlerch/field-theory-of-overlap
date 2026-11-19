@@ -1025,8 +1025,6 @@ fn display_writers_have_independent_full_document_goldens_and_neutral_harvests()
         );
         assert_eq!(markdown::render(&plan), expected_md);
         assert_eq!(latex::render(&plan), expected_tex);
-        assert_eq!(markdown::size(&plan), expected_md.len());
-        assert_eq!(latex::size(&plan), expected_tex.len());
         for (target, source) in [
             (DocumentTarget::Markdown, expected_md.as_str()),
             (DocumentTarget::Latex, expected_tex.as_str()),
@@ -1154,8 +1152,6 @@ Relation \(({\FtooQCoefficientOne{}}={\frac{1}{3}})\); see \FtdocTag{dec:weld}{u
     );
     assert_eq!(markdown::render(&plan), markdown);
     assert_eq!(latex::render(&plan), latex);
-    assert_eq!(markdown::size(&plan), markdown.len());
-    assert_eq!(latex::size(&plan), latex.len());
     assert_eq!(
         plan::check_emission(&plan, markdown, DocumentTarget::Markdown),
         Ok(())

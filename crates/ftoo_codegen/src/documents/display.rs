@@ -109,15 +109,3 @@ pub(super) fn render(body: &DisplayBody, target: DocumentTarget) -> String {
     }
     output
 }
-pub(super) fn size(body: &DisplayBody, target: DocumentTarget) -> usize {
-    parts(body, target)
-        .into_iter()
-        .map(|part| match part {
-            Part::Structure(value) => value.len(),
-            Part::Region(index) => match target {
-                DocumentTarget::Markdown => super::markdown::inline_size(&body.regions[index].runs),
-                DocumentTarget::Latex => super::latex::prose_inline_size(&body.regions[index].runs),
-            },
-        })
-        .fold(0, usize::saturating_add)
-}

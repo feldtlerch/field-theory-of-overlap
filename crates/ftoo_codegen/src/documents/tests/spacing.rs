@@ -151,7 +151,6 @@ fn citation_refuses_discretionary_break_markers_and_rereads_restoration() {
     {
         let plan = fixture(true, None, " word");
         let correct = latex::render(&plan);
-        assert_eq!(latex::size(&plan), correct.len());
         let marker = r"\FtdocTag{record}{u0-c0}";
         assert!(correct.contains(marker));
         for replacement in [

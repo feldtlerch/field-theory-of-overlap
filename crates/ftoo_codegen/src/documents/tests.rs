@@ -65,7 +65,6 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             let mut output = String::new();
             latex::prose_inline(&mut output, &runs);
             assert_eq!(output, format!("{prefix}{expected}"));
-            assert_eq!(latex::prose_inline_size(&runs), output.len());
         }
         let runs = vec![
             insertion(),
@@ -87,7 +86,6 @@ fn comment_spacing_writer_consumes_only_semantic_spaces() {
             output,
             format!("{prefix}\\space{{}}\\(x\\){prefix}{prefix}")
         );
-        assert_eq!(latex::inline_size(&runs), output.len());
         // A new region cannot inherit the previous region's comment boundary.
         latex::prose_inline(&mut output, &[Inline::Text(" next".into())]);
         assert!(output.ends_with("\n next"));
@@ -1198,7 +1196,6 @@ fn typography_apostrophe_contexts() {
         .unwrap();
     let pending_wording = super::pending::paragraph(&pending_block, "en", DocumentTarget::Latex);
     assert!(pending_wording.contains("\\(x’s\\)"));
-    assert_eq!(latex::size(&document), emitted.len());
     assert_eq!(
         plan::check_emission(&document, &emitted, DocumentTarget::Latex),
         Ok(())
@@ -2255,14 +2252,6 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
         (DocumentTarget::Markdown, markdown::render(&plan)),
         (DocumentTarget::Latex, latex::render(&plan)),
     ] {
-        assert_eq!(
-            if target == DocumentTarget::Markdown {
-                markdown::size(&plan)
-            } else {
-                latex::size(&plan)
-            },
-            rendered.len()
-        );
         assert_eq!(plan::check_emission(&plan, &rendered, target), Ok(()));
         let expected = vec![
             EmissionRecord {

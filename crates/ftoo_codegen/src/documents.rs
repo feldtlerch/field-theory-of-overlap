@@ -465,6 +465,12 @@ fn render_artifacts(
     known_labels: &[&str],
 ) -> Result<Vec<DocumentArtifact>, DocumentError> {
     let addressing = runtime::render(book, plans)?;
+    check_rendered_bytes("generated/addressing.tex", addressing.as_bytes(), &[])?;
+    check_rendered_bytes(
+        "generated/notation.tex",
+        notation.declarations().as_bytes(),
+        &[],
+    )?;
     let lock = native_support::lock(root)?;
     support.scope(&lock, || {
         let mut artifacts = Vec::new();
@@ -473,7 +479,6 @@ fn render_artifacts(
             if targets.contains(&DocumentOutput::Markdown) {
                 markdown::check_math_admission(plan)?;
             }
-            document_size(plan)?;
             refuse_quoted_screen_targets(plan, targets)?;
             for target in targets {
                 match target {
@@ -512,7 +517,13 @@ fn render_artifacts(
                         });
                     }
                     DocumentOutput::Latex => {
+                        let path = format!(
+                            "generated/documents/{}/{}.tex",
+                            plan.document, plan.language
+                        );
                         let tex = latex::render(plan);
+                        let origins = plan.origins(DocumentTarget::Latex);
+                        check_rendered_bytes(&path, tex.as_bytes(), &origins)?;
                         plan::check_emission(plan, &tex, DocumentTarget::Latex)?;
                         native::consume_plan(
                             support,
@@ -523,24 +534,23 @@ fn render_artifacts(
                             plan,
                         )?;
                         artifacts.push(DocumentArtifact {
-                            path: format!(
-                                "generated/documents/{}/{}.tex",
-                                plan.document, plan.language
-                            ),
+                            path,
                             bytes: tex.into_bytes(),
-                            origins: plan.origins(DocumentTarget::Latex),
+                            origins,
                             emissions: plan.records(DocumentTarget::Latex),
                         });
                     }
                     DocumentOutput::Fragment => {
                         for block in plan.blocks.iter().filter(|block| block.depth.is_none()) {
                             let source = fragment_line(block)?;
+                            let path = format!(
+                                "generated/documents/{}/{}.tex",
+                                plan.document,
+                                block.unit.replace(':', "-")
+                            );
+                            check_rendered_bytes(&path, source.as_bytes(), &[])?;
                             artifacts.push(DocumentArtifact {
-                                path: format!(
-                                    "generated/documents/{}/{}.tex",
-                                    plan.document,
-                                    block.unit.replace(':', "-")
-                                ),
+                                path,
                                 bytes: source.into_bytes(),
                                 origins: Vec::new(),
                                 emissions: Vec::new(),
@@ -567,26 +577,32 @@ fn render_artifacts(
             emissions: Vec::new(),
         });
         unique_artifact_paths(&artifacts)?;
-        for artifact in &artifacts {
-            if artifact.bytes.len() > 16_777_216 {
-                return Err(failure(
-                    RuleId::M055,
-                    AssemblyStage::Emission,
-                    AssemblySite::Generated {
-                        path: artifact.path.clone(),
-                        bytes: 16_777_216..16_777_217,
-                        origins: artifact.origins.clone(),
-                    },
-                    AssemblyFault::Limit {
-                        resource: ftoo_manifest::AssemblyResource::DocumentBytes,
-                        limit: 16_777_216,
-                        actual: 16_777_217,
-                    },
-                ));
-            }
-        }
         Ok(artifacts)
     })
+}
+
+fn check_rendered_bytes(
+    path: &str,
+    bytes: &[u8],
+    origins: &[SourceOrigin],
+) -> Result<(), DocumentError> {
+    if bytes.len() > 16_777_216 {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: path.into(),
+                bytes: 16_777_216..16_777_217,
+                origins: origins.to_vec(),
+            },
+            AssemblyFault::Limit {
+                resource: ftoo_manifest::AssemblyResource::DocumentBytes,
+                limit: 16_777_216,
+                actual: 16_777_217,
+            },
+        ));
+    }
+    Ok(())
 }
 
 fn refuse_quoted_screen_targets(
@@ -804,39 +820,5 @@ fn consume_sweep(
         rows.iter().map(|row| row.origin.clone()).collect(),
     )
     .map_err(|error| native::sweep_origin(error, &sweep, &rows))?;
-    Ok(())
-}
-
-fn document_size(plan: &plan::DocumentPlan) -> Result<(), DocumentError> {
-    for (target, size) in [
-        (DocumentTarget::Markdown, markdown::size(plan)),
-        (DocumentTarget::Latex, latex::size(plan)),
-    ] {
-        if size > 16_777_216 {
-            return Err(failure(
-                RuleId::M055,
-                AssemblyStage::Emission,
-                AssemblySite::Generated {
-                    path: format!(
-                        "generated/documents/{}/{}.{}",
-                        plan.document,
-                        plan.language,
-                        if target == DocumentTarget::Markdown {
-                            "labels.md"
-                        } else {
-                            "tex"
-                        }
-                    ),
-                    bytes: 16_777_216..16_777_217,
-                    origins: plan.origins(target),
-                },
-                AssemblyFault::Limit {
-                    resource: ftoo_manifest::AssemblyResource::DocumentBytes,
-                    limit: 16_777_216,
-                    actual: 16_777_217,
-                },
-            ));
-        }
-    }
     Ok(())
 }

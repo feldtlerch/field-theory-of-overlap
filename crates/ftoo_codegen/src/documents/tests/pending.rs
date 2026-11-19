@@ -299,19 +299,16 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             blocks: vec![block],
         };
         for target in [DocumentTarget::Markdown, DocumentTarget::Latex] {
-            let (source, paragraph, expected_size) = match target {
+            let (source, paragraph) = match target {
                 DocumentTarget::Markdown => (
                     super::super::markdown::render(&plan),
                     "Pending notation: $`{c}_{1}`$: retained formulation c:1<!-- label def:langevin:coefficient-one -->.",
-                    super::super::markdown::size(&plan),
                 ),
                 DocumentTarget::Latex => (
                     super::super::latex::render(&plan),
                     "Pending notation: \\({c}_{1}\\): retained formulation \\FtdocTag{c:1}{u0-p0-r0}% label def:langevin:coefficient-one\n.",
-                    super::super::latex::size(&plan),
                 ),
             };
-            assert_eq!(source.len(), expected_size);
             assert_eq!(source.matches(paragraph).count(), 1);
             assert_eq!(plan::check_emission(&plan, &source, target), Ok(()));
             if target == DocumentTarget::Markdown {

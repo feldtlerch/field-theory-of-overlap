@@ -80,14 +80,6 @@ fn retained_selected_outcomes_census_and_scope_are_derived() {
                 latex::render(&plan)
             };
             assert_eq!(check_emission(&plan, &source, target), Ok(()));
-            assert_eq!(
-                source.len(),
-                if target == DocumentTarget::Markdown {
-                    markdown::size(&plan)
-                } else {
-                    latex::size(&plan)
-                }
-            );
         }
         if selection == 2 {
             scope_controls(&book, &accepted);
@@ -304,14 +296,6 @@ fn retained_outcome_runs_have_exact_bytes_recovery_and_runtime_sites() {
                 latex::render(&plan)
             };
             assert_eq!(check_emission(&plan, &source, target), Ok(()));
-            assert_eq!(
-                source.len(),
-                if target == DocumentTarget::Markdown {
-                    markdown::size(&plan)
-                } else {
-                    latex::size(&plan)
-                }
-            );
         }
         let runtime = super::super::runtime::render(&book, std::slice::from_ref(&plan)).unwrap();
         let rows: Vec<_> = runtime
