@@ -12,6 +12,16 @@ Not yet converted: earlier material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<p align="center"><a id="sec-charm--enlargement"></a><em>Harm is downhill; enlargement is uphill.</em></p>
+<p align="right">sec:harm&#45;enlargement</p>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
+<p align="center"><a id="sec-cwonder--beauty"></a><em>Wonder is the will that crosses before the reward exists; beauty is what it finds on the far side.</em></p>
+<p align="right">sec:wonder&#45;beauty</p>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <p align="center"><a id="sec-cenemy--to--none"></a><em>Close to all, enemy to none.</em></p>
 <p align="right">sec:enemy&#45;to&#45;none</p>
 

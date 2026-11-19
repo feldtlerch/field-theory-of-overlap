@@ -18,7 +18,7 @@ sha256 = "ecefe970be164c3005a1e947ff8a05127d986f2c2449d1f781ff304faf00a8b2"
 site = "paragraph-partA-481-492"
 target = "documents/paper/parts/partA.tex"
 lines = [481, 492]
-sha256 = "9fea274486142abe38b8f4cd42d3b57e86ad2b1a6a7062b584e4afcf3a906dbf"
+sha256 = "c1443c3895b5910111cd772398d8fdafe0bb9d20b436e8aaf62641b550511097"
 
 [[pin]]
 site = "paragraph-partB-71-80"
@@ -126,7 +126,7 @@ sha256 = "9b1fe2d0b67c87523bb0ed9707121aba20df16093db723c03ab9c7bbb4552e7c"
 site = "alignment-partA-686"
 target = "documents/paper/parts/partA.tex"
 lines = [686, 686]
-sha256 = "9fea274486142abe38b8f4cd42d3b57e86ad2b1a6a7062b584e4afcf3a906dbf"
+sha256 = "c1443c3895b5910111cd772398d8fdafe0bb9d20b436e8aaf62641b550511097"
 
 [[pin]]
 site = "alignment-partB-40"
@@ -144,13 +144,13 @@ sha256 = "286675eaa68242bd7b09657c631a61cf9ec2676877b76f17b2860233dff515fd"
 site = "heading-page-partA-529"
 target = "documents/paper/parts/partA.tex"
 lines = [529, 529]
-sha256 = "9fea274486142abe38b8f4cd42d3b57e86ad2b1a6a7062b584e4afcf3a906dbf"
+sha256 = "c1443c3895b5910111cd772398d8fdafe0bb9d20b436e8aaf62641b550511097"
 
 [[pin]]
 site = "widow-partA-359"
 target = "documents/paper/parts/partA.tex"
 lines = [359, 359]
-sha256 = "9fea274486142abe38b8f4cd42d3b57e86ad2b1a6a7062b584e4afcf3a906dbf"
+sha256 = "c1443c3895b5910111cd772398d8fdafe0bb9d20b436e8aaf62641b550511097"
 
 [[pin]]
 site = "paragraph-partB-691-698"

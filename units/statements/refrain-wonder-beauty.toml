@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:say:wonder-beauty"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "Wonder is the will that crosses before the reward exists; beauty is what it finds on the far side."

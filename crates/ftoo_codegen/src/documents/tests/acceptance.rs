@@ -815,6 +815,8 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",
             "generated/documents/paper-pilot/sec-say-direction.tex",
+            "generated/documents/paper-pilot/sec-say-harm-enlargement.tex",
+            "generated/documents/paper-pilot/sec-say-wonder-beauty.tex",
             "generated/documents/paper-pilot/sec-say-enemy-to-none.tex",
             "generated/documents/paper-pilot/sec-coda-record-limit.tex",
             "generated/documents/paper-pilot/en.labels.md",

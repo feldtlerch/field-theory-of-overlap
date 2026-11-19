@@ -11,8 +11,8 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
         check_unit_files(&root, &book).unwrap(),
         UnitCheckSummary {
             documents: 3,
-            units: 9,
-            texts: 9,
+            units: 11,
+            texts: 11,
             tag_sites: 3
         }
     );
@@ -40,7 +40,9 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             ("sec:pilot:explainer-excerpt", "explainer-pilot"),
             ("sec:pilot:paper-excerpt", "paper-pilot"),
             ("sec:say:direction", "paper-pilot"),
-            ("sec:say:enemy-to-none", "paper-pilot")
+            ("sec:say:enemy-to-none", "paper-pilot"),
+            ("sec:say:harm-enlargement", "paper-pilot"),
+            ("sec:say:wonder-beauty", "paper-pilot")
         ]
     );
     let first = corpus

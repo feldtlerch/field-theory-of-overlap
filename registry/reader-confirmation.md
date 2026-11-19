@@ -52,6 +52,8 @@ Each admission binds the exact spelling to the object minted at that label, loca
 | `tbl:will:reach` | `tbl:reach` | admit |
 | `app:recovery` | `app:recovery` | admit |
 | `sec:say:direction` | `sec:which-way` | admit |
+| `sec:say:harm-enlargement` | `sec:harm-enlargement` | admit |
+| `sec:say:wonder-beauty` | `sec:wonder-beauty` | admit |
 | `sec:say:enemy-to-none` | `sec:enemy-to-none` | admit |
 | `sec:coda:record-limit` | `sec:record-limit` | admit |
 | `subsec:fixed:exact` | `sec:closure-scope` | admit |

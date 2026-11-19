@@ -9,11 +9,13 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime, digest
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-harm-enlargement.tex", "generated/documents/paper-pilot/sec-say-wonder-beauty.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex"]
 SOURCES = 'documents/paper/'
 BUILD = 'documents/paper-build/'
 FRAGMENTS = (
     ('documents/paper/parts/partA.tex', 184, 184, 'generated/documents/paper-pilot/sec-say-direction.tex', 'sec:say:direction'),
+    ('documents/paper/parts/partA.tex', 601, 601, 'generated/documents/paper-pilot/sec-say-harm-enlargement.tex', 'sec:say:harm-enlargement'),
+    ('documents/paper/parts/partA.tex', 675, 675, 'generated/documents/paper-pilot/sec-say-wonder-beauty.tex', 'sec:say:wonder-beauty'),
     ('documents/paper/explainer/explainer.tex', 319, 320, 'generated/documents/explainer-pilot/sec-say-direction.tex', 'sec:say:direction'),
     ('documents/paper/parts/partD.tex', 298, 298, 'generated/documents/paper-pilot/sec-say-enemy-to-none.tex', 'sec:say:enemy-to-none'),
     ('documents/paper/explainer/explainer.tex', 687, 687, 'generated/documents/explainer-pilot/sec-say-enemy-to-none.tex', 'sec:say:enemy-to-none'),

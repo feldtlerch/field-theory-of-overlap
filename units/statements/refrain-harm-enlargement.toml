@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:say:harm-enlargement"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "Harm is downhill; enlargement is uphill."

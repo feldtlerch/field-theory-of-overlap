@@ -182,7 +182,7 @@ class Identities(unittest.TestCase):
     def test_release_refuses_explicit_candidates(self):
         rows=bindings(self.root,True)
         self.assertEqual(sum(v['status']=='paper' for v in rows.values()),332)
-        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),89)
+        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),91)
         self.candidate()
         with self.assertRaisesRegex(ValueError,'M064: release refuses'):bindings(self.root,True)
 
@@ -263,7 +263,7 @@ sites = ["fixture"]
         source=pathlib.Path(__file__).resolve().parents[2]
         record=read(source/'registry/reader-confirmation.md')
         decisions=re.findall(r'\| `([^`]+)` \| `([^`]+)` \| (admit|alias) \|',record)
-        self.assertEqual(len(decisions),92)
+        self.assertEqual(len(decisions),94)
         rows=bindings(self.root,True)
         for key,spelling,decision in decisions:
             self.assertEqual(rows[key]['spelling'],spelling)

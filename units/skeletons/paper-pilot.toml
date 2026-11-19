@@ -7,6 +7,8 @@ document = "paper-pilot"
 heading = "sec:pilot:paper-excerpt"
 children = [
   { kind = "unit", unit = "sec:say:direction" },
+  { kind = "unit", unit = "sec:say:harm-enlargement" },
+  { kind = "unit", unit = "sec:say:wonder-beauty" },
   { kind = "unit", unit = "sec:say:enemy-to-none" },
   { kind = "unit", unit = "sec:coda:record-limit" }
 ]

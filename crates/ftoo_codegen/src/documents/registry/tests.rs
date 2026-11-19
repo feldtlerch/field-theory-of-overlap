@@ -393,9 +393,9 @@ fn documentary_ledger_checks_first_event_fields_and_production_admissions() {
         .with_paper_mints(paper_mint_rows(&std::fs::read(root.join(PAPER_MINTS)).unwrap()).unwrap())
         .unwrap();
     let events = load(&source(committed)).unwrap();
-    assert_eq!(events.len(), 90);
+    assert_eq!(events.len(), 92);
     let admitted = book.with_documentary(&joint, events).unwrap();
-    assert_eq!(admitted.documentary().count(), 90);
+    assert_eq!(admitted.documentary().count(), 92);
     assert_eq!(
         admitted.resolve("dec:weld"),
         Ok(ftoo_manifest::AddressTarget::Documentary(

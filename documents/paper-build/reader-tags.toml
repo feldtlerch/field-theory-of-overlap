@@ -254,6 +254,16 @@ spelling = "sec:which-way"
 confirmation = "dec:reader:confirmed-tags"
 
 [[admissions]]
+key = "sec:say:harm-enlargement"
+spelling = "sec:harm-enlargement"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
+key = "sec:say:wonder-beauty"
+spelling = "sec:wonder-beauty"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
 key = "sec:say:enemy-to-none"
 spelling = "sec:enemy-to-none"
 confirmation = "dec:reader:confirmed-tags"

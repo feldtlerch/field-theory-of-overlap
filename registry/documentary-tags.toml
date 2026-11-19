@@ -718,3 +718,19 @@ handle = "sec:enemy-to-none"
 label = "sec:say:enemy-to-none"
 authority-record = "dec:reader:confirmed-tags"
 reason = "Addresses the paper's refrain on equal regard."
+
+[[events]]
+ordinal = 91
+change = "admit"
+handle = "sec:harm-enlargement"
+label = "sec:say:harm-enlargement"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper's refrain on harm and enlargement."
+
+[[events]]
+ordinal = 92
+change = "admit"
+handle = "sec:wonder-beauty"
+label = "sec:say:wonder-beauty"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper's refrain on wonder and beauty."
