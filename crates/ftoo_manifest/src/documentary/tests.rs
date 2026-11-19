@@ -25,7 +25,7 @@ fn paper_mint_targets_reuse_admission_without_becoming_confirmation_records() {
     );
     let joint = collect_joint_mints(&corpus, &markdown)
         .unwrap()
-        .with_paper_mints(vec![(key.into(), "documents/paper/main.tex".into(), 1)])
+        .with_paper_mints(vec![(key.into(), "documents/paper/main.tex".into())])
         .unwrap();
     let book = addressing(&graph)
         .unwrap()
@@ -50,12 +50,39 @@ fn paper_mint_targets_reuse_admission_without_becoming_confirmation_records() {
             .with_documentary(&joint, wrong)
             .is_err()
     );
-    assert!(
-        collect_joint_mints(&corpus, &markdown)
-            .unwrap()
-            .with_paper_mints(vec![(LABEL.into(), "documents/paper/main.tex".into(), 1)])
-            .is_err()
-    );
+    let duplicate = collect_joint_mints(&corpus, &markdown)
+        .unwrap()
+        .with_paper_mints(vec![(
+            "sec:fixture:unit".into(),
+            "documents/paper/main.tex".into(),
+        )])
+        .unwrap_err();
+    assert_eq!(duplicate.diagnostics()[0].rule, RuleId::M043);
+    assert!(matches!(
+        &duplicate.diagnostics()[0].fault,
+        LabelFault::DuplicateMint { label, origins, .. }
+            if label == "sec:fixture:unit"
+                && origins.iter().any(|origin| origin.kind == MintKind::UnitMetadata)
+                && origins.iter().any(|origin| matches!(
+                    &origin.site,
+                    LabelSite::PaperMintFile { file } if file == "documents/paper/main.tex"
+                ))
+    ));
+    let markdown_duplicate = collect_joint_mints(&corpus, &markdown)
+        .unwrap()
+        .with_paper_mints(vec![(LABEL.into(), "documents/paper/main.tex".into())])
+        .unwrap_err();
+    assert_eq!(markdown_duplicate.diagnostics()[0].rule, RuleId::M043);
+    assert!(matches!(
+        &markdown_duplicate.diagnostics()[0].fault,
+        LabelFault::DuplicateMint { label, origins, .. }
+            if label == LABEL
+                && origins.iter().any(|origin| origin.kind == MintKind::Markdown)
+                && origins.iter().any(|origin| matches!(
+                    &origin.site,
+                    LabelSite::PaperMintFile { file } if file == "documents/paper/main.tex"
+                ))
+    ));
 }
 
 #[test]

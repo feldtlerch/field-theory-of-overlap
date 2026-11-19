@@ -1,664 +1,664 @@
-# Labels minted in the paper sources, one row per key with the line that mints it; evidence for documentary targets, never admissions.
-B:belief	documents/paper/parts/partG.tex	52
-B:record	documents/paper/parts/partG.tex	41
-B:relevance	documents/paper/parts/partG.tex	59
-B:salience	documents/paper/parts/partG.tex	62
-J:anchor	documents/paper/parts/gateways.tex	16
-J:broker	documents/paper/parts/partB.tex	625
-J:forensics	documents/paper/parts/partB.tex	650
-J:hip	documents/paper/parts/gateways.tex	93
-J:occ	documents/paper/parts/gateways.tex	54
-J:power	documents/paper/parts/partB.tex	384
-J:read	documents/paper/parts/front.tex	324
-J:seal	documents/paper/parts/partB.tex	591
-J:seal-floor	documents/paper/parts/partB.tex	607
-J:tremble	documents/paper/parts/partB.tex	405
-J:triage	documents/paper/parts/partC.tex	362
-P:akrasia	documents/paper/explainer/explainer.tex	825
-P:anti	documents/paper/parts/partE.tex	118
-P:axes	documents/paper/parts/appendices.tex	547
-P:bld	documents/paper/parts/front.tex	213
-P:dens	documents/paper/parts/front.tex	212
-P:dir	documents/paper/parts/front.tex	212
-P:leak	documents/paper/parts/partE.tex	80
-P:nar	documents/paper/parts/front.tex	213
-P:nonorm	documents/paper/parts/partE.tex	42
-P:order	documents/paper/parts/partE.tex	116
-P:res	documents/paper/parts/front.tex	213
-P:sig	documents/paper/parts/front.tex	212
-P:vec	documents/paper/parts/front.tex	220
-P:will	documents/paper/parts/front.tex	212
-R:askonly	documents/paper/parts/partG.tex	85
-R:nostake	documents/paper/parts/partG.tex	76
-R:trusted	documents/paper/parts/partG.tex	81
-T:audited	documents/paper/parts/partG.tex	105
-T:certnull	documents/paper/parts/partG.tex	94
-T:justice	documents/paper/parts/partG.tex	120
-T:wound	documents/paper/parts/partG.tex	113
-W:connect	documents/paper/parts/partG.tex	113
-W:keepers	documents/paper/parts/partG.tex	147
-W:lookout	documents/paper/parts/partG.tex	144
-W:seed	documents/paper/parts/partG.tex	155
-app:corners	documents/paper/parts/appendices.tex	597
-app:cos:acctstake	documents/paper/parts/appendices.tex	793
-app:cos:cosine	documents/paper/parts/appendices.tex	760
-app:cos:covectors	documents/paper/parts/appendices.tex	737
-app:cos:dividends	documents/paper/parts/appendices.tex	815
-app:cos:inclexpo	documents/paper/parts/appendices.tex	844
-app:cos:propagation	documents/paper/parts/appendices.tex	867
-app:cos:stakemag	documents/paper/parts/appendices.tex	773
-app:cosine	documents/paper/parts/appendices.tex	731
-app:index	documents/paper/parts/appendices.tex	429
-app:ledger	documents/paper/parts/appendices.tex	969
-app:log	documents/paper/parts/appendices.tex	336
-app:port:blindrate	documents/paper/parts/appendices.tex	678
-app:port:concave	documents/paper/parts/appendices.tex	672
-app:port:deadseam	documents/paper/parts/appendices.tex	675
-app:port:fabline	documents/paper/parts/appendices.tex	713
-app:port:flywheel	documents/paper/parts/appendices.tex	680
-app:port:sigmoid	documents/paper/parts/appendices.tex	673
-app:port:spectrum	documents/paper/parts/appendices.tex	688
-app:portraits	documents/paper/parts/appendices.tex	662
-app:recovery	documents/paper/parts/appendices.tex	16
-app:self-limit	documents/paper/parts/appendices.tex	904
-art:directive	documents/paper/explainer/explainer.tex	883
-art:keepers	documents/paper/parts/partG.tex	161
-bd:G	documents/paper/parts/partF.tex	352
-bd:V	documents/paper/parts/partF.tex	352
-bd:edge	documents/paper/parts/partF.tex	361
-bd:fab	documents/paper/parts/partF.tex	316
-bd:fab-power	documents/paper/parts/partF.tex	320
-bd:rep	documents/paper/parts/partF.tex	315
-bf:cred	documents/paper/parts/partD.tex	204
-bf:factors	documents/paper/parts/partD.tex	195
-bf:ind	documents/paper/parts/partD.tex	200
-bf:mot	documents/paper/parts/partD.tex	206
-bf:unb	documents/paper/parts/partD.tex	202
-c:Da	documents/paper/parts/appendices.tex	972
-c:Gstar	documents/paper/parts/partA.tex	115
-c:Npool	documents/paper/parts/appendices.tex	971
-c:W0	documents/paper/parts/appendices.tex	970
-c:Wstar	documents/paper/parts/appendices.tex	970
-c:burn	documents/paper/parts/appendices.tex	971
-c:exch	documents/paper/parts/partA.tex	257
-c:kappa0	documents/paper/parts/appendices.tex	971
-c:lam	documents/paper/parts/appendices.tex	987
-c:mu	documents/paper/parts/appendices.tex	972
-c:nu	documents/paper/data/ftoo_registers.tex	62
-c:q	documents/paper/explainer/explainer.tex	884
-c:tau	documents/paper/parts/appendices.tex	970
-cor:tremble:curve	documents/paper/parts/partB.tex	414
-deon:open	documents/paper/parts/partF.tex	232
-deon:test	documents/paper/parts/partF.tex	251
-dyn:bend	documents/paper/parts/partB.tex	202
-dyn:bif	documents/paper/parts/partB.tex	180
-dyn:exact	documents/paper/parts/partB.tex	262
-dyn:floor	documents/paper/parts/partB.tex	748
-dyn:flow	documents/paper/parts/partB.tex	37
-dyn:formclose	documents/paper/parts/partB.tex	49
-dyn:gamma	documents/paper/parts/partB.tex	47
-dyn:jac	documents/paper/parts/partB.tex	898
-dyn:lapse	documents/paper/parts/partB.tex	45
-dyn:loop	documents/paper/parts/partB.tex	850
-dyn:moment	documents/paper/parts/partB.tex	243
-dyn:pitch	documents/paper/parts/partB.tex	825
-dyn:pitchpair	documents/paper/parts/partB.tex	870
-dyn:polar	documents/paper/parts/partB.tex	699
-dyn:precess	documents/paper/parts/partB.tex	845
-dyn:radial	documents/paper/parts/partB.tex	789
-dyn:reconcile	documents/paper/parts/partB.tex	727
-dyn:release	documents/paper/parts/partB.tex	819
-dyn:response	documents/paper/parts/partB.tex	280
-dyn:rot	documents/paper/parts/partB.tex	970
-dyn:scramble	documents/paper/parts/partB.tex	772
-dyn:seed	documents/paper/parts/partB.tex	214
-dyn:skew	documents/paper/parts/partB.tex	682
-dyn:split	documents/paper/parts/partB.tex	676
-dyn:spont	documents/paper/parts/partB.tex	216
-dyn:stand	documents/paper/parts/partB.tex	924
-dyn:sub	documents/paper/parts/partB.tex	212
-dyn:sym	documents/paper/parts/partB.tex	681
-dyn:tri	documents/paper/parts/partB.tex	205
-dyn:ttax	documents/paper/parts/partB.tex	803
-dyn:whereskew	documents/paper/parts/partB.tex	979
-e:afriat	documents/paper/parts/partF.tex	410
-e:arrow	documents/paper/parts/partD.tex	432
-e:artifact	documents/paper/parts/partG.tex	219
-e:balance	documents/paper/parts/partA.tex	653
-e:baseline	documents/paper/parts/partC.tex	153
-e:bistab	documents/paper/parts/partB.tex	329
-e:capability	documents/paper/parts/coda.tex	72
-e:capital	documents/paper/parts/partA.tex	347
-e:carework	documents/paper/parts/partB.tex	572
-e:cartel	documents/paper/parts/gateways.tex	152
-e:closure	documents/paper/parts/partA.tex	743
-e:colour	documents/paper/parts/partD.tex	222
-e:commitment	documents/paper/parts/partC.tex	255
-e:dmp	documents/paper/parts/partB.tex	106
-e:externality	documents/paper/parts/partG.tex	205
-e:extself	documents/paper/parts/partC.tex	410
-e:faces	documents/paper/parts/partA.tex	774
-e:fwt	documents/paper/parts/partA.tex	633
-e:goodhart	documents/paper/parts/partF.tex	103
-e:hayek	documents/paper/parts/partD.tex	443
-e:input	documents/paper/parts/front.tex	329
-e:lemons	documents/paper/parts/partA.tex	326
-e:license	documents/paper/parts/partC.tex	267
-e:menus	documents/paper/parts/partB.tex	450
-e:netform	documents/paper/parts/partB.tex	339
-e:osc	documents/paper/parts/partB.tex	1055
-e:pow	documents/paper/parts/partD.tex	170
-e:rent-surplus	documents/paper/parts/partA.tex	551
-e:repeated	documents/paper/parts/partA.tex	517
-e:robbins	documents/paper/parts/partE.tex	99
-e:smith	documents/paper/parts/partD.tex	300
-e:stock	documents/paper/parts/partB.tex	497
-e:sybil	documents/paper/parts/gateways.tex	67
-e:witness	documents/paper/parts/partA.tex	339
-epi:blind	documents/paper/parts/partB.tex	143
-epi:conv	documents/paper/parts/front.tex	182
-epi:fact	documents/paper/parts/partA.tex	18
-epi:option	documents/paper/parts/partB.tex	148
-epi:shadow	documents/paper/parts/front.tex	191
-epist:duhem	documents/paper/parts/partF.tex	86
-eq:J:anchor	documents/paper/parts/gateways.tex	20
-eq:J:broker	documents/paper/parts/partB.tex	636
-eq:J:occ	documents/paper/parts/partB.tex	367
-eq:J:occ:exact	documents/paper/parts/partB.tex	375
-eq:J:power	documents/paper/parts/partB.tex	393
-eq:J:seal	documents/paper/parts/partB.tex	598
-eq:J:triage-cancel	documents/paper/parts/partC.tex	369
-eq:P:nonorm-expand	documents/paper/parts/partE.tex	49
-eq:T:audited	documents/paper/parts/partG.tex	110
-eq:T:certnull-ceiling	documents/paper/parts/partG.tex	101
-eq:T:justice	documents/paper/parts/partG.tex	131
-eq:anchor:split	documents/paper/parts/gateways.tex	42
-eq:art:keepers	documents/paper/parts/partG.tex	170
-eq:bd:Gdef	documents/paper/parts/partF.tex	357
-eq:bd:burncost	documents/paper/parts/partF.tex	332
-eq:bd:edge	documents/paper/parts/partF.tex	366
-eq:bd:fabcount	documents/paper/parts/partF.tex	325
-eq:bd:fabpower	documents/paper/parts/partF.tex	340
-eq:bd:two	documents/paper/parts/partF.tex	313
-eq:c:exch	documents/paper/parts/partA.tex	262
-eq:coda:feet	documents/paper/parts/coda.tex	19
-eq:conv:forge	documents/paper/parts/partD.tex	542
-eq:conv:normalform	documents/paper/parts/partD.tex	520
-eq:conv:positive-holding	documents/paper/parts/partD.tex	478
-eq:conv:telos	documents/paper/parts/partD.tex	489
-eq:cosine:def	documents/paper/parts/appendices.tex	766
-eq:decep:L	documents/paper/parts/partF.tex	37
-eq:deon:open	documents/paper/parts/partF.tex	240
-eq:dyn:bif	documents/paper/parts/partB.tex	186
-eq:dyn:exact	documents/paper/parts/partB.tex	273
-eq:dyn:floor	documents/paper/parts/partB.tex	754
-eq:dyn:flow	documents/paper/parts/partB.tex	43
-eq:dyn:jac	documents/paper/parts/partB.tex	907
-eq:dyn:jaccouple	documents/paper/parts/partB.tex	915
-eq:dyn:loop	documents/paper/parts/partB.tex	863
-eq:dyn:moment	documents/paper/parts/partB.tex	251
-eq:dyn:pitch	documents/paper/parts/partB.tex	831
-eq:dyn:pitchpair	documents/paper/parts/partB.tex	875
-eq:dyn:polar	documents/paper/parts/partB.tex	708
-eq:dyn:radial	documents/paper/parts/partB.tex	793
-eq:dyn:reconcile	documents/paper/parts/partB.tex	732
-eq:dyn:response	documents/paper/parts/partB.tex	290
-eq:dyn:scramble	documents/paper/parts/partB.tex	778
-eq:dyn:split	documents/paper/parts/partB.tex	680
-eq:dyn:stand	documents/paper/parts/partB.tex	935
-eq:epi:decompose	documents/paper/parts/partA.tex	24
-eq:epi:null	documents/paper/parts/partA.tex	77
-eq:epi:vel	documents/paper/parts/partA.tex	75
-eq:f:Ncount	documents/paper/parts/partA.tex	369
-eq:f:acc	documents/paper/parts/partA.tex	456
-eq:f:cap	documents/paper/parts/partA.tex	189
-eq:f:ceiling	documents/paper/parts/partA.tex	201
-eq:f:charge	documents/paper/parts/partA.tex	458
-eq:f:defector	documents/paper/parts/partA.tex	385
-eq:f:eff	documents/paper/parts/partA.tex	414
-eq:f:felt	documents/paper/parts/partA.tex	158
-eq:f:holonomy	documents/paper/parts/partA.tex	271
-eq:f:holonomy-coherence	documents/paper/parts/partA.tex	278
-eq:f:opp	documents/paper/parts/partA.tex	572
-eq:f:reach	documents/paper/parts/partA.tex	396
-eq:f:rew	documents/paper/parts/partA.tex	538
-eq:f:split	documents/paper/parts/partA.tex	171
-eq:fixed:beta	documents/paper/parts/partB.tex	314
-eq:gen:Srange	documents/paper/parts/front.tex	89
-eq:gen:dimspace	documents/paper/parts/front.tex	103
-eq:gen:extdef	documents/paper/parts/front.tex	112
-eq:gen:fact	documents/paper/parts/front.tex	146
-eq:gen:goods	documents/paper/parts/front.tex	87
-eq:gen:pool	documents/paper/parts/front.tex	114
-eq:gen:trich	documents/paper/parts/front.tex	128
-eq:gen:wgrade	documents/paper/parts/front.tex	92
-eq:hip:cartel	documents/paper/parts/gateways.tex	134
-eq:loom:event	documents/paper/parts/partA.tex	245
-eq:loom:standing	documents/paper/parts/partA.tex	238
-eq:maint:ident	documents/paper/parts/partB.tex	529
-eq:maint:knee	documents/paper/parts/partB.tex	480
-eq:normative:lived-return	documents/paper/parts/partC.tex	305
-eq:nrm:grid	documents/paper/parts/partA.tex	98
-eq:nrm:holding	documents/paper/parts/partA.tex	293
-eq:nrm:holding-cos	documents/paper/parts/partA.tex	295
-eq:nrm:incl	documents/paper/parts/partA.tex	291
-eq:nrm:public	documents/paper/parts/gateways.tex	121
-eq:nrm:wedge	documents/paper/parts/partD.tex	504
-eq:op:M	documents/paper/parts/partB.tex	136
-eq:op:Mproj	documents/paper/parts/partB.tex	139
-eq:op:afriat	documents/paper/parts/partF.tex	388
-eq:op:recess	documents/paper/parts/partF.tex	21
-eq:op:vmoral	documents/paper/parts/partC.tex	52
-eq:op:vmoralself	documents/paper/parts/partC.tex	58
-eq:opp:enemy	documents/paper/parts/partA.tex	612
-eq:pr:agg	documents/paper/parts/partD.tex	363
-eq:pr:colour-detached	documents/paper/parts/partD.tex	416
-eq:pr:deltaspan	documents/paper/parts/partD.tex	148
-eq:pr:fact-intercept	documents/paper/parts/partD.tex	404
-eq:pr:gain	documents/paper/parts/partD.tex	50
-eq:pr:info	documents/paper/parts/partD.tex	246
-eq:pr:info-cred	documents/paper/parts/partD.tex	250
-eq:pr:info-unb	documents/paper/parts/partD.tex	248
-eq:pr:report	documents/paper/parts/partD.tex	24
-eq:pr:span	documents/paper/parts/partD.tex	81
-eq:pr:span-ident	documents/paper/parts/partD.tex	110
-eq:pr:span-model	documents/paper/parts/partD.tex	103
-eq:pr:span-moments	documents/paper/parts/partD.tex	70
-eq:pr:span-proof	documents/paper/parts/partD.tex	134
-eq:pr:stand	documents/paper/parts/partD.tex	330
-eq:pr:verdict-colour	documents/paper/parts/partD.tex	411
-eq:pr:woven	documents/paper/parts/partD.tex	264
-eq:recov:Q	documents/paper/parts/appendices.tex	178
-eq:recov:anchordecay	documents/paper/parts/appendices.tex	310
-eq:recov:anchorode	documents/paper/parts/appendices.tex	305
-eq:recov:anchorprec	documents/paper/parts/appendices.tex	300
-eq:recov:block	documents/paper/parts/appendices.tex	73
-eq:recov:blocksum	documents/paper/parts/appendices.tex	106
-eq:recov:ceiling	documents/paper/parts/appendices.tex	118
-eq:recov:certceil	documents/paper/parts/appendices.tex	250
-eq:recov:cleanreads	documents/paper/parts/appendices.tex	80
-eq:recov:compare	documents/paper/parts/appendices.tex	265
-eq:recov:component	documents/paper/parts/appendices.tex	277
-eq:recov:covering	documents/paper/parts/appendices.tex	187
-eq:recov:covsplit	documents/paper/parts/appendices.tex	36
-eq:recov:effharm	documents/paper/parts/appendices.tex	220
-eq:recov:effprecision	documents/paper/parts/appendices.tex	91
-eq:recov:gls	documents/paper/parts/appendices.tex	42
-eq:recov:infopool	documents/paper/parts/appendices.tex	84
-eq:recov:invariant	documents/paper/parts/appendices.tex	199
-eq:recov:lhat	documents/paper/parts/appendices.tex	176
-eq:recov:margclean	documents/paper/parts/appendices.tex	227
-eq:recov:marginfo	documents/paper/parts/appendices.tex	234
-eq:recov:reparam	documents/paper/parts/appendices.tex	194
-eq:recov:reports	documents/paper/parts/appendices.tex	31
-eq:recov:route	documents/paper/parts/appendices.tex	151
-eq:recov:routecorner	documents/paper/parts/appendices.tex	158
-eq:recov:sat	documents/paper/parts/appendices.tex	66
-eq:recov:spanmodel	documents/paper/parts/appendices.tex	130
-eq:recov:split-cred	documents/paper/parts/appendices.tex	166
-eq:recov:split-unbias	documents/paper/parts/appendices.tex	168
-eq:recov:woodG	documents/paper/parts/appendices.tex	57
-eq:recov:woodJ	documents/paper/parts/appendices.tex	53
-eq:recov:woodd	documents/paper/parts/appendices.tex	55
-eq:seal:floor	documents/paper/parts/partB.tex	617
-eq:tremble:curve	documents/paper/parts/partB.tex	421
-eq:verd:decompose	documents/paper/parts/partD.tex	354
-eq:vmoral:cancel	documents/paper/parts/partC.tex	81
-eq:vmoral:cancel-exact	documents/paper/parts/partC.tex	118
-eq:w:faces	documents/paper/parts/partA.tex	761
-eq:w:signed	documents/paper/parts/partA.tex	687
-eq:w:virtue	documents/paper/parts/partA.tex	762
-eq:will:passive-decay	documents/paper/parts/partA.tex	692
-ev:afriat-conv	documents/paper/parts/appendices.tex	574
-ev:decay-occ	documents/paper/explainer/explainer.tex	475
-ev:knee-rate	documents/paper/explainer/explainer.tex	475
-ev:resid-ex	documents/paper/explainer/explainer.tex	475
-ev:resid-opp	documents/paper/explainer/explainer.tex	476
-ev:tremble-conv	documents/paper/parts/appendices.tex	574
-f:Ncount	documents/paper/parts/partA.tex	364
-f:acc	documents/paper/parts/partA.tex	452
-f:ambiv	documents/paper/parts/partA.tex	313
-f:cap	documents/paper/parts/partA.tex	186
-f:ceiling	documents/paper/parts/partA.tex	197
-f:couple	documents/paper/parts/partA.tex	138
-f:defector	documents/paper/parts/partA.tex	376
-f:eff	documents/paper/parts/partA.tex	339
-f:felt	documents/paper/parts/partA.tex	151
-f:feltmag	documents/paper/parts/partA.tex	159
-f:feltsign	documents/paper/parts/partA.tex	160
-f:feltzero	documents/paper/parts/partA.tex	315
-f:holonomy	documents/paper/parts/partA.tex	268
-f:local	documents/paper/parts/partA.tex	398
-f:opp	documents/paper/parts/partA.tex	565
-f:path	documents/paper/parts/partA.tex	400
-f:pool	documents/paper/parts/partA.tex	420
-f:reach	documents/paper/parts/partA.tex	392
-f:rew	documents/paper/parts/partA.tex	533
-f:seal-law	documents/paper/parts/partA.tex	481
-f:sealed	documents/paper/parts/partA.tex	317
-f:split	documents/paper/parts/partA.tex	164
-f:stake	documents/paper/parts/partA.tex	190
-f:surplus	documents/paper/parts/partA.tex	532
-g:gate	documents/paper/parts/front.tex	269
-g:knock	documents/paper/parts/front.tex	254
-g:proj	documents/paper/parts/front.tex	255
-g:rec	documents/paper/parts/front.tex	257
-g:sign	documents/paper/parts/front.tex	270
-g:split	documents/paper/parts/front.tex	268
-gate:G1	documents/paper/parts/partE.tex	14
-gate:G2	documents/paper/parts/partE.tex	14
-gate:G3	documents/paper/parts/partE.tex	14
-gate:G4	documents/paper/parts/partE.tex	14
-gen:alph	documents/paper/parts/front.tex	137
-gen:basins	documents/paper/parts/front.tex	234
-gen:ext	documents/paper/parts/front.tex	108
-gen:goods	documents/paper/parts/front.tex	82
-gen:grade	documents/paper/parts/front.tex	97
-gen:obj	documents/paper/parts/front.tex	71
-gen:trich	documents/paper/parts/front.tex	119
-gen:w-exists	documents/paper/parts/front.tex	163
-gen:w-opp	documents/paper/parts/front.tex	168
-gen:w-rate	documents/paper/parts/front.tex	165
-gen:will	documents/paper/parts/front.tex	161
-maint:ident	documents/paper/parts/partB.tex	523
-maint:knee	documents/paper/parts/partB.tex	473
-mod:branch	documents/paper/explainer/explainer.tex	480
-mod:drifts	documents/paper/parts/appendices.tex	547
-mod:facets	documents/paper/explainer/explainer.tex	928
-mod:recruit	documents/paper/parts/appendices.tex	547
-mod:reg	documents/paper/parts/front.tex	263
-nrm:anch	documents/paper/parts/gateways.tex	44
-nrm:anchbase	documents/paper/parts/partG.tex	13
-nrm:anchmetric	documents/paper/parts/partG.tex	13
-nrm:annex	documents/paper/parts/partA.tex	304
-nrm:assign	documents/paper/parts/gateways.tex	89
-nrm:expo	documents/paper/parts/partA.tex	588
-nrm:floor	documents/paper/parts/partF.tex	55
-nrm:funding	documents/paper/parts/partC.tex	336
-nrm:good	documents/paper/parts/partA.tex	85
-nrm:grid	documents/paper/parts/partA.tex	89
-nrm:incl	documents/paper/parts/partA.tex	284
-nrm:incl-expo	documents/paper/explainer/explainer.tex	633
-nrm:int	documents/paper/parts/gateways.tex	44
-nrm:martyr	documents/paper/parts/partC.tex	341
-nrm:maxbook	documents/paper/parts/partC.tex	298
-nrm:modest	documents/paper/parts/partC.tex	25
-nrm:nodepl	documents/paper/parts/partC.tex	321
-nrm:public	documents/paper/parts/gateways.tex	114
-nrm:self	documents/paper/parts/partC.tex	292
-nrm:telos	documents/paper/parts/partD.tex	471
-nrm:wedge	documents/paper/parts/partD.tex	497
-nrm:wise	documents/paper/parts/partA.tex	85
-op:L	documents/paper/parts/partF.tex	32
-op:afriat	documents/paper/parts/partF.tex	384
-op:cancel	documents/paper/parts/partC.tex	73
-op:cos	documents/paper/parts/partA.tex	133
-op:cosev	documents/paper/parts/partA.tex	136
-op:null	documents/paper/parts/partA.tex	72
-op:read	documents/paper/parts/partB.tex	130
-op:recess	documents/paper/parts/partF.tex	13
-op:vel	documents/paper/parts/partA.tex	72
-op:vmoral	documents/paper/parts/coda.tex	72
-part:gw:anchor	documents/paper/parts/gateways.tex	4
-part:gw:hip	documents/paper/parts/gateways.tex	79
-pr:agg	documents/paper/parts/partD.tex	347
-pr:certnull	documents/paper/parts/partD.tex	377
-pr:colour	documents/paper/parts/partD.tex	26
-pr:deltaspan	documents/paper/parts/partD.tex	143
-pr:detach	documents/paper/parts/partD.tex	399
-pr:equi	documents/paper/parts/partD.tex	281
-pr:forge	documents/paper/parts/partD.tex	535
-pr:gain	documents/paper/parts/partD.tex	46
-pr:info	documents/paper/parts/partD.tex	242
-pr:report	documents/paper/parts/partD.tex	17
-pr:scope	documents/paper/parts/partD.tex	387
-pr:silence	documents/paper/parts/partD.tex	213
-pr:span	documents/paper/parts/partD.tex	64
-pr:span-ident	documents/paper/parts/partD.tex	92
-pr:stand	documents/paper/parts/partD.tex	326
-pr:verdict	documents/paper/parts/partD.tex	332
-pr:woven	documents/paper/parts/partD.tex	259
-recov:Lhat	documents/paper/parts/appendices.tex	172
-recov:anchorflow	documents/paper/parts/appendices.tex	295
-recov:ancill	documents/paper/parts/appendices.tex	214
-recov:auditor	documents/paper/parts/appendices.tex	256
-recov:blocks	documents/paper/parts/appendices.tex	99
-recov:ceil	documents/paper/parts/appendices.tex	243
-recov:compare	documents/paper/parts/appendices.tex	261
-recov:contrast	documents/paper/parts/appendices.tex	290
-recov:cover	documents/paper/parts/appendices.tex	96
-recov:effreads	documents/paper/parts/appendices.tex	89
-recov:estimand	documents/paper/parts/appendices.tex	24
-recov:ext	documents/paper/parts/appendices.tex	142
-recov:factor	documents/paper/parts/appendices.tex	27
-recov:gap	documents/paper/parts/appendices.tex	322
-recov:groupframe	documents/paper/parts/appendices.tex	285
-recov:held	documents/paper/parts/appendices.tex	318
-recov:hold	documents/paper/parts/appendices.tex	314
-recov:null	documents/paper/parts/appendices.tex	183
-recov:route	documents/paper/parts/appendices.tex	146
-recov:sat	documents/paper/parts/appendices.tex	49
-recov:scope	documents/paper/parts/appendices.tex	204
-recov:span	documents/paper/parts/appendices.tex	124
-recov:split	documents/paper/parts/appendices.tex	162
-recov:victim	documents/paper/parts/appendices.tex	209
-sec:anchor	documents/paper/parts/gateways.tex	6
-sec:artifact	documents/paper/parts/partG.tex	8
-sec:coda	documents/paper/parts/coda.tex	6
-sec:coloured-report	documents/paper/parts/partD.tex	8
-sec:convergence	documents/paper/parts/partD.tex	464
-sec:epistemic	documents/paper/parts/partA.tex	8
-sec:explainer:accountability	documents/paper/explainer/explainer.tex	595
-sec:explainer:edge	documents/paper/explainer/explainer.tex	270
-sec:explainer:falsifier	documents/paper/explainer/explainer.tex	707
-sec:explainer:good-wise	documents/paper/explainer/explainer.tex	488
-sec:explainer:goods	documents/paper/explainer/explainer.tex	331
-sec:explainer:log	documents/paper/explainer/explainer.tex	829
-sec:explainer:plain	documents/paper/explainer/explainer.tex	45
-sec:explainer:the-L	documents/paper/explainer/explainer.tex	546
-sec:explainer:two-feet	documents/paper/explainer/explainer.tex	933
-sec:explainer:typed	documents/paper/explainer/explainer.tex	893
-sec:explainer:verdicts-lives	documents/paper/explainer/explainer.tex	754
-sec:explainer:will	documents/paper/explainer/explainer.tex	390
-sec:explainer:witnesses	documents/paper/explainer/explainer.tex	636
-sec:fixed-points	documents/paper/parts/partB.tex	172
-sec:flow	documents/paper/parts/partB.tex	8
-sec:generators	documents/paper/parts/front.tex	59
-sec:good-wise	documents/paper/parts/partC.tex	277
-sec:goodness	documents/paper/parts/partC.tex	8
-sec:hip	documents/paper/parts/gateways.tex	81
-sec:maintenance	documents/paper/parts/partB.tex	355
-sec:nonnormable	documents/paper/parts/partE.tex	8
-sec:null-verdict	documents/paper/parts/partD.tex	321
-sec:ontic-fields	documents/paper/parts/partA.tex	110
-sec:oscillation	documents/paper/parts/partB.tex	671
-sec:readout	documents/paper/parts/partB.tex	125
-sec:self-deception	documents/paper/parts/partF.tex	8
-sec:signed-will	documents/paper/parts/partA.tex	679
-sec:still-center	documents/paper/parts/partF.tex	140
-sec:two-boundaries	documents/paper/parts/partF.tex	301
-sec:witness-functional	documents/paper/parts/partD.tex	237
-snk:anch	documents/paper/parts/gateways.tex	54
-snk:anch-G	documents/paper/parts/gateways.tex	59
-snk:anch-t	documents/paper/parts/gateways.tex	58
-snk:ker	documents/paper/parts/coda.tex	21
-snk:two	documents/paper/parts/coda.tex	21
-src:nd	documents/paper/parts/partB.tex	96
-subsec:anchor:internal	documents/paper/parts/gateways.tex	9
-subsec:anchor:overlaps	documents/paper/parts/gateways.tex	37
-subsec:anchor:second-foot	documents/paper/parts/gateways.tex	50
-subsec:artifact:buildables	documents/paper/parts/partG.tex	38
-subsec:artifact:directive	documents/paper/parts/partG.tex	11
-subsec:artifact:refusals	documents/paper/parts/partG.tex	73
-subsec:artifact:theorems	documents/paper/parts/partG.tex	91
-subsec:artifact:wills	documents/paper/parts/partG.tex	136
-subsec:bd:darknesses	documents/paper/parts/partF.tex	375
-subsec:bd:edge	documents/paper/parts/partF.tex	350
-subsec:bd:ratio-rate	documents/paper/parts/partF.tex	304
-subsec:coda:close	documents/paper/parts/coda.tex	101
-subsec:coda:tenses	documents/paper/parts/coda.tex	9
-subsec:coda:wall	documents/paper/parts/coda.tex	53
-subsec:coda:words	documents/paper/parts/coda.tex	88
-subsec:colour-span	documents/paper/parts/partD.tex	39
-subsec:conv:forge	documents/paper/parts/partD.tex	529
-subsec:conv:telos	documents/paper/parts/partD.tex	467
-subsec:corners:corners	documents/paper/parts/appendices.tex	600
-subsec:corners:scales	documents/paper/parts/appendices.tex	630
-subsec:decep:Lrestrict	documents/paper/parts/partF.tex	30
-subsec:decep:coins	documents/paper/parts/partF.tex	70
-subsec:decep:floor	documents/paper/parts/partF.tex	53
-subsec:decep:recession	documents/paper/parts/partF.tex	11
-subsec:decep:second-prediction	documents/paper/parts/partF.tex	122
-subsec:epi:fact	documents/paper/parts/partA.tex	11
-subsec:epi:grid	documents/paper/parts/partA.tex	83
-subsec:epi:readability	documents/paper/parts/partA.tex	35
-subsec:epi:scope	documents/paper/parts/partA.tex	67
-subsec:fixed:exact	documents/paper/parts/partB.tex	229
-subsec:fixed:gate	documents/paper/parts/partB.tex	175
-subsec:fixed:latency	documents/paper/parts/partB.tex	308
-subsec:fixed:tri	documents/paper/parts/partB.tex	200
-subsec:flow:branch	documents/paper/parts/partB.tex	11
-subsec:flow:confluence	documents/paper/parts/partB.tex	33
-subsec:gen:audit	documents/paper/parts/front.tex	251
-subsec:gen:basins	documents/paper/parts/front.tex	233
-subsec:gen:covenant	documents/paper/parts/front.tex	308
-subsec:gen:grades	documents/paper/parts/front.tex	275
-subsec:gen:object	documents/paper/parts/front.tex	62
-subsec:gen:place	documents/paper/parts/front.tex	210
-subsec:gen:posits	documents/paper/parts/front.tex	154
-subsec:good:baseline	documents/paper/parts/partC.tex	40
-subsec:good:kernel	documents/paper/parts/partC.tex	206
-subsec:good:licenses	documents/paper/parts/partC.tex	246
-subsec:good:located	documents/paper/parts/partC.tex	11
-subsec:good:spends	documents/paper/parts/partC.tex	169
-subsec:gw:bottom-left	documents/paper/parts/partC.tex	388
-subsec:gw:temporal	documents/paper/parts/partC.tex	280
-subsec:gw:uniqueness	documents/paper/parts/partC.tex	290
-subsec:hip:cartel	documents/paper/parts/gateways.tex	128
-subsec:hip:split	documents/paper/parts/gateways.tex	84
-subsec:ledger:branches	documents/paper/parts/appendices.tex	1047
-subsec:ledger:debts	documents/paper/parts/appendices.tex	1134
-subsec:ledger:equiv	documents/paper/parts/appendices.tex	1054
-subsec:ledger:evidence	documents/paper/parts/appendices.tex	1061
-subsec:ledger:rulings	documents/paper/parts/appendices.tex	991
-subsec:ledger:shapes	documents/paper/parts/appendices.tex	1070
-subsec:ledger:verify	documents/paper/parts/appendices.tex	1000
-subsec:log:concordance	documents/paper/parts/appendices.tex	415
-subsec:log:knock	documents/paper/parts/appendices.tex	339
-subsec:log:split	documents/paper/parts/appendices.tex	377
-subsec:maint:filled	documents/paper/parts/partB.tex	553
-subsec:maint:ident	documents/paper/parts/partB.tex	513
-subsec:maint:standing	documents/paper/parts/partB.tex	358
-subsec:maint:stock	documents/paper/parts/partB.tex	466
-subsec:maint:twosided	documents/paper/parts/partB.tex	586
-subsec:ont:accountability	documents/paper/parts/partA.tex	450
-subsec:ont:density	documents/paper/parts/partA.tex	362
-subsec:ont:loom	documents/paper/parts/partA.tex	218
-subsec:ont:operator	documents/paper/parts/partA.tex	113
-subsec:ont:opposition	documents/paper/parts/partA.tex	563
-subsec:ont:rewards	documents/paper/parts/partA.tex	530
-subsec:ont:zeros	documents/paper/parts/partA.tex	308
-subsec:osc:dag	documents/paper/parts/partB.tex	881
-subsec:osc:polar	documents/paper/parts/partB.tex	690
-subsec:osc:precommit	documents/paper/parts/partB.tex	1002
-subsec:osc:release	documents/paper/parts/partB.tex	817
-subsec:osc:soft	documents/paper/parts/partB.tex	991
-subsec:osc:spectrum	documents/paper/parts/partB.tex	920
-subsec:osc:split	documents/paper/parts/partB.tex	674
-subsec:osc:tremor	documents/paper/parts/partB.tex	843
-subsec:prof:antichain	documents/paper/parts/partE.tex	133
-subsec:prof:athome	documents/paper/parts/partE.tex	168
-subsec:prof:dignity	documents/paper/parts/partE.tex	185
-subsec:prof:gates	documents/paper/parts/partE.tex	12
-subsec:prof:leak	documents/paper/parts/partE.tex	73
-subsec:prof:nonorm	documents/paper/parts/partE.tex	40
-subsec:prof:order	documents/paper/parts/partE.tex	114
-subsec:readout:image-kernel	documents/paper/parts/partB.tex	128
-subsec:readout:kernel	documents/paper/parts/partB.tex	163
-subsec:rep:content	documents/paper/parts/partD.tex	11
-subsec:rep:factors	documents/paper/parts/partD.tex	193
-subsec:rep:silencing	documents/paper/parts/partD.tex	211
-subsec:still:deontic	documents/paper/parts/partF.tex	228
-subsec:still:hides	documents/paper/parts/partF.tex	266
-subsec:still:severance	documents/paper/parts/partF.tex	282
-subsec:still:tenants	documents/paper/parts/partF.tex	143
-subsec:verd:certificate	documents/paper/parts/partD.tex	375
-subsec:verd:null-projection	documents/paper/parts/partD.tex	345
-subsec:verd:standing	documents/paper/parts/partD.tex	324
-subsec:will:faces	documents/paper/parts/partA.tex	756
-subsec:will:signed	documents/paper/parts/partA.tex	682
-subsec:wit:functional	documents/paper/parts/partD.tex	257
-subsec:wit:gate	documents/paper/parts/partD.tex	240
-subsec:wit:manifold	documents/paper/parts/partD.tex	279
-tbl:P:antichain	documents/paper/parts/partE.tex	139
-tbl:P:gates	documents/paper/parts/partE.tex	20
-tbl:W:rests	documents/paper/parts/partG.tex	183
-tbl:branches	documents/paper/ftoo_typed_tools.tex	1161
-tbl:corners	documents/paper/parts/appendices.tex	606
-tbl:cosine:covectors	documents/paper/parts/appendices.tex	742
-tbl:cosine:dividends	documents/paper/parts/appendices.tex	819
-tbl:cosine:inclexpo	documents/paper/parts/appendices.tex	850
-tbl:cosine:propagation	documents/paper/parts/appendices.tex	874
-tbl:cosine:stake	documents/paper/parts/appendices.tex	778
-tbl:cosine:zeros	documents/paper/parts/appendices.tex	798
-tbl:coupling	documents/paper/parts/appendices.tex	695
-tbl:debts	documents/paper/parts/appendices.tex	1140
-tbl:epi:spend	documents/paper/parts/partA.tex	42
-tbl:equivalences	documents/paper/ftoo_typed_tools.tex	1032
-tbl:ev	documents/paper/ftoo_typed_tools.tex	1137
-tbl:fabline	documents/paper/parts/appendices.tex	718
-tbl:falsifiers	documents/paper/parts/partB.tex	1010
-tbl:gen:grades	documents/paper/parts/front.tex	281
-tbl:good:kernel	documents/paper/parts/partC.tex	215
-tbl:good:spends	documents/paper/parts/partC.tex	180
-tbl:gw:bottomleft	documents/paper/parts/partC.tex	394
-tbl:gw:ladder	documents/paper/parts/partC.tex	349
-tbl:ledger	documents/paper/ftoo_typed_tools.tex	1005
-tbl:log:concordance	documents/paper/econ_membrane.tex	164
-tbl:log:knock	documents/paper/parts/appendices.tex	344
-tbl:log:split	documents/paper/parts/appendices.tex	384
-tbl:ont:zeros	documents/paper/parts/partA.tex	496
-tbl:portraits	documents/paper/parts/appendices.tex	667
-tbl:rulings	documents/paper/ftoo_typed_tools.tex	1050
-tbl:sc:acc	documents/paper/parts/appendices.tex	633
-tbl:sc:bif	documents/paper/parts/appendices.tex	632
-tbl:sc:edge	documents/paper/parts/appendices.tex	632
-tbl:sc:info	documents/paper/parts/appendices.tex	648
-tbl:scales	documents/paper/parts/appendices.tex	638
-tbl:self:duality	documents/paper/parts/appendices.tex	937
-tbl:self:struts	documents/paper/parts/appendices.tex	912
-tbl:shapes	documents/paper/parts/appendices.tex	1079
-tbl:still:tenants	documents/paper/parts/partF.tex	155
-tbl:verify	documents/paper/parts/appendices.tex	1010
-tbl:will:reach	documents/paper/parts/partA.tex	717
-ten:deon	documents/paper/parts/partF.tex	145
-ten:fid	documents/paper/parts/partB.tex	572
-ten:lapse	documents/paper/parts/partC.tex	208
-ten:res	documents/paper/parts/partC.tex	208
-ten:self	documents/paper/parts/partF.tex	145
-ten:sev	documents/paper/parts/partF.tex	145
-ten:spite	documents/paper/parts/partF.tex	145
-ten:toll	documents/paper/parts/partF.tex	145
-w:anti	documents/paper/parts/partA.tex	690
-w:con	documents/paper/parts/partA.tex	688
-w:enl	documents/paper/parts/partA.tex	765
-w:exp	documents/paper/parts/partA.tex	763
-w:faces	documents/paper/parts/partA.tex	758
-w:net	documents/paper/parts/partB.tex	44
-w:rec	documents/paper/parts/partA.tex	689
-w:res	documents/paper/parts/partA.tex	766
-w:sev	documents/paper/parts/partA.tex	691
-w:signed	documents/paper/parts/partA.tex	684
-w:torque	documents/paper/parts/partA.tex	704
-w:vir	documents/paper/parts/partA.tex	764
-xstmt:comovement	documents/paper/explainer/explainer.tex	274
-xstmt:converter	documents/paper/explainer/explainer.tex	346
-xstmt:fact	documents/paper/explainer/explainer.tex	360
-xstmt:fidelity	documents/paper/explainer/explainer.tex	442
-xstmt:place	documents/paper/explainer/explainer.tex	801
-xstmt:plain	documents/paper/explainer/explainer.tex	197
-xstmt:sweep	documents/paper/explainer/explainer.tex	675
-xstmt:verdict	documents/paper/explainer/explainer.tex	758
-xtbl:L	documents/paper/explainer/explainer.tex	105
-xtbl:backL	documents/paper/explainer/explainer.tex	132
-xtbl:confusions	documents/paper/explainer/explainer.tex	208
+# Paper target evidence has one evidence row per key and source file; the key occurs in that file. These rows do not admit documentary identities.
+B:belief	documents/paper/parts/partG.tex
+B:record	documents/paper/parts/partG.tex
+B:relevance	documents/paper/parts/partG.tex
+B:salience	documents/paper/parts/partG.tex
+J:anchor	documents/paper/parts/gateways.tex
+J:broker	documents/paper/parts/partB.tex
+J:forensics	documents/paper/parts/partB.tex
+J:hip	documents/paper/parts/gateways.tex
+J:occ	documents/paper/parts/gateways.tex
+J:power	documents/paper/parts/partB.tex
+J:read	documents/paper/parts/front.tex
+J:seal	documents/paper/parts/partB.tex
+J:seal-floor	documents/paper/parts/partB.tex
+J:tremble	documents/paper/parts/partB.tex
+J:triage	documents/paper/parts/partC.tex
+P:akrasia	documents/paper/explainer/explainer.tex
+P:anti	documents/paper/parts/partE.tex
+P:axes	documents/paper/parts/appendices.tex
+P:bld	documents/paper/parts/front.tex
+P:dens	documents/paper/parts/front.tex
+P:dir	documents/paper/parts/front.tex
+P:leak	documents/paper/parts/partE.tex
+P:nar	documents/paper/parts/front.tex
+P:nonorm	documents/paper/parts/partE.tex
+P:order	documents/paper/parts/partE.tex
+P:res	documents/paper/parts/front.tex
+P:sig	documents/paper/parts/front.tex
+P:vec	documents/paper/parts/front.tex
+P:will	documents/paper/parts/front.tex
+R:askonly	documents/paper/parts/partG.tex
+R:nostake	documents/paper/parts/partG.tex
+R:trusted	documents/paper/parts/partG.tex
+T:audited	documents/paper/parts/partG.tex
+T:certnull	documents/paper/parts/partG.tex
+T:justice	documents/paper/parts/partG.tex
+T:wound	documents/paper/parts/partG.tex
+W:connect	documents/paper/parts/partG.tex
+W:keepers	documents/paper/parts/partG.tex
+W:lookout	documents/paper/parts/partG.tex
+W:seed	documents/paper/parts/partG.tex
+app:corners	documents/paper/parts/appendices.tex
+app:cos:acctstake	documents/paper/parts/appendices.tex
+app:cos:cosine	documents/paper/parts/appendices.tex
+app:cos:covectors	documents/paper/parts/appendices.tex
+app:cos:dividends	documents/paper/parts/appendices.tex
+app:cos:inclexpo	documents/paper/parts/appendices.tex
+app:cos:propagation	documents/paper/parts/appendices.tex
+app:cos:stakemag	documents/paper/parts/appendices.tex
+app:cosine	documents/paper/parts/appendices.tex
+app:index	documents/paper/parts/appendices.tex
+app:ledger	documents/paper/parts/appendices.tex
+app:log	documents/paper/parts/appendices.tex
+app:port:blindrate	documents/paper/parts/appendices.tex
+app:port:concave	documents/paper/parts/appendices.tex
+app:port:deadseam	documents/paper/parts/appendices.tex
+app:port:fabline	documents/paper/parts/appendices.tex
+app:port:flywheel	documents/paper/parts/appendices.tex
+app:port:sigmoid	documents/paper/parts/appendices.tex
+app:port:spectrum	documents/paper/parts/appendices.tex
+app:portraits	documents/paper/parts/appendices.tex
+app:recovery	documents/paper/parts/appendices.tex
+app:self-limit	documents/paper/parts/appendices.tex
+art:directive	documents/paper/explainer/explainer.tex
+art:keepers	documents/paper/parts/partG.tex
+bd:G	documents/paper/parts/partF.tex
+bd:V	documents/paper/parts/partF.tex
+bd:edge	documents/paper/parts/partF.tex
+bd:fab	documents/paper/parts/partF.tex
+bd:fab-power	documents/paper/parts/partF.tex
+bd:rep	documents/paper/parts/partF.tex
+bf:cred	documents/paper/parts/partD.tex
+bf:factors	documents/paper/parts/partD.tex
+bf:ind	documents/paper/parts/partD.tex
+bf:mot	documents/paper/parts/partD.tex
+bf:unb	documents/paper/parts/partD.tex
+c:Da	documents/paper/parts/appendices.tex
+c:Gstar	documents/paper/parts/partA.tex
+c:Npool	documents/paper/parts/appendices.tex
+c:W0	documents/paper/parts/appendices.tex
+c:Wstar	documents/paper/parts/appendices.tex
+c:burn	documents/paper/parts/appendices.tex
+c:exch	documents/paper/parts/partA.tex
+c:kappa0	documents/paper/parts/appendices.tex
+c:lam	documents/paper/parts/appendices.tex
+c:mu	documents/paper/parts/appendices.tex
+c:nu	documents/paper/data/ftoo_registers.tex
+c:q	documents/paper/explainer/explainer.tex
+c:tau	documents/paper/parts/appendices.tex
+cor:tremble:curve	documents/paper/parts/partB.tex
+deon:open	documents/paper/parts/partF.tex
+deon:test	documents/paper/parts/partF.tex
+dyn:bend	documents/paper/parts/partB.tex
+dyn:bif	documents/paper/parts/partB.tex
+dyn:exact	documents/paper/parts/partB.tex
+dyn:floor	documents/paper/parts/partB.tex
+dyn:flow	documents/paper/parts/partB.tex
+dyn:formclose	documents/paper/parts/partB.tex
+dyn:gamma	documents/paper/parts/partB.tex
+dyn:jac	documents/paper/parts/partB.tex
+dyn:lapse	documents/paper/parts/partB.tex
+dyn:loop	documents/paper/parts/partB.tex
+dyn:moment	documents/paper/parts/partB.tex
+dyn:pitch	documents/paper/parts/partB.tex
+dyn:pitchpair	documents/paper/parts/partB.tex
+dyn:polar	documents/paper/parts/partB.tex
+dyn:precess	documents/paper/parts/partB.tex
+dyn:radial	documents/paper/parts/partB.tex
+dyn:reconcile	documents/paper/parts/partB.tex
+dyn:release	documents/paper/parts/partB.tex
+dyn:response	documents/paper/parts/partB.tex
+dyn:rot	documents/paper/parts/partB.tex
+dyn:scramble	documents/paper/parts/partB.tex
+dyn:seed	documents/paper/parts/partB.tex
+dyn:skew	documents/paper/parts/partB.tex
+dyn:split	documents/paper/parts/partB.tex
+dyn:spont	documents/paper/parts/partB.tex
+dyn:stand	documents/paper/parts/partB.tex
+dyn:sub	documents/paper/parts/partB.tex
+dyn:sym	documents/paper/parts/partB.tex
+dyn:tri	documents/paper/parts/partB.tex
+dyn:ttax	documents/paper/parts/partB.tex
+dyn:whereskew	documents/paper/parts/partB.tex
+e:afriat	documents/paper/parts/partF.tex
+e:arrow	documents/paper/parts/partD.tex
+e:artifact	documents/paper/parts/partG.tex
+e:balance	documents/paper/parts/partA.tex
+e:baseline	documents/paper/parts/partC.tex
+e:bistab	documents/paper/parts/partB.tex
+e:capability	documents/paper/parts/coda.tex
+e:capital	documents/paper/parts/partA.tex
+e:carework	documents/paper/parts/partB.tex
+e:cartel	documents/paper/parts/gateways.tex
+e:closure	documents/paper/parts/partA.tex
+e:colour	documents/paper/parts/partD.tex
+e:commitment	documents/paper/parts/partC.tex
+e:dmp	documents/paper/parts/partB.tex
+e:externality	documents/paper/parts/partG.tex
+e:extself	documents/paper/parts/partC.tex
+e:faces	documents/paper/parts/partA.tex
+e:fwt	documents/paper/parts/partA.tex
+e:goodhart	documents/paper/parts/partF.tex
+e:hayek	documents/paper/parts/partD.tex
+e:input	documents/paper/parts/front.tex
+e:lemons	documents/paper/parts/partA.tex
+e:license	documents/paper/parts/partC.tex
+e:menus	documents/paper/parts/partB.tex
+e:netform	documents/paper/parts/partB.tex
+e:osc	documents/paper/parts/partB.tex
+e:pow	documents/paper/parts/partD.tex
+e:rent-surplus	documents/paper/parts/partA.tex
+e:repeated	documents/paper/parts/partA.tex
+e:robbins	documents/paper/parts/partE.tex
+e:smith	documents/paper/parts/partD.tex
+e:stock	documents/paper/parts/partB.tex
+e:sybil	documents/paper/parts/gateways.tex
+e:witness	documents/paper/parts/partA.tex
+epi:blind	documents/paper/parts/partB.tex
+epi:conv	documents/paper/parts/front.tex
+epi:fact	documents/paper/parts/partA.tex
+epi:option	documents/paper/parts/partB.tex
+epi:shadow	documents/paper/parts/front.tex
+epist:duhem	documents/paper/parts/partF.tex
+eq:J:anchor	documents/paper/parts/gateways.tex
+eq:J:broker	documents/paper/parts/partB.tex
+eq:J:occ	documents/paper/parts/partB.tex
+eq:J:occ:exact	documents/paper/parts/partB.tex
+eq:J:power	documents/paper/parts/partB.tex
+eq:J:seal	documents/paper/parts/partB.tex
+eq:J:triage-cancel	documents/paper/parts/partC.tex
+eq:P:nonorm-expand	documents/paper/parts/partE.tex
+eq:T:audited	documents/paper/parts/partG.tex
+eq:T:certnull-ceiling	documents/paper/parts/partG.tex
+eq:T:justice	documents/paper/parts/partG.tex
+eq:anchor:split	documents/paper/parts/gateways.tex
+eq:art:keepers	documents/paper/parts/partG.tex
+eq:bd:Gdef	documents/paper/parts/partF.tex
+eq:bd:burncost	documents/paper/parts/partF.tex
+eq:bd:edge	documents/paper/parts/partF.tex
+eq:bd:fabcount	documents/paper/parts/partF.tex
+eq:bd:fabpower	documents/paper/parts/partF.tex
+eq:bd:two	documents/paper/parts/partF.tex
+eq:c:exch	documents/paper/parts/partA.tex
+eq:coda:feet	documents/paper/parts/coda.tex
+eq:conv:forge	documents/paper/parts/partD.tex
+eq:conv:normalform	documents/paper/parts/partD.tex
+eq:conv:positive-holding	documents/paper/parts/partD.tex
+eq:conv:telos	documents/paper/parts/partD.tex
+eq:cosine:def	documents/paper/parts/appendices.tex
+eq:decep:L	documents/paper/parts/partF.tex
+eq:deon:open	documents/paper/parts/partF.tex
+eq:dyn:bif	documents/paper/parts/partB.tex
+eq:dyn:exact	documents/paper/parts/partB.tex
+eq:dyn:floor	documents/paper/parts/partB.tex
+eq:dyn:flow	documents/paper/parts/partB.tex
+eq:dyn:jac	documents/paper/parts/partB.tex
+eq:dyn:jaccouple	documents/paper/parts/partB.tex
+eq:dyn:loop	documents/paper/parts/partB.tex
+eq:dyn:moment	documents/paper/parts/partB.tex
+eq:dyn:pitch	documents/paper/parts/partB.tex
+eq:dyn:pitchpair	documents/paper/parts/partB.tex
+eq:dyn:polar	documents/paper/parts/partB.tex
+eq:dyn:radial	documents/paper/parts/partB.tex
+eq:dyn:reconcile	documents/paper/parts/partB.tex
+eq:dyn:response	documents/paper/parts/partB.tex
+eq:dyn:scramble	documents/paper/parts/partB.tex
+eq:dyn:split	documents/paper/parts/partB.tex
+eq:dyn:stand	documents/paper/parts/partB.tex
+eq:epi:decompose	documents/paper/parts/partA.tex
+eq:epi:null	documents/paper/parts/partA.tex
+eq:epi:vel	documents/paper/parts/partA.tex
+eq:f:Ncount	documents/paper/parts/partA.tex
+eq:f:acc	documents/paper/parts/partA.tex
+eq:f:cap	documents/paper/parts/partA.tex
+eq:f:ceiling	documents/paper/parts/partA.tex
+eq:f:charge	documents/paper/parts/partA.tex
+eq:f:defector	documents/paper/parts/partA.tex
+eq:f:eff	documents/paper/parts/partA.tex
+eq:f:felt	documents/paper/parts/partA.tex
+eq:f:holonomy	documents/paper/parts/partA.tex
+eq:f:holonomy-coherence	documents/paper/parts/partA.tex
+eq:f:opp	documents/paper/parts/partA.tex
+eq:f:reach	documents/paper/parts/partA.tex
+eq:f:rew	documents/paper/parts/partA.tex
+eq:f:split	documents/paper/parts/partA.tex
+eq:fixed:beta	documents/paper/parts/partB.tex
+eq:gen:Srange	documents/paper/parts/front.tex
+eq:gen:dimspace	documents/paper/parts/front.tex
+eq:gen:extdef	documents/paper/parts/front.tex
+eq:gen:fact	documents/paper/parts/front.tex
+eq:gen:goods	documents/paper/parts/front.tex
+eq:gen:pool	documents/paper/parts/front.tex
+eq:gen:trich	documents/paper/parts/front.tex
+eq:gen:wgrade	documents/paper/parts/front.tex
+eq:hip:cartel	documents/paper/parts/gateways.tex
+eq:loom:event	documents/paper/parts/partA.tex
+eq:loom:standing	documents/paper/parts/partA.tex
+eq:maint:ident	documents/paper/parts/partB.tex
+eq:maint:knee	documents/paper/parts/partB.tex
+eq:normative:lived-return	documents/paper/parts/partC.tex
+eq:nrm:grid	documents/paper/parts/partA.tex
+eq:nrm:holding	documents/paper/parts/partA.tex
+eq:nrm:holding-cos	documents/paper/parts/partA.tex
+eq:nrm:incl	documents/paper/parts/partA.tex
+eq:nrm:public	documents/paper/parts/gateways.tex
+eq:nrm:wedge	documents/paper/parts/partD.tex
+eq:op:M	documents/paper/parts/partB.tex
+eq:op:Mproj	documents/paper/parts/partB.tex
+eq:op:afriat	documents/paper/parts/partF.tex
+eq:op:recess	documents/paper/parts/partF.tex
+eq:op:vmoral	documents/paper/parts/partC.tex
+eq:op:vmoralself	documents/paper/parts/partC.tex
+eq:opp:enemy	documents/paper/parts/partA.tex
+eq:pr:agg	documents/paper/parts/partD.tex
+eq:pr:colour-detached	documents/paper/parts/partD.tex
+eq:pr:deltaspan	documents/paper/parts/partD.tex
+eq:pr:fact-intercept	documents/paper/parts/partD.tex
+eq:pr:gain	documents/paper/parts/partD.tex
+eq:pr:info	documents/paper/parts/partD.tex
+eq:pr:info-cred	documents/paper/parts/partD.tex
+eq:pr:info-unb	documents/paper/parts/partD.tex
+eq:pr:report	documents/paper/parts/partD.tex
+eq:pr:span	documents/paper/parts/partD.tex
+eq:pr:span-ident	documents/paper/parts/partD.tex
+eq:pr:span-model	documents/paper/parts/partD.tex
+eq:pr:span-moments	documents/paper/parts/partD.tex
+eq:pr:span-proof	documents/paper/parts/partD.tex
+eq:pr:stand	documents/paper/parts/partD.tex
+eq:pr:verdict-colour	documents/paper/parts/partD.tex
+eq:pr:woven	documents/paper/parts/partD.tex
+eq:recov:Q	documents/paper/parts/appendices.tex
+eq:recov:anchordecay	documents/paper/parts/appendices.tex
+eq:recov:anchorode	documents/paper/parts/appendices.tex
+eq:recov:anchorprec	documents/paper/parts/appendices.tex
+eq:recov:block	documents/paper/parts/appendices.tex
+eq:recov:blocksum	documents/paper/parts/appendices.tex
+eq:recov:ceiling	documents/paper/parts/appendices.tex
+eq:recov:certceil	documents/paper/parts/appendices.tex
+eq:recov:cleanreads	documents/paper/parts/appendices.tex
+eq:recov:compare	documents/paper/parts/appendices.tex
+eq:recov:component	documents/paper/parts/appendices.tex
+eq:recov:covering	documents/paper/parts/appendices.tex
+eq:recov:covsplit	documents/paper/parts/appendices.tex
+eq:recov:effharm	documents/paper/parts/appendices.tex
+eq:recov:effprecision	documents/paper/parts/appendices.tex
+eq:recov:gls	documents/paper/parts/appendices.tex
+eq:recov:infopool	documents/paper/parts/appendices.tex
+eq:recov:invariant	documents/paper/parts/appendices.tex
+eq:recov:lhat	documents/paper/parts/appendices.tex
+eq:recov:margclean	documents/paper/parts/appendices.tex
+eq:recov:marginfo	documents/paper/parts/appendices.tex
+eq:recov:reparam	documents/paper/parts/appendices.tex
+eq:recov:reports	documents/paper/parts/appendices.tex
+eq:recov:route	documents/paper/parts/appendices.tex
+eq:recov:routecorner	documents/paper/parts/appendices.tex
+eq:recov:sat	documents/paper/parts/appendices.tex
+eq:recov:spanmodel	documents/paper/parts/appendices.tex
+eq:recov:split-cred	documents/paper/parts/appendices.tex
+eq:recov:split-unbias	documents/paper/parts/appendices.tex
+eq:recov:woodG	documents/paper/parts/appendices.tex
+eq:recov:woodJ	documents/paper/parts/appendices.tex
+eq:recov:woodd	documents/paper/parts/appendices.tex
+eq:seal:floor	documents/paper/parts/partB.tex
+eq:tremble:curve	documents/paper/parts/partB.tex
+eq:verd:decompose	documents/paper/parts/partD.tex
+eq:vmoral:cancel	documents/paper/parts/partC.tex
+eq:vmoral:cancel-exact	documents/paper/parts/partC.tex
+eq:w:faces	documents/paper/parts/partA.tex
+eq:w:signed	documents/paper/parts/partA.tex
+eq:w:virtue	documents/paper/parts/partA.tex
+eq:will:passive-decay	documents/paper/parts/partA.tex
+ev:afriat-conv	documents/paper/parts/appendices.tex
+ev:decay-occ	documents/paper/explainer/explainer.tex
+ev:knee-rate	documents/paper/explainer/explainer.tex
+ev:resid-ex	documents/paper/explainer/explainer.tex
+ev:resid-opp	documents/paper/explainer/explainer.tex
+ev:tremble-conv	documents/paper/parts/appendices.tex
+f:Ncount	documents/paper/parts/partA.tex
+f:acc	documents/paper/parts/partA.tex
+f:ambiv	documents/paper/parts/partA.tex
+f:cap	documents/paper/parts/partA.tex
+f:ceiling	documents/paper/parts/partA.tex
+f:couple	documents/paper/parts/partA.tex
+f:defector	documents/paper/parts/partA.tex
+f:eff	documents/paper/parts/partA.tex
+f:felt	documents/paper/parts/partA.tex
+f:feltmag	documents/paper/parts/partA.tex
+f:feltsign	documents/paper/parts/partA.tex
+f:feltzero	documents/paper/parts/partA.tex
+f:holonomy	documents/paper/parts/partA.tex
+f:local	documents/paper/parts/partA.tex
+f:opp	documents/paper/parts/partA.tex
+f:path	documents/paper/parts/partA.tex
+f:pool	documents/paper/parts/partA.tex
+f:reach	documents/paper/parts/partA.tex
+f:rew	documents/paper/parts/partA.tex
+f:seal-law	documents/paper/parts/partA.tex
+f:sealed	documents/paper/parts/partA.tex
+f:split	documents/paper/parts/partA.tex
+f:stake	documents/paper/parts/partA.tex
+f:surplus	documents/paper/parts/partA.tex
+g:gate	documents/paper/parts/front.tex
+g:knock	documents/paper/parts/front.tex
+g:proj	documents/paper/parts/front.tex
+g:rec	documents/paper/parts/front.tex
+g:sign	documents/paper/parts/front.tex
+g:split	documents/paper/parts/front.tex
+gate:G1	documents/paper/parts/partE.tex
+gate:G2	documents/paper/parts/partE.tex
+gate:G3	documents/paper/parts/partE.tex
+gate:G4	documents/paper/parts/partE.tex
+gen:alph	documents/paper/parts/front.tex
+gen:basins	documents/paper/parts/front.tex
+gen:ext	documents/paper/parts/front.tex
+gen:goods	documents/paper/parts/front.tex
+gen:grade	documents/paper/parts/front.tex
+gen:obj	documents/paper/parts/front.tex
+gen:trich	documents/paper/parts/front.tex
+gen:w-exists	documents/paper/parts/front.tex
+gen:w-opp	documents/paper/parts/front.tex
+gen:w-rate	documents/paper/parts/front.tex
+gen:will	documents/paper/parts/front.tex
+maint:ident	documents/paper/parts/partB.tex
+maint:knee	documents/paper/parts/partB.tex
+mod:branch	documents/paper/explainer/explainer.tex
+mod:drifts	documents/paper/parts/appendices.tex
+mod:facets	documents/paper/explainer/explainer.tex
+mod:recruit	documents/paper/parts/appendices.tex
+mod:reg	documents/paper/parts/front.tex
+nrm:anch	documents/paper/parts/gateways.tex
+nrm:anchbase	documents/paper/parts/partG.tex
+nrm:anchmetric	documents/paper/parts/partG.tex
+nrm:annex	documents/paper/parts/partA.tex
+nrm:assign	documents/paper/parts/gateways.tex
+nrm:expo	documents/paper/parts/partA.tex
+nrm:floor	documents/paper/parts/partF.tex
+nrm:funding	documents/paper/parts/partC.tex
+nrm:good	documents/paper/parts/partA.tex
+nrm:grid	documents/paper/parts/partA.tex
+nrm:incl	documents/paper/parts/partA.tex
+nrm:incl-expo	documents/paper/explainer/explainer.tex
+nrm:int	documents/paper/parts/gateways.tex
+nrm:martyr	documents/paper/parts/partC.tex
+nrm:maxbook	documents/paper/parts/partC.tex
+nrm:modest	documents/paper/parts/partC.tex
+nrm:nodepl	documents/paper/parts/partC.tex
+nrm:public	documents/paper/parts/gateways.tex
+nrm:self	documents/paper/parts/partC.tex
+nrm:telos	documents/paper/parts/partD.tex
+nrm:wedge	documents/paper/parts/partD.tex
+nrm:wise	documents/paper/parts/partA.tex
+op:L	documents/paper/parts/partF.tex
+op:afriat	documents/paper/parts/partF.tex
+op:cancel	documents/paper/parts/partC.tex
+op:cos	documents/paper/parts/partA.tex
+op:cosev	documents/paper/parts/partA.tex
+op:null	documents/paper/parts/partA.tex
+op:read	documents/paper/parts/partB.tex
+op:recess	documents/paper/parts/partF.tex
+op:vel	documents/paper/parts/partA.tex
+op:vmoral	documents/paper/parts/coda.tex
+part:gw:anchor	documents/paper/parts/gateways.tex
+part:gw:hip	documents/paper/parts/gateways.tex
+pr:agg	documents/paper/parts/partD.tex
+pr:certnull	documents/paper/parts/partD.tex
+pr:colour	documents/paper/parts/partD.tex
+pr:deltaspan	documents/paper/parts/partD.tex
+pr:detach	documents/paper/parts/partD.tex
+pr:equi	documents/paper/parts/partD.tex
+pr:forge	documents/paper/parts/partD.tex
+pr:gain	documents/paper/parts/partD.tex
+pr:info	documents/paper/parts/partD.tex
+pr:report	documents/paper/parts/partD.tex
+pr:scope	documents/paper/parts/partD.tex
+pr:silence	documents/paper/parts/partD.tex
+pr:span	documents/paper/parts/partD.tex
+pr:span-ident	documents/paper/parts/partD.tex
+pr:stand	documents/paper/parts/partD.tex
+pr:verdict	documents/paper/parts/partD.tex
+pr:woven	documents/paper/parts/partD.tex
+recov:Lhat	documents/paper/parts/appendices.tex
+recov:anchorflow	documents/paper/parts/appendices.tex
+recov:ancill	documents/paper/parts/appendices.tex
+recov:auditor	documents/paper/parts/appendices.tex
+recov:blocks	documents/paper/parts/appendices.tex
+recov:ceil	documents/paper/parts/appendices.tex
+recov:compare	documents/paper/parts/appendices.tex
+recov:contrast	documents/paper/parts/appendices.tex
+recov:cover	documents/paper/parts/appendices.tex
+recov:effreads	documents/paper/parts/appendices.tex
+recov:estimand	documents/paper/parts/appendices.tex
+recov:ext	documents/paper/parts/appendices.tex
+recov:factor	documents/paper/parts/appendices.tex
+recov:gap	documents/paper/parts/appendices.tex
+recov:groupframe	documents/paper/parts/appendices.tex
+recov:held	documents/paper/parts/appendices.tex
+recov:hold	documents/paper/parts/appendices.tex
+recov:null	documents/paper/parts/appendices.tex
+recov:route	documents/paper/parts/appendices.tex
+recov:sat	documents/paper/parts/appendices.tex
+recov:scope	documents/paper/parts/appendices.tex
+recov:span	documents/paper/parts/appendices.tex
+recov:split	documents/paper/parts/appendices.tex
+recov:victim	documents/paper/parts/appendices.tex
+sec:anchor	documents/paper/parts/gateways.tex
+sec:artifact	documents/paper/parts/partG.tex
+sec:coda	documents/paper/parts/coda.tex
+sec:coloured-report	documents/paper/parts/partD.tex
+sec:convergence	documents/paper/parts/partD.tex
+sec:epistemic	documents/paper/parts/partA.tex
+sec:explainer:accountability	documents/paper/explainer/explainer.tex
+sec:explainer:edge	documents/paper/explainer/explainer.tex
+sec:explainer:falsifier	documents/paper/explainer/explainer.tex
+sec:explainer:good-wise	documents/paper/explainer/explainer.tex
+sec:explainer:goods	documents/paper/explainer/explainer.tex
+sec:explainer:log	documents/paper/explainer/explainer.tex
+sec:explainer:plain	documents/paper/explainer/explainer.tex
+sec:explainer:the-L	documents/paper/explainer/explainer.tex
+sec:explainer:two-feet	documents/paper/explainer/explainer.tex
+sec:explainer:typed	documents/paper/explainer/explainer.tex
+sec:explainer:verdicts-lives	documents/paper/explainer/explainer.tex
+sec:explainer:will	documents/paper/explainer/explainer.tex
+sec:explainer:witnesses	documents/paper/explainer/explainer.tex
+sec:fixed-points	documents/paper/parts/partB.tex
+sec:flow	documents/paper/parts/partB.tex
+sec:generators	documents/paper/parts/front.tex
+sec:good-wise	documents/paper/parts/partC.tex
+sec:goodness	documents/paper/parts/partC.tex
+sec:hip	documents/paper/parts/gateways.tex
+sec:maintenance	documents/paper/parts/partB.tex
+sec:nonnormable	documents/paper/parts/partE.tex
+sec:null-verdict	documents/paper/parts/partD.tex
+sec:ontic-fields	documents/paper/parts/partA.tex
+sec:oscillation	documents/paper/parts/partB.tex
+sec:readout	documents/paper/parts/partB.tex
+sec:self-deception	documents/paper/parts/partF.tex
+sec:signed-will	documents/paper/parts/partA.tex
+sec:still-center	documents/paper/parts/partF.tex
+sec:two-boundaries	documents/paper/parts/partF.tex
+sec:witness-functional	documents/paper/parts/partD.tex
+snk:anch	documents/paper/parts/gateways.tex
+snk:anch-G	documents/paper/parts/gateways.tex
+snk:anch-t	documents/paper/parts/gateways.tex
+snk:ker	documents/paper/parts/coda.tex
+snk:two	documents/paper/parts/coda.tex
+src:nd	documents/paper/parts/partB.tex
+subsec:anchor:internal	documents/paper/parts/gateways.tex
+subsec:anchor:overlaps	documents/paper/parts/gateways.tex
+subsec:anchor:second-foot	documents/paper/parts/gateways.tex
+subsec:artifact:buildables	documents/paper/parts/partG.tex
+subsec:artifact:directive	documents/paper/parts/partG.tex
+subsec:artifact:refusals	documents/paper/parts/partG.tex
+subsec:artifact:theorems	documents/paper/parts/partG.tex
+subsec:artifact:wills	documents/paper/parts/partG.tex
+subsec:bd:darknesses	documents/paper/parts/partF.tex
+subsec:bd:edge	documents/paper/parts/partF.tex
+subsec:bd:ratio-rate	documents/paper/parts/partF.tex
+subsec:coda:close	documents/paper/parts/coda.tex
+subsec:coda:tenses	documents/paper/parts/coda.tex
+subsec:coda:wall	documents/paper/parts/coda.tex
+subsec:coda:words	documents/paper/parts/coda.tex
+subsec:colour-span	documents/paper/parts/partD.tex
+subsec:conv:forge	documents/paper/parts/partD.tex
+subsec:conv:telos	documents/paper/parts/partD.tex
+subsec:corners:corners	documents/paper/parts/appendices.tex
+subsec:corners:scales	documents/paper/parts/appendices.tex
+subsec:decep:Lrestrict	documents/paper/parts/partF.tex
+subsec:decep:coins	documents/paper/parts/partF.tex
+subsec:decep:floor	documents/paper/parts/partF.tex
+subsec:decep:recession	documents/paper/parts/partF.tex
+subsec:decep:second-prediction	documents/paper/parts/partF.tex
+subsec:epi:fact	documents/paper/parts/partA.tex
+subsec:epi:grid	documents/paper/parts/partA.tex
+subsec:epi:readability	documents/paper/parts/partA.tex
+subsec:epi:scope	documents/paper/parts/partA.tex
+subsec:fixed:exact	documents/paper/parts/partB.tex
+subsec:fixed:gate	documents/paper/parts/partB.tex
+subsec:fixed:latency	documents/paper/parts/partB.tex
+subsec:fixed:tri	documents/paper/parts/partB.tex
+subsec:flow:branch	documents/paper/parts/partB.tex
+subsec:flow:confluence	documents/paper/parts/partB.tex
+subsec:gen:audit	documents/paper/parts/front.tex
+subsec:gen:basins	documents/paper/parts/front.tex
+subsec:gen:covenant	documents/paper/parts/front.tex
+subsec:gen:grades	documents/paper/parts/front.tex
+subsec:gen:object	documents/paper/parts/front.tex
+subsec:gen:place	documents/paper/parts/front.tex
+subsec:gen:posits	documents/paper/parts/front.tex
+subsec:good:baseline	documents/paper/parts/partC.tex
+subsec:good:kernel	documents/paper/parts/partC.tex
+subsec:good:licenses	documents/paper/parts/partC.tex
+subsec:good:located	documents/paper/parts/partC.tex
+subsec:good:spends	documents/paper/parts/partC.tex
+subsec:gw:bottom-left	documents/paper/parts/partC.tex
+subsec:gw:temporal	documents/paper/parts/partC.tex
+subsec:gw:uniqueness	documents/paper/parts/partC.tex
+subsec:hip:cartel	documents/paper/parts/gateways.tex
+subsec:hip:split	documents/paper/parts/gateways.tex
+subsec:ledger:branches	documents/paper/parts/appendices.tex
+subsec:ledger:debts	documents/paper/parts/appendices.tex
+subsec:ledger:equiv	documents/paper/parts/appendices.tex
+subsec:ledger:evidence	documents/paper/parts/appendices.tex
+subsec:ledger:rulings	documents/paper/parts/appendices.tex
+subsec:ledger:shapes	documents/paper/parts/appendices.tex
+subsec:ledger:verify	documents/paper/parts/appendices.tex
+subsec:log:concordance	documents/paper/parts/appendices.tex
+subsec:log:knock	documents/paper/parts/appendices.tex
+subsec:log:split	documents/paper/parts/appendices.tex
+subsec:maint:filled	documents/paper/parts/partB.tex
+subsec:maint:ident	documents/paper/parts/partB.tex
+subsec:maint:standing	documents/paper/parts/partB.tex
+subsec:maint:stock	documents/paper/parts/partB.tex
+subsec:maint:twosided	documents/paper/parts/partB.tex
+subsec:ont:accountability	documents/paper/parts/partA.tex
+subsec:ont:density	documents/paper/parts/partA.tex
+subsec:ont:loom	documents/paper/parts/partA.tex
+subsec:ont:operator	documents/paper/parts/partA.tex
+subsec:ont:opposition	documents/paper/parts/partA.tex
+subsec:ont:rewards	documents/paper/parts/partA.tex
+subsec:ont:zeros	documents/paper/parts/partA.tex
+subsec:osc:dag	documents/paper/parts/partB.tex
+subsec:osc:polar	documents/paper/parts/partB.tex
+subsec:osc:precommit	documents/paper/parts/partB.tex
+subsec:osc:release	documents/paper/parts/partB.tex
+subsec:osc:soft	documents/paper/parts/partB.tex
+subsec:osc:spectrum	documents/paper/parts/partB.tex
+subsec:osc:split	documents/paper/parts/partB.tex
+subsec:osc:tremor	documents/paper/parts/partB.tex
+subsec:prof:antichain	documents/paper/parts/partE.tex
+subsec:prof:athome	documents/paper/parts/partE.tex
+subsec:prof:dignity	documents/paper/parts/partE.tex
+subsec:prof:gates	documents/paper/parts/partE.tex
+subsec:prof:leak	documents/paper/parts/partE.tex
+subsec:prof:nonorm	documents/paper/parts/partE.tex
+subsec:prof:order	documents/paper/parts/partE.tex
+subsec:readout:image-kernel	documents/paper/parts/partB.tex
+subsec:readout:kernel	documents/paper/parts/partB.tex
+subsec:rep:content	documents/paper/parts/partD.tex
+subsec:rep:factors	documents/paper/parts/partD.tex
+subsec:rep:silencing	documents/paper/parts/partD.tex
+subsec:still:deontic	documents/paper/parts/partF.tex
+subsec:still:hides	documents/paper/parts/partF.tex
+subsec:still:severance	documents/paper/parts/partF.tex
+subsec:still:tenants	documents/paper/parts/partF.tex
+subsec:verd:certificate	documents/paper/parts/partD.tex
+subsec:verd:null-projection	documents/paper/parts/partD.tex
+subsec:verd:standing	documents/paper/parts/partD.tex
+subsec:will:faces	documents/paper/parts/partA.tex
+subsec:will:signed	documents/paper/parts/partA.tex
+subsec:wit:functional	documents/paper/parts/partD.tex
+subsec:wit:gate	documents/paper/parts/partD.tex
+subsec:wit:manifold	documents/paper/parts/partD.tex
+tbl:P:antichain	documents/paper/parts/partE.tex
+tbl:P:gates	documents/paper/parts/partE.tex
+tbl:W:rests	documents/paper/parts/partG.tex
+tbl:branches	documents/paper/ftoo_typed_tools.tex
+tbl:corners	documents/paper/parts/appendices.tex
+tbl:cosine:covectors	documents/paper/parts/appendices.tex
+tbl:cosine:dividends	documents/paper/parts/appendices.tex
+tbl:cosine:inclexpo	documents/paper/parts/appendices.tex
+tbl:cosine:propagation	documents/paper/parts/appendices.tex
+tbl:cosine:stake	documents/paper/parts/appendices.tex
+tbl:cosine:zeros	documents/paper/parts/appendices.tex
+tbl:coupling	documents/paper/parts/appendices.tex
+tbl:debts	documents/paper/parts/appendices.tex
+tbl:epi:spend	documents/paper/parts/partA.tex
+tbl:equivalences	documents/paper/ftoo_typed_tools.tex
+tbl:ev	documents/paper/ftoo_typed_tools.tex
+tbl:fabline	documents/paper/parts/appendices.tex
+tbl:falsifiers	documents/paper/parts/partB.tex
+tbl:gen:grades	documents/paper/parts/front.tex
+tbl:good:kernel	documents/paper/parts/partC.tex
+tbl:good:spends	documents/paper/parts/partC.tex
+tbl:gw:bottomleft	documents/paper/parts/partC.tex
+tbl:gw:ladder	documents/paper/parts/partC.tex
+tbl:ledger	documents/paper/ftoo_typed_tools.tex
+tbl:log:concordance	documents/paper/econ_membrane.tex
+tbl:log:knock	documents/paper/parts/appendices.tex
+tbl:log:split	documents/paper/parts/appendices.tex
+tbl:ont:zeros	documents/paper/parts/partA.tex
+tbl:portraits	documents/paper/parts/appendices.tex
+tbl:rulings	documents/paper/ftoo_typed_tools.tex
+tbl:sc:acc	documents/paper/parts/appendices.tex
+tbl:sc:bif	documents/paper/parts/appendices.tex
+tbl:sc:edge	documents/paper/parts/appendices.tex
+tbl:sc:info	documents/paper/parts/appendices.tex
+tbl:scales	documents/paper/parts/appendices.tex
+tbl:self:duality	documents/paper/parts/appendices.tex
+tbl:self:struts	documents/paper/parts/appendices.tex
+tbl:shapes	documents/paper/parts/appendices.tex
+tbl:still:tenants	documents/paper/parts/partF.tex
+tbl:verify	documents/paper/parts/appendices.tex
+tbl:will:reach	documents/paper/parts/partA.tex
+ten:deon	documents/paper/parts/partF.tex
+ten:fid	documents/paper/parts/partB.tex
+ten:lapse	documents/paper/parts/partC.tex
+ten:res	documents/paper/parts/partC.tex
+ten:self	documents/paper/parts/partF.tex
+ten:sev	documents/paper/parts/partF.tex
+ten:spite	documents/paper/parts/partF.tex
+ten:toll	documents/paper/parts/partF.tex
+w:anti	documents/paper/parts/partA.tex
+w:con	documents/paper/parts/partA.tex
+w:enl	documents/paper/parts/partA.tex
+w:exp	documents/paper/parts/partA.tex
+w:faces	documents/paper/parts/partA.tex
+w:net	documents/paper/parts/partB.tex
+w:rec	documents/paper/parts/partA.tex
+w:res	documents/paper/parts/partA.tex
+w:sev	documents/paper/parts/partA.tex
+w:signed	documents/paper/parts/partA.tex
+w:torque	documents/paper/parts/partA.tex
+w:vir	documents/paper/parts/partA.tex
+xstmt:comovement	documents/paper/explainer/explainer.tex
+xstmt:converter	documents/paper/explainer/explainer.tex
+xstmt:fact	documents/paper/explainer/explainer.tex
+xstmt:fidelity	documents/paper/explainer/explainer.tex
+xstmt:place	documents/paper/explainer/explainer.tex
+xstmt:plain	documents/paper/explainer/explainer.tex
+xstmt:sweep	documents/paper/explainer/explainer.tex
+xstmt:verdict	documents/paper/explainer/explainer.tex
+xtbl:L	documents/paper/explainer/explainer.tex
+xtbl:backL	documents/paper/explainer/explainer.tex
+xtbl:confusions	documents/paper/explainer/explainer.tex

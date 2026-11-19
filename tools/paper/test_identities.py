@@ -168,7 +168,7 @@ class Identities(unittest.TestCase):
         source=pathlib.Path(__file__).resolve().parents[2]
         for name in ['documents/paper-build/paper-tags.tsv','documents/paper-build/reader-tags.toml',
                      'documents/paper-build/provisional-tags.toml','registry/documentary-tags.toml','generated/manifest.json',
-                     'documents/paper-build/label-mints.tsv']:
+                     'documents/paper-build/label-mints.tsv','documents/paper-build/sources.tsv']:
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
         shutil.copytree(source/'documents/paper',self.root/'documents/paper')
@@ -219,33 +219,68 @@ sites = ["fixture"]
             ledger_binding({}, 'identity', 'absent:key', 'absent:key', 'paper')
         self.assertEqual(str(caught.exception), 'M064: unbound ledger key: absent:key')
 
-    def test_table_row_counts_and_grammar_refuse(self):
-        for name, count_fault, grammar_fault in [
-            ('paper-tags.tsv', 'M063: paper tag row count differs', 'M063: malformed paper tag pair'),
-            ('label-mints.tsv', 'M063: label mint row count differs', 'M063: malformed label mint row'),
-        ]:
-            path=self.root/'documents/paper-build'/name
-            original=read(path)
-            rows=[line for line in original.splitlines() if not line.startswith('#')]
-            malformed=rows.copy(); malformed[0]='!'+malformed[0]
-            for changed, expected in [(rows[:-1],count_fault),(malformed,grammar_fault)]:
-                with self.subTest(table=name,fault=expected):
-                    write(path,'\n'.join(changed)+'\n')
-                    with self.assertRaises(ValueError) as caught:bindings(self.root)
-                    self.assertEqual(str(caught.exception),expected)
-                    write(path,original)
-
-    def test_label_mint_line_must_hold_its_key(self):
-        bindings(self.root)
-        path=self.root/'documents/paper-build/label-mints.tsv'
-        rows=read(path).splitlines()
-        index=next(i for i,row in enumerate(rows) if row.startswith('c:q\t'))
-        key,file,line=rows[index].split('\t')
-        for wrong in [str(int(line)+1), '999999']:
-            with self.subTest(line=wrong):
-                rows[index]='\t'.join([key,file,wrong]); write(path,'\n'.join(rows)+'\n')
+    def test_paper_tag_row_count_and_grammar_refuse(self):
+        path=self.root/'documents/paper-build/paper-tags.tsv'
+        original=read(path)
+        rows=[line for line in original.splitlines() if not line.startswith('#')]
+        malformed=rows.copy(); malformed[0]='!'+malformed[0]
+        for changed, expected in [(rows[:-1],'M063: paper tag row count differs'),
+                                  (malformed,'M063: malformed paper tag pair')]:
+            with self.subTest(fault=expected):
+                write(path,'\n'.join(changed)+'\n')
                 with self.assertRaises(ValueError) as caught:bindings(self.root)
-                self.assertEqual(str(caught.exception),'M063: label mint line does not hold its key: c:q at '+file+':'+wrong)
+                self.assertEqual(str(caught.exception),expected)
+                write(path,original)
+
+    def test_label_mint_file_evidence_survives_line_moves(self):
+        baseline=bindings(self.root)
+        path=self.root/'documents/paper-build/label-mints.tsv'
+        original=read(path)
+        rows=original.splitlines()
+        index=next(i for i,row in enumerate(rows) if row.startswith('c:q\t'))
+        key,file=rows[index].split('\t')
+        source=self.root/file
+        source_text=read(source)
+        lines=source_text.splitlines(keepends=True)
+        occurrence=next(i for i,line in enumerate(lines) if holds(line,key))
+        lines.insert(occurrence,'\n')
+        write(source,''.join(lines))
+        self.assertEqual(bindings(self.root),baseline)
+        write(source,source_text)
+
+        rows[index]='\t'.join([key,'documents/paper/parts/missing.tex'])
+        write(path,'\n'.join(rows)+'\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: label mint file is absent: documents/paper/parts/missing.tex')
+        write(path,original)
+
+        unlisted='documents/paper/parts/unlisted.tex'
+        write(self.root/unlisted,'\\label{c:q}\n')
+        rows[index]='\t'.join([key,unlisted])
+        write(path,'\n'.join(rows)+'\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: label mint file is not declared: '+unlisted)
+        write(path,original)
+        rows[index]='\t'.join([key,file])
+
+        changed=re.sub(r'(?<![A-Za-z0-9_:-])'+re.escape(key)+r'(?![A-Za-z0-9_:-])','c:qx',source_text)
+        write(source,changed)
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: label mint file does not hold its key: '+key+' at '+file)
+        write(source,source_text)
+
+        write(path,original+rows[index]+'\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: duplicate label mint key: '+key)
+        write(path,original)
+        rows[index]='\t'.join([key,file,'1'])
+        write(path,'\n'.join(rows)+'\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: malformed label mint row '+str(index+1))
+        rows[index]='\t'.join(['!'+key,file])
+        write(path,'\n'.join(rows)+'\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),'M063: malformed label mint key: !'+key+' at row '+str(index+1))
         self.assertFalse(holds('\\ftag{c:qx}','c:q'))
         self.assertFalse(holds('\\label{sec:null-verdict}','c:nu'))
         self.assertTrue(holds('(the axis constant is \\ptg{c:q});','c:q'))

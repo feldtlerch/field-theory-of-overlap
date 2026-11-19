@@ -542,12 +542,20 @@ fn m068_paper_tag_target_of_the_reserved_kind_refuses() {
         .expect_err("reserved");
     assert_eq!(error.diagnostics().len(), 1);
     assert_eq!(error.diagnostics()[0].rule, RuleId::M068);
+    assert!(matches!(
+        &error.diagnostics()[0].fault,
+        LabelFault::ReservedOpenKind { label, .. } if label == "open:paper:x"
+    ));
     assert_eq!(
         error.diagnostics()[0].site,
-        crate::LabelSite::PaperTex {
+        crate::LabelSite::PaperTagRow {
             file: "documents/paper-build/paper-tags.tsv".into(),
             line: 4
         }
+    );
+    assert_eq!(
+        error.diagnostics()[0].site.to_string(),
+        "paper tag table \"documents/paper-build/paper-tags.tsv\" row 4"
     );
     assert!(
         crate::check_paper_tag_targets("documents/paper-build/paper-tags.tsv", &rows[..1]).is_ok()
@@ -801,14 +809,18 @@ fn m068_paper_mint_key_of_the_reserved_kind_refuses() {
         .with_paper_mints(vec![(
             "open:test:a".into(),
             "documents/paper/main.tex".into(),
-            1,
         )])
         .expect_err("reserved");
     assert_eq!(error.diagnostics()[0].rule, RuleId::M068);
     assert!(matches!(
         &error.diagnostics()[0].fault,
-        LabelFault::ReservedOpenKind { origin, .. } if origin.kind == MintKind::PaperTex
+        LabelFault::ReservedOpenKind { label, origin }
+            if label == "open:test:a" && origin.kind == MintKind::PaperTex
     ));
+    assert_eq!(
+        error.diagnostics()[0].site.to_string(),
+        "paper mint file \"documents/paper/main.tex\""
+    );
 }
 #[test]
 fn m068_store_labels_are_checked_against_the_joint_inventory_and_a_second_mint_refuses() {

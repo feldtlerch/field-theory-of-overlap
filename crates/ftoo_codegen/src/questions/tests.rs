@@ -341,14 +341,16 @@ fn m068_markdown_mint_of_the_reserved_kind_refuses_the_store() {
 }
 #[test]
 fn m068_paper_tag_target_and_mint_key_of_the_reserved_kind_refuse() {
-    for (file, row) in [
+    for (file, row, key) in [
         (
             crate::documents::registry::PAPER_TAGS,
             "x:open\topen:paper:tag\tnode\n",
+            "open:paper:tag",
         ),
         (
             crate::documents::registry::PAPER_MINTS,
-            "open:paper:key\tdocuments/paper/main.tex\t1\n",
+            "open:paper:key\tdocuments/paper/main.tex\n",
+            "open:paper:key",
         ),
     ] {
         let fixture = Fixture::new();
@@ -356,11 +358,15 @@ fn m068_paper_tag_target_and_mint_key_of_the_reserved_kind_refuse() {
         let mut text = fs::read_to_string(&path).unwrap();
         text.push_str(row);
         fs::write(&path, text).unwrap();
-        assert_eq!(
-            label_rule(&fixture.check().unwrap_err()),
-            RuleId::M068,
-            "{file}"
-        );
+        let error = fixture.check().unwrap_err();
+        assert_eq!(label_rule(&error), RuleId::M068, "{file}");
+        let OpenQuestionError::Labels(LabelFileError::Labels(errors)) = error else {
+            unreachable!("the label rule identifies a label refusal")
+        };
+        assert!(matches!(
+            &errors.diagnostics()[0].fault,
+            ftoo_manifest::LabelFault::ReservedOpenKind { label, .. } if label == key
+        ));
     }
 }
 fn admission(error: &OpenQuestionError) -> (RuleId, QuestionFault) {

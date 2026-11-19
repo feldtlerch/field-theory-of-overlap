@@ -520,19 +520,16 @@ impl JointMints<'_, '_> {
     /// # Errors
     /// Refuses a paper key of the store-reserved kind, then a paper key that already has
     /// any joint mint or another paper mint.
-    pub fn with_paper_mints(
-        mut self,
-        rows: Vec<(String, String, usize)>,
-    ) -> Result<Self, LabelErrors> {
+    pub fn with_paper_mints(mut self, rows: Vec<(String, String)>) -> Result<Self, LabelErrors> {
         let mut candidates: BTreeMap<String, Vec<MintOrigin>> = self
             .mints
             .iter()
             .map(|(key, origin)| (key.clone(), vec![origin.clone()]))
             .collect();
-        for (key, file, line) in rows {
+        for (key, file) in rows {
             candidates.entry(key).or_default().push(MintOrigin {
                 kind: MintKind::PaperTex,
-                site: LabelSite::PaperTex { file, line },
+                site: LabelSite::PaperMintFile { file },
             });
         }
         let mut errors = reserved(&candidates);
@@ -603,7 +600,7 @@ pub fn check_paper_tag_targets(
     for (_, target, line) in rows {
         targets.entry(target.clone()).or_default().push(MintOrigin {
             kind: MintKind::PaperTex,
-            site: LabelSite::PaperTex {
+            site: LabelSite::PaperTagRow {
                 file: file.to_owned(),
                 line: *line,
             },

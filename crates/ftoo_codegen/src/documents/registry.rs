@@ -12,22 +12,18 @@ use ftoo_manifest::{
 pub(super) const FILE: &str = "registry/documentary-tags.toml";
 pub(crate) const PAPER_MINTS: &str = "documents/paper-build/label-mints.tsv";
 
-pub(crate) fn paper_mint_rows(data: &[u8]) -> Result<Vec<(String, String, usize)>, DocumentError> {
+pub(crate) fn paper_mint_rows(data: &[u8]) -> Result<Vec<(String, String)>, DocumentError> {
     let fault = |line| DocumentError::Input(super::DocumentInputFault::PaperMintRow { line });
-    let text = std::str::from_utf8(data).map_err(|_| fault(0))?;
+    let text = std::str::from_utf8(data).map_err(|_| fault(None))?;
     text.lines()
         .enumerate()
         .filter(|(_, line)| !line.starts_with('#'))
         .map(|(index, line)| {
             let fields: Vec<_> = line.split('\t').collect();
-            if fields.len() != 3 {
-                return Err(fault(index + 1));
+            if fields.len() != 2 || fields.iter().any(|field| field.is_empty()) {
+                return Err(fault(Some(index + 1)));
             }
-            let number = fields[2].parse::<usize>().map_err(|_| fault(index + 1))?;
-            if fields[0].is_empty() || fields[1].is_empty() || number == 0 {
-                return Err(fault(index + 1));
-            }
-            Ok((fields[0].into(), fields[1].into(), number))
+            Ok((fields[0].into(), fields[1].into()))
         })
         .collect()
 }

@@ -12,7 +12,10 @@ pub enum LabelStage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LabelSite {
     MintContext,
-    PaperTex {
+    PaperMintFile {
+        file: String,
+    },
+    PaperTagRow {
         file: String,
         line: usize,
     },
@@ -43,7 +46,8 @@ impl fmt::Display for LabelSite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MintContext => f.write_str("joint-mint context"),
-            Self::PaperTex { file, line } => write!(f, "paper source {file:?} line {line}"),
+            Self::PaperMintFile { file } => write!(f, "paper mint file {file:?}"),
+            Self::PaperTagRow { file, line } => write!(f, "paper tag table {file:?} row {line}"),
             Self::OpenQuestion { file, record } => {
                 write!(f, "open-question store {file:?} record {record}")
             }

@@ -9,6 +9,28 @@ fn assert_refusal(result: Result<impl std::fmt::Debug, DocumentError>, expected:
 }
 
 #[test]
+fn paper_mint_rows_keep_two_fields_and_locate_malformed_rows() {
+    let file = "documents/paper/parts/partA.tex";
+    assert_eq!(
+        paper_mint_rows(format!("# evidence\nc:q\t{file}\n").as_bytes()),
+        Ok(vec![("c:q".into(), file.into())])
+    );
+    for (data, line) in [
+        (
+            format!("# evidence\nc:q\t{file}\t1\n").into_bytes(),
+            Some(2),
+        ),
+        (b"# evidence\nc:q\t\n".to_vec(), Some(2)),
+        (b"# evidence\n\xff\n".to_vec(), None),
+    ] {
+        assert_refusal(
+            paper_mint_rows(&data),
+            DocumentError::Input(super::super::DocumentInputFault::PaperMintRow { line }),
+        );
+    }
+}
+
+#[test]
 fn documentary_unknown_and_duplicate_fields_restore_and_reread() {
     let directory = super::super::tests::Directory::new();
     std::fs::create_dir(directory.0.join("registry")).unwrap();

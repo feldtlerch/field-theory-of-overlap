@@ -3495,7 +3495,8 @@ pub(super) fn citation_origins(
                 },
             ),
             ftoo_manifest::LabelSite::RustHistory { .. }
-            | ftoo_manifest::LabelSite::PaperTex { .. }
+            | ftoo_manifest::LabelSite::PaperMintFile { .. }
+            | ftoo_manifest::LabelSite::PaperTagRow { .. }
             | ftoo_manifest::LabelSite::MintContext => unreachable!("checked mint origin"),
         };
         origins.push(SourceOrigin {

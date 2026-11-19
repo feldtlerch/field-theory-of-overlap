@@ -438,7 +438,7 @@ fn prepare(root: &Path) -> Result<Prepared, OpenQuestionError> {
         paper: tag_rows
             .iter()
             .map(|(_, target, _)| target.clone())
-            .chain(mint_rows.iter().map(|(key, _, _)| key.clone()))
+            .chain(mint_rows.iter().map(|(key, _)| key.clone()))
             .collect(),
         files,
     };

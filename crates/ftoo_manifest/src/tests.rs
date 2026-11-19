@@ -1082,6 +1082,10 @@ fn m015_awaiting_claim_prevents_complete_even_outside_slice() -> TestResult {
 #[test]
 fn paper_rule_consumers_are_explicit() {
     assert_eq!(
+        RULES[62].statement,
+        "Paper-scoped tag pairs are checked for uniqueness, grammar and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each paper target-evidence row names a unique key and an existing declared source file containing that whole key; its file origin joins native and Markdown mint evidence without duplicate ownership and without entering strict-unit scope."
+    );
+    assert_eq!(
         RULES[62..64]
             .iter()
             .map(|r| (r.number, r.scope, r.state))

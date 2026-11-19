@@ -739,7 +739,7 @@ pub enum DocumentEntryKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentInputFault {
     PaperMintRow {
-        line: usize,
+        line: Option<usize>,
     },
     InvalidSourceName {
         value: String,
