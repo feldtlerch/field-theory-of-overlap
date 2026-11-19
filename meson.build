@@ -49,6 +49,7 @@ run_target('documents-generate', command: [codegen, 'documents-generate',
   '--repository', source, '--support', support], env: notation_env)
 documents_record = custom_target('documents-record', output: 'documents-record.json',
   command: [python, adapter, 'documents-record', '--repository', source,
+    '--support', support, '--notation-support', notation_support,
     '--output', '@OUTPUT@'], build_always_stale: true)
 documents_verified = custom_target('documents-verified',
   input: [documents_record, codegen], output: 'documents.checked',

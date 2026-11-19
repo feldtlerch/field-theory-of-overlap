@@ -7,6 +7,7 @@ import json
 import os
 import pathlib
 import shutil
+import stat
 import subprocess
 
 from inputs import inventory
@@ -83,11 +84,95 @@ def paper_record(args):
 
 def documents_record(args):
     repo = pathlib.Path(args.repository)
-    paths = [repo / 'units/documents.toml', *sorted((repo / 'units/skeletons').glob('*.toml')),
-             *sorted((repo / 'units/statements').glob('*.toml')),
-             *sorted((repo / 'generated/documents').glob('**/*'))]
-    value = {str(path.relative_to(repo)): digest(path) for path in paths if path.is_file()}
+    paths = {
+        'units/documents.toml', 'registry/documentary-tags.toml',
+        'generated/manifest.json', 'generated/notation.tex',
+        'generated/addressing.tex', 'tools/assembly/native-lock.toml',
+        'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
+        'tools/notation/package.json', 'tools/notation/support-digests.json',
+        'tools/notation/.node-version', 'tools/notation/check.cjs',
+    }
+    directories = {}
+    for name in ('units/statements', 'units/skeletons', 'units/displays'):
+        directory = repo / name
+        present = directory.exists() or directory.is_symlink()
+        if not present and name != 'units/displays':
+            raise RuntimeError('Missing document input directory: ' + name)
+        if present:
+            if not stat.S_ISDIR(directory.lstat().st_mode):
+                raise RuntimeError('Invalid document input directory: ' + name)
+            for path in directory.iterdir():
+                if not stat.S_ISREG(path.lstat().st_mode) or not path.name.endswith('.toml'):
+                    raise RuntimeError('Invalid document input entry: ' + str(path))
+                paths.add(str(path.relative_to(repo)))
+        directories[name] = present
+    paths.add('documents/paper-build/label-mints.tsv')
+    paths.update(document_tree(repo, 'generated/documents'))
+    paths.update(markdown_sources(repo))
+    optional = {'documents/paper-build/label-mints.tsv', 'generated/audit-report.json'}
+    paths.update(optional)
+    inputs = {}
+    for name in sorted(paths):
+        path = repo / name
+        if not path.exists() and name in optional:
+            inputs[name] = None
+        elif not path.exists():
+            raise RuntimeError('Missing document input entry: ' + name)
+        elif not stat.S_ISREG(path.lstat().st_mode):
+            raise RuntimeError('Invalid document input entry: ' + name)
+        else:
+            inputs[name] = digest(path)
+    support = pathlib.Path(args.support).resolve()
+    notation_support = pathlib.Path(args.notation_support).resolve()
+    engine = support / 'runtime/bin/tectonic'
+    notation_engine = notation_support / 'runtime/bin/node'
+    if not engine.is_file():
+        raise RuntimeError('Missing assembly engine: ' + str(engine))
+    if not notation_engine.is_file():
+        raise RuntimeError('Missing notation engine: ' + str(notation_engine))
+    value = {'inputs': inputs, 'directories': directories,
+             'support': {'assembly': str(support), 'notation': str(notation_support),
+                         'engine': {'path': str(engine), 'sha256': digest(engine)},
+                         'notation_engine': {'path': str(notation_engine),
+                                             'sha256': digest(notation_engine)}},
+             'adapter': digest(pathlib.Path(__file__))}
     replace_if_changed(pathlib.Path(args.output), canonical(value))
+
+
+def document_tree(repo, directory):
+    root = repo / directory
+    if not root.exists():
+        raise RuntimeError('Missing document input directory: ' + directory)
+    if not stat.S_ISDIR(root.lstat().st_mode):
+        raise RuntimeError('Invalid document input directory: ' + directory)
+    found = set()
+    for path in root.rglob('*'):
+        mode = path.lstat().st_mode
+        if stat.S_ISREG(mode):
+            found.add(str(path.relative_to(repo)))
+        elif not stat.S_ISDIR(mode):
+            raise RuntimeError('Invalid document input entry: ' + str(path))
+    return found
+
+
+def markdown_sources(repo):
+    found = set()
+
+    def visit(directory):
+        for path in directory.iterdir():
+            mode = path.lstat().st_mode
+            matching = os.fsencode(path.name).endswith(b'.md')
+            if matching:
+                if not stat.S_ISREG(mode):
+                    raise RuntimeError('Invalid Markdown input entry: ' + str(path))
+                path.name.encode('utf-8')
+                found.add(str(path.relative_to(repo)))
+            elif stat.S_ISDIR(mode):
+                path.name.encode('utf-8')
+                visit(path)
+
+    visit(repo)
+    return found
 
 
 def documents_check(args):
@@ -175,6 +260,7 @@ def main():
     parser.add_argument('--repository', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--support')
+    parser.add_argument('--notation-support')
     parser.add_argument('--cargo-target-dir')
     parser.add_argument('--cargo-home')
     parser.add_argument('--record')

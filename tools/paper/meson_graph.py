@@ -13,7 +13,7 @@ FIXTURE = '''project('paper-graph-fixture', meson_version: '>=1.11.2')
 python = find_program('python3')
 record = custom_target('record', output: 'record.json', build_always_stale: true,
   command: [python, meson.project_source_root() / 'step.py', 'record',
-    meson.project_source_root() / 'source.txt', '@OUTPUT@'])
+    meson.project_source_root() / 'paper.tex', '@OUTPUT@'])
 document_record = custom_target('document-record', output: 'document-record.json',
   build_always_stale: true,
   command: [python, meson.project_source_root() / 'step.py', 'record',
@@ -117,7 +117,7 @@ def fixture(parent, publish=None):
         (source / 'publisher.py').write_text(PUBLISHER)
     (source / 'meson.build').write_text(FIXTURE + extra)
     (source / 'step.py').write_text(STEP)
-    (source / 'source.txt').write_text('alpha')
+    (source / 'paper.tex').write_text('alpha')
     (source / 'generated/documents/main').mkdir(parents=True)
     (source / 'generated/documents/main/en.md').write_text('first')
     (source / 'generated/documents/explainer-pilot').mkdir(parents=True)
@@ -157,7 +157,7 @@ def g1(parent, adapter, cargo_home):
     assert count(build / 'document-check.calls') == 3
     assert count(build / 'producer.calls') == 1
     print('Restored Markdown: check reran; producer stayed at one call')
-    item = source / 'source.txt'
+    item = source / 'paper.tex'
     old = item.stat()
     item.write_text('alpha')
     compile(build)
@@ -168,16 +168,163 @@ def g1(parent, adapter, cargo_home):
     assert count(build / 'producer.calls') == 1
     replacement = source / 'replacement'
     replacement.mkdir()
-    (replacement / 'source.txt').write_text('alpha')
-    (replacement / 'source.txt').replace(item)
+    (replacement / 'paper.tex').write_text('alpha')
+    (replacement / 'paper.tex').replace(item)
     compile(build)
     assert count(build / 'producer.calls') == 1
     item.write_text('bravo')
     os.utime(item, ns=(old.st_atime_ns, old.st_mtime_ns))
     compile(build)
     assert count(build / 'producer.calls') == 2
-    print('G1 same bytes: zero producer calls; changed bytes with restored time: one call')
+    print('G1 same TeX bytes: zero producer calls; changed TeX bytes with restored time: one call')
+    real_documents_record(parent, adapter)
     cargo_freshness(parent, adapter, cargo_home)
+
+
+def real_documents_record(parent, adapter):
+    repo = parent / 'record-probe'
+    support = parent / 'record-support'
+    notation = parent / 'notation-support'
+    support.joinpath('runtime/bin').mkdir(parents=True)
+    (support / 'runtime/bin/tectonic').write_bytes(b'engine')
+    notation.joinpath('runtime/bin').mkdir(parents=True)
+    (notation / 'runtime/bin/node').write_bytes(b'notation engine')
+    # These fixture inputs follow the document loader, notation sweep, native support, and generated-document readers.
+    values = {
+        'units/documents.toml': b'documents',
+        'units/statements/one.toml': b'statement',
+        'units/skeletons/one.toml': b'skeleton',
+        'units/displays/one.toml': b'display',
+        'registry/documentary-tags.toml': b'events',
+        'documents/paper-build/label-mints.tsv': b'mints',
+        'generated/manifest.json': b'manifest',
+        'generated/audit-report.json': b'audit',
+        'generated/documents/main/en.md': b'document',
+        'generated/notation.tex': b'notation',
+        'generated/addressing.tex': b'addressing',
+        'tools/assembly/native-lock.toml': b'lock',
+        'tools/assembly/prepare-native.py': b'prepare',
+        'tools/notation/package-lock.json': b'package lock',
+        'tools/notation/package.json': b'package',
+        'tools/notation/support-digests.json': b'digests',
+        'tools/notation/.node-version': b'node',
+        'tools/notation/check.cjs': b'notation check',
+        '.hidden/deeper/mint.md': b'markdown mint',
+    }
+    for name, data in values.items():
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    output = parent / 'documents-record.json'
+
+    def refresh(notation_path=notation, allowed=(0,)):
+        return run('python3', str(adapter), 'documents-record', '--repository', str(repo),
+                   '--support', str(support), '--notation-support', str(notation_path),
+                   '--output', str(output), allowed=allowed)
+
+    refresh()
+    original = output.read_bytes()
+    original_time = output.stat().st_mtime_ns
+    recorded = json.loads(original)
+    assert set(values) == recorded['inputs'].keys()
+    assert recorded['support']['engine']['sha256'] == hashlib.sha256(b'engine').hexdigest()
+    assert recorded['support']['notation_engine']['sha256'] == hashlib.sha256(b'notation engine').hexdigest()
+    assert recorded['adapter'] == hashlib.sha256(adapter.read_bytes()).hexdigest()
+    refresh()
+    assert output.read_bytes() == original and output.stat().st_mtime_ns == original_time
+    for name, data in values.items():
+        path = repo / name
+        stamp = path.stat()
+        path.write_bytes(data + b' changed')
+        os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+        refresh()
+        assert json.loads(output.read_bytes())['inputs'][name] != recorded['inputs'][name], name
+        path.write_bytes(data)
+        os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+        refresh()
+        assert output.read_bytes() == original, name
+    for name in ('generated/audit-report.json', 'documents/paper-build/label-mints.tsv'):
+        path = repo / name
+        path.unlink()
+        refresh()
+        assert json.loads(output.read_bytes())['inputs'][name] is None
+        path.write_bytes(values[name])
+        refresh()
+        assert output.read_bytes() == original
+    added_unit = repo / 'units/statements/added.toml'
+    unit_directory_stamp = added_unit.parent.stat()
+    added_unit.write_bytes(b'new statement')
+    os.utime(added_unit.parent, ns=(unit_directory_stamp.st_atime_ns,
+                                    unit_directory_stamp.st_mtime_ns))
+    refresh()
+    assert 'units/statements/added.toml' in json.loads(output.read_bytes())['inputs']
+    added_unit.unlink()
+    os.utime(added_unit.parent, ns=(unit_directory_stamp.st_atime_ns,
+                                    unit_directory_stamp.st_mtime_ns))
+    refresh()
+    assert output.read_bytes() == original
+    added = repo / '.hidden/deeper/added.md'
+    directory_stamp = added.parent.stat()
+    added.write_bytes(b'new mint')
+    os.utime(added.parent, ns=(directory_stamp.st_atime_ns, directory_stamp.st_mtime_ns))
+    refresh()
+    assert '.hidden/deeper/added.md' in json.loads(output.read_bytes())['inputs']
+    added.unlink()
+    os.utime(added.parent, ns=(directory_stamp.st_atime_ns, directory_stamp.st_mtime_ns))
+    refresh()
+    assert output.read_bytes() == original
+    invalid = repo / '.hidden/deeper/bad.md'
+    invalid.mkdir()
+    assert 'Invalid Markdown input entry' in refresh(allowed=(1,)).stderr
+    invalid.rmdir()
+    refresh()
+    assert output.read_bytes() == original
+    required = repo / 'generated/notation.tex'
+    required.unlink()
+    assert 'Missing document input entry: generated/notation.tex' in refresh(allowed=(1,)).stderr
+    required.write_bytes(values['generated/notation.tex'])
+    generated = repo / 'generated/documents'
+    generated.rename(repo / 'generated/documents.saved')
+    assert 'Missing document input directory: generated/documents' in refresh(allowed=(1,)).stderr
+    (repo / 'generated/documents.saved').rename(generated)
+    displays = repo / 'units/displays'
+    (displays / 'one.toml').unlink()
+    displays.rmdir()
+    displays.symlink_to('absent-displays')
+    assert 'Invalid document input directory: units/displays' in refresh(allowed=(1,)).stderr
+    displays.unlink()
+    displays.mkdir()
+    (displays / 'one.toml').write_bytes(values['units/displays/one.toml'])
+    refresh()
+    assert output.read_bytes() == original
+    engine = support / 'runtime/bin/tectonic'
+    engine.unlink()
+    assert 'Missing assembly engine' in refresh(allowed=(1,)).stderr
+    engine.write_bytes(b'engine')
+    engine.write_bytes(b'changed engine')
+    refresh()
+    assert json.loads(output.read_bytes())['support']['engine']['sha256'] != recorded['support']['engine']['sha256']
+    engine.write_bytes(b'engine')
+    refresh()
+    assert output.read_bytes() == original
+    notation_engine = notation / 'runtime/bin/node'
+    notation_engine.unlink()
+    assert 'Missing notation engine' in refresh(allowed=(1,)).stderr
+    notation_engine.write_bytes(b'notation engine')
+    notation_engine.write_bytes(b'changed notation engine')
+    refresh()
+    assert json.loads(output.read_bytes())['support']['notation_engine']['sha256'] != recorded['support']['notation_engine']['sha256']
+    notation_engine.write_bytes(b'notation engine')
+    refresh()
+    assert output.read_bytes() == original
+    other_notation = parent / 'other-notation-support'
+    other_notation.joinpath('runtime/bin').mkdir(parents=True)
+    (other_notation / 'runtime/bin/node').write_bytes(b'notation engine')
+    refresh(other_notation)
+    assert output.read_bytes() != original
+    refresh()
+    assert output.read_bytes() == original
+    print('G1 real documents record: all input categories, hidden Markdown, membership, invalid entry, support context, equal cutoff')
 
 
 def cargo_freshness(parent, adapter, cargo_home):
