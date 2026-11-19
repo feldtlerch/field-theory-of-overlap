@@ -28,8 +28,9 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016|
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017|
-|017|Screen rendering contracts|accepted|
+|017|Screen rendering contracts|accepted; mathematics transport is governed by 022|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause|
+|022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|

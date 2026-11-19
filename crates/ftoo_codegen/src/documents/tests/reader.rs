@@ -2,6 +2,372 @@ use super::*;
 use ftoo_manifest::{NodeId, ReaderIdentityPosition};
 use std::{fs, path::Path};
 
+fn math_run(body: &str, site: &UnitSite) -> Inline {
+    Inline::Math {
+        definition_site: super::super::input::site("units/definitions/fixture.toml"),
+        key: "fixture".into(),
+        markdown: body.into(),
+        latex: body.into(),
+        pending: vec![],
+        site: site.clone(),
+    }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // One fixture checks every admitted writer context and its refusals.
+fn markdown_math_context_envelopes() {
+    use super::super::diagnostics::MarkdownMathReason;
+    let site = super::super::input::site("units/statements/fixture.toml");
+    let block = |unit: &str, depth, runs| Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: unit.into(),
+        depth,
+        quotation: false,
+        site: site.clone(),
+        runs,
+    };
+    let mut plan = DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
+        blocks: vec![
+            block(
+                "sec:fixture:prose",
+                None,
+                vec![
+                    Inline::Text("Value ".into()),
+                    math_run("{x}_{1}", &site),
+                    Inline::Text(".".into()),
+                ],
+            ),
+            block(
+                "sec:fixture:heading",
+                Some(4),
+                vec![Inline::Text("Value ".into()), math_run("{y}_{2}", &site)],
+            ),
+            block(
+                "sec:fixture:table",
+                None,
+                vec![Inline::Text("Table.".into())],
+            ),
+            block(
+                "sec:fixture:pending",
+                None,
+                vec![Inline::Math {
+                    definition_site: super::super::input::site("units/definitions/fixture.toml"),
+                    key: "pending".into(),
+                    markdown: "p".into(),
+                    latex: "p".into(),
+                    pending: vec![crate::PendingEntry::fixture(
+                        ftoo_manifest::DefinitionId::FirstCoefficient,
+                        0,
+                        "{p}_{4}",
+                        vec![ftoo_manifest::PendingReason::FormulationProposed {
+                            object: NodeId::LangevinCoefficientOneValue,
+                        }],
+                        vec![],
+                    )],
+                    site: site.clone(),
+                }],
+            ),
+        ],
+    };
+    plan.blocks[3].pending_names.insert(
+        (
+            DocumentTarget::Markdown,
+            ftoo_manifest::DefinitionId::FirstCoefficient,
+        ),
+        vec![super::super::PendingReaderName {
+            reason: 0,
+            role: ftoo_manifest::ReasonRole::Subject,
+            object: NodeId::LangevinCoefficientOneValue,
+            handle: "v:1".into(),
+            label: "claim:langevin:coefficient-one-value".into(),
+            token: "u3-p0-r0".into(),
+        }],
+    );
+    plan.blocks[2].displays.insert(
+        DocumentTarget::Markdown,
+        DisplayBody {
+            source: "| Header |\n| --- |\n| @math{fixture} |".into(),
+            layout: ftoo_manifest::DisplayLayout::Table {
+                columns: vec!["---".into()],
+                rows: vec![vec![0], vec![1]],
+                rules: vec![],
+            },
+            regions: vec![
+                block(
+                    "sec:fixture:table",
+                    None,
+                    vec![Inline::Text("Header".into())],
+                ),
+                block("sec:fixture:table", None, vec![math_run("{z}_{3}", &site)]),
+            ],
+            site: site.clone(),
+        },
+    );
+    super::super::markdown::check_math_admission(&plan).unwrap();
+    let (annotated, reader) = super::super::markdown::emit(&plan, &[]).unwrap();
+    assert_eq!(annotated.len(), super::super::markdown::size(&plan));
+    assert_eq!(
+        reader,
+        super::super::markdown::erase_annotations(&annotated).unwrap()
+    );
+    let mut prose = String::new();
+    super::super::markdown::inline(&mut prose, &plan.blocks[0].runs);
+    assert_eq!(prose, "Value $`{x}_{1}`$.");
+    let mut heading = String::new();
+    super::super::markdown::inline(&mut heading, &plan.blocks[1].runs);
+    assert_eq!(heading, "Value $`{y}_{2}`$");
+    assert!(annotated.contains("| Header |\n| --- |\n| $`{z}_{3}`$ |"));
+    for expected in [
+        "$`{x}_{1}`$",
+        "$`{y}_{2}`$",
+        "$`{z}_{3}`$",
+        "Pending notation: $`{p}_{4}`$",
+    ] {
+        assert!(annotated.contains(expected));
+        assert!(reader.contains(expected));
+    }
+    let assert_fault = |fault: DocumentError, context: &str, reason: MarkdownMathReason| {
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("math refusal")
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        assert_eq!(
+            (diagnostic.rule, diagnostic.stage),
+            (RuleId::M055, AssemblyStage::Emission)
+        );
+        assert_eq!(diagnostic.site, AssemblySite::Source(site.clone()));
+        assert_eq!(
+            diagnostic.fault,
+            AssemblyFault::UnsupportedMarkdownMath {
+                context: context.into(),
+                reason,
+                key: "fixture".into(),
+                definition_site: super::super::input::site("units/definitions/fixture.toml"),
+            }
+        );
+    };
+    let original = plan.blocks[0].runs.clone();
+    for (runs, context, reason) in [
+        (
+            vec![Inline::Text("Value ".into()), math_run("x|y", &site)],
+            "ordinary prose",
+            MarkdownMathReason::ForbiddenBodyCharacter {
+                character: '|',
+                offset: 1,
+            },
+        ),
+        (
+            vec![Inline::Text("Value ".into()), math_run("x`y", &site)],
+            "ordinary prose",
+            MarkdownMathReason::ForbiddenBodyCharacter {
+                character: '`',
+                offset: 1,
+            },
+        ),
+        (
+            vec![
+                Inline::Tag {
+                    handle: "v:1".into(),
+                    label: "def:fixture:one".into(),
+                    token: "u0-t0".into(),
+                    site: site.clone(),
+                },
+                Inline::Text(String::new()),
+                math_run("x", &site),
+            ],
+            "ordinary prose",
+            MarkdownMathReason::DirectTagOrCitationAdjacency,
+        ),
+    ] {
+        plan.blocks[0].runs = runs;
+        assert_fault(
+            super::super::markdown::emit(&plan, &[]).unwrap_err(),
+            context,
+            reason,
+        );
+    }
+    plan.blocks[0].runs = vec![
+        Inline::Tag {
+            handle: "v:1".into(),
+            label: "def:fixture:one".into(),
+            token: "u0-t0".into(),
+            site: site.clone(),
+        },
+        Inline::Text(" ".into()),
+        math_run("x", &site),
+    ];
+    super::super::markdown::check_math_admission(&plan).unwrap();
+    plan.blocks[0].runs = vec![
+        Inline::Citation {
+            identity: super::super::CitationIdentity {
+                label: "dec:fixture:source".into(),
+                resolved: None,
+                handle: "record".into(),
+                token: "u0-c0".into(),
+                position: ftoo_manifest::ReaderIdentityPosition::Citation {
+                    unit: "sec:fixture:prose".into(),
+                    span: 0,
+                    target: None,
+                },
+                mint: None,
+            },
+            text: "record".into(),
+            site: site.clone(),
+        },
+        Inline::Text(String::new()),
+        math_run("x", &site),
+    ];
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "ordinary prose",
+        MarkdownMathReason::DirectTagOrCitationAdjacency,
+    );
+    plan.blocks[0].runs.insert(1, Inline::Text(" ".into()));
+    super::super::markdown::check_math_admission(&plan).unwrap();
+    plan.blocks[0].runs = vec![
+        math_run("a", &site),
+        Inline::Text(String::new()),
+        math_run("b", &site),
+    ];
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "ordinary prose",
+        MarkdownMathReason::DirectMathAdjacency,
+    );
+    plan.blocks[0].runs = vec![
+        Inline::Mention {
+            text: "code".into(),
+            site: site.clone(),
+        },
+        Inline::Text(String::new()),
+        math_run("b", &site),
+    ];
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "ordinary prose",
+        MarkdownMathReason::DirectCodeMentionAdjacency,
+    );
+    plan.blocks[0].runs = original;
+    plan.blocks[1].depth = Some(2);
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "unobserved heading",
+        MarkdownMathReason::UnobservedContext,
+    );
+    plan.blocks[1].depth = Some(4);
+    plan.blocks[2]
+        .displays
+        .get_mut(&DocumentTarget::Markdown)
+        .unwrap()
+        .source = "| @math{fixture} |\n| --- |\n| Header |".into();
+    plan.blocks[2]
+        .displays
+        .get_mut(&DocumentTarget::Markdown)
+        .unwrap()
+        .layout = ftoo_manifest::DisplayLayout::Table {
+        columns: vec!["---".into()],
+        rows: vec![vec![1], vec![0]],
+        rules: vec![],
+    };
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "table header cell",
+        MarkdownMathReason::UnobservedContext,
+    );
+    plan.blocks[2]
+        .displays
+        .get_mut(&DocumentTarget::Markdown)
+        .unwrap()
+        .layout = ftoo_manifest::DisplayLayout::Quote {
+        rows: vec![Some(0)],
+    };
+    assert_fault(
+        super::super::markdown::check_math_admission(&plan).unwrap_err(),
+        "blockquote",
+        MarkdownMathReason::UnobservedContext,
+    );
+    let mut screen = excerpt_plan();
+    screen.blocks[1].runs = vec![math_run("x", &site)];
+    assert_fault(
+        super::super::markdown::check_math_admission(&screen).unwrap_err(),
+        "refrain HTML block",
+        MarkdownMathReason::UnobservedContext,
+    );
+}
+
+#[test]
+fn markdown_math_recovery_rejects_envelope_and_body_damage() {
+    let site = super::super::input::site("units/statements/fixture.toml");
+    let math_site = super::super::input::site("units/statements/math-use.toml");
+    let mut plan = DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage.", "Slice."),
+        screen: None,
+        blocks: vec![Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:math".into(),
+            depth: None,
+            quotation: false,
+            site: site.clone(),
+            runs: vec![
+                Inline::Text("Value ".into()),
+                math_run("{x}_{1}", &math_site),
+                Inline::Text(".".into()),
+            ],
+        }],
+    };
+    plan.blocks.push(Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: "sec:fixture:following".into(),
+        depth: None,
+        quotation: false,
+        site: site.clone(),
+        runs: vec![Inline::Text("Following.".into())],
+    });
+    let source = super::super::markdown::render(&plan);
+    assert_eq!(
+        check_emission(&plan, &source, DocumentTarget::Markdown),
+        Ok(())
+    );
+    assert!(super::recover_markdown("$x$", std::iter::empty::<&str>()).is_none());
+    for replacement in ["${x}_{1}$", "$`{x}_{1}$", "$`{x}{1}`$", "$x$"] {
+        let changed = source.replacen("$`{x}_{1}`$", replacement, 1);
+        assert_ne!(changed, source);
+        let fault = check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = fault else {
+            panic!("recovery refusal")
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        assert_eq!(
+            (diagnostic.rule, diagnostic.stage),
+            (RuleId::M055, AssemblyStage::Emission)
+        );
+        let start = changed.find("<!-- unit sec:fixture:math").unwrap();
+        let end = changed.find("<!-- unit sec:fixture:following").unwrap();
+        assert!(
+            matches!(&diagnostic.site, AssemblySite::Generated { path, bytes, .. } if path == "generated/documents/fixture/en.labels.md" && *bytes == (start..end))
+        );
+        let AssemblyFault::EmissionMismatch {
+            missing, changed, ..
+        } = &diagnostic.fault
+        else {
+            panic!("whole-block mismatch")
+        };
+        assert!(
+            missing.iter().any(|record| record.site == math_site)
+                || changed.iter().any(|pair| pair.expected.site == math_site)
+        );
+    }
+}
+
 #[test]
 fn reader_diagnostics_sort_families_before_owners_and_indices() {
     use ftoo_manifest::{AddressTarget, DefinitionId, ReaderIdentityReason};
@@ -1673,7 +2039,7 @@ fn reader_pending_templates_keep_all_blockers_and_actual_targets() {
                 )
             } else {
                 format!(
-                    "Pending notation: $x$: {before}v:1<!-- label claim:langevin:coefficient-one-value -->{}.\n\n",
+                    "Pending notation: $`x`$: {before}v:1<!-- label claim:langevin:coefficient-one-value -->{}.\n\n",
                     after.replace('-', "&#45;")
                 )
             };
@@ -2132,7 +2498,7 @@ fn retained_premise_reason_has_two_independent_names_and_exact_fragments() {
     for (target, expected) in [
         (
             DocumentTarget::Markdown,
-            "Pending notation: $x$: claim evidence v:3<!-- label claim:langevin:coefficient-three-value --> awaits premise v:1<!-- label claim:langevin:coefficient-one-value --> with evidence undecided.\n\n",
+            "Pending notation: $`x`$: claim evidence v:3<!-- label claim:langevin:coefficient-three-value --> awaits premise v:1<!-- label claim:langevin:coefficient-one-value --> with evidence undecided.\n\n",
         ),
         (
             DocumentTarget::Latex,

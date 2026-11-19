@@ -12,6 +12,12 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    UnsupportedMarkdownMath {
+        context: String,
+        reason: MarkdownMathReason,
+        key: String,
+        definition_site: UnitSite,
+    },
     UnsupportedPublicHandle {
         handle: String,
         character: char,
@@ -233,6 +239,15 @@ pub enum AssemblyFault {
         diff: String,
     },
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MarkdownMathReason {
+    UnobservedContext,
+    ForbiddenBodyCharacter { character: char, offset: usize },
+    DirectTagOrCitationAdjacency,
+    DirectMathAdjacency,
+    DirectCodeMentionAdjacency,
+}
 impl fmt::Display for AssemblyFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Self::DisplayTag { cause } = self {
@@ -244,6 +259,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::UnsupportedMarkdownMath { .. } => 47,
             Self::UnsupportedPublicHandle { .. } => 36,
             Self::MissingScreenTemplates { .. } => 37,
             Self::ExcerptShape { .. } => 38,

@@ -80,7 +80,6 @@ pub(super) fn identity_text(source: &str) -> String {
 
 fn render<'a>(
     entries: impl Iterator<Item = (&'a str, &'a [ftoo_manifest::PendingReason])>,
-    target: DocumentTarget,
 ) -> String {
     let mut output = String::new();
     for (index, (body, reasons)) in entries.enumerate() {
@@ -98,13 +97,7 @@ fn render<'a>(
             .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join("; ");
-        match target {
-            DocumentTarget::Markdown => {
-                write!(output, "${body}$: {}", super::markdown::text(&reasons))
-            }
-            DocumentTarget::Latex => write!(output, "\\({body}\\): {}", identity_text(&reasons)),
-        }
-        .expect("string write");
+        write!(output, "\\({body}\\): {}", identity_text(&reasons)).expect("string write");
     }
     if !output.is_empty() {
         output.push_str(".\n\n");
@@ -176,7 +169,6 @@ pub(super) fn sweep(entries: &[crate::PendingEntry]) -> String {
         entries
             .iter()
             .map(|entry| (entry.body_macro(), entry.reasons())),
-        DocumentTarget::Latex,
     );
     if paragraph.is_empty() {
         paragraph
@@ -207,17 +199,10 @@ mod tests {
             },
         ];
         assert_eq!(
-            render(
-                std::iter::once((r"({{c}_{1}}={\frac{1}{3}})", reasons.as_slice())),
-                DocumentTarget::Markdown
-            ),
-            "Pending notation: $({{c}_{1}}={\\frac{1}{3}})$: retained formulation claim:langevin:coefficient&#45;one&#45;value; retained formulation def:langevin:coefficient&#45;one; claim evidence claim:langevin:coefficient&#45;one&#45;value awaits audit&#45;run&#45;required.\n\n"
-        );
-        assert_eq!(
-            render(
-                std::iter::once((r"({{c}_{1}}={\frac{1}{3}})", reasons.as_slice())),
-                DocumentTarget::Latex
-            ),
+            render(std::iter::once((
+                r"({{c}_{1}}={\frac{1}{3}})",
+                reasons.as_slice()
+            ))),
             "Pending notation: \\(({{c}_{1}}={\\frac{1}{3}})\\): retained formulation claim:\\allowbreak{}langevin:\\allowbreak{}coefficient-\\allowbreak{}one-\\allowbreak{}value; retained formulation def:\\allowbreak{}langevin:\\allowbreak{}coefficient-\\allowbreak{}one; claim evidence claim:\\allowbreak{}langevin:\\allowbreak{}coefficient-\\allowbreak{}one-\\allowbreak{}value awaits audit-\\allowbreak{}run-\\allowbreak{}required.\n\n"
         );
     }

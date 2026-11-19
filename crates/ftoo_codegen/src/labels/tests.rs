@@ -3,12 +3,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{fs, process::Command};
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 #[test]
-fn w02_discovery_order_matches_pathlib_components() {
+fn w02_discovery_order_matches_pathlib_paths() {
     let root = directory();
     let baseline = files::collect(&root).unwrap();
     fs::create_dir(root.join("sort")).unwrap();
     fs::write(root.join("sort/nested.md"), "").unwrap();
     fs::write(root.join("sort.md"), "").unwrap();
+    fs::create_dir(root.join("sort-more")).unwrap();
+    fs::write(root.join("sort-more/nested.md"), "").unwrap();
+    fs::write(root.join("sort-more.md"), "").unwrap();
     let sources = files::collect(&root).unwrap();
     let names: Vec<_> = sources.iter().map(|s| s.file.as_str()).collect();
     assert_eq!(
@@ -17,7 +20,9 @@ fn w02_discovery_order_matches_pathlib_components() {
             ".hidden/nested/.note.md",
             "root.md",
             "sort/nested.md",
-            "sort.md"
+            "sort-more/nested.md",
+            "sort-more.md",
+            "sort.md",
         ]
     );
     let output = Command::new("python3").args(["-I", "-B", "-c", "import pathlib,json; print(json.dumps([p.as_posix() for p in sorted(pathlib.Path('.').rglob('*.md'))]))"]).current_dir(&root).output().unwrap();
@@ -27,9 +32,15 @@ fn w02_discovery_order_matches_pathlib_components() {
         serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
         serde_json::json!(names)
     );
+    let admitted = load_markdown_files(&root).unwrap();
+    let admitted_names: Vec<_> = admitted.sources().iter().map(|s| s.file.as_str()).collect();
+    assert_eq!(admitted_names, names);
     fs::remove_file(root.join("sort.md")).unwrap();
     fs::remove_file(root.join("sort/nested.md")).unwrap();
     fs::remove_dir(root.join("sort")).unwrap();
+    fs::remove_file(root.join("sort-more.md")).unwrap();
+    fs::remove_file(root.join("sort-more/nested.md")).unwrap();
+    fs::remove_dir(root.join("sort-more")).unwrap();
     assert_eq!(files::collect(&root).unwrap(), baseline);
     fs::remove_dir_all(root).unwrap();
 }

@@ -23,7 +23,7 @@ pub(super) fn collect_with(
 ) -> Result<Vec<MarkdownSource>, LabelFileError> {
     let mut sources = Vec::new();
     visit(root, "", &mut sources, &mut before)?;
-    // pathlib orders paths by components, not by the slash-joined spelling.
+    // Path components give the same order as Python's pathlib traversal.
     sources.sort_by(|a, b| a.file.split('/').cmp(b.file.split('/')));
     Ok(sources)
 }

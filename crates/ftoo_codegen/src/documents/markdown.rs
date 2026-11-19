@@ -1,8 +1,10 @@
 use super::{
-    diagnostics::{AssemblyFault, DocumentError},
+    diagnostics::{
+        AssemblyDiagnostic, AssemblyErrors, AssemblyFault, DocumentError, MarkdownMathReason,
+    },
     plan::{DocumentPlan, Inline},
 };
-use ftoo_manifest::{AssemblySite, AssemblyStage, DocumentTarget, RuleId};
+use ftoo_manifest::{AssemblySite, AssemblyStage, DisplayLayout, DocumentTarget, RuleId, UnitSite};
 use std::fmt::Write;
 use std::ops::Range;
 pub(super) fn size(plan: &DocumentPlan) -> usize {
@@ -97,6 +99,172 @@ fn code(source: &str) -> String {
     }
     output.push_str("</code>");
     output
+}
+
+fn math_failure(
+    plan: &DocumentPlan,
+    unit: Option<&str>,
+    site: &UnitSite,
+    definition_site: &UnitSite,
+    key: &str,
+    context: &str,
+    reason: MarkdownMathReason,
+) -> DocumentError {
+    DocumentError::Assembly(
+        AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+            rule: RuleId::M055,
+            stage: AssemblyStage::Emission,
+            document: Some(plan.document.clone()),
+            unit: unit.map(str::to_owned),
+            language: Some(plan.language.clone()),
+            target: Some(DocumentTarget::Markdown),
+            site: AssemblySite::Source(site.clone()),
+            fault: AssemblyFault::UnsupportedMarkdownMath {
+                context: context.into(),
+                reason,
+                key: key.into(),
+                definition_site: definition_site.clone(),
+            },
+        }])
+        .expect("one diagnostic"),
+    )
+}
+
+#[allow(clippy::too_many_arguments)] // A refusal retains both source sites and its exact context.
+fn check_math_body(
+    plan: &DocumentPlan,
+    unit: Option<&str>,
+    site: &UnitSite,
+    definition_site: &UnitSite,
+    key: &str,
+    context: &str,
+    admitted: bool,
+    body: &str,
+    adjacent: Option<MarkdownMathReason>,
+) -> Result<(), DocumentError> {
+    let reason = if !admitted {
+        Some(MarkdownMathReason::UnobservedContext)
+    } else if adjacent.is_some() {
+        adjacent
+    } else {
+        body.char_indices().find_map(|(offset, character)| {
+            matches!(
+                character,
+                '`' | '$' | '|' | '<' | '&' | '*' | ':' | '\n' | '\r'
+            )
+            .then_some(MarkdownMathReason::ForbiddenBodyCharacter { character, offset })
+        })
+    };
+    if let Some(reason) = reason {
+        return Err(math_failure(
+            plan,
+            unit,
+            site,
+            definition_site,
+            key,
+            context,
+            reason,
+        ));
+    }
+    Ok(())
+}
+
+fn check_runs(
+    plan: &DocumentPlan,
+    unit: Option<&str>,
+    runs: &[Inline],
+    context: &str,
+    admitted: bool,
+) -> Result<(), DocumentError> {
+    let mut adjacent = None;
+    for run in runs {
+        match run {
+            Inline::Text(text) if !text.is_empty() => adjacent = None,
+            Inline::Text(_) => {}
+            Inline::Tag { .. } | Inline::Citation { .. } => {
+                adjacent = Some(MarkdownMathReason::DirectTagOrCitationAdjacency);
+            }
+            Inline::Mention { .. } => {
+                adjacent = Some(MarkdownMathReason::DirectCodeMentionAdjacency);
+            }
+            Inline::Math {
+                definition_site,
+                key,
+                markdown,
+                pending,
+                site,
+                ..
+            } => {
+                check_math_body(
+                    plan,
+                    unit,
+                    site,
+                    definition_site,
+                    key,
+                    context,
+                    admitted,
+                    markdown,
+                    adjacent.clone(),
+                )?;
+                for entry in pending {
+                    check_math_body(
+                        plan,
+                        unit,
+                        site,
+                        definition_site,
+                        key,
+                        "pending prose",
+                        true,
+                        entry.body_unicode(),
+                        None,
+                    )?;
+                }
+                adjacent = Some(MarkdownMathReason::DirectMathAdjacency);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn check_math_admission(plan: &DocumentPlan) -> Result<(), DocumentError> {
+    check_runs(plan, None, &plan.coverage.runs, "coverage prose", true)?;
+    for runs in &plan.coverage.audit {
+        check_runs(plan, None, runs, "audit prose", true)?;
+    }
+    for (index, block) in plan.blocks.iter().enumerate() {
+        let (context, admitted) = if plan.screen.is_some() {
+            if index == 0 {
+                ("screen heading", false)
+            } else {
+                ("refrain HTML block", false)
+            }
+        } else {
+            match block.depth {
+                None => ("ordinary prose", true),
+                Some(4) => ("level-four heading", true),
+                Some(_) => ("unobserved heading", false),
+            }
+        };
+        check_runs(plan, Some(&block.unit), &block.runs, context, admitted)?;
+        if let Some(body) = block.displays.get(&DocumentTarget::Markdown) {
+            for (region_index, region) in body.regions.iter().enumerate() {
+                let (context, admitted) = match &body.layout {
+                    DisplayLayout::Table { rows, .. }
+                        if rows
+                            .first()
+                            .is_some_and(|header| header.contains(&region_index)) =>
+                    {
+                        ("table header cell", false)
+                    }
+                    DisplayLayout::Table { .. } => ("table body cell", true),
+                    DisplayLayout::Quote { .. } => ("blockquote", false),
+                    DisplayLayout::Picture { .. } => ("picture", false),
+                };
+                check_runs(plan, Some(&block.unit), &region.runs, context, admitted)?;
+            }
+        }
+    }
+    Ok(())
 }
 pub(super) fn render(plan: &DocumentPlan) -> String {
     let mut output = format!(
@@ -212,6 +380,7 @@ pub(super) fn emit(
     plan: &DocumentPlan,
     known_labels: &[&str],
 ) -> Result<(String, String), DocumentError> {
+    check_math_admission(plan)?;
     let roles = render_roles(plan)?;
     check_reader(plan, &roles.1, known_labels)?;
     Ok(roles)
@@ -521,7 +690,7 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                 write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
             }
             Inline::Math { markdown, .. } => {
-                write!(output, "${markdown}$").expect("string write");
+                write!(output, "$`{markdown}`$").expect("string write");
             }
             Inline::Citation {
                 text: label,
@@ -544,7 +713,7 @@ pub(super) fn inline_size(runs: &[Inline]) -> usize {
             Inline::Tag { handle, label, .. } => {
                 text_size(handle).saturating_add(format!("<!-- label {label} -->").len())
             }
-            Inline::Math { markdown, .. } => markdown.len().saturating_add(2),
+            Inline::Math { markdown, .. } => markdown.len().saturating_add(4),
             Inline::Citation { text, identity, .. } => {
                 text_size(&identity.handle).saturating_add(format!("<!-- cite {text} -->").len())
             }

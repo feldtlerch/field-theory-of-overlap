@@ -469,8 +469,11 @@ fn render_artifacts(
     support.scope(&lock, || {
         let mut artifacts = Vec::new();
         for plan in plans {
-            document_size(plan)?;
             let targets = &selected[&plan.document];
+            if targets.contains(&DocumentOutput::Markdown) {
+                markdown::check_math_admission(plan)?;
+            }
+            document_size(plan)?;
             refuse_quoted_screen_targets(plan, targets)?;
             for target in targets {
                 match target {

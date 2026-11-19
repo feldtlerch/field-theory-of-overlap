@@ -1462,7 +1462,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
         let (tag_source, math_source, cite_source, marker) = if target == DocumentTarget::Markdown {
             (
                 "c:1<!-- label def:fixture:one -->",
-                "$1$",
+                "$`1`$",
                 "record<!-- cite dec:fixture:source -->",
                 "<!-- unit ",
             )
@@ -1550,11 +1550,12 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             }],
         ));
         let malformed_math = if target == DocumentTarget::Markdown {
-            "$broken"
+            "$`broken"
         } else {
             "\\(broken"
         };
         let malformed = rendered.replacen(math_source, malformed_math, 1);
+        assert_ne!(malformed, rendered);
         let mut actual_body = body.clone();
         actual_body.value = format!("{tag_source}{prose_space}{malformed_math} {cite_source}");
         cases.push((

@@ -152,7 +152,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
         let (one_body, three_body, space) = if target == DocumentTarget::Latex {
             (r"\({c}_{1}\)", r"\({c}_{3}\)", r"\space{}")
         } else {
-            ("${c}_{1}$", "${c}_{3}$", " ")
+            ("$`{c}_{1}`$", "$`{c}_{3}`$", " ")
         };
         let prefix = format!(
             "Pending notation: {one_body}: retained formulation {first}. {three_body}: retained formulation {third}. {one_body}: "
@@ -302,7 +302,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             let (source, paragraph, expected_size) = match target {
                 DocumentTarget::Markdown => (
                     super::super::markdown::render(&plan),
-                    "Pending notation: ${c}_{1}$: retained formulation c:1<!-- label def:langevin:coefficient-one -->.",
+                    "Pending notation: $`{c}_{1}`$: retained formulation c:1<!-- label def:langevin:coefficient-one -->.",
                     super::super::markdown::size(&plan),
                 ),
                 DocumentTarget::Latex => (

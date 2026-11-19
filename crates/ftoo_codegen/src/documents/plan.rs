@@ -149,11 +149,13 @@ fn recover_markdown<'a>(
             let value = decode_code(&tail[..end])?;
             at += 6 + end + 7;
             output.push(Recovered::Mention(value));
-        } else if let Some(tail) = tail.strip_prefix('$') {
+        } else if let Some(tail) = tail.strip_prefix("$`") {
             flush_text(&mut output, &mut text);
-            let end = tail.find('$')?;
+            let end = tail.find("`$")?;
             output.push(Recovered::Math(tail[..end].into()));
-            at += end + 2;
+            at += end + 4;
+        } else if tail.starts_with('$') {
+            return None;
         } else if tail.starts_with('&') {
             let (c, n) = entity(tail, false)?;
             text.push(c);

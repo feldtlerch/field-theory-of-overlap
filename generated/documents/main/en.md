@@ -8,9 +8,9 @@ Certification concerns the finite coefficient claim; pending notation concerns a
 
 The value claim v:1 concerns the coefficient c:1. See dec:weld.
 
-The first coefficient c:1 has the value $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$.
+The first coefficient c:1 has the value $`({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})`$.
 
-Pending notation: ${c}_{1}$: retained formulation c:1.
+Pending notation: $`{c}_{1}`$: retained formulation c:1.
 
 Registered coefficient value claims.
 

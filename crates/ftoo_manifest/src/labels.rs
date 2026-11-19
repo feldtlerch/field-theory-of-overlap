@@ -225,7 +225,7 @@ pub fn check_markdown_sources(
     mut sources: Vec<MarkdownSource>,
 ) -> Result<CheckedMarkdown, LabelSourceError> {
     source_names(&sources)?;
-    sources.sort_by(|a, b| a.file.cmp(&b.file));
+    sources.sort_by(|a, b| a.file.split('/').cmp(b.file.split('/')));
     let mut errors = Vec::new();
     let mut mints = Vec::new();
     let mut citations = Vec::new();

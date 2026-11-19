@@ -1123,7 +1123,7 @@ fn complete_figure_caption_pending_math_and_citation_match_literal_blocks() {
     let markdown = concat!(
         "<!-- generated document main language en -->\nCoverage.<br>\nSlice.\n\n",
         "<!-- unit sec:coefficients:relation document main language en -->\n",
-        r"Relation $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$; see dec:weld<!-- cite dec:weld:equal-address-sets -->.",
+        r"Relation $`({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})`$; see dec:weld<!-- cite dec:weld:equal-address-sets -->.",
         "\n\n> c:1<!-- label def:langevin:coefficient-one --> → c:3<!-- label def:langevin:coefficient-three -->\n",
     );
     let latex = format!(

@@ -1,0 +1,234 @@
+Math probe observation record: GitHub file view of experiments/markdown-view/math/*.md
+
+HEADER
+- Observer: one read-only observer using an embedded Chromium browser.
+- Date/time: 2026-11-18, about 17:40 to 18:05 UTC (the last page read was at 18:02:14 UTC by the page clock).
+- Forge view: the repository's file view of experiments/markdown-view/math/<file> on a temporary experiment branch; the pages show commit 3e95972 ("test(markdown): mathematics spellings for the forge ...").
+- Sources: the branch's raw sources were read only to quote the input; every result below comes from the rendered file view.
+- Browser: Chromium 156.0.8078.75 (embedded), Linux x86_64.
+- Session: signed out (Sign in / Sign up shown).
+- Theme: dark (GitHub default for the session).
+- Window sizes:
+  - The DOM and MathML were read at whatever size was set; they do not depend on width.
+  - Screenshots were taken at an emulated 800x580 CSS px viewport, file tree hidden, content column 49 to 737 px. The embedded browser's visible area was smaller than the emulated viewport, so larger emulated sizes (1400x1000) came back cropped to their top-left 800 px and could not show centred displays.
+  - The long-line cases were measured at 1400x1000, 800x580 and 400x800 (actual innerWidth 400).
+  - Viewport emulation was restored to desktop at the end.
+- Math engine:
+  - GitHub renders each formula into a <math-renderer> element (class js-inline-math or js-display-math). After a script runs, that element holds native MathML (<math data-latex="..."> with data-mjx-texclass attributes, and mathcolor="red" for undefined macros). The browser draws the MathML natively.
+  - There is no mjx-container, window.MathJax is undefined, and no engine name or version is visible in the DOM. Engine: unknown (the MathML has MathJax-style attributes).
+  - The math font is CSS font-family "math", that is, whatever system math font exists. document.fonts lists no math web font (only "Noto Sans Backtick Fix"). Every glyph result below therefore depends on the observing system's installed fonts, which were not inventoried.
+- Rendering is lazy: math-renderer elements stayed unconverted (raw "$...$" text) until the tab was visible. Every reading below followed conversion of all renderers on the page.
+- Console: inspected once (on 04-display-fences.md) with the error filter. No messages were captured. Visible error text below is page text.
+- Evidence: the DOM extracts (data-latex and a MathML linearisation) and the screenshots were viewed during the observation and not retained.
+
+Notation used: T = typeset as described. S = shown as source. E = an error is shown. TW = typeset but wrong (a math element exists but it looks wrong). "data-latex" is the TeX string the math engine received after GitHub's Markdown processing.
+
+Font-dependent defects that recur in every case using them:
+(F1) The underbrace character U+23DF (⏟) has no glyph in any installed font. Wherever \underbrace is typeset, it is drawn as a small missing-glyph box (about 8x12 px) under the base, not stretched. The base, the "pending" label and the rest are present. Every \underbrace result below is therefore at best TW in this environment.
+(F2) Single Greek letters in math italic (auto-italic MathML mi) are drawn as missing-glyph boxes (α and β in M39).
+(F3) mathvariant values other than normal (bold, script, double-struck, sans-serif) are ignored. Those letters draw as ordinary italic.
+(F4) mlabeledtr (\tag) and menclose (\boxed) are not laid out as intended (see M28, M34, M46).
+
+PER CASE
+
+File 01-delimiters.md
+M01 single: S. Shows: Value $({\underbrace{{c}{1}}{\text{pending}}}={\frac{1}{3}})$.
+  - Both underscores are lost. The span "{1}}" between them is set in italic (<em>), so the pair of underscores became Markdown emphasis.
+  - Dollar delimiters and backslashes stay visible. No math element.
+M02 single: TW (structure correct, glyph F1).
+  - data-latex "({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})": the engine got the full TeX.
+  - Shows: ( c₁ over a missing-glyph box over "pending" = 1/3 ), with an inline-size fraction. The backticks are not visible.
+M03 single (```math fence): TW. A display block, centred: ( c₁, box (F1), "pending" underneath, = 1/3 ). Parentheses are normal size. data-latex is identical to M02.
+M04 single ($$ on its own lines): TW. Identical to M03 (display block inside a <p>).
+M05 single (escaped \_): TW (F1 only). The backslashes before the underscores were consumed by Markdown and the engine received plain underscores: data-latex "({\underbrace{{c}_{1}}_{\text{pending}}}=...)". The underscores act as subscripts; no literal underscore is printed. It looks identical to M02.
+M06 single: S. Shows: Value $({\underbrace{{{c}{1}}}{\text{pending}}}={\frac{1}{3}})$ with "{1}}}" in italic. Both underscores are lost to emphasis. No math element.
+M07 single: T. c with subscript 1 (data-latex "{c}_{1}").
+M08 single (\( \)): S. Shows: Value (({\underbrace{{c}{1}}{\text{pending}}}={\frac{1}{3}})).
+  - The backslashes of \( and \) are removed, leaving doubled plain parentheses "((" and "))".
+  - Both underscores are lost, with "{1}}" in italic. The other backslashes (\underbrace, \text, \frac) stay visible. No math element.
+
+File 02-punctuation.md
+M09 prose: "plain_name stays plain_name; ... plain_name" all keep their underscores (the &#95; control looks the same).
+  A: S. Shows: ${x}{1}+{y}{2}$ with "{1}+{y}" in italic. Both underscores are lost to emphasis.
+  B: T. x₁ + y₂.
+M10 prose: "marked" is italic and the literal * is visible (correct).
+  A: S. Shows: $xy+z^{}$ with "y+z^{" in italic. Both stars are lost (taken as emphasis).
+  B: T. x ∗ y + z with a superscript ∗.
+M11 prose: one backslash visible ("A prose backslash \ remains visible.").
+  A: T. 1/2 + \ (a visible backslash).
+  B: T. The same.
+M12 prose: "<sample>" and the encoded "<sample>" are both visible.
+  A: TW. The engine received data-latex "x0" and shows "x0". The "<y>" was taken as an HTML tag and removed, so the less-than sign, y and the greater-than sign are lost.
+  B: T. x < y > 0.
+M13 prose: "left | right" is kept.
+  A: T. |x|.
+  B: T. |x|.
+M14 prose: "~one~ and ~~two~~" keeps its literal tildes, with no strikethrough.
+  A: T. x␣y + x̃ ∼ y. The tilde accent sits above the x; there is a fairly wide gap before ∼.
+  B: T. The same.
+M15 prose: "x^2" is kept.
+  A: T. x² + y².
+  B: T. The same.
+
+File 03-contexts.md
+M16 A: S. Shows: ${x}{1}$ and ${y}{2}$. with "{1}$ and ${y}" in italic. Emphasis spans across the two formulas and both underscores are lost.
+M16 B: T. x₁ and y₂ as two separate formulas, with "and" upright between them.
+M17 A: T. x₁ at the line start, then "starts A." This line has only one underscore, so no emphasis pair formed.
+M17 B: T.
+M18 A: T. "A ends here: x₁".
+M18 B: T.
+M19 (table, header A | B, one body row; the table structure is intact):
+  A cell: S. Shows $({\underbrace{{c}{1}}{\text{pending}}}={\frac{1}{3}})$ with "{1}}" in italic; the underscores are lost.
+  B cell: TW (F1). ( c₁, box, "pending" underneath = 1/3 ) typeset in the cell.
+M20 (bullet list, two items; the list structure is intact):
+  A: S. The same text as M19 A, with "{1}}" in italic.
+  B: TW (F1). Typeset.
+M21 (two h4 headings):
+  A: T. "A: x₁" with the formula typeset in the heading.
+  B: T. The same.
+M22 (<p align="center"> HTML blocks; both centred):
+  A: TW (F1 only). The plain-dollar form is typeset correctly here, because the content of an HTML block is not processed for Markdown emphasis.
+  B: TW, a second defect. The dollar-backtick form is NOT recognised inside the HTML block: the engine received data-latex "`({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})`", backticks included. They print as quote-like marks: ‘( c₁ ⏟ "pending" = 1/3 )‘.
+M23 (<p align="center"><em>...</em></p>):
+  A: S. No math element at all. Shows, all in italic: A: $({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})$. The underscores, backslashes and dollars are all intact.
+  B: S. Shows in italic: B: $`({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})`$. Everything is intact, including the backticks.
+M24 (comment next to the formula):
+  A: S. Shows: A: c:1 $({\underbrace{{c}{1}}{\text{pending}}}={\frac{1}{3}})$ remains. with "{1}}" in italic; the underscores are lost.
+  B: TW (F1). Shows: B: c:1 [typeset formula] remains.
+  In both, the HTML comments are invisible and the word "remains" is present.
+
+File 04-display-fences.md (all ```math)
+M25: T, minor defect. Two rows: x = 1 and y = 2, with the equals signs aligned.
+  - data-latex is "...x&=1\\\⏎y&=2...": the engine received three backslashes before the line end, where the source has two. Row 2 begins with an extra control-space token (mtext &nbsp;).
+  - It is invisible here, because the first column is right-aligned.
+M26: T, minor defect. f(x) = with a stretched left brace and two rows: 0 "if x<0" and x "otherwise".
+  - The same extra backslash gives row 2 a leading non-breaking space, so the "x" of row 2 is indented slightly relative to the "0" above it.
+M27: T, minor defect. A stretched parenthesised 2x2 matrix with rows 1 2 and 3 4. Row 2 starts with the same extra space token, so "3" sits slightly right of "1".
+M28: TW (F4). There is no visible tag "(7)" at the right.
+  - The MathML is mtable/mlabeledtr: the label cell holds mtext "(", "7", ")" and the equation cell holds x, =, 1.
+  - Chromium does not lay out mlabeledtr. The result shows "(", "7", ")" stacked vertically at the left (each about 10 px wide, one above another), and x, a squashed "=" (13x5 px) and 1 stacked vertically to their right. The equation x = 1 is not readable as an equation.
+M29: T. "x = 1" is displayed. No automatic equation number appears anywhere (none in the MathML either).
+M30:
+  - Typeset completely: all twenty terms x₁ ... x₂₀ and "= 20" are in the MathML. There is no wrapping.
+  - 1400x1000: the content column is 1012 px and the formula 880 px wide, so it fits with no scrollbar.
+  - 800x580: the math element is 688 px with 880 px of content and overflow-x:auto. A horizontal scrollbar shows under the formula; terms up to about x₁₆ are visible and the rest are reached by scrolling. The page itself does not overflow.
+  - 400x800 (innerWidth 400): the math element is 335 px with 880 px of content, and the same scrollbar. About x₁ ... x₉ are visible and the rest are reached by scrolling. The page does not overflow (document width 400). Nothing is clipped permanently and nothing is missing.
+
+File 05-display-dollars.md (all $$ blocks, each in its own <p>)
+M31: T. Two rows, x = 1 and y = 2, with aligned equals signs. data-latex has the correct "\\" (two backslashes) before each line end, and there is no extra space token.
+M32: T. The brace stretches over two rows with left-aligned first cells: "0" and "x" are aligned. This is correct, unlike M26.
+M33: T. A stretched parenthesised 2x2 matrix 1 2 / 3 4, aligned.
+M34: TW (F4). The same broken mlabeledtr layout as M28: "(", "7", ")" stacked at the left and x, =, 1 stacked at the right. There is no tag at the right.
+M35: T. "x = 1". No automatic number appears.
+M36: Typeset completely and identical to M30. It fits at 1400 px. At 800 px it scrolls horizontally inside the math element (880 vs 688 px). At 400 px it scrolls (880 vs 335 px), with the page not overflowing. Nothing is missing.
+
+File 06-expanded-notation.md
+M37 A: T. (xᵢ = x²).
+M37 B: T. The same.
+M38 A: T. A stacked fraction 1 over 3 (inline size).
+M38 B: T. The same.
+M39 A: TW (F2). The structure is ( α + β ) (code points U+03B1 and U+03B2 in mi), but both Greek letters are drawn as missing-glyph boxes: "( ▯ + ▯ )".
+M39 B: TW (F2). The same.
+M40 A: T. ( x · y ) with the centred dot U+22C5.
+M40 B: T. The same.
+M41 A: T. ( − x ) with the minus sign U+2212. The minus is spaced like a binary operator, so there is a gap after "(".
+M41 B: T. The same.
+M42 A: three formulas.
+  - "{x}\,{y}": TW. Markdown consumed the backslash and the engine received "{x},{y}", so it shows "x , y" (a comma instead of a thin space).
+  - "({x})": T, (x).
+  - "[{x}]": T, [x].
+M42 B: three formulas, all T. "x y" with a 0.167 em thin space, then (x) and [x].
+
+File 07-paper-constructs.md (M43 to M46 are ```math fences; M47 is inline)
+M43: TW (F3). It shows "u, W, R, A^T" with all four letters in ordinary italic.
+  - The MathML carries mathvariant bold (u), script (W), double-struck (R) and sans-serif (T), but the computed styles are all weight 400, text-transform math-auto.
+  - So there is no bold u, no calligraphic W, no blackboard R and no upright sans T. The commas and quad spaces are correct.
+M44: E. GitHub shows its own red error box with the text "The following macros are not allowed: operatorname". Under it, a code block shows the source "$$\kappa+\tau+\Delta+\Pi,\qquad\operatorname{Var}(x),\quad\operatorname{col}(A)$$" with a horizontal scrollbar. No part of the formula is typeset, not even the Greek letters.
+M45: T. A display sum with i = 1 below and n above, then xᵢ +, then an integral with 0 and 1 as side limits (subscript and superscript to the right, as TeX does by default in display), then x dx with a thin space.
+M46: TW (F1, F4).
+  - Shows a large parenthesised fraction 1/(1+x) with stretched parentheses, a missing-glyph box under it, and "pending" below that.
+  - There is NO box: menclose notation="box" is not drawn by this browser.
+M47 A: TW.
+  - The primes are present as U+2032 and U+2033 in superscript position, but they are drawn very small and high above the f (barely visible ticks).
+  - "\quad otherwise \quad" is correct.
+  - Markdown consumed the backslashes of \, \; and \!, and the engine received "a,b;c!d". It shows "a, b; c!d" with a literal comma, semicolon and exclamation mark.
+M47 B: T, with the prime caveat. The same prime rendering (small, high ticks), "otherwise" upright with quad spaces, then "a b cd": a thin space, a medium space, and a negative thin space that makes c and d touch, as specified.
+
+File 08-failure-controls.md
+M48 A: The source command shown as error-coloured text, without a box or message. Shows "\mathprobeunknown" in red (mtext mathcolor="red", computed rgb(242,125,131)) followed by an italic x. There is no other message.
+M48 B: The same.
+M49 A: Shows "\leanbare" in red. No other message.
+M49 B: The same.
+M50 single (fence): Shows "\usepackage" in red, then "amsmath" as italic math letters (the braces are lost and the word reads as a product of variables), then "x = 1" typeset. No message. The package was not loaded; the command is visible.
+M51 A: T. x₁.
+M51 B: T. x₁. The earlier failures did not disable later mathematics.
+
+SUMMARY (bounded by commit 3e95972, the forge's file view, signed out, dark theme, embedded Chromium 156 on Linux with the observing system's uninventoried installed fonts, 2026-11-18)
+
+1. What rescues the failing equation (M01)
+- Dollar-backtick $`...`$ (M02): typesets with the full TeX intact.
+- The ```math fence (M03) and the $$ block (M04): typeset.
+- Escaping the underscores as \_ inside dollars (M05): typesets, because Markdown strips the backslashes and the engine still gets the subscripts.
+- Extra brace groups (M06) do NOT help.
+- \( \) (M08) does NOT work: it is not a math delimiter here, and its backslashes are stripped.
+- Every typeset form of this equation shares the missing underbrace glyph (F1) in this environment.
+
+2. Characters next to prose that break plain $...$ inline mathematics, and whether $`...`$ avoids each
+- Two or more underscores in a paragraph form a Markdown emphasis pair. This happened inside one formula (M01, M06, M09) and across two formulas on one line (M16). B avoids it. A single underscore on a line was harmless (M07, M17, M18, M21, M37).
+- Two stars: emphasis (M10). B avoids it.
+- "<letters>" such as <y>: removed as an HTML tag (M12, typeset but wrong). B avoids it.
+- Backslash before punctuation (\, \; \!): the backslash is stripped by Markdown escaping, so spacing commands turn into literal punctuation (M42, M47). B avoids it.
+- Backslash + parenthesis: \( \) lose their backslashes (M08).
+- Survived in both forms: \\ (M11), | (M13), ~ (M14), ^ (M15), \frac (M38), Unicode α β ⋅ − (M39 to M41; the Greek glyphs are missing only for font reasons), and a leading or trailing formula on a line (M17, M18).
+- No character tested broke the dollar-backtick form in an ordinary paragraph, list item, table cell or heading.
+
+3. Contexts
+- Plain-text table cell, bullet list item, h4 heading, and a line with HTML comments next to the formula:
+  - $`...`$ works in all of them (M19 to M21, M24).
+  - Plain $...$ works only when the formula contains no emphasis-forming pair (the headings with a single underscore work; the underbrace formula fails in the table, the list and next to comments).
+  - Table and list structure stayed intact in every case.
+- Centred HTML paragraph <p align="center">...</p> (M22):
+  - Plain $...$ WORKS (no Markdown emphasis is applied inside an HTML block).
+  - $`...`$ FAILS: the backticks reach the engine and print as ‘ ... ‘ around the formula.
+- Centred HTML paragraph with <em> inside (M23): NEITHER form is converted to mathematics; both show as italic source. This is the one context where no observed inline wrapper survives.
+- Comments right next to a formula (M24) did not stop the B form; A failed only because of the underscores.
+
+4. Fenced ```math versus $$ display
+- Both produce display mathematics for every construct.
+- Difference: inside ```math, every TeX line ending "\\" reached the engine with an extra backslash ("\\\" + newline), which inserts a control space at the start of the next row (M25 to M27). It is visible as a slight indent in the cases and matrix rows.
+- The $$ form passed "\\" exactly and the rows align correctly (M31 to M33).
+- In $$ form the display sits inside a <p>; in fence form it is a block of its own. They look the same.
+
+5. Display constructs (same in both display forms)
+- aligned, cases and pmatrix: work (with the fence row-start space noted above).
+- \tag{7}: broken. The label and equation cells are stacked vertically, there is no right-hand tag, and the equation is unreadable (M28, M34).
+- equation environment: renders "x = 1" with NO number, in both forms (M29, M35).
+- Long line: no wrapping. It scrolls horizontally inside the formula below about 1012 px of content width; nothing is lost (M30, M36).
+- \sum and \int limits: work (M45).
+- \boxed: no box drawn (M46).
+- \mathbf, \mathcal, \mathbb, \mathsf: present in the MathML but drawn as plain italic (M43).
+- \operatorname: refused with a visible page error, and the whole display is not typeset (M44).
+
+6. How failures look
+- Markdown failures: raw TeX source in the paragraph, with dollars and backslashes visible. Underscores and stars vanish, and the text between them turns italic. HTML-like <...> disappears.
+- Engine-level unknown macros (M48 to M50): no error box. The macro name is printed in red as text and the rest is typeset; arguments become italic letters (amsmath).
+- Disallowed macros (M44): a red GitHub flash box "The following macros are not allowed: operatorname" followed by the source in a code block.
+- A failure does not affect later formulas (M51).
+
+7. Surprises
+- The underbrace, the paper's own construct, never looks right here: its glyph U+23DF is missing (F1), and \boxed draws no box.
+- Greek letters in math italic are missing glyphs (F2), and mathvariant styles are ignored (F3).
+- These three are properties of native MathML rendering with the observing system's fonts, not of the forge's Markdown parsing. They may look different on a machine or browser with a math font. They are recorded as observed, not generalised.
+- Escaped underscores (\_) inside $...$ work as subscripts (M05).
+- Plain $...$ inside an HTML block works while $`...`$ there does not (M22).
+- Rendering is lazy and happens only when the tab is visible.
+- The fenced form adds a backslash at "\\" line ends (M25 to M27).
+- No automatic equation numbers exist.
+
+NOT VERIFIED
+- The signed-in view, the light theme, other browsers (Firefox, Safari) and other operating systems' fonts. F1 to F4 may differ there.
+- GitHub mobile and app clients.
+- The engine name and version, which are not exposed in the DOM.
+- Screenshots at an exact 1400x1000 window. The hidden pane cropped them, so visual judgement used 800x580 and 400x800. The DOM readings and the M30/M36 widths at 1400 are measured.
+- Browser-console errors on pages other than 04 (none captured there).
+- Whether the page's math rendering differs on a fresh load with the tab visible from the start. All readings were taken after rendering completed.
