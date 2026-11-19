@@ -54,7 +54,7 @@ sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
 site = "paragraph-partD-143-146"
 target = "documents/paper/parts/partD.tex"
 lines = [143, 146]
-sha256 = "c5519a962001ff44e69f9d1b04bf8b33d892168b685d6c6c0899d348c1c36a34"
+sha256 = "286675eaa68242bd7b09657c631a61cf9ec2676877b76f17b2860233dff515fd"
 
 [[pin]]
 site = "paragraph-partE-123-131"
@@ -90,25 +90,25 @@ sha256 = "dbd81e146c8183efb85bfd69ba465eeeb737b23eb58bbdb17b5dd8685443f710"
 site = "paragraph-explainer-592-592"
 target = "documents/paper/explainer/explainer.tex"
 lines = [592, 592]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "paragraph-explainer-633-633"
 target = "documents/paper/explainer/explainer.tex"
 lines = [633, 633]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "paragraph-explainer-826-826"
 target = "documents/paper/explainer/explainer.tex"
 lines = [826, 826]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "paragraph-explainer-930-930"
 target = "documents/paper/explainer/explainer.tex"
 lines = [930, 930]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "heading-break-partB-591"
@@ -138,7 +138,7 @@ sha256 = "cb8c00a720205b061359002f82db511821fee3990934f7fecef557cd3d3fa219"
 site = "alignment-partD-22"
 target = "documents/paper/parts/partD.tex"
 lines = [22, 22]
-sha256 = "c5519a962001ff44e69f9d1b04bf8b33d892168b685d6c6c0899d348c1c36a34"
+sha256 = "286675eaa68242bd7b09657c631a61cf9ec2676877b76f17b2860233dff515fd"
 
 [[pin]]
 site = "heading-page-partA-529"
@@ -174,7 +174,7 @@ sha256 = "a017f767a7e4ca1e75cd20d279c1d18cc3dac1cfccbc5340ece6e8680c400d6b"
 site = "lastline-explainer-378-380"
 target = "documents/paper/explainer/explainer.tex"
 lines = [378, 380]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "nohyphen-coda-55-71"
@@ -192,10 +192,10 @@ sha256 = "a017f767a7e4ca1e75cd20d279c1d18cc3dac1cfccbc5340ece6e8680c400d6b"
 site = "paragraph-explainer-883-890"
 target = "documents/paper/explainer/explainer.tex"
 lines = [883, 890]
-sha256 = "71f2b24b89a286eb601d8fd022498b9a6532d95ba6604ced2a071e3a3137ac92"
+sha256 = "492a124ab7f0bd20419b69198e9982ff5d43f58301f5a2e6fab1818b66378133"
 
 [[pin]]
 site = "nohyphen-partD-198"
 target = "documents/paper/parts/partD.tex"
 lines = [198, 198]
-sha256 = "c5519a962001ff44e69f9d1b04bf8b33d892168b685d6c6c0899d348c1c36a34"
+sha256 = "286675eaa68242bd7b09657c631a61cf9ec2676877b76f17b2860233dff515fd"

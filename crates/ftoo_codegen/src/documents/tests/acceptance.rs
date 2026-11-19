@@ -807,6 +807,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             .collect::<Vec<_>>(),
         [
             "generated/documents/explainer-pilot/sec-say-direction.tex",
+            "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex",
             "generated/documents/explainer-pilot/sec-coda-record-limit.tex",
             "generated/documents/explainer-pilot/en.labels.md",
             "generated/documents/explainer-pilot/en.md",
@@ -814,6 +815,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
             "generated/documents/main/en.md",
             "generated/documents/main/en.tex",
             "generated/documents/paper-pilot/sec-say-direction.tex",
+            "generated/documents/paper-pilot/sec-say-enemy-to-none.tex",
             "generated/documents/paper-pilot/sec-coda-record-limit.tex",
             "generated/documents/paper-pilot/en.labels.md",
             "generated/documents/paper-pilot/en.md",

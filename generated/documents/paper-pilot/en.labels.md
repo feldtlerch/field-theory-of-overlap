@@ -5,13 +5,19 @@ Audit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certifie
 Audit scope: finite source jet of order 5, residual order 4 and derivative order 1; analytic identification is not certified.
 
 <!-- unit sec:pilot:paper-excerpt document paper-pilot language en -->
-# Paper excerpt: direction and closing refrains
+# Paper excerpt: selected refrains
 
 Not yet converted: earlier material is omitted from this excerpt.
 
 <!-- unit sec:say:direction document paper-pilot language en -->
 <p align="center"><a id="sec-cwhich--way"></a><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>
 <p align="right">sec:which&#45;way<!-- label sec:say:direction --></p>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
+<!-- unit sec:say:enemy-to-none document paper-pilot language en -->
+<p align="center"><a id="sec-cenemy--to--none"></a><em>Close to all, enemy to none.</em></p>
+<p align="right">sec:enemy&#45;to&#45;none<!-- label sec:say:enemy-to-none --></p>
 
 Not yet converted: intervening material is omitted from this excerpt.
 

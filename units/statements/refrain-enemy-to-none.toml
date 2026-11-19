@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:say:enemy-to-none"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "Close to all, enemy to none."

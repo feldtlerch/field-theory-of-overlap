@@ -710,3 +710,11 @@ handle = "sec:record-limit"
 label = "sec:coda:record-limit"
 authority-record = "dec:reader:confirmed-tags"
 reason = "Addresses the paper's closing refrain."
+
+[[events]]
+ordinal = 90
+change = "admit"
+handle = "sec:enemy-to-none"
+label = "sec:say:enemy-to-none"
+authority-record = "dec:reader:confirmed-tags"
+reason = "Addresses the paper's refrain on equal regard."

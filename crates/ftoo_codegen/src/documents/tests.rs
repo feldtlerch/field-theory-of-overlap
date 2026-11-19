@@ -964,12 +964,14 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         &document_sites,
     )
     .map_err(|errors| format!("{errors:?}"))?;
-    assert_eq!(checked.documents()["paper-pilot"].len(), 3);
-    assert_eq!(checked.documents()["explainer-pilot"].len(), 3);
+    assert_eq!(checked.documents()["paper-pilot"].len(), 4);
+    assert_eq!(checked.documents()["explainer-pilot"].len(), 4);
     assert!(!checked.documents()["paper-pilot"][1].quotation());
     assert!(checked.documents()["explainer-pilot"][1].quotation());
     assert!(!checked.documents()["paper-pilot"][2].quotation());
     assert!(checked.documents()["explainer-pilot"][2].quotation());
+    assert!(!checked.documents()["paper-pilot"][3].quotation());
+    assert!(checked.documents()["explainer-pilot"][3].quotation());
     let selected = crate::units::toml::selected_targets(&declaration)
         .map_err(|errors| format!("{errors:?}"))?;
     let mut checked_fragments = 0;

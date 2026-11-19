@@ -3,12 +3,17 @@ Declared slice: v:1, v:3.<br>
 Audit outcomes: v:1: certified; v:3: certified.<br>
 Audit scope: finite source jet of order 5, residual order 4 and derivative order 1; analytic identification is not certified.
 
-# Paper excerpt: direction and closing refrains
+# Paper excerpt: selected refrains
 
 Not yet converted: earlier material is omitted from this excerpt.
 
 <p align="center"><a id="sec-cwhich--way"></a><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>
 <p align="right">sec:which&#45;way</p>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
+<p align="center"><a id="sec-cenemy--to--none"></a><em>Close to all, enemy to none.</em></p>
+<p align="right">sec:enemy&#45;to&#45;none</p>
 
 Not yet converted: intervening material is omitted from this excerpt.
 

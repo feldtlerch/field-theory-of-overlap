@@ -254,6 +254,11 @@ spelling = "sec:which-way"
 confirmation = "dec:reader:confirmed-tags"
 
 [[admissions]]
+key = "sec:say:enemy-to-none"
+spelling = "sec:enemy-to-none"
+confirmation = "dec:reader:confirmed-tags"
+
+[[admissions]]
 key = "sec:coda:record-limit"
 spelling = "sec:record-limit"
 confirmation = "dec:reader:confirmed-tags"
