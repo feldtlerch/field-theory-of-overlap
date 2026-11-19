@@ -19,7 +19,7 @@ $\outcomechange{k}$ is a field-fact, never directly observed. The witness logs i
   log carries content plus slant. The act itself is a goods \emph{vector} and a slant is a
   scalar; the two add only after the act is read on a published axis
   (\ftag{art:directive}, \ftag*{c:q}) --- one scalar coin for fact and slant alike:
-  \begin{align}
+  \PaperAlignSep{9pt}\begin{align}
     &\witnessreport{w} = \mathbf q\transpose\outcomechange{k} + \witnesscolour{w}
       \label{eq:pr:report}\\
     &\witnesscolour{w} = (\lean{w}{i}-\lean{w}{k})\,\witnessstake{w}
@@ -143,7 +143,7 @@ $\dimpublicwelfareinvsq$ once the count-grade is read through the pooling conven
 \begin{corollary}[\hdr{pr:deltaspan}]\grade{feas}
   When authorship-independence and colour-span are orthogonal confounds, the public
   de-colouring density factors:
-  \begin{equation}
+  \PaperDisplayParagraph{equation}{stretch=2em}\begin{equation}
     \spandensity:=\effdensity\,\colourspan\qquad \dimratio.
     \label{eq:pr:deltaspan}
   \end{equation}
@@ -195,7 +195,7 @@ what the actor is.
 \begin{definition}[\hdr{bf:factors}]\grade{nec}
   The witness's effect on a reader is governed by four ratios, each on a distinct directed
   edge, which the single scalar ``reliability'' had conflated \ftag{g:split}:
-  \begin{align}
+  \PaperDisplayParagraph{align}{stretch=2em,wholewords}\begin{align}
     \text{independence} &= 1-|\lean{w}{i}|
       &:& \eqtag{bf:ind}{not the actor's puppet; anti-Sybil}\\
     \text{unbias} &= 1-\tfrac12|\lean{w}{i}-\lean{w}{k}|

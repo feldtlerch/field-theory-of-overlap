@@ -23,6 +23,71 @@ PREAMBLE = r'''\documentclass{article}
 \ExplSyntaxOff
 \begin{document}
 '''
+LAYOUT_SITES = r'''\newdimen\savedstretch \savedstretch=\emergencystretch
+\newskip\savedright \savedright=\rightskip
+\newskip\savedfill \savedfill=\parfillskip
+\newcount\savedfinal \savedfinal=\finalhyphendemerits
+\newcount\savedhyphen \savedhyphen=\hyphenpenalty
+\newcount\savedwidow \savedwidow=\widowpenalty
+\newcount\savedbroken \savedbroken=\brokenpenalty
+\newdimen\savedalign \savedalign=\minalignsep
+\newcommand\checkoriginal{%
+  \ifdim\emergencystretch=\savedstretch\else\errmessage{stretch remained}\fi
+  \ifdim\rightskip=\savedright\else\errmessage{right margin remained}\fi
+  \ifdim\gluestretch\rightskip=\gluestretch\savedright\else\errmessage{right margin flexibility remained}\fi
+  \ifdim\parfillskip=\savedfill\else\errmessage{last line remained}\fi
+  \ifdim\gluestretch\parfillskip=\gluestretch\savedfill\else\errmessage{last line flexibility remained}\fi
+  \ifnum\finalhyphendemerits=\savedfinal\else\errmessage{final hyphen remained}\fi
+  \ifnum\hyphenpenalty=\savedhyphen\else\errmessage{hyphen remained}\fi}
+\newcommand\checkchanged{%
+  \ifdim\emergencystretch=2em\else\errmessage{stretch absent}\fi
+  \ifdim\rightskip=0pt\else\errmessage{right margin absent}\fi
+  \ifdim\gluestretch\rightskip=1em\else\errmessage{right margin flexibility absent}\fi
+  \ifdim\parfillskip=0pt\else\errmessage{last line absent}\fi
+  \ifdim\gluestretch\parfillskip=0.8\hsize\else\errmessage{last line flexibility absent}\fi
+  \ifnum\finalhyphendemerits=1000000\else\errmessage{final hyphen absent}\fi
+  \ifnum\hyphenpenalty=10000\else\errmessage{whole words absent}\fi}
+\newenvironment{econ}{\begingroup}{\endgroup}
+\newcommand\formalfoot[1]{\begingroup #1\par\endgroup}
+\PaperParagraph{stretch=2em,rightskip=0pt plus 1em,lastline,wholewords}%
+\AddToHookNext{para/end}{\checkchanged}Ordinary paragraph.\par\checkoriginal
+\formalfoot{\PaperParagraph{stretch=2em}\AddToHookNext{para/end}{%
+  \ifdim\emergencystretch=2em\else\errmessage{formal note stretch absent}\fi}%
+  Formal note paragraph.}\checkoriginal
+\begingroup
+\PaperDisplayParagraph{equation}{stretch=2em,lastline}
+\begin{equation}
+  \ifdim\emergencystretch=2em\else\errmessage{equation stretch absent}\fi
+  \ifnum\finalhyphendemerits=1000000\else\errmessage{equation last line absent}\fi
+  1=1
+\end{equation}
+\checkoriginal
+\begin{equation}
+  \checkoriginal 2=2
+\end{equation}
+\PaperAlignSep{3pt}\PaperDisplayParagraph{align}{stretch=2em,wholewords}
+\begin{align}
+  \ifdim\minalignsep=3pt\else\errmessage{alignment separation absent}\fi
+  \ifdim\emergencystretch=2em\else\errmessage{align stretch absent}\fi
+  \ifnum\hyphenpenalty=10000\else\errmessage{align whole words absent}\fi
+  3&=3
+\end{align}
+\checkoriginal
+\begin{align}
+  \ifdim\minalignsep=\savedalign\else\errmessage{alignment separation remained}\fi
+  \checkoriginal 4&=4
+\end{align}
+\endgroup
+\begin{econ}Box ending.\PaperBoxEnding{widow}%
+  \ifnum\widowpenalty=10000\else\errmessage{box ending absent}\fi\par\end{econ}
+\ifnum\widowpenalty=\savedwidow\else\errmessage{widow penalty remained}\fi
+\begin{econ}Broken line ending.\PaperBoxEnding{broken-line}%
+  \ifnum\brokenpenalty=10000\else\errmessage{broken line ending absent}\fi\par\end{econ}
+\ifnum\brokenpenalty=\savedbroken\else\errmessage{broken line penalty remained}\fi
+\AddToHookNext{para/end}{\checkoriginal}Subsequent ordinary paragraph.\par
+\checkoriginal
+\typeout{LAYOUT-SITES-PASS}
+'''
 
 
 def check(repo,support,work):
@@ -51,6 +116,7 @@ def check(repo,support,work):
         'concordance':r'\newcommand\ftooBoxFoot[1]{}\newcommand\GenerateConcordanceE{\def\prevdep{@none}{\thisstopsat\\}}\UseHook{file/econ_membrane.tex/after}\def\thisstopsat{eq:f:felt}\GenerateConcordanceE\par',
         'concordance-differs':r'\newcommand\ftooBoxFoot[1]{}\newcommand\GenerateConcordanceE{changed}\UseHook{file/econ_membrane.tex/after}',
         'missing':r'\tagdef{absent:identity}\par',
+        'layout-sites':LAYOUT_SITES,
     }
     for name,body in fixtures.items():
         area=work/name;area.mkdir();emit(repo,area)
@@ -62,10 +128,14 @@ def check(repo,support,work):
             require(result.returncode!=0 and refusals[name] in b' '.join(result.stdout.split()),'Expected refusal absent: '+name)
         else:
             require(result.returncode==0,'Expansion control failed: '+name+' '+result.stdout.decode('utf-8'))
-            lines=(area/(name+'.identities')).read_text(encoding='utf-8').splitlines()
-            require(len(lines)==(2 if name=='copies' else 1),'Discarded measurement or copied output count differs: '+str(lines))
-            expected='|number:only:source||' if name=='locator' else '|eq:f:felt|eq:felt|'
-            require(all(expected in line.replace(' ','') for line in lines),'Expanded lookup differs: '+str(lines))
+            if name=='layout-sites':
+                require('LAYOUT-SITES-PASS' in (area/(name+'.log')).read_text(),
+                        'Layout site checks did not complete')
+            else:
+                lines=(area/(name+'.identities')).read_text(encoding='utf-8').splitlines()
+                require(len(lines)==(2 if name=='copies' else 1),'Discarded measurement or copied output count differs: '+str(lines))
+                expected='|number:only:source||' if name=='locator' else '|eq:f:felt|eq:felt|'
+                require(all(expected in line.replace(' ','') for line in lines),'Expanded lookup differs: '+str(lines))
         print(name,'exit',result.returncode)
 
 

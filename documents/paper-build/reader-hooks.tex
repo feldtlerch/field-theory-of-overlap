@@ -156,93 +156,58 @@
     \group_begin:\tl_clear:N\l_paper_spelling_tl
     \IfBooleanTF{#1}{\PaperZcref*[#2]{#3}}{\PaperZcref[#2]{#3}}
     \clist_map_inline:nn{#3}{\tl_set:Nn\l_paper_key_tl{##1}\paper_record:nn{locator}{##1}}\group_end:}}
-% Extra line-breaking stretch is confined to these paragraphs and restored afterward.
+% Paragraph assignments follow the saved values and precede their restoration.
 \dim_new:N\l_paper_stretch_dim
 \skip_new:N\l_paper_right_skip
-\cs_new_protected:Npn\paper_rebreak:nn#1#2{
-  \int_compare:nT{\inputlineno>=#1}{
-    \int_compare:nT{\inputlineno<=#2}{\emergencystretch=2em\relax}}}
+\cs_new_protected:Npn\paper_layout_key:n#1{
+  \str_case:nnF{#1}{
+    {stretch=2em}{\emergencystretch=2em\relax}
+    {stretch=4em}{\emergencystretch=4em\relax}
+    {rightskip=0pt~plus~1em}{\rightskip=0pt~plus~1em\relax}
+    {lastline}{\parfillskip=0pt~plus~0.8\hsize\relax\finalhyphendemerits=1000000\relax}
+    {wholewords}{\hyphenpenalty=10000\relax}}
+    {\PackageError{paper-layout}{Unknown~paragraph~layout~key:~#1}{}}}
+\cs_new_protected:Npn\paper_layout_keys:n#1{\clist_map_inline:nn{#1}{\paper_layout_key:n{##1}}}
+\NewDocumentCommand\PaperParagraph{m}{\AddToHookNext{para/end}{\paper_layout_keys:n{#1}}}
+\NewDocumentCommand\PaperDisplayParagraph{mm}{
+  \str_case:nnF{#1}{
+    {equation}{\AddToHookNext{env/equation/begin}{\paper_layout_keys:n{#2}}}
+    {align}{\AddToHookNext{env/align/begin}{\paper_layout_keys:n{#2}}}}
+    {\PackageError{paper-layout}{Unknown~display~layout~kind:~#1}{}}}
+\NewDocumentCommand\PaperAlignSep{m}{\AddToHookNext{env/align/begin}{\renewcommand\minalignsep{#1}}}
+\NewDocumentCommand\PaperHeadingBreak{}{\newline\ignorespaces}
+\NewDocumentCommand\PaperGradeGap{m}{\kern#1}
+\NewDocumentCommand\PaperNeedLines{m}{\par\dim_compare:nNnT{\pagegoal-\pagetotal}<{#1\baselineskip}{\newpage}}
+\NewDocumentCommand\PaperBoxEnding{m}{
+  \str_case:nnF{#1}{
+    {widow}{\widowpenalty=10000\relax}
+    {broken-line}{\brokenpenalty=10000\relax}}
+    {\PackageError{paper-layout}{Unknown~box~ending:~#1}{}}}
 \cs_new_protected:Npn\paper_paragraph_spacing:{
   \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {front.tex}{\paper_rebreak:nn{138}{144}\paper_rebreak:nn{161}{180}}
-    {partA.tex}{\paper_rebreak:nn{481}{492}}
-    {partB.tex}{\paper_rebreak:nn{71}{80}\paper_rebreak:nn{201}{204}
-      \paper_rebreak:nn{544}{551}\paper_rebreak:nn{591}{594}\paper_rebreak:nn{691}{698}
-      \paper_rebreak:nn{699}{704}}
-    {partD.tex}{\paper_rebreak:nn{143}{146}}
-    {partE.tex}{\paper_rebreak:nn{123}{131}}
-    {partF.tex}{\paper_rebreak:nn{144}{152}\paper_rebreak:nn{251}{263}}
-    {partG.tex}{\paper_rebreak:nn{81}{84}}
-    {coda.tex}{\paper_rebreak:nn{55}{71}}
     {appendices.tex}{\int_compare:nT{\inputlineno>=1040}{
       \int_compare:nT{\inputlineno<=1045}{\emergencystretch=4em\relax\rightskip=0pt~plus~1em\relax}}}
-    {explainer.tex}{\paper_rebreak:nn{592}{592}\paper_rebreak:nn{633}{633}\paper_rebreak:nn{883}{890}
-      \paper_rebreak:nn{826}{826}\paper_rebreak:nn{930}{930}}}}
-% These paragraphs keep at least two words, and no word fragment, on their last line before the
-% paragraph's end or its display; both settings are restored afterward.
+    {explainer.tex}{\int_compare:nT{\inputlineno=930}{\emergencystretch=2em\relax}}}}
+% Saved last-line settings are restored after each paragraph.
 \skip_new:N\l_paper_fill_skip
 \int_new:N\l_paper_final_hyphen_int
-\cs_new_protected:Npn\paper_last_line:{
-  \parfillskip=0pt~plus~0.8\hsize\relax\finalhyphendemerits=1000000\relax}
-\cs_new_protected:Npn\paper_last_lines:{
-  \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {partF.tex}{\int_compare:nT{\inputlineno>=321}{\int_compare:nT{\inputlineno<=322}{\paper_last_line:}}
-      \int_compare:nT{\inputlineno>=405}{\int_compare:nT{\inputlineno<=409}{\paper_last_line:}}}
-    {explainer.tex}{\int_compare:nT{\inputlineno>=378}{\int_compare:nT{\inputlineno<=380}{\paper_last_line:}}}}}
-% These paragraphs are set without hyphens, with the extra stretch that needs: one would otherwise
-% carry a word fragment across a page break, one a hyphenated word across a page break before its
-% display, and two would split a locator's reference name. All settings are restored afterward.
+% Saved hyphenation settings are restored after each paragraph.
 \int_new:N\l_paper_hyphen_int
-\cs_new_protected:Npn\paper_whole_words:{
-  \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {coda.tex}{\int_compare:nT{\inputlineno>=55}{\int_compare:nT{\inputlineno<=71}{\hyphenpenalty=10000\relax}}}
-    {partB.tex}{\int_compare:nT{\inputlineno>=691}{\int_compare:nT{\inputlineno<=698}{\hyphenpenalty=10000\relax}}}
-    {partD.tex}{\int_compare:nT{\inputlineno=198}{\hyphenpenalty=10000\relax\emergencystretch=2em\relax}}
-    {explainer.tex}{\int_compare:nT{\inputlineno>=883}{\int_compare:nT{\inputlineno<=890}{\hyphenpenalty=10000\relax}}}}}
-\AddToHook{env/align/begin}{\paper_whole_words:}
 \AddToHook{para/end}{
   \dim_set:Nn\l_paper_stretch_dim{\emergencystretch}
   \skip_set:Nn\l_paper_right_skip{\rightskip}
   \skip_set:Nn\l_paper_fill_skip{\parfillskip}
   \int_set:Nn\l_paper_final_hyphen_int{\finalhyphendemerits}
   \int_set:Nn\l_paper_hyphen_int{\hyphenpenalty}
-  \paper_paragraph_spacing:\paper_last_lines:\paper_whole_words:}
+  \paper_paragraph_spacing:}
 \AddToHook{para/after}{\emergencystretch=\l_paper_stretch_dim\relax\rightskip=\l_paper_right_skip\relax
   \parfillskip=\l_paper_fill_skip\relax\finalhyphendemerits=\l_paper_final_hyphen_int\relax
   \hyphenpenalty=\l_paper_hyphen_int\relax}
-\AddToHook{env/equation/begin}{\paper_paragraph_spacing:\paper_last_lines:}
 % Local ledger padding gives the following empty register room to close.
 \AddToHook{cmd/GenerateLedger/before}{
   \group_begin:\bool_set_true:N\l_paper_ledger_bool\setlength\tabcolsep{4pt}}
 \AddToHook{cmd/GenerateLedger/after}{\group_end:}
 \AddToHook{cmd/GenerateRulings/before}{\par\nopagebreak[4]}
-% The seal theorem starts its introduction below the long heading.
-\AddToHook{cmd/DisplayClass/after}{
-  \str_if_eq:eeT{\CurrentFile}{partB.tex}{
-    \int_compare:nT{\inputlineno=591}{\newline\ignorespaces}}}
-% This heading needs two points less space after its grade, not another line.
-\AddToHook{cmd/grade/after}{
-  \str_if_eq:eeT{\CurrentFile}{partC.tex}{
-    \int_compare:nT{\inputlineno=25}{\kern-2pt}}}
-% Only these three displays exhaust the minimum alignment separation.
-\AddToHook{env/align/begin}{
-  \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {partA.tex}{\int_compare:nT{\inputlineno=686}{\renewcommand\minalignsep{2pt}}}
-    {partB.tex}{\int_compare:nT{\inputlineno=40}{\renewcommand\minalignsep{3pt}}}
-    {partD.tex}{\int_compare:nT{\inputlineno=22}{\renewcommand\minalignsep{9pt}}}}}
-% This run-in heading begins the next page when less than five lines remain, instead of standing at
-% the foot of a page with a single line of its item.
-\AddToHook{cmd/subsection/before}{
-  \str_if_eq:eeT{\CurrentFile}{partA.tex}{
-    \int_compare:nT{\inputlineno=529}{\par
-      \dim_compare:nNnT{\pagegoal-\pagetotal}<{5\baselineskip}{\newpage}}}}
-% The first box's closing paragraph may not break before its last line, so that line does not stand
-% alone atop the next page; the second's may not break a page after a hyphenated line. The settings
-% end with the box.
-\AddToHook{env/econ/end}{
-  \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {partA.tex}{\int_compare:nT{\inputlineno=359}{\widowpenalty=10000\relax}}
-    {partF.tex}{\int_compare:nT{\inputlineno=119}{\brokenpenalty=10000\relax}}}}
 % A box title that wraps keeps natural word spacing on its first line.
 \AddToHook{file/econ_membrane.tex/after}{\cs_if_exist:NT\tcbset{\tcbset{ftoo/econ/.append~style={halign~title=flush~left}}}}
 % These long-table captions fit one line at the full measure instead of stretching a short first line.

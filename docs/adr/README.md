@@ -25,7 +25,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |011|Serialization is strict everywhere|accepted|
 |012|The weld: equal address sets across a unit's texts|accepted|
 |013|Workspace norms: edition, lints, toolchain|accepted|
-|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016|
+|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023|
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017|
 |017|Screen rendering contracts|accepted; mathematics transport is governed by 022|
@@ -34,3 +34,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause|
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
+|023|Site-local paper layout with two retained coordinates|accepted; supersedes 014's layout-selection clauses|

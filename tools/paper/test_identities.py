@@ -84,12 +84,12 @@ class Identities(unittest.TestCase):
     def test_shifted_layout_target_refuses_before_preparation(self):
         self.layout_fixture()
         check_layout_targets(self.root)
-        target=self.root/'documents/paper/parts/front.tex'
+        target=self.root/'documents/paper/explainer/explainer.tex'
         target.write_bytes(b'\n'+target.read_bytes())
         with self.assertRaises(ValueError) as caught:
             prepare(self.root, self.root/'support', self.root/'work')
         self.assertEqual(str(caught.exception),
-            'Layout hook target differs: paragraph-front-138-144 (documents/paper/parts/front.tex)')
+            'Layout hook target differs: paragraph-explainer-930-930 (documents/paper/explainer/explainer.tex)')
         self.assertFalse((self.root/'work').exists())
 
     def test_layout_pins_cover_exactly_the_addressed_hooks(self):
@@ -103,24 +103,24 @@ class Identities(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:check_layout_targets(self.root)
         self.assertEqual(str(caught.exception),'Layout pins are missing')
         second=original.index('[[pin]]',original.index('[[pin]]')+1)
-        write(pins,original[:second]+original[original.index('[[pin]]',second+1):])
+        write(pins,original[:second])
         with self.assertRaises(ValueError) as caught:check_layout_targets(self.root)
         self.assertEqual(str(caught.exception),
-            "Layout hook addresses differ from pins: unpinned [('front.tex', 161, 180)], unused []")
+            "Layout hook addresses differ from pins: unpinned [('explainer.tex', 930, 930)], unused []")
         write(pins,original)
-        self.replace('documents/paper-build/reader-hooks.tex','\\paper_rebreak:nn{81}{84}','\\paper_rebreak:nn{81}{85}')
+        self.replace('documents/paper-build/reader-hooks.tex','\\inputlineno=930','\\inputlineno=931')
         with self.assertRaises(ValueError) as caught:check_layout_targets(self.root)
         self.assertEqual(str(caught.exception),
-            "Layout hook addresses differ from pins: unpinned [('partG.tex', 81, 85)], unused [('partG.tex', 81, 84)]")
+            "Layout hook addresses differ from pins: unpinned [('explainer.tex', 931, 931)], unused [('explainer.tex', 930, 930)]")
 
     def test_unrecognised_hook_address_form_refuses(self):
         self.layout_fixture()
         check_layout_targets(self.root)
         hooks='documents/paper-build/reader-hooks.tex'
         original=read(self.root/hooks)
-        for form in ['\\inputlineno = 591', '\\inputlineno<591', '\\inputlineno}={591']:
+        for form in ['\\inputlineno = 930', '\\inputlineno<930', '\\inputlineno}={930']:
             with self.subTest(form=form):
-                self.replace(hooks,'\\inputlineno=591',form)
+                self.replace(hooks,'\\inputlineno=930',form)
                 with self.assertRaises(ValueError) as caught:check_layout_targets(self.root)
                 self.assertEqual(str(caught.exception),'Layout hook address form is not recognised')
                 write(self.root/hooks,original)
