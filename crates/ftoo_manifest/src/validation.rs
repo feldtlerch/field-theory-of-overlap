@@ -556,8 +556,8 @@ pub const RULES: [RuleSpec; 73] = [
     },
     RuleSpec {
         number: RuleId::M065,
-        statement: "Paper release requires no provisional printed identity, acceptance matching all nineteen final self-description passages, an equal PDF pair and input receipt, and layout pins that cover exactly the line-addressed hooks with matching target hashes.",
-        scope: "The paper check --release consumer conjoins existing identity, acceptance, byte and layout checks and names the failing part in one release refusal. Page acceptance and publication permission remain separate.",
+        statement: "Paper release requires no provisional printed identity, acceptance matching all nineteen final self-description passages, and an equal PDF pair and input receipt.",
+        scope: "The paper check --release consumer conjoins existing identity, acceptance and byte checks and names the failing part in one release refusal. Page acceptance and publication permission remain separate.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

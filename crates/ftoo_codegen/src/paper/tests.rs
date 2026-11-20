@@ -119,14 +119,8 @@ fn release_conjunction_refuses_each_failed_condition() {
     let root = scratch.0.join("repo");
     let work = scratch.0.join("work");
     fs::create_dir_all(root.join("documents/paper-build")).unwrap();
-    fs::create_dir_all(root.join("documents/paper")).unwrap();
     fs::create_dir_all(root.join("generated/paper")).unwrap();
-    fs::create_dir_all(root.join("tools/paper")).unwrap();
     fs::create_dir_all(&work).unwrap();
-    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tools/paper");
-    for name in ["prepare.py", "bibroute.py", "identities.py", "common.py"] {
-        fs::copy(source.join(name), root.join("tools/paper").join(name)).unwrap();
-    }
     let record = json!({"passages": (1..=19).map(|id| json!({"id":id,"file":"text.tex",
         "start":0,"end":4,"anchor":"ab","sha256":hex(&Sha256::digest(b"abcd")),
         "reading_acceptance":"accepted"})).collect::<Vec<_>>()});
@@ -136,16 +130,6 @@ fn release_conjunction_refuses_each_failed_condition() {
     )
     .unwrap();
     fs::write(root.join("text.tex"), b"abcd").unwrap();
-    let target = root.join("documents/paper/target.tex");
-    fs::write(&target, b"target\n").unwrap();
-    fs::write(
-        root.join("documents/paper-build/reader-hooks.tex"),
-        b"{target.tex}{\\paper_rebreak:nn{1}{1}}\n",
-    )
-    .unwrap();
-    fs::write(root.join("documents/paper-build/layout-pins.toml"), format!(
-        "[[pin]]\nsite = \"fixture\"\ntarget = \"documents/paper/target.tex\"\nlines = [1, 1]\nsha256 = \"{}\"\n",
-        hex(&Sha256::digest(b"target\n")))).unwrap();
     let ledger = json!([{"key":"e:test","spelling":"E:TEST","status":"paper"}]);
     save(&work.join("identity-ledger.json"), &ledger).unwrap();
     let receipt = json!({"inputs": {}});
@@ -160,10 +144,6 @@ fn release_conjunction_refuses_each_failed_condition() {
             "self-description acceptance",
             "Paper passage 1: accepted bytes must occur exactly once with the recorded hash and a filled reading acceptance",
         ),
-        (
-            "layout targets",
-            "command failed exit status: 1: Layout hook target differs: fixture (documents/paper/target.tex)\n",
-        ),
         ("printed identities", "Provisional printed identity: e:test"),
         (
             "paper byte gate",
@@ -172,7 +152,6 @@ fn release_conjunction_refuses_each_failed_condition() {
     ] {
         match part {
             "self-description acceptance" => fs::write(root.join("text.tex"), b"abXd").unwrap(),
-            "layout targets" => fs::write(&target, b"\ntarget\n").unwrap(),
             "printed identities" => {
                 let mut changed = ledger.clone();
                 changed[0]["status"] = json!("provisional");
@@ -193,7 +172,6 @@ fn release_conjunction_refuses_each_failed_condition() {
             format!("Paper release M065 refused at {part}: {reason}")
         );
         fs::write(root.join("text.tex"), b"abcd").unwrap();
-        fs::write(&target, b"target\n").unwrap();
         save(&work.join("identity-ledger.json"), &ledger).unwrap();
         fs::write(work.join("paper.pdf"), b"abcd").unwrap();
     }
@@ -437,7 +415,6 @@ fn actual_input_declarations_run_without_support() {
         "tools/paper/test_identities.py",
         "tools/paper/ledger.py",
         "tools/paper/pdf_text.py",
-        "documents/paper-build/layout-pins.toml",
         "documents/paper-build/label-mints.tsv",
         "documents/paper-build/self-description.json",
         "tools/paper/fixtures/leak-control.tex",

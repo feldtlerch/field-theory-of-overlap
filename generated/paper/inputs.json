@@ -3,7 +3,7 @@
     "documents/paper-build/compat.tex": "c04b14fc4cf89dd6f3844a0f4b1674698128dc147348fab31ccc3d79cdd33823",
     "documents/paper-build/paper-tags.tsv": "f02a1776046e45b3079e4e5e61172c367f0e4c32994c2b7e77cf9f0985d1bdf0",
     "documents/paper-build/provisional-tags.toml": "900078426f9c6bb5601f0a98ffc3d73eac5da8fd0f6a8620324efbb93c0959d6",
-    "documents/paper-build/reader-hooks.tex": "82eb8a06efa62fe6c0108f3b368a09b6e450e15769e406beaabd157c3e27c65e",
+    "documents/paper-build/reader-hooks.tex": "bfa53d3dc2384ae0a1ab9c0b9d25a045ea13327635df15ebf513e1b254be4883",
     "documents/paper-build/reader-tags.toml": "396ef2d23890e994d47b1ff3b6500e98bb41e416bce311037dacf8ad96bdc61d",
     "documents/paper-build/runtime.toml": "442c5f0e2da4c4da324f4e052ba1f9019891cc632d7299b9576e05af8af23333",
     "documents/paper-build/sources.tsv": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
@@ -14,7 +14,7 @@
     "documents/paper/data/ftoo_symbols.tex": "a0c098eb7da53ddb444196429c215c6583181db64528f68a8a74735c15c463bc",
     "documents/paper/data/ftoo_symbols_historical.tex": "c0cac6e1456e2fe721b4df7e589f1d67994839e97286bd1d7fa50a9652816392",
     "documents/paper/econ_membrane.tex": "121ff6fab50cc019885e3325a10b58d670b1394ec23134941f2ff88bb28b3aa4",
-    "documents/paper/explainer/explainer.tex": "96407ef0d65d85282b1c02262ce903d1e820eb84beb9cf008456b459a9108d2c",
+    "documents/paper/explainer/explainer.tex": "597cbe4f253dbea32c8d893e5b25d9f746a625500d48abdc3311b438ced6e476",
     "documents/paper/explainer_displayskips.tex": "a8f5592f4b1de4e3e09ad42318490904a57b73608d9385422fb80193fa0de3c8",
     "documents/paper/explainer_strings_english.tex": "d926a1e396152163876e5f9fbabb4674710381cc8ce679581007023a807d4ca5",
     "documents/paper/ftoo_typed_tools.tex": "3d1ddc89bd5565b61ce44d926d2961290789bdbea7e056732e4a54a3e0102a57",
@@ -22,7 +22,7 @@
     "documents/paper/main.tex": "a005a45295d92f05f5cc0360017951b08ff2ae9c3001fd2157fdeb0bbfb3f2df",
     "documents/paper/main_explainer.tex.in": "66ce30759e2b22873ae7d2dca68d2b04e4bc20083977b2feb99b385cca089daa",
     "documents/paper/paper_xref.tex.in": "d7d2d60b6aa72b86982a6ddec6ad27373fb69bc016ab42f62aba282bd781a84d",
-    "documents/paper/parts/appendices.tex": "dbd81e146c8183efb85bfd69ba465eeeb737b23eb58bbdb17b5dd8685443f710",
+    "documents/paper/parts/appendices.tex": "27dd170dcc62406bb98f7193fcf287db0e9d2cb6b2bd58e11172adde1592eea3",
     "documents/paper/parts/coda.tex": "30b39311fca849705583b140100fd80edb22d45bfa523ab2e8853a3cb2813169",
     "documents/paper/parts/front.tex": "0a4cd240431cfafecea3831fd7781e332bb72183e24c0ae9e93fbc39f70e9061",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
@@ -47,6 +47,6 @@
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "f0763b3e24c662c3e2f70fa0eb1eeef85e193767010e67187ef3c2276c035138",
     "tools/paper/inputs.py": "04b65bf5e937021383819ab1516c090232fc208a27d8171ee124f05c5aa82333",
-    "tools/paper/prepare.py": "d266252e071371dcef1ae78bd2081ebdf648bf2a47471e21a60ab7ce8c015965"
+    "tools/paper/prepare.py": "f3ae2421f42c2d255e5b1eb9052c8ae40bfca3ed76521b3e3450071be1b9165c"
   }
 }

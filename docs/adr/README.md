@@ -25,13 +25,14 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |011|Serialization is strict everywhere|accepted|
 |012|The weld: equal address sets across a unit's texts|accepted|
 |013|Workspace norms: edition, lints, toolchain|accepted|
-|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023|
+|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024|
 |015|Open questions are records|accepted|
-|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017|
-|017|Screen rendering contracts|accepted; mathematics transport is governed by 022|
+|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024|
+|017|Screen rendering contracts|accepted; mathematics transport is governed by 022; named passage-renewal acceptance is governed by 024|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause|
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
-|023|Site-local paper layout with two retained coordinates|accepted; supersedes 014's layout-selection clauses|
+|023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
+|024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|

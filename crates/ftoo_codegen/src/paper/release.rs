@@ -1,8 +1,7 @@
 //! M065: one conjunction over the existing paper release conditions.
-use super::{PaperFault, Result, bytes, check_reading_acceptance, command_output, compare, text};
+use super::{PaperFault, Result, bytes, check_reading_acceptance, compare, text};
 use serde_json::Value;
 use std::path::Path;
-use std::process::Command;
 
 pub(super) fn part<T>(part: &'static str, result: Result<T>) -> Result<T> {
     result.map_err(|fault| PaperFault::Release {
@@ -15,15 +14,6 @@ pub(super) fn inputs(root: &Path) -> Result<()> {
     part(
         "self-description acceptance",
         check_reading_acceptance(root),
-    )?;
-    part(
-        "layout targets",
-        command_output(
-            Command::new("python3")
-                .current_dir(root)
-                .args(["-B", "tools/paper/prepare.py", "--check-layout"])
-                .arg(root),
-        ),
     )?;
     Ok(())
 }

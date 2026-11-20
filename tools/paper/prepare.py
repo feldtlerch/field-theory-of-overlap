@@ -7,11 +7,10 @@ import shutil
 import tomllib
 from bibroute import derive
 from identities import emit
-from common import require, read, write, timed, runtime, digest
+from common import require, read, write, timed, runtime
 
 INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-harm-enlargement.tex", "generated/documents/paper-pilot/sec-say-wonder-beauty.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex"]
 SOURCES = 'documents/paper/'
-BUILD = 'documents/paper-build/'
 FRAGMENTS = (
     ('documents/paper/parts/partA.tex', 184, 184, 'generated/documents/paper-pilot/sec-say-direction.tex', 'sec:say:direction'),
     ('documents/paper/parts/partA.tex', 601, 601, 'generated/documents/paper-pilot/sec-say-harm-enlargement.tex', 'sec:say:harm-enlargement'),
@@ -22,30 +21,6 @@ FRAGMENTS = (
     ('documents/paper/parts/coda.tex', 112, 112, 'generated/documents/paper-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
     ('documents/paper/explainer/explainer.tex', 972, 973, 'generated/documents/explainer-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
 )
-
-
-def hook_addresses(hooks):
-    """Return every (file name, first line, last line) that the reader hooks address by input line."""
-    addresses = set(); current = None; pending = None
-    token = re.compile(r'\{([A-Za-z0-9_-]+\.tex)\}|rebreak:nn\{(\d+)\}\{(\d+)\}|\\inputlineno(>=|<=|=)(\d+)')
-    for match in token.finditer(hooks):
-        name, first, last, relation, number = match.groups()
-        if name:
-            current = name
-        elif first:
-            addresses.add((current, int(first), int(last)))
-        elif relation == '=':
-            addresses.add((current, int(number), int(number)))
-        elif relation == '>=':
-            pending = int(number)
-        else:
-            require(pending is not None, 'Layout hook upper bound lacks its lower bound')
-            addresses.add((current, pending, int(number))); pending = None
-    require(pending is None and all(a[0] is not None for a in addresses), 'Layout hook address lacks its file')
-    # A comparison of the input line with a literal number in any other form would address a line unpinned.
-    literal = re.findall(r'\\inputlineno\s*\}?\s*[<>=]+\s*\{?\s*\d', hooks)
-    require(len(literal) == len(re.findall(r'\\inputlineno(?:>=|<=|=)\d', hooks)), 'Layout hook address form is not recognised')
-    return addresses
 
 
 def versioned(text, version, name):
@@ -62,25 +37,6 @@ def paper_master(text, version):
     paper = versioned(text, version, 'paper')
     require(not re.search(r'@[A-Z_]+@',paper), 'Unexpanded paper placeholder')
     return paper
-
-
-def check_layout_targets(repository):
-    record = tomllib.loads(read(repository/BUILD/'layout-pins.toml'))
-    pins = record.get('pin', [])
-    require(set(record) == {'pin'} and pins, 'Layout pins are missing')
-    pinned = set()
-    for item in pins:
-        require(set(item) == {'site', 'target', 'lines', 'sha256'} and len(item['lines']) == 2,
-                'Malformed layout pin: '+str(item.get('site')))
-        require(item['target'].startswith(SOURCES) and '..' not in pathlib.PurePosixPath(item['target']).parts,
-                'Layout pin target escapes paper root: '+item['site'])
-        address = (pathlib.PurePosixPath(item['target']).name, *item['lines'])
-        require(address not in pinned, 'Duplicate layout pin: '+item['site'])
-        pinned.add(address)
-        require(digest((repository/item['target']).read_bytes()) == item['sha256'],
-                'Layout hook target differs: '+item['site']+' ('+item['target']+')')
-    addresses = hook_addresses(read(repository/BUILD/'reader-hooks.tex'))
-    require(pinned == addresses, 'Layout hook addresses differ from pins: unpinned '+str(sorted(addresses-pinned))+', unused '+str(sorted(pinned-addresses)))
 
 
 def declared_fragments(repository, rows):
@@ -129,7 +85,6 @@ def prepare(repository, support, work):
     rows = read(root/'sources.tsv').splitlines()
     require(len(rows) == 26 and len(set(rows)) == 26, 'Closed list must have 26 distinct paths')
     require(all(p.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(p).parts for p in rows), 'Closed list path escapes paper root')
-    check_layout_targets(repository)
     fragments = declared_fragments(repository, rows)
     settings, lock, engine, bundle = runtime(repository, support)
     locked = {f['member']:f['sha256'] for f in lock['bundle']['files']}
@@ -171,16 +126,9 @@ def prepare(repository, support, work):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--check-layout', action='store_true')
     parser.add_argument('repository', type=pathlib.Path)
     for name in ['support','work']: parser.add_argument(name,type=pathlib.Path,nargs='?')
     args = parser.parse_args()
-    if args.check_layout:
-        try:
-            check_layout_targets(args.repository)
-        except ValueError as error:
-            parser.exit(1, str(error)+'\n')
-    else:
-        with timed('prepare'):
-            require(args.support is not None and args.work is not None, 'Support and work paths are required')
-            print('Checked bundled packages:',', '.join(prepare(args.repository,args.support,args.work)))
+    with timed('prepare'):
+        require(args.support is not None and args.work is not None, 'Support and work paths are required')
+        print('Checked bundled packages:',', '.join(prepare(args.repository,args.support,args.work)))

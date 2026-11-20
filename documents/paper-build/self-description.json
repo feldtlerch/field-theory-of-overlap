@@ -16,8 +16,8 @@
     {
       "id": 2,
       "file": "documents/paper/parts/front.tex",
-      "start": 15371,
-      "end": 15581,
+      "start": 15444,
+      "end": 15654,
       "sha256": "0a13b3add8e8ebe297ee169a623cccc1982fa7a49cc797229491010251916023",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "are two gradings, not one (\\ftag{mod:facets}): what a claim is built on is the compiler's"
@@ -25,8 +25,8 @@
     {
       "id": 3,
       "file": "documents/paper/parts/partA.tex",
-      "start": 10008,
-      "end": 10041,
+      "start": 9930,
+      "end": 9963,
       "sha256": "3a9c3b780dd766bf80e1f1e6552591513f9bba903c0a4eb742c1493c009d7bc2",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "spend set: the compiler's column)"
@@ -89,16 +89,16 @@
       "id": 10,
       "file": "documents/paper/parts/appendices.tex",
       "start": 44771,
-      "end": 47190,
-      "sha256": "c317c9efcc6041144c80a32030b0037172f9be56f3b5bd921a0485af18074f86",
-      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "end": 47241,
+      "sha256": "deb99ef883f68b75080f2e3af1a8da73f86c1ee3ece6a6994fe4b3bd96014db2",
+      "reading_acceptance": "Renewed bytes differ from the previously accepted bytes only by one layout instruction; accepted through independent review of registry/paper-layout/passages-10-14-renewal.md by a reviewer other than the change's author.",
       "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
     },
     {
       "id": 11,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52649,
-      "end": 52765,
+      "start": 52700,
+      "end": 52816,
       "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
@@ -106,8 +106,8 @@
     {
       "id": 12,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52791,
-      "end": 52879,
+      "start": 52842,
+      "end": 52930,
       "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
@@ -124,10 +124,10 @@
     {
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 53402,
-      "end": 56095,
-      "sha256": "002068089d36e3135d0e0926bb745dcb8708930db2ef87de3ce24c476d2ba453",
-      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
+      "start": 53475,
+      "end": 56196,
+      "sha256": "0204ef8616c7c00a63f28a2b2deae49923cd68a7df472a1d1839c3e4a7d88099",
+      "reading_acceptance": "Renewed bytes differ from the previously accepted bytes only by one layout instruction; accepted through independent review of registry/paper-layout/passages-10-14-renewal.md by a reviewer other than the change's author.",
       "anchor": "\\section{The Paper and Its Checks}"
     },
     {

@@ -51,6 +51,12 @@ LAYOUT_SITES = r'''\newdimen\savedstretch \savedstretch=\emergencystretch
 \newcommand\formalfoot[1]{\begingroup #1\par\endgroup}
 \PaperParagraph{stretch=2em,rightskip=0pt plus 1em,lastline,wholewords}%
 \AddToHookNext{para/end}{\checkchanged}Ordinary paragraph.\par\checkoriginal
+\PaperParagraph{stretch=4em,rightskip=0pt plus 1em}%
+\AddToHookNext{para/end}{%
+  \ifdim\emergencystretch=4em\else\errmessage{appendix stretch absent}\fi
+  \ifdim\rightskip=0pt\else\errmessage{appendix right margin absent}\fi
+  \ifdim\gluestretch\rightskip=1em\else\errmessage{appendix right margin flexibility absent}\fi}%
+Appendix paragraph.\par\checkoriginal
 \formalfoot{\PaperParagraph{stretch=2em}\AddToHookNext{para/end}{%
   \ifdim\emergencystretch=2em\else\errmessage{formal note stretch absent}\fi}%
   Formal note paragraph.}\checkoriginal

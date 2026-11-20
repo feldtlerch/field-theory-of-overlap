@@ -183,11 +183,6 @@
     {widow}{\widowpenalty=10000\relax}
     {broken-line}{\brokenpenalty=10000\relax}}
     {\PackageError{paper-layout}{Unknown~box~ending:~#1}{}}}
-\cs_new_protected:Npn\paper_paragraph_spacing:{
-  \exp_args:Ne\str_case:nn{\CurrentFile}{
-    {appendices.tex}{\int_compare:nT{\inputlineno>=1040}{
-      \int_compare:nT{\inputlineno<=1045}{\emergencystretch=4em\relax\rightskip=0pt~plus~1em\relax}}}
-    {explainer.tex}{\int_compare:nT{\inputlineno=930}{\emergencystretch=2em\relax}}}}
 % Saved last-line settings are restored after each paragraph.
 \skip_new:N\l_paper_fill_skip
 \int_new:N\l_paper_final_hyphen_int
@@ -198,8 +193,7 @@
   \skip_set:Nn\l_paper_right_skip{\rightskip}
   \skip_set:Nn\l_paper_fill_skip{\parfillskip}
   \int_set:Nn\l_paper_final_hyphen_int{\finalhyphendemerits}
-  \int_set:Nn\l_paper_hyphen_int{\hyphenpenalty}
-  \paper_paragraph_spacing:}
+  \int_set:Nn\l_paper_hyphen_int{\hyphenpenalty}}
 \AddToHook{para/after}{\emergencystretch=\l_paper_stretch_dim\relax\rightskip=\l_paper_right_skip\relax
   \parfillskip=\l_paper_fill_skip\relax\finalhyphendemerits=\l_paper_final_hyphen_int\relax
   \hyphenpenalty=\l_paper_hyphen_int\relax}
