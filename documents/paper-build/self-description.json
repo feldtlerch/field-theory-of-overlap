@@ -89,16 +89,16 @@
       "id": 10,
       "file": "documents/paper/parts/appendices.tex",
       "start": 44771,
-      "end": 47241,
-      "sha256": "deb99ef883f68b75080f2e3af1a8da73f86c1ee3ece6a6994fe4b3bd96014db2",
-      "reading_acceptance": "Renewed bytes differ from the previously accepted bytes only by one layout instruction; accepted through independent review of registry/paper-layout/passages-10-14-renewal.md by a reviewer other than the change's author.",
+      "end": 47380,
+      "sha256": "24d2a6660d0fdc9d5024fa627ee4db46277ec2944c0196879d792721ea3a6e0f",
+      "reading_acceptance": "The project's owner approved the qualified typed-layer certification; this SHA256 identifies the accepted passage bytes.",
       "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
     },
     {
       "id": 11,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52700,
-      "end": 52816,
+      "start": 52839,
+      "end": 52955,
       "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
@@ -106,8 +106,8 @@
     {
       "id": 12,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52842,
-      "end": 52930,
+      "start": 52981,
+      "end": 53069,
       "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
