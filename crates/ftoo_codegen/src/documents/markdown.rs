@@ -114,7 +114,7 @@ fn check_runs(
         match run {
             Inline::Text(text) if !text.is_empty() => adjacent = None,
             Inline::Text(_) => {}
-            Inline::Tag { .. } | Inline::Citation { .. } => {
+            Inline::Tag { .. } | Inline::PaperTag { .. } | Inline::Citation { .. } => {
                 adjacent = Some(MarkdownMathReason::DirectTagOrCitationAdjacency);
             }
             Inline::Mention { .. } => {
@@ -200,6 +200,12 @@ pub(super) fn check_math_admission(plan: &DocumentPlan) -> Result<(), DocumentEr
     Ok(())
 }
 pub(super) fn render(plan: &DocumentPlan) -> String {
+    render_with_paper_spans(plan).0
+}
+
+#[allow(clippy::too_many_lines)] // One traversal binds emitted paper tags to their exact reader spans.
+fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, String)>) {
+    let mut paper_spans = Vec::new();
     let mut output = format!(
         "<!-- generated document {} language {} -->\n{}<br>\n",
         plan.document, plan.language, plan.coverage.declaration
@@ -221,15 +227,32 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
         output.push_str("# ");
         inline(&mut output, &heading.runs);
         output.push_str("\n\n");
-        for (index, refrain) in screen.refrains.iter().enumerate() {
-            writeln!(output, "{}\n", text(&screen.gaps[index].message)).expect("string write");
-            let block = &plan.blocks[index + 1];
+        for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            writeln!(output, "{}\n", text(&screen.gaps[index - 1].message)).expect("string write");
             writeln!(
                 output,
                 "<!-- unit {} document {} language {} -->",
                 block.unit, plan.document, plan.language
             )
             .expect("string write");
+            if block.paragraph {
+                for run in &block.runs {
+                    if let Inline::PaperTag { value, .. } = run {
+                        let start = output.len();
+                        inline(&mut output, std::slice::from_ref(run));
+                        paper_spans.push((
+                            start..start + text(&value.spelling).len(),
+                            value.key.clone(),
+                        ));
+                    } else {
+                        inline(&mut output, std::slice::from_ref(run));
+                    }
+                }
+                output.push_str("\n\n");
+                continue;
+            }
+            let refrain = &screen.refrains[super::plan::refrain_index(&plan.blocks, index)
+                .expect("non-paragraph screen position")];
             if refrain.quotation.is_some() {
                 output.push_str("<p align=\"center\"><em>");
             } else {
@@ -265,7 +288,7 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
         )
         .expect("string write");
         output.pop();
-        return output;
+        return (output, paper_spans);
     }
     for block in &plan.blocks {
         writeln!(
@@ -293,7 +316,7 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
         ));
     }
     output.pop();
-    output
+    (output, paper_spans)
 }
 
 pub(super) fn render_roles(plan: &DocumentPlan) -> Result<(String, String), DocumentError> {
@@ -424,24 +447,63 @@ pub(super) fn check_reader(
             at += value.len_utf8();
         }
     }
-    let mut leak = ftoo_manifest::reader_label_literals(&decoded)
+    let (annotated, planned_spans) = render_with_paper_spans(plan);
+    let allowed: Vec<_> = planned_spans
         .into_iter()
-        .map(|range| {
-            let start = offsets[range.start];
-            let end = offsets.get(range.end).copied().unwrap_or(reader.len());
-            (start..end, decoded[range].to_owned())
+        .filter_map(|(range, key)| {
+            let spelling = text(&key);
+            (annotated[range.clone()] == spelling).then(|| {
+                let start = erase_annotations(&annotated[..range.start])
+                    .expect("generated annotation prefix")
+                    .len();
+                (start..start + spelling.len(), key)
+            })
         })
-        .next();
-    for &label in known_labels {
-        if let Some(start) = reader.find(label) {
-            select_leak(&mut leak, start..start + label.len(), label);
+        .filter(|(range, key)| reader.get(range.clone()) == Some(text(key).as_str()))
+        .collect();
+    let permitted = |range: &Range<usize>, label: &str| {
+        allowed
+            .iter()
+            .any(|(span, key)| span == range && key == label)
+    };
+    let mut leak = None;
+    for range in ftoo_manifest::reader_label_literals(&decoded) {
+        let start = offsets[range.start];
+        let end = offsets.get(range.end).copied().unwrap_or(reader.len());
+        let bytes = start..end;
+        if !permitted(&bytes, &decoded[range.clone()]) {
+            select_leak(&mut leak, bytes, &decoded[range]);
         }
-        if let Some(start) = decoded.find(label) {
+    }
+    for &label in known_labels {
+        for (start, _) in reader.match_indices(label) {
+            let bytes = start..start + label.len();
+            if !permitted(&bytes, label) {
+                select_leak(&mut leak, bytes, label);
+            }
+        }
+        for (start, _) in decoded.match_indices(label) {
             let end = start + label.len();
             let raw_start = offsets[start];
             let raw_end = offsets.get(end).copied().unwrap_or(reader.len());
-            select_leak(&mut leak, raw_start..raw_end, label);
+            let bytes = raw_start..raw_end;
+            if !permitted(&bytes, label) {
+                select_leak(&mut leak, bytes, label);
+            }
         }
+    }
+    // A checked paper handle in this plan makes a literal label in an attribute
+    // a leak even when the attribute's address is malformed.
+    if let Some((bytes, value)) = leak.as_ref().filter(|_| !allowed.is_empty()) {
+        return Err(role_failure(
+            plan,
+            false,
+            bytes.clone(),
+            AssemblyFault::ReaderLabelLiteral {
+                value: value.clone(),
+                bytes: bytes.clone(),
+            },
+        ));
     }
     if plan.screen.is_some() {
         for (index, (at, prefix)) in reader.match_indices("id=\"").enumerate() {
@@ -635,6 +697,15 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             Inline::Text(value) => output.push_str(&text(value)),
             Inline::Tag { handle, label, .. } => {
                 write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
+            }
+            Inline::PaperTag { value, .. } => {
+                write!(
+                    output,
+                    "{}<!-- label {} -->",
+                    text(&value.spelling),
+                    value.target
+                )
+                .expect("string write");
             }
             Inline::Math { markdown, .. } => {
                 write!(output, "$`{markdown}`$").expect("string write");

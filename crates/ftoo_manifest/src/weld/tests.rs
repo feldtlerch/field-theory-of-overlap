@@ -84,7 +84,7 @@ fn tag_side(language: &str, entries: &[(&str, NodeId, usize, usize, usize)]) -> 
             .entry(input)
             .or_insert_with(|| TagMember {
                 input: (*input).into(),
-                target: *target,
+                target: crate::ResolvedTagTarget::Theory(*target),
                 sites: vec![],
             })
             .sites
@@ -137,14 +137,23 @@ fn tags_debug(s: &TagSide) -> String {
         .members
         .iter()
         .map(|m| {
-            let target = match m.target {
-                NodeId::LangevinCoefficientOne => "LangevinCoefficientOne",
-                NodeId::LangevinCoefficientThree => "LangevinCoefficientThree",
-                NodeId::LangevinCoefficientOneValue => "LangevinCoefficientOneValue",
-                NodeId::LangevinCoefficientThreeValue => "LangevinCoefficientThreeValue",
+            let target = match &m.target {
+                crate::ResolvedTagTarget::Theory(NodeId::LangevinCoefficientOne) => {
+                    "LangevinCoefficientOne"
+                }
+                crate::ResolvedTagTarget::Theory(NodeId::LangevinCoefficientThree) => {
+                    "LangevinCoefficientThree"
+                }
+                crate::ResolvedTagTarget::Theory(NodeId::LangevinCoefficientOneValue) => {
+                    "LangevinCoefficientOneValue"
+                }
+                crate::ResolvedTagTarget::Theory(NodeId::LangevinCoefficientThreeValue) => {
+                    "LangevinCoefficientThreeValue"
+                }
+                crate::ResolvedTagTarget::Paper(_) => "Paper",
             };
             format!(
-                "TagMember {{ input: {:?}, target: {target}, sites: [{}] }}",
+                "TagMember {{ input: {:?}, target: Theory({target}), sites: [{}] }}",
                 m.input,
                 m.sites
                     .iter()

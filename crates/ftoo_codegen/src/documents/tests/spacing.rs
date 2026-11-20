@@ -42,6 +42,7 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
             unit: "sec:fixture:spacing".into(),
             depth,
             quotation: false,
+            paragraph: false,
             site: site(),
             runs: vec![
                 insertion(citation),

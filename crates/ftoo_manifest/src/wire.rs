@@ -16,7 +16,15 @@ use crate::{
     ValidationErrors, validate,
 };
 use std::{error::Error, fmt};
+pub use syntax::Value as JsonValue;
 use syntax::Value;
+
+/// Parse JSON while retaining field order and refusing duplicate keys.
+/// # Errors
+/// Returns a located syntax refusal for malformed or duplicate input.
+pub fn strict_json(bytes: &[u8]) -> Result<JsonValue, WireError> {
+    syntax::parse(bytes)
+}
 
 const TAG_FIELDS: &[&str] = &["tag", "target"];
 const HISTORY_FIELDS: &[&str] = &["ordinal", "authority-record", "reason", "change"];

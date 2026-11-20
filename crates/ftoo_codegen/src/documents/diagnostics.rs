@@ -12,6 +12,9 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    UnsupportedParagraphBody {
+        reason: String,
+    },
     UnsupportedMarkdownMath {
         context: String,
         reason: MarkdownMathReason,
@@ -259,6 +262,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::UnsupportedParagraphBody { .. } => 48,
             Self::UnsupportedMarkdownMath { .. } => 47,
             Self::UnsupportedPublicHandle { .. } => 36,
             Self::MissingScreenTemplates { .. } => 37,
@@ -790,6 +794,7 @@ pub struct IoFailure {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentError {
+    PaperLookup(super::registry::PaperLookupError),
     Retention(Box<crate::retention::RetentionCheckError>),
     DocumentaryRegistry(ftoo_manifest::RegistryErrors),
     Projection(ProjectionCheckError),

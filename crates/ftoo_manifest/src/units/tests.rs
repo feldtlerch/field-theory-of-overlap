@@ -853,8 +853,8 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M040,
-            "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar. A document's optional targets list is a nonempty set of distinct values from fragment, markdown, latex and html, and defaults to markdown and latex.",
-            "Document language and target declarations and all associated statement-unit texts.",
+            "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar. A document's optional targets list is a nonempty set of distinct values from fragment, markdown, latex and html, and defaults to markdown and latex. A document's optional paper-context is exactly paper; omission supplies no paper-scoped resolver.",
+            "Document language, target and paper-context declarations and all associated statement-unit texts.",
         ),
         (
             RuleId::M041,
@@ -1335,6 +1335,29 @@ fn resolution_matrix(
         }
         let error = resolve_unit_tags(&corpus, book).unwrap_err();
         assert_eq!(error, UnitErrors::from_diagnostics(faults).unwrap());
+        if !matches!(cause, crate::TagResolutionFault::UnknownTag { .. }) {
+            let paper_documents = BTreeSet::from(["explainer".to_owned()]);
+            let fallback_calls = std::cell::Cell::new(0);
+            let with_paper = resolve_unit_tags_with(&corpus, book, &paper_documents, |key| {
+                fallback_calls.set(fallback_calls.get() + 1);
+                let site = PaperEvidenceSite {
+                    file: "paper-tags.tsv".into(),
+                    line: 1,
+                };
+                Some(PaperResolution::Available(PaperTagValue {
+                    key: key.into(),
+                    spelling: key.into(),
+                    target: "fixture:paper".into(),
+                    target_kind: "node".into(),
+                    lookup_site: site.clone(),
+                    alias_site: None,
+                    declaration_sites: vec![site],
+                }))
+            })
+            .unwrap_err();
+            assert_eq!(with_paper, error);
+            assert_eq!(fallback_calls.get(), 0);
+        }
         assert_eq!(error.to_string(), display);
         assert_eq!(error.diagnostics()[0].fault.to_string(), message);
         if let UnitFault::ResolutionFault { cause } = &error.diagnostics()[0].fault {
@@ -1819,7 +1842,7 @@ fn register_m042_literal_statement_scope_and_state() {
     assert_eq!(rule.number, RuleId::M042);
     assert_eq!(
         rule.statement,
-        "Every tag-facing statement-text occurrence resolves through the supplied AddressBook's live resolver or refuses admission with its unit, language and site."
+        "Every tag-facing statement-text occurrence first resolves through the supplied AddressBook's live resolver. Only an unknown permanent spelling in a document declaring paper context may fall back to the checked paper-scoped lookup; retired and out-of-slice refusals and documentary-target refusals are terminal. The fallback accepts only paper or alias rows of kind node or evidence; admitted and candidate rows refuse. Resolution preserves the target domain, printed spelling, source key and evidence without permanent admission, or refuses with its unit, language and site."
     );
     assert_eq!(
         rule.scope,

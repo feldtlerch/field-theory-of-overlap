@@ -120,9 +120,11 @@ A label has the form `kind:area:slug`, using lowercase letters, digits and hyphe
 
 A unit's id follows the three-component grammar. ADR 016 decides that a separate, closed documentary-target field in unit metadata may mint admitted targets outside that grammar; [the unit loader](crates/ftoo_codegen/src/units/toml.rs) does not implement it yet, and until it does such targets are evidenced only by the paper's label-mint inventory (M060). That inventory records source mints while authored paper sources remain; unit prose does not mint labels.
 
+A document may declare `paper-context = "paper"` for checked paper-only tag runs. A paragraph skeleton child is owning prose; omission of the context keeps permanent-only resolution. Python 3.11 or later is required for actual-corpus checks.
+
 A reader handle is called a **tag** in the decision records, glossary and registry files. Reader citations need a unique live handle (ADR 003). ADR 016 decides that address availability will not depend on audit coverage and that handles are required only where readers address objects; rules M035 and M036 still implement the earlier out-of-slice store and full theory coverage until revised. Documentary bindings are immutable, retirement is final and label-shaped documentary handles are refused (M060).
 
-Reader text refuses literal labels (M055). Under ADR 017, `en.md` contains no internal labels, even in raw source; `en.labels.md` retains recovery evidence. The Python commands above, run at the repository root, check Markdown harvesting, mint uniqueness and citation resolution. [Manifest labels](crates/ftoo_manifest/src/labels.rs) and [codegen integration](crates/ftoo_codegen/src/labels.rs), exercised by workspace tests, check across Rust identities, Markdown and unit metadata; the Python check alone cannot prove that wider uniqueness.
+Reader text refuses literal labels, except the exact planned spelling span of a checked paper tag whose printed spelling is its own source key (M055). Under ADR 017, `en.md` contains no internal labels, even in raw source; `en.labels.md` retains recovery evidence. The Python commands above, run at the repository root, check Markdown harvesting, mint uniqueness and citation resolution. [Manifest labels](crates/ftoo_manifest/src/labels.rs) and [codegen integration](crates/ftoo_codegen/src/labels.rs), exercised by workspace tests, check across Rust identities, Markdown and unit metadata; the Python check alone cannot prove that wider uniqueness.
 
 ## Review renderings and licences
 

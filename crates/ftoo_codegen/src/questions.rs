@@ -409,7 +409,14 @@ fn prepare(root: &Path) -> Result<Prepared, OpenQuestionError> {
     )?)
     .map_err(|line| OpenQuestionError::Input(QuestionInputFault::PaperTagRow { line }))?;
     let labels = |e| OpenQuestionError::Labels(LabelFileError::Labels(e));
-    check_paper_tag_targets(crate::documents::registry::PAPER_TAGS, &tag_rows).map_err(labels)?;
+    check_paper_tag_targets(
+        crate::documents::registry::PAPER_TAGS,
+        &tag_rows
+            .iter()
+            .map(|(key, target, _, line)| (key.clone(), target.clone(), *line))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(labels)?;
     let joint = collect_joint_mints(&corpus, &markdown)
         .map_err(labels)?
         .with_paper_mints(mint_rows.clone())
@@ -437,7 +444,7 @@ fn prepare(root: &Path) -> Result<Prepared, OpenQuestionError> {
             .collect(),
         paper: tag_rows
             .iter()
-            .map(|(_, target, _)| target.clone())
+            .map(|(_, target, _, _)| target.clone())
             .chain(mint_rows.iter().map(|(key, _)| key.clone()))
             .collect(),
         files,
@@ -446,7 +453,7 @@ fn prepare(root: &Path) -> Result<Prepared, OpenQuestionError> {
         .map_err(OpenQuestionError::Admission)?;
     joint.with_open_questions(&store).map_err(labels)?;
     let mut tags = BTreeMap::<String, Vec<String>>::new();
-    for (spelling, target, _) in tag_rows {
+    for (spelling, target, _, _) in tag_rows {
         tags.entry(target).or_default().push(spelling);
     }
     let bytes = register(&store, &tags).into_bytes();

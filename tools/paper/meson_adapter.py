@@ -11,6 +11,7 @@ import stat
 import subprocess
 
 from inputs import inventory
+import identities
 
 
 def digest(path):
@@ -107,9 +108,10 @@ def documents_record(args):
                 paths.add(str(path.relative_to(repo)))
         directories[name] = present
     paths.add('documents/paper-build/label-mints.tsv')
+    paths.update(identities.input_paths(repo))
     paths.update(document_tree(repo, 'generated/documents'))
     paths.update(markdown_sources(repo))
-    optional = {'documents/paper-build/label-mints.tsv', 'generated/audit-report.json'}
+    optional = {'generated/audit-report.json'}
     paths.update(optional)
     inputs = {}
     for name in sorted(paths):
@@ -134,7 +136,8 @@ def documents_record(args):
              'support': {'assembly': str(support), 'notation': str(notation_support),
                          'engine': {'path': str(engine), 'sha256': digest(engine)},
                          'notation_engine': {'path': str(notation_engine),
-                                             'sha256': digest(notation_engine)}},
+                                             'sha256': digest(notation_engine)},
+                         'python': tool('python3')},
              'adapter': digest(pathlib.Path(__file__))}
     replace_if_changed(pathlib.Path(args.output), canonical(value))
 

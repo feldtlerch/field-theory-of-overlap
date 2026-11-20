@@ -2,10 +2,10 @@
 mod files;
 #[cfg(test)]
 mod tests;
-use crate::{UnitLoadError, load_unit_files};
+use crate::UnitLoadError;
 use ftoo_manifest::{
     AddressBook, CheckedMarkdown, LabelErrors, LabelSourceError, MintKind, check_markdown_sources,
-    integrate_labels, resolve_unit_tags,
+    integrate_labels,
 };
 use std::{
     fmt, io,
@@ -80,9 +80,10 @@ pub fn check_label_files(
     root: &Path,
     book: &AddressBook<'_>,
 ) -> Result<LabelCheckSummary, LabelFileError> {
-    let corpus = load_unit_files(root).map_err(LabelFileError::Units)?;
-    let resolved = resolve_unit_tags(&corpus, book)
-        .map_err(|e| LabelFileError::Units(UnitLoadError::Admission(e)))?;
+    let (corpus, declaration) =
+        crate::units::load_unit_files_with_declaration(root).map_err(LabelFileError::Units)?;
+    let resolved = crate::units::checked_resolution(root, &declaration, &corpus, book)
+        .map_err(LabelFileError::Units)?;
     let markdown = load_markdown_files(root)?;
     let integrated = integrate_labels(&resolved, &markdown).map_err(LabelFileError::Labels)?;
     Ok(LabelCheckSummary {

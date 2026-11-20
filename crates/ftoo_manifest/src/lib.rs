@@ -66,10 +66,11 @@ mod validation;
 mod wire;
 pub use units::{
     CheckedText, CheckedUnit, DocumentDraft, DocumentEntryDraft, InsertionReason,
-    LanguageCheckedUnits, LocatedEntryDraft, LocatedString, MathOccurrence, NameDomain, PathPart,
+    LanguageCheckedUnits, LocatedEntryDraft, LocatedString, MathOccurrence, NameDomain,
+    PaperEvidenceSite, PaperResolution, PaperTagValue, PathPart, ResolvedTagTarget,
     ResolvedUnitTag, ResolvedUnits, ShapeKind, SourceAnchor, TagOccurrence, UnitDiagnostic,
     UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite, UnitStage, admit_unit_drafts,
-    resolve_unit_tags,
+    resolve_unit_tags, resolve_unit_tags_with,
 };
 
 /// Check the closed three-component semantic-label spelling.
@@ -79,9 +80,9 @@ pub fn is_semantic_label(value: &str) -> bool {
 }
 
 pub use wire::{
-    BudgetExport, CapabilityExport, LoadedProjection, ProducerExport, ProjectionDiagnostic,
-    ProjectionError, ProjectionFault, ProjectionValue, SourceDifference, WireError, WireFault,
-    WireLocation, load_projection, projection_bytes,
+    BudgetExport, CapabilityExport, JsonValue, LoadedProjection, ProducerExport,
+    ProjectionDiagnostic, ProjectionError, ProjectionFault, ProjectionValue, SourceDifference,
+    WireError, WireFault, WireLocation, load_projection, projection_bytes, strict_json,
 };
 
 pub use tag_history::{HistoryChange, HistoryEvent, RetirementCause};

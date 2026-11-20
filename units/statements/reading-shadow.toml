@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:reading:shadow"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "One may assume naively that the fact is the light and the principle its elaboration; the dependence runs the other way — the fact is the shadow the principle casts on the poorest instrument, and the still center’s population is scoped by exactly that dependence: darkness is the set of held, unposted converters, with the unspendable ground beneath (@tag{src:nd})."

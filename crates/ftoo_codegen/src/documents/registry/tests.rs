@@ -31,6 +31,229 @@ fn paper_mint_rows_keep_two_fields_and_locate_malformed_rows() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // One bounded protocol fixture covers valid evidence and each malformed boundary.
+fn paper_protocol_is_bound() {
+    use sha2::Digest;
+    let directory = super::super::tests::Directory::new();
+    let root = &directory.0;
+    std::fs::create_dir_all(root.join("tools/paper")).unwrap();
+    std::fs::create_dir_all(root.join("fixtures")).unwrap();
+    std::fs::write(root.join("fixtures/input.txt"), b"checked input").unwrap();
+    let digest = crate::hex(&sha2::Sha256::digest(b"checked input"));
+    let baseline = format!(
+        r#"{{"schema":1,"inputs":[{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}}]}}"#
+    );
+    let script = root.join("tools/paper/identities.py");
+    let write_response = |response: &str| {
+        std::fs::write(
+            &script,
+            format!("import sys\nsys.stdout.write({response:?})\n"),
+        )
+        .unwrap();
+    };
+    write_response(&baseline);
+    let lookup = CheckedPaperLookup::check(root).unwrap();
+    let PaperResolution::Available(value) = lookup.resolve("src:nd").unwrap() else {
+        panic!("checked binding absent");
+    };
+    assert_eq!(value.target, "node");
+    assert_eq!(
+        value.lookup_site.file,
+        "documents/paper-build/paper-tags.tsv"
+    );
+    assert_eq!(value.lookup_site.line, 1);
+    let alias = baseline
+        .replace("\"status\":\"paper\"", "\"status\":\"alias\"")
+        .replace(
+            "\"alias_site\":null",
+            "\"alias_site\":{\"file\":\"documents/paper-build/reader-tags.toml\",\"line\":2}",
+        )
+        .replace(
+            "\"line\":1}]",
+            "\"line\":1},{\"file\":\"documents/paper/data/ftoo_manifest.tex\",\"line\":3}]",
+        );
+    write_response(&alias);
+    let lookup = CheckedPaperLookup::check(root).unwrap();
+    let PaperResolution::Available(value) = lookup.resolve("src:nd").unwrap() else {
+        panic!("checked alias absent");
+    };
+    assert_eq!(
+        value.lookup_site.file,
+        "documents/paper-build/paper-tags.tsv"
+    );
+    assert_eq!(
+        value.alias_site.unwrap().file,
+        "documents/paper-build/reader-tags.toml"
+    );
+    assert_eq!(value.declaration_sites.len(), 2);
+    let repeated_input = format!("{{\"path\":\"fixtures/input.txt\",\"sha256\":\"{digest}\"}}");
+    std::fs::write(root.join("fixtures/other.txt"), b"other input").unwrap();
+    let other_digest = crate::hex(&sha2::Sha256::digest(b"other input"));
+    let other_input = format!("{{\"path\":\"fixtures/other.txt\",\"sha256\":\"{other_digest}\"}}");
+    let binding_row = baseline
+        .split("\"bindings\":[")
+        .nth(1)
+        .unwrap()
+        .strip_suffix("]}")
+        .unwrap();
+    let oversized_inputs = baseline.replacen(
+        &repeated_input,
+        &vec![repeated_input.clone(); 513].join(","),
+        1,
+    );
+    for (response, site) in [
+        (
+            baseline.replacen("\"schema\":1", "\"schema\":2", 1),
+            "schema",
+        ),
+        (
+            baseline.replacen("\"bindings\":", "\"extra\":null,\"bindings\":", 1),
+            "assembly-json",
+        ),
+        (
+            baseline.replacen("\"inputs\":", "\"schema\":1,\"inputs\":", 1),
+            "assembly-json",
+        ),
+        (
+            baseline.replacen("\"line\":1", "\"line\":0", 1),
+            "bindings.lookup_site",
+        ),
+        (
+            baseline.replacen("fixtures/input.txt", "/fixtures/input.txt", 1),
+            "inputs.path",
+        ),
+        (
+            baseline.replacen("fixtures/input.txt", "../input.txt", 1),
+            "inputs.path",
+        ),
+        (
+            baseline.replacen(
+                &repeated_input,
+                &format!("{repeated_input},{repeated_input}"),
+                1,
+            ),
+            "fixtures/input.txt",
+        ),
+        (
+            baseline.replacen(
+                &repeated_input,
+                &format!("{other_input},{repeated_input}"),
+                1,
+            ),
+            "fixtures/input.txt",
+        ),
+        (
+            baseline
+                .replacen(
+                    &repeated_input,
+                    &format!("{repeated_input},{other_input}"),
+                    1,
+                )
+                .replace("fixtures/other.txt", "fixtures/missing.txt"),
+            "fixtures/missing.txt",
+        ),
+        (
+            baseline.replacen(
+                "\"bindings\":[",
+                &format!("\"bindings\":[{binding_row},"),
+                1,
+            ),
+            "src:nd",
+        ),
+        (
+            baseline.replacen("\"status\":\"paper\"", "\"status\":\"alias\"", 1),
+            "src:nd",
+        ),
+        (
+            baseline.replacen(
+                "\"alias_site\":null",
+                "\"alias_site\":{\"file\":\"fixtures/input.txt\",\"line\":1}",
+                1,
+            ),
+            "src:nd",
+        ),
+        (
+            baseline.replacen("\"status\":\"paper\"", "\"status\":\"candidate\"", 1),
+            "src:nd",
+        ),
+        (
+            baseline.replacen("\"status\":\"paper\"", "\"status\":\"admitted\"", 1),
+            "src:nd",
+        ),
+        (
+            baseline.replacen("\"status\":\"paper\"", "\"status\":\"unknown\"", 1),
+            "src:nd",
+        ),
+        (
+            baseline.replacen("\"target_kind\":\"node\"", "\"target_kind\":\"other\"", 1),
+            "src:nd",
+        ),
+        (oversized_inputs, "inputs"),
+        (
+            baseline.replacen(
+                "\"bindings\":[",
+                &format!(
+                    "\"bindings\":[{}",
+                    vec![format!("{binding_row},"); 4096].concat()
+                ),
+                1,
+            ),
+            "bindings",
+        ),
+        (format!("{baseline} true"), "assembly-json"),
+    ] {
+        write_response(&response);
+        let error = CheckedPaperLookup::check(root).unwrap_err();
+        assert_eq!(error.rule, RuleId::M063);
+        assert_eq!(error.site, site);
+        assert!(matches!(
+            error.fault,
+            PaperLookupFault::ProtocolInvalid { .. }
+        ));
+    }
+    let link = root.join("fixtures/link.txt");
+    std::os::unix::fs::symlink(root.join("fixtures/input.txt"), &link).unwrap();
+    write_response(&baseline.replacen("fixtures/input.txt", "fixtures/link.txt", 1));
+    let error = CheckedPaperLookup::check(root).unwrap_err();
+    assert_eq!(error.rule, RuleId::M063);
+    assert_eq!(error.site, "fixtures/link.txt");
+    assert!(matches!(
+        error.fault,
+        PaperLookupFault::ProtocolInvalid { .. }
+    ));
+    write_response(&baseline);
+    let missing = CheckedPaperLookup::check_with(root, "no-such-python-executable").unwrap_err();
+    assert_eq!(missing.rule, RuleId::M063);
+    assert_eq!(missing.fault, PaperLookupFault::ProcessFailed);
+    std::fs::write(&script, "import sys\nsys.stdout.write('x' * 4194305)\n").unwrap();
+    let oversized = CheckedPaperLookup::check(root).unwrap_err();
+    assert_eq!(oversized.rule, RuleId::M063);
+    assert_eq!(oversized.site, "assembly-json");
+    assert_eq!(
+        oversized.fault,
+        PaperLookupFault::ProtocolInvalid {
+            reason: "response limit exceeded".into()
+        }
+    );
+    write_response(&baseline);
+    std::fs::write(root.join("fixtures/input.txt"), b"changed input").unwrap();
+    let error = CheckedPaperLookup::check(root).unwrap_err();
+    assert_eq!(error.rule, RuleId::M063);
+    assert_eq!(error.site, "fixtures/input.txt");
+    assert_eq!(
+        error.fault,
+        PaperLookupFault::InputChanged {
+            path: "fixtures/input.txt".into()
+        }
+    );
+    std::fs::write(&script, "raise SystemExit(1)\n").unwrap();
+    let error = CheckedPaperLookup::check(root).unwrap_err();
+    assert_eq!(error.rule, RuleId::M063);
+    assert_eq!(error.site, "tools/paper/identities.py");
+    assert_eq!(error.fault, PaperLookupFault::AuthorityRefused);
+}
+
+#[test]
 fn documentary_unknown_and_duplicate_fields_restore_and_reread() {
     let directory = super::super::tests::Directory::new();
     std::fs::create_dir(directory.0.join("registry")).unwrap();

@@ -599,12 +599,38 @@ fn check_texts(
 }
 
 /// A live identity at one authored occurrence, accessible through its resolved corpus.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaperEvidenceSite {
+    pub file: String,
+    pub line: usize,
+}
+/// A checked paper binding remains outside the permanent theory identity domain.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaperTagValue {
+    pub key: String,
+    pub spelling: String,
+    pub target: String,
+    pub target_kind: String,
+    pub lookup_site: PaperEvidenceSite,
+    pub alias_site: Option<PaperEvidenceSite>,
+    pub declaration_sites: Vec<PaperEvidenceSite>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PaperResolution {
+    Available(PaperTagValue),
+    Unavailable { status: String },
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResolvedTagTarget {
+    Theory(NodeId),
+    Paper(PaperTagValue),
+}
 #[derive(Debug)]
 pub struct ResolvedUnitTag<'u> {
     unit: &'u UnitLabel,
     language: &'u str,
     occurrence: &'u TagOccurrence,
-    target: NodeId,
+    target: ResolvedTagTarget,
 }
 impl ResolvedUnitTag<'_> {
     #[must_use]
@@ -620,8 +646,17 @@ impl ResolvedUnitTag<'_> {
         self.occurrence
     }
     #[must_use]
+    /// # Panics
+    /// Panics for a paper-scoped binding, which has no theory node.
     pub fn target(&self) -> NodeId {
-        self.target
+        match &self.target {
+            ResolvedTagTarget::Theory(target) => *target,
+            ResolvedTagTarget::Paper(_) => panic!("paper bindings have no theory node"),
+        }
+    }
+    #[must_use]
+    pub fn resolved_target(&self) -> &ResolvedTagTarget {
+        &self.target
     }
 }
 
@@ -683,6 +718,17 @@ pub fn resolve_unit_tags<'u, 'b, 'g>(
     corpus: &'u LanguageCheckedUnits,
     book: &'b AddressBook<'g>,
 ) -> Result<ResolvedUnits<'u, 'b, 'g>, UnitErrors> {
+    resolve_unit_tags_with(corpus, book, &BTreeSet::new(), |_| None)
+}
+/// Resolve permanent tags first, then unknown spellings in explicitly selected paper documents.
+/// # Errors
+/// Returns located refusals for every unavailable or mismatched occurrence.
+pub fn resolve_unit_tags_with<'u, 'b, 'g>(
+    corpus: &'u LanguageCheckedUnits,
+    book: &'b AddressBook<'g>,
+    paper_documents: &BTreeSet<String>,
+    paper: impl Fn(&str) -> Option<PaperResolution>,
+) -> Result<ResolvedUnits<'u, 'b, 'g>, UnitErrors> {
     let mut errors = Vec::new();
     let mut tags = Vec::new();
     for unit in &corpus.units {
@@ -693,7 +739,7 @@ pub fn resolve_unit_tags<'u, 'b, 'g>(
                         unit: &unit.label,
                         language,
                         occurrence,
-                        target,
+                        target: ResolvedTagTarget::Theory(target),
                     }),
                     Ok(crate::AddressTarget::Documentary(label)) => errors.push(diagnostic(
                         RuleId::M042,
@@ -706,6 +752,45 @@ pub fn resolve_unit_tags<'u, 'b, 'g>(
                             label,
                         },
                     )),
+                    Err(crate::TagResolutionFault::UnknownTag { .. })
+                        if paper_documents.contains(&unit.document) =>
+                    {
+                        match paper(&occurrence.input) {
+                            Some(PaperResolution::Available(target)) => {
+                                tags.push(ResolvedUnitTag {
+                                    unit: &unit.label,
+                                    language,
+                                    occurrence,
+                                    target: ResolvedTagTarget::Paper(target),
+                                });
+                            }
+                            Some(PaperResolution::Unavailable { status }) => {
+                                errors.push(diagnostic(
+                                    RuleId::M042,
+                                    UnitStage::Resolution,
+                                    Some(unit.label.as_str()),
+                                    Some(language),
+                                    &occurrence.site,
+                                    UnitFault::PaperTagUnavailable {
+                                        input: occurrence.input.clone(),
+                                        status,
+                                    },
+                                ));
+                            }
+                            None => errors.push(diagnostic(
+                                RuleId::M042,
+                                UnitStage::Resolution,
+                                Some(unit.label.as_str()),
+                                Some(language),
+                                &occurrence.site,
+                                UnitFault::ResolutionFault {
+                                    cause: crate::TagResolutionFault::UnknownTag {
+                                        input: occurrence.input.clone(),
+                                    },
+                                },
+                            )),
+                        }
+                    }
                     Err(cause) => errors.push(diagnostic(
                         RuleId::M042,
                         UnitStage::Resolution,

@@ -5,9 +5,14 @@ Audit outcomes: v:1<!-- label claim:langevin:coefficient-one-value -->: certifie
 Audit scope: finite source jet of order 5, residual order 4 and derivative order 1; analytic identification is not certified.
 
 <!-- unit sec:pilot:paper-excerpt document paper-pilot language en -->
-# Paper excerpt: selected refrains
+# Paper excerpt: selected passages
 
 Not yet converted: earlier material is omitted from this excerpt.
+
+<!-- unit sec:reading:shadow document paper-pilot language en -->
+One may assume naively that the fact is the light and the principle its elaboration; the dependence runs the other way — the fact is the shadow the principle casts on the poorest instrument, and the still center’s population is scoped by exactly that dependence: darkness is the set of held, unposted converters, with the unspendable ground beneath &#40;src:nd<!-- label sem:unrepresented:motive-distinction -->&#41;.
+
+Not yet converted: intervening material is omitted from this excerpt.
 
 <!-- unit sec:say:direction document paper-pilot language en -->
 <p align="center"><a id="sec-cwhich--way"></a><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>

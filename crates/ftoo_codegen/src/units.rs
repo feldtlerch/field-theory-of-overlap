@@ -45,6 +45,7 @@ pub enum UnitLoadError {
         kind: io::ErrorKind,
     },
     Admission(UnitErrors),
+    PaperLookup(crate::documents::registry::PaperLookupError),
 }
 impl fmt::Display for UnitInputFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -55,6 +56,7 @@ impl fmt::Display for UnitLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Admission(errors) => write!(f, "{errors}"),
+            Self::PaperLookup(error) => write!(f, "{error}"),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -159,6 +161,34 @@ pub fn load_unit_files(root: &Path) -> Result<LanguageCheckedUnits, UnitLoadErro
     let (declaration, statements) = files::collect(root)?;
     load_unit_sources(declaration, statements)
 }
+pub(crate) fn load_unit_files_with_declaration(
+    root: &Path,
+) -> Result<(LanguageCheckedUnits, UnitSource), UnitLoadError> {
+    let (declaration, statements) = files::collect(root)?;
+    let corpus = load_unit_sources(declaration.clone(), statements)?;
+    Ok((corpus, declaration))
+}
+pub(crate) fn checked_resolution<'u, 'b, 'g>(
+    root: &Path,
+    declaration: &UnitSource,
+    corpus: &'u LanguageCheckedUnits,
+    book: &'b ftoo_manifest::AddressBook<'g>,
+) -> Result<ftoo_manifest::ResolvedUnits<'u, 'b, 'g>, UnitLoadError> {
+    let contexts = toml::paper_contexts(declaration).map_err(UnitLoadError::Admission)?;
+    let lookup = if contexts.is_empty() {
+        None
+    } else {
+        Some(
+            crate::documents::registry::CheckedPaperLookup::check(root)
+                .map_err(UnitLoadError::PaperLookup)?,
+        )
+    };
+    let documents = contexts.into_keys().collect();
+    ftoo_manifest::resolve_unit_tags_with(corpus, book, &documents, |key| {
+        lookup.as_ref().and_then(|lookup| lookup.resolve(key))
+    })
+    .map_err(UnitLoadError::Admission)
+}
 
 /// Owned counts from a successful actual-file check; no detached resolved identities.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -176,9 +206,8 @@ pub fn check_unit_files(
     root: &Path,
     book: &ftoo_manifest::AddressBook<'_>,
 ) -> Result<UnitCheckSummary, UnitLoadError> {
-    let corpus = load_unit_files(root)?;
-    let resolved =
-        ftoo_manifest::resolve_unit_tags(&corpus, book).map_err(UnitLoadError::Admission)?;
+    let (corpus, declaration) = load_unit_files_with_declaration(root)?;
+    let resolved = checked_resolution(root, &declaration, &corpus, book)?;
     Ok(UnitCheckSummary {
         documents: corpus.documents().len(),
         units: corpus.units().len(),

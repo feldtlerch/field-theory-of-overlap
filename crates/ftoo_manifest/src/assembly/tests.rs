@@ -314,7 +314,9 @@ fn math_byte_and_group_limits_have_exact_boundary_controls()
 #[test]
 fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
     let previous: [RuleSpec; 52] = include!("../../tests/fixtures/assembly/rules_before.rs");
-    assert_eq!(RULES[..48], previous[..48]);
+    assert_eq!(RULES[..39], previous[..39]);
+    assert_eq!(RULES[40..41], previous[40..41]);
+    assert_eq!(RULES[42..48], previous[42..48]);
     assert_eq!(RULES[49..52], previous[49..52]);
     assert_eq!(
         RULES[52..57]
@@ -331,15 +333,15 @@ fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
             ),
             (
                 RuleId::M054,
-                "Every declared document has one ordered skeleton, every skeleton names a declared document, and every admitted unit occurs exactly once in its associated document's skeleton within the assembly bounds. A quotation child names an existing unit owned by another document with text in every language the quoting document requires, and adds no membership.",
+                "Every declared document has one ordered skeleton, every skeleton names a declared document, and every admitted unit occurs exactly once in its associated document's skeleton within the assembly bounds. A quotation child names an existing unit owned by another document with text in every language the quoting document requires, and adds no membership. A paragraph child is an owning prose position, not a heading, refrain or quotation.",
                 "The complete skeleton and admitted unit corpora, including heading positions.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M055,
-                "Markdown and LaTeX emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text. Markdown mathematics is emitted only in admitted observed contexts, with a body that satisfies the delimiter and citation boundary, and refuses an unobserved context, forbidden body character or direct tag/citation adjacency at the mathematical use site before sizing or emission. A fragment target emits each non-heading position in its document as one TeX macro line with a plain-text body and refuses any other unit body. Every generated artifact path is unique. A selected target without an emitter, or a Markdown or LaTeX target of a document with a quotation position, refuses.",
-                "Every selected document target and its generated notation and addressing support.",
+                "Markdown and LaTeX emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text. The only paper-key exception is the exact planned emitted spelling span of a checked paper tag run whose printed spelling equals its own source key; the same bytes in text, titles, hrefs or ids remain refused. Markdown mathematics is emitted only in admitted observed contexts, with a body that satisfies the delimiter and citation boundary, and refuses an unobserved context, forbidden body character or direct tag/citation adjacency at the mathematical use site before sizing or emission. A fragment target emits each non-heading position in its document as one TeX macro line: a plain-text refrain or quotation, or a paragraph containing only admitted text and checked paper tag runs; other bodies refuse. Paragraph target spellings preserve decoded characters and refuse merging hyphen/em-dash runs or text requiring braced, backslash or multiline output. Each declared fragment replaces exactly one unique matching marker line in its declared source; malformed, repeated, undeclared or absent markers, role disagreements and authored duplicates of a converted body refuse. Every generated artifact path is unique. A selected target or role without an emitter refuses; Markdown quotations require the checked owner destination, and LaTeX quotations remain refused.",
+                "Every selected document target, its declared fragment source slots and generated notation and addressing support.",
                 RuleState::Enforced,
                 None
             ),

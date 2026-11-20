@@ -210,7 +210,7 @@ fn language(
         tags.entry(tag.occurrence().input().to_owned())
             .or_insert_with(|| TagMember {
                 input: tag.occurrence().input().to_owned(),
-                target: tag.target(),
+                target: tag.resolved_target().clone(),
                 sites: Vec::new(),
             })
             .sites

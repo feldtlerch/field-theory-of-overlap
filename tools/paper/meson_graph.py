@@ -190,6 +190,20 @@ def real_documents_record(parent, adapter):
     notation.joinpath('runtime/bin').mkdir(parents=True)
     (notation / 'runtime/bin/node').write_bytes(b'notation engine')
     # These fixture inputs follow the document loader, notation sweep, native support, and generated-document readers.
+    source_names = (
+        'documents/paper/main.tex', 'documents/paper/macros_overlap.tex',
+        'documents/paper/econ_membrane.tex', 'documents/paper/main_explainer.tex.in',
+        'documents/paper/paper_xref.tex.in', 'documents/paper/explainer_strings_english.tex',
+        'documents/paper/explainer_displayskips.tex', 'documents/paper/references.bib',
+        'documents/paper/explainer/explainer.tex',
+        *(f'documents/paper/parts/{part}.tex' for part in
+          ('front', 'partA', 'partB', 'gateways', 'partC', 'partD', 'partE',
+           'partF', 'partG', 'coda', 'appendices')),
+        *(f'documents/paper/data/{name}.tex' for name in
+          ('ftoo_manifest', 'ftoo_index', 'ftoo_registers', 'ftoo_symbols',
+           'ftoo_symbols_historical')),
+        'documents/paper/ftoo_typed_tools.tex',
+    )
     values = {
         'units/documents.toml': b'documents',
         'units/statements/one.toml': b'statement',
@@ -197,6 +211,11 @@ def real_documents_record(parent, adapter):
         'units/displays/one.toml': b'display',
         'registry/documentary-tags.toml': b'events',
         'documents/paper-build/label-mints.tsv': b'mints',
+        'documents/paper-build/sources.tsv': ('\n'.join(source_names) + '\n').encode(),
+        'documents/paper-build/paper-tags.tsv': b'paper tags',
+        'documents/paper-build/reader-tags.toml': b'aliases',
+        'documents/paper-build/provisional-tags.toml': b'candidates',
+        'documents/paper-build/reader-hooks.tex': b'hooks',
         'generated/manifest.json': b'manifest',
         'generated/audit-report.json': b'audit',
         'generated/documents/main/en.md': b'document',
@@ -209,8 +228,11 @@ def real_documents_record(parent, adapter):
         'tools/notation/support-digests.json': b'digests',
         'tools/notation/.node-version': b'node',
         'tools/notation/check.cjs': b'notation check',
+        'tools/paper/identities.py': b'checker',
+        'tools/paper/common.py': b'common',
         '.hidden/deeper/mint.md': b'markdown mint',
     }
+    values.update({name: b'source' for name in source_names})
     for name, data in values.items():
         path = repo / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -229,13 +251,15 @@ def real_documents_record(parent, adapter):
     assert set(values) == recorded['inputs'].keys()
     assert recorded['support']['engine']['sha256'] == hashlib.sha256(b'engine').hexdigest()
     assert recorded['support']['notation_engine']['sha256'] == hashlib.sha256(b'notation engine').hexdigest()
+    assert recorded['support']['python']['sha256']
     assert recorded['adapter'] == hashlib.sha256(adapter.read_bytes()).hexdigest()
     refresh()
     assert output.read_bytes() == original and output.stat().st_mtime_ns == original_time
     for name, data in values.items():
         path = repo / name
         stamp = path.stat()
-        path.write_bytes(data + b' changed')
+        path.write_bytes(data + (source_names[0] + '\n').encode()
+                         if name == 'documents/paper-build/sources.tsv' else data + b' changed')
         os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
         refresh()
         assert json.loads(output.read_bytes())['inputs'][name] != recorded['inputs'][name], name
@@ -243,7 +267,7 @@ def real_documents_record(parent, adapter):
         os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
         refresh()
         assert output.read_bytes() == original, name
-    for name in ('generated/audit-report.json', 'documents/paper-build/label-mints.tsv'):
+    for name in ('generated/audit-report.json',):
         path = repo / name
         path.unlink()
         refresh()
@@ -251,6 +275,12 @@ def real_documents_record(parent, adapter):
         path.write_bytes(values[name])
         refresh()
         assert output.read_bytes() == original
+    required_mints = repo / 'documents/paper-build/label-mints.tsv'
+    required_mints.unlink()
+    assert 'Missing document input entry: documents/paper-build/label-mints.tsv' in refresh(allowed=(1,)).stderr
+    required_mints.write_bytes(values['documents/paper-build/label-mints.tsv'])
+    refresh()
+    assert output.read_bytes() == original
     added_unit = repo / 'units/statements/added.toml'
     unit_directory_stamp = added_unit.parent.stat()
     added_unit.write_bytes(b'new statement')

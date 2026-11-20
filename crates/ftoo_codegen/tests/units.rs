@@ -1,4 +1,7 @@
-use ftoo_codegen::{UnitCheckSummary, check_projection, check_unit_files, load_unit_files};
+use ftoo_codegen::{
+    UnitCheckSummary, UnitSource, check_projection, check_unit_files, load_unit_files,
+    load_unit_sources,
+};
 use ftoo_manifest::{NodeId, load_projection, resolve_unit_tags};
 use std::collections::BTreeMap;
 
@@ -61,8 +64,9 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
             .collect::<Vec<_>>(),
         source_units
     );
+    let checked = check_unit_files(&root, &book).unwrap();
     assert_eq!(
-        check_unit_files(&root, &book).unwrap(),
+        checked,
         UnitCheckSummary {
             documents: corpus.documents().len(),
             units: source_units.len(),
@@ -123,7 +127,7 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
     );
     assert_eq!(second.math().len(), 0);
     assert_eq!(second.texts()["en"].occurrences(), []);
-    assert_tag_inventory(&corpus, &book);
+    assert_tag_inventory(&corpus, &book, checked.tag_sites);
 }
 
 fn expected_tag_targets(root: &std::path::Path) -> BTreeMap<String, String> {
@@ -143,14 +147,40 @@ fn expected_tag_targets(root: &std::path::Path) -> BTreeMap<String, String> {
         .collect()
 }
 
+#[allow(clippy::too_many_lines)] // Independent source, declaration and resolved-target inventories are compared together.
 fn assert_tag_inventory(
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     book: &ftoo_manifest::AddressBook<'_>,
+    checked_tag_sites: usize,
 ) {
-    let resolved = resolve_unit_tags(corpus, book).unwrap();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let permanent = load_unit_sources(
+        UnitSource {
+            file: "units/documents.toml".into(),
+            bytes: std::fs::read(root.join("units/documents.toml")).unwrap(),
+        },
+        std::fs::read_dir(root.join("units/statements"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.extension().is_some_and(|ext| ext == "toml")
+                    && path.file_name().unwrap() != "reading-shadow.toml"
+            })
+            .map(|path| UnitSource {
+                file: format!(
+                    "units/statements/{}",
+                    path.file_name().unwrap().to_string_lossy()
+                ),
+                bytes: std::fs::read(path).unwrap(),
+            })
+            .collect(),
+    )
+    .unwrap();
+    let resolved = resolve_unit_tags(&permanent, book).unwrap();
     let declared: Vec<_> = corpus
         .units()
         .iter()
+        .filter(|unit| unit.label().as_str() != "sec:reading:shadow")
         .flat_map(|unit| {
             unit.texts().iter().flat_map(move |(language, text)| {
                 text.tag_occurrences().iter().map(move |occurrence| {
@@ -182,8 +212,19 @@ fn assert_tag_inventory(
     for tag in resolved.tags() {
         assert!(resolved.book().graph().node(tag.target()).is_some());
     }
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let expected_targets = expected_tag_targets(&root);
+    let mut expected_targets = expected_tag_targets(&root);
+    let paper_tags =
+        std::fs::read_to_string(root.join("documents/paper-build/paper-tags.tsv")).unwrap();
+    let paper_keys: std::collections::BTreeSet<_> = paper_tags
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| {
+            let fields: Vec<_> = line.split('\t').collect();
+            assert_eq!(fields.len(), 3);
+            expected_targets.insert(fields[0].to_owned(), fields[1].to_owned());
+            fields[0].to_owned()
+        })
+        .collect();
     let mut expected = Vec::new();
     for entry in std::fs::read_dir(root.join("units/statements")).unwrap() {
         let path = entry.unwrap().path();
@@ -210,6 +251,17 @@ fn assert_tag_inventory(
         }
     }
     expected.sort();
+    assert_eq!(expected.len(), checked_tag_sites);
+    assert!(expected.iter().any(|(unit, language, input, target)| {
+        unit == "sec:reading:shadow"
+            && language == "en"
+            && input == "src:nd"
+            && expected_targets.get(input) == Some(target)
+    }));
+    let expected_permanent: Vec<_> = expected
+        .into_iter()
+        .filter(|(_, _, input, _)| !paper_keys.contains(input))
+        .collect();
     let mut actual: Vec<_> = resolved
         .tags()
         .iter()
@@ -223,7 +275,7 @@ fn assert_tag_inventory(
         })
         .collect();
     actual.sort();
-    assert_eq!(actual, expected);
+    assert_eq!(actual, expected_permanent);
 }
 
 #[test]

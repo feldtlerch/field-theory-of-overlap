@@ -6,6 +6,7 @@ document = "paper-pilot"
 [[skeleton.sections]]
 heading = "sec:pilot:paper-excerpt"
 children = [
+  { kind = "paragraph", unit = "sec:reading:shadow" },
   { kind = "unit", unit = "sec:say:direction" },
   { kind = "unit", unit = "sec:say:harm-enlargement" },
   { kind = "unit", unit = "sec:say:wonder-beauty" },

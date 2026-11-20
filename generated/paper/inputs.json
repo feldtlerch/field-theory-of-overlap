@@ -3,7 +3,7 @@
     "documents/paper-build/compat.tex": "c04b14fc4cf89dd6f3844a0f4b1674698128dc147348fab31ccc3d79cdd33823",
     "documents/paper-build/paper-tags.tsv": "f02a1776046e45b3079e4e5e61172c367f0e4c32994c2b7e77cf9f0985d1bdf0",
     "documents/paper-build/provisional-tags.toml": "900078426f9c6bb5601f0a98ffc3d73eac5da8fd0f6a8620324efbb93c0959d6",
-    "documents/paper-build/reader-hooks.tex": "bfa53d3dc2384ae0a1ab9c0b9d25a045ea13327635df15ebf513e1b254be4883",
+    "documents/paper-build/reader-hooks.tex": "2013d9a4a11758033c1bb5d5e858c15899b038357b6895a16cbfeb7846784ff8",
     "documents/paper-build/reader-tags.toml": "396ef2d23890e994d47b1ff3b6500e98bb41e416bce311037dacf8ad96bdc61d",
     "documents/paper-build/runtime.toml": "442c5f0e2da4c4da324f4e052ba1f9019891cc632d7299b9576e05af8af23333",
     "documents/paper-build/sources.tsv": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
@@ -24,7 +24,7 @@
     "documents/paper/paper_xref.tex.in": "d7d2d60b6aa72b86982a6ddec6ad27373fb69bc016ab42f62aba282bd781a84d",
     "documents/paper/parts/appendices.tex": "1e3c9ad802c05cf74e6aadc29eb7adf1d4d9284a63bcf0b1f8e236ecdfedf093",
     "documents/paper/parts/coda.tex": "30b39311fca849705583b140100fd80edb22d45bfa523ab2e8853a3cb2813169",
-    "documents/paper/parts/front.tex": "0a4cd240431cfafecea3831fd7781e332bb72183e24c0ae9e93fbc39f70e9061",
+    "documents/paper/parts/front.tex": "5e2acc51013ee73ee46218a8729d76edc2f11b82e167a4eb1b1a785e808c1aaa",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
     "documents/paper/parts/partA.tex": "1d7d04332608aa4a129d23df889ac769dd7cdfe599c6a4dcab500dc7c88d0ebf",
     "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
@@ -38,6 +38,7 @@
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
     "generated/documents/paper-pilot/sec-coda-record-limit.tex": "5ef0afd8c91d085aaa545b7790d6ddbf4b1776e52f72d189566bc75cdbc1dc22",
+    "generated/documents/paper-pilot/sec-reading-shadow.tex": "4e8117b1b6e59e3a60bf467c29f93e36d458386a17cc982e0c721ec16eff6e6e",
     "generated/documents/paper-pilot/sec-say-direction.tex": "5a6c5258c14720ead07f6ad4d4fbbce4ee0c0979cfcb8a8f9977d961d5b30c22",
     "generated/documents/paper-pilot/sec-say-enemy-to-none.tex": "8ba727b89ba7ca414d2aae5c0c91bc03f37a4b8c28203b843f90d4a247b462b5",
     "generated/documents/paper-pilot/sec-say-harm-enlargement.tex": "c9981cfb492c326bc78d8c9e434251017b9ac8e34ea697ec50efc427f5d327fe",
@@ -45,8 +46,8 @@
     "tools/assembly/native-lock.toml": "4d483a627b55c1d8eabefbcdbd8c5422bffa4344787ed9e772f9c4c46190f284",
     "tools/paper/bibroute.py": "2670cbf7a3fe5dbd78cf984201e5e6d09826748e370ed2ceb13529e150834b95",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
-    "tools/paper/identities.py": "49176714761e40119ea869a59027ada3878d9c1da716cad20f143f20aaddb88e",
+    "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
     "tools/paper/inputs.py": "04b65bf5e937021383819ab1516c090232fc208a27d8171ee124f05c5aa82333",
-    "tools/paper/prepare.py": "f3ae2421f42c2d255e5b1eb9052c8ae40bfca3ed76521b3e3450071be1b9165c"
+    "tools/paper/prepare.py": "07851e782efa710cc9acf82e6f2f507f94773adfbac4255b8e113559af2f4350"
   }
 }

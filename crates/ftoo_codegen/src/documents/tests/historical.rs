@@ -18,7 +18,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
         bytes: input::read(&root, "units/documents.toml")?,
     };
     let statements = input::sources(&root, &input::discover(&root, "units/statements", false)?)?;
-    let corpus = crate::load_unit_sources(declaration, statements.clone()).unwrap();
+    let corpus = crate::load_unit_sources(declaration.clone(), statements.clone()).unwrap();
     let markdown = crate::load_markdown_files(&root).unwrap();
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
     let registry_joint = joint
@@ -33,7 +33,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
             registry::load(&registry::read(&root).unwrap()).unwrap(),
         )
         .unwrap();
-    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book).unwrap();
+    let resolved = crate::units::checked_resolution(&root, &declaration, &corpus, &book).unwrap();
     let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint).unwrap();
     let welded = ftoo_manifest::weld_units(&integrated).unwrap();
     let sources = input::sources(&root, &input::discover(&root, "units/skeletons", false)?)?;

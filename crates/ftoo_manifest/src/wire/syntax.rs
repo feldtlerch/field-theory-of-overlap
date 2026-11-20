@@ -11,7 +11,7 @@ use super::{WireError, WireFault, WireLocation};
 use crate::RuleId;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum Value {
+pub enum Value {
     Object(Vec<(String, Value)>),
     Array(Vec<Value>),
     String(String),
@@ -21,7 +21,8 @@ pub(super) enum Value {
 }
 
 impl Value {
-    pub(super) const fn kind(&self) -> &'static str {
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
         match self {
             Self::Object(_) => "object",
             Self::Array(_) => "array",

@@ -1087,7 +1087,7 @@ fn paper_rule_consumers_are_explicit() {
     );
     assert_eq!(
         RULES[62].statement,
-        "Paper-scoped tag pairs are checked for uniqueness, grammar and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each paper target-evidence row names a unique key and an existing declared source file containing that whole key; its file origin joins native and Markdown mint evidence without duplicate ownership and without entering strict-unit scope."
+        "Paper-scoped tag pairs are checked for uniqueness, grammar, exact source coverage and collision with both permanent registries; a changed row surfaces through the byte-input receipt and PDF byte gate. Confirmed admissions preserve immutable bindings and name their confirmation records. Aliases resolve to paper spellings and retain their own origin and their target's declaration origins; exact and case-insensitive reserved-name collisions and overlapping candidate ownership refuse. Each paper target-evidence row names a unique key and an existing declared source file containing that whole key; its file origin joins native and Markdown mint evidence without duplicate ownership and without entering strict-unit scope. Native paper resolution consumes the same Python-checked bindings through a strict, bounded hand-off with complete input digests and retained source evidence; malformed hand-offs, checker failures and changed inputs refuse. Check-only inputs invalidate document checking without becoming PDF byte inputs."
     );
     assert_eq!(
         RULES[62..64]
@@ -1097,7 +1097,7 @@ fn paper_rule_consumers_are_explicit() {
         vec![
             (
                 RuleId::M063,
-                "The paper's tag lookup with paper spellings, admissions, aliases and a provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
+                "The paper's tag lookup with paper spellings, admissions, aliases and a provisional list, source declarations, permanent registries and reserved histories; consumed by paper preparation, documentary admission and native paper unit admission, label integration, welding, document assembly and recovery.",
                 RuleState::Enforced
             ),
             (

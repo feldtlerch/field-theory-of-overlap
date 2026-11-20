@@ -1,11 +1,11 @@
 //! Complete occurrence evidence for unit citations and language inequalities.
-use crate::{LabelSite, NodeId, ReferenceDomain, RuleId, UnitSite};
+use crate::{LabelSite, ReferenceDomain, ResolvedTagTarget, RuleId, UnitSite};
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TagMember {
     pub input: String,
-    pub target: NodeId,
+    pub target: ResolvedTagTarget,
     pub sites: Vec<UnitSite>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]

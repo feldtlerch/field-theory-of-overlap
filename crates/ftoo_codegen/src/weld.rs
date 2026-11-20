@@ -1,10 +1,8 @@
 //! Actual-file composition of unit admission, joint labels and the complete weld.
 #[cfg(test)]
 mod tests;
-use crate::{LabelFileError, UnitLoadError, load_markdown_files, load_unit_files};
-use ftoo_manifest::{
-    AddressBook, MintKind, WeldErrors, integrate_labels, resolve_unit_tags, weld_units,
-};
+use crate::{LabelFileError, load_markdown_files};
+use ftoo_manifest::{AddressBook, MintKind, WeldErrors, integrate_labels, weld_units};
 use std::{fmt, path::Path};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,10 +40,10 @@ pub fn check_weld_files(
     root: &Path,
     book: &AddressBook<'_>,
 ) -> Result<WeldCheckSummary, WeldFileError> {
-    let corpus =
-        load_unit_files(root).map_err(|e| WeldFileError::Labels(LabelFileError::Units(e)))?;
-    let resolved = resolve_unit_tags(&corpus, book)
-        .map_err(|e| WeldFileError::Labels(LabelFileError::Units(UnitLoadError::Admission(e))))?;
+    let (corpus, declaration) = crate::units::load_unit_files_with_declaration(root)
+        .map_err(|e| WeldFileError::Labels(LabelFileError::Units(e)))?;
+    let resolved = crate::units::checked_resolution(root, &declaration, &corpus, book)
+        .map_err(|e| WeldFileError::Labels(LabelFileError::Units(e)))?;
     let markdown = load_markdown_files(root).map_err(WeldFileError::Labels)?;
     let integrated = integrate_labels(&resolved, &markdown)
         .map_err(|e| WeldFileError::Labels(LabelFileError::Labels(e)))?;

@@ -942,7 +942,8 @@ fn declared_positions(section: &ftoo_manifest::SkeletonSection, out: &mut Vec<(S
     out.push((section.heading.value.clone(), false));
     for child in &section.children {
         match child {
-            ftoo_manifest::SkeletonChild::Unit(unit) => {
+            ftoo_manifest::SkeletonChild::Unit(unit)
+            | ftoo_manifest::SkeletonChild::Paragraph(unit) => {
                 out.push((unit.value.clone(), false));
             }
             ftoo_manifest::SkeletonChild::Quotation(unit) => {
@@ -1002,7 +1003,7 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         for language in &corpus.documents()[document] {
             for position in positions
                 .iter()
-                .filter(|position| position.depth().is_none())
+                .filter(|position| position.depth().is_none() && !position.paragraph())
             {
                 let unit = corpus
                     .units()
@@ -1015,6 +1016,7 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
                     unit: position.unit().into(),
                     depth: position.depth(),
                     quotation: position.quotation(),
+                    paragraph: position.paragraph(),
                     site: position.site().clone(),
                     runs: vec![plan::Inline::Text(unit.texts()[language].text().into())],
                 };
@@ -1141,6 +1143,7 @@ fn typography_apostrophe_contexts() {
         unit: unit.into(),
         depth,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text(text.into())],
     };
@@ -1258,6 +1261,7 @@ fn fragment_macro_follows_planned_quotation() {
         unit: "sec:fixture:refrain".into(),
         depth: None,
         quotation: false,
+        paragraph: false,
         site: input::site("units/statements/fixture.toml"),
         runs: vec![plan::Inline::Text("Refrain.".into())],
     };
@@ -1468,7 +1472,12 @@ skeleton={document='main',sections=[{heading='sec:fixture:first',children=[{kind
             site: AssemblySite::Source(site),
             fault: AssemblyFault::UnknownToken {
                 value: "other".into(),
-                expected: vec!["unit".into(), "quotation".into(), "section".into()],
+                expected: vec![
+                    "unit".into(),
+                    "paragraph".into(),
+                    "quotation".into(),
+                    "section".into(),
+                ],
             },
         }])
         .unwrap(),
@@ -2235,6 +2244,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
             unit: "sec:coefficients:overview".into(),
             depth: Some(1),
             quotation: false,
+            paragraph: false,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Coefficient ".into()),

@@ -24,6 +24,7 @@ use ftoo_manifest::{
     SourceOrigin, UnitSite,
 };
 pub use native_support::NativeSupport;
+pub use registry::{PaperLookupError, PaperLookupFault};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -202,6 +203,21 @@ pub fn prepare_documents(
 ) -> Result<PreparedDocuments, DocumentError> {
     prepare_context(root, support, None)
 }
+fn merge_checked_input(
+    inputs: &mut BTreeMap<String, Vec<u8>>,
+    path: String,
+    bytes: Vec<u8>,
+) -> Result<(), DocumentError> {
+    if inputs.get(&path).is_some_and(|held| held != &bytes) {
+        return Err(DocumentError::PaperLookup(registry::PaperLookupError {
+            rule: RuleId::M063,
+            site: path.clone(),
+            fault: registry::PaperLookupFault::InputChanged { path },
+        }));
+    }
+    inputs.insert(path, bytes);
+    Ok(())
+}
 #[allow(clippy::too_many_lines)] // Admission and the final source snapshot form one preparation boundary.
 pub(crate) fn prepare_context(
     root: &Path,
@@ -242,6 +258,18 @@ pub(crate) fn prepare_context(
         .map_err(DocumentError::Units)?;
     let selected = crate::units::toml::selected_targets(&declaration)
         .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
+    let paper_contexts = crate::units::toml::paper_contexts(&declaration)
+        .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
+    let paper_lookup = if paper_contexts.is_empty() {
+        None
+    } else {
+        Some(registry::CheckedPaperLookup::check(root).map_err(DocumentError::PaperLookup)?)
+    };
+    if let Some(lookup) = &paper_lookup {
+        for (path, bytes) in lookup.inputs() {
+            merge_checked_input(&mut inputs, path.clone(), bytes.clone())?;
+        }
+    }
     let markdown = crate::load_markdown_files(root).map_err(DocumentError::Labels)?;
     neutral(&markdown, true, AssemblyStage::Source)?;
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
@@ -258,16 +286,19 @@ pub(crate) fn prepare_context(
         registry_joint = registry_joint
             .with_paper_mints(registry::paper_mint_rows(&data)?)
             .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
-        inputs.insert(registry::PAPER_MINTS.into(), data);
+        merge_checked_input(&mut inputs, registry::PAPER_MINTS.into(), data)?;
     }
     let source = registry::read(root)?;
     let events = registry::load(&source)?;
-    inputs.insert(source.file, source.bytes);
+    merge_checked_input(&mut inputs, source.file, source.bytes)?;
     let book = book
         .with_documentary(&registry_joint, events)
         .map_err(DocumentError::DocumentaryRegistry)?;
-    let resolved = ftoo_manifest::resolve_unit_tags(&corpus, &book)
-        .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;
+    let paper_documents = paper_contexts.into_keys().collect();
+    let resolved = ftoo_manifest::resolve_unit_tags_with(&corpus, &book, &paper_documents, |key| {
+        paper_lookup.as_ref().and_then(|lookup| lookup.resolve(key))
+    })
+    .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;
     let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint)
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let welded = ftoo_manifest::weld_units(&integrated).map_err(DocumentError::Weld)?;
@@ -659,6 +690,9 @@ fn fragment_macro(block: &plan::Block) -> &'static str {
 }
 
 fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
+    if block.paragraph {
+        return paragraph_fragment_line(block);
+    }
     let text = fragment_text(block)?;
     let macro_name = fragment_macro(block);
     Ok(format!(
@@ -666,6 +700,58 @@ fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
         block.unit,
         latex::prose_text(text)
     ))
+}
+
+fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
+    use std::fmt::Write;
+    let refuse = |reason: &str| {
+        failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(block.site.clone()),
+            AssemblyFault::UnsupportedParagraphBody {
+                reason: reason.into(),
+            },
+        )
+    };
+    if !block.displays.is_empty() {
+        return Err(refuse("a paragraph fragment has a display"));
+    }
+    let mut body = String::new();
+    for run in &block.runs {
+        match run {
+            plan::Inline::Text(value) => {
+                let mut marks = 0;
+                for scalar in value.chars() {
+                    if matches!(scalar, '-' | '—') {
+                        marks += 1;
+                        if marks > 1 {
+                            return Err(refuse("adjacent hyphen or em-dash marks"));
+                        }
+                    } else {
+                        marks = 0;
+                    }
+                }
+                let emitted = latex::prose_text(value).replace('—', "---");
+                if emitted
+                    .chars()
+                    .any(|c| matches!(c, '{' | '}' | '\\' | '\n' | '\r'))
+                {
+                    return Err(refuse(
+                        "text requires braced, backslash or multiline output",
+                    ));
+                }
+                body.push_str(&emitted);
+            }
+            plan::Inline::PaperTag { value, .. } => {
+                write!(body, "\\ftag{{{}}}", value.key).expect("string write");
+            }
+            _ => return Err(refuse("paragraph contains a non-text run")),
+        }
+    }
+    let mut output = String::new();
+    writeln!(output, "\\PaperNativeParagraph{{{}}}{{{body}}}", block.unit).expect("string write");
+    Ok(output)
 }
 
 fn fragment_text(block: &plan::Block) -> Result<&str, DocumentError> {

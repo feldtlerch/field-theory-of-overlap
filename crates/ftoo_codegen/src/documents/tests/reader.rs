@@ -24,6 +24,7 @@ fn markdown_math_context_envelopes() {
         unit: unit.into(),
         depth,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs,
     };
@@ -314,6 +315,7 @@ fn markdown_math_recovery_rejects_envelope_and_body_damage() {
             unit: "sec:fixture:math".into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Value ".into()),
@@ -328,6 +330,7 @@ fn markdown_math_recovery_rejects_envelope_and_body_damage() {
         unit: "sec:fixture:following".into(),
         depth: None,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs: vec![Inline::Text("Following.".into())],
     });
@@ -464,6 +467,7 @@ fn plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {
             unit: "sec:fixture:reader".into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: super::super::input::site("fixture.toml"),
             runs: vec![Inline::Text("Body.".into())],
         }],
@@ -643,6 +647,7 @@ fn excerpt_plan() -> DocumentPlan {
         unit: unit.into(),
         depth,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs: vec![Inline::Text(text.into())],
     };
@@ -683,6 +688,101 @@ fn excerpt_plan() -> DocumentPlan {
     .collect();
     plan.screen = Some(ScreenPlan { gaps, refrains });
     plan
+}
+
+#[test]
+fn paper_tag_reader_span() {
+    use ftoo_manifest::{PaperEvidenceSite, PaperTagValue};
+    let mut plan = excerpt_plan();
+    let site = super::super::input::site("units/statements/fixture.toml");
+    let evidence = PaperEvidenceSite {
+        file: "documents/paper-build/paper-tags.tsv".into(),
+        line: 1,
+    };
+    plan.blocks.insert(
+        1,
+        Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:paper-tag".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![
+                Inline::Text("A ".into()),
+                Inline::PaperTag {
+                    value: PaperTagValue {
+                        key: "src:nd".into(),
+                        spelling: "src:nd".into(),
+                        target: "node".into(),
+                        target_kind: "node".into(),
+                        lookup_site: evidence.clone(),
+                        alias_site: None,
+                        declaration_sites: vec![evidence],
+                    },
+                    site: site.clone(),
+                },
+                Inline::Text(" span.".into()),
+            ],
+        },
+    );
+    let gap = screen_gap(&plan, &site, GapPosition::Between).unwrap();
+    plan.screen.as_mut().unwrap().gaps.insert(1, gap);
+    let (_, reader) = super::super::markdown::render_roles(&plan).unwrap();
+    let known = ["src:nd"];
+    assert_eq!(
+        super::super::markdown::check_reader(&plan, &reader, &known),
+        Ok(())
+    );
+    for extra in [
+        "src:nd",
+        "# src:nd",
+        "&#115;rc:nd",
+        "<a id=\"src:nd\">",
+        "<a href=\"#src:nd\">",
+    ] {
+        let changed = format!("{reader}{extra}");
+        let start = changed.len() - extra.len();
+        let bytes = if extra.starts_with("&#") {
+            start..changed.len()
+        } else {
+            let key_start = changed.rfind("src:nd").unwrap();
+            key_start..key_start + "src:nd".len()
+        };
+        let expected = super::super::failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Generated {
+                path: "generated/documents/paper-pilot/en.md".into(),
+                bytes: bytes.clone(),
+                origins: plan.origins(DocumentTarget::Markdown),
+            },
+            AssemblyFault::ReaderLabelLiteral {
+                value: "src:nd".into(),
+                bytes,
+            },
+        );
+        let actual = super::super::markdown::check_reader(&plan, &changed, &known).unwrap_err();
+        assert_eq!(actual, expected);
+    }
+    let (annotated, _) = super::super::markdown::render_roles(&plan).unwrap();
+    for replacement in ["<!-- label other -->", ""] {
+        let changed = annotated.replacen("<!-- label node -->", replacement, 1);
+        assert_ne!(changed, annotated);
+        let error = check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("expected recovery refusal");
+        };
+        assert_eq!(errors.diagnostics().len(), 1);
+        let diagnostic = &errors.diagnostics()[0];
+        assert_eq!(diagnostic.rule, RuleId::M055);
+        assert_eq!(diagnostic.stage, AssemblyStage::Emission);
+        assert!(matches!(
+            diagnostic.fault,
+            AssemblyFault::EmissionMismatch { .. }
+        ));
+    }
 }
 
 fn quoted_excerpt_plan() -> DocumentPlan {
@@ -2277,6 +2377,7 @@ fn reader_pending_collects_unavailable_objects_with_real_mixed_origins() {
                 unit: "sec:fixture:pending".into(),
                 depth: None,
                 quotation: false,
+                paragraph: false,
                 site: definition_site.clone(),
                 runs: vec![],
             };
@@ -2295,6 +2396,7 @@ fn reader_pending_collects_unavailable_objects_with_real_mixed_origins() {
                             unit: block.unit.clone(),
                             depth: None,
                             quotation: false,
+                            paragraph: false,
                             site: definition_site.clone(),
                             runs,
                         }],
@@ -2443,6 +2545,7 @@ fn reader_pending_shared_selection_retains_both_target_bodies_and_definition_sit
                     unit: block.unit.clone(),
                     depth: None,
                     quotation: false,
+                    paragraph: false,
                     site: super::super::input::site(name),
                     runs: vec![run(name)],
                 }],

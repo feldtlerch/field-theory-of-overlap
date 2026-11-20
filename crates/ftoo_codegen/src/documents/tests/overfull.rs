@@ -435,6 +435,7 @@ pub(super) fn support_required_overfull_boxes_refuse_complete_frames_and_restore
             unit: "sec:fixture:box".into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: input::site("units/box.toml"),
             runs: vec![plan::Inline::Text("BOUNDARY".into())],
         }],
@@ -592,6 +593,7 @@ fn exact_sweep_explanation_is_refused_in_a_reader_pending_paragraph() {
         unit: "sec:fixture:pending".into(),
         depth: None,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs: vec![plan::Inline::Math {
             definition_site: site.clone(),

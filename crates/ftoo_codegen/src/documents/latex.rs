@@ -141,6 +141,9 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
                     .expect("string write");
                 commented = true;
             }
+            Inline::PaperTag { value, .. } => {
+                write!(output, "\\ftag{{{}}}", value.key).expect("string write");
+            }
             Inline::Math { latex, .. } => {
                 write!(output, "\\({latex}\\)").expect("string write");
             }

@@ -16,8 +16,8 @@
     {
       "id": 2,
       "file": "documents/paper/parts/front.tex",
-      "start": 15444,
-      "end": 15654,
+      "start": 15108,
+      "end": 15318,
       "sha256": "0a13b3add8e8ebe297ee169a623cccc1982fa7a49cc797229491010251916023",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "are two gradings, not one (\\ftag{mod:facets}): what a claim is built on is the compiler's"

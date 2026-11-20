@@ -6,6 +6,169 @@ use std::{
 };
 const DECLARATION: &str = "schema = 1\n[documents.main]\nrequired-languages = ['en']\n";
 const STATEMENT: &str = "schema = 1\n[unit]\nid = 'sec:coefficients:first-value'\ndocument = 'main'\nmath = {}\n[unit.texts]\nen = 'The coefficient.'\n";
+
+#[test]
+fn paper_context_resolution() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let projection = std::fs::read(root.join("generated/manifest.json")).unwrap();
+    let loaded = ftoo_manifest::load_projection(&projection).unwrap();
+    let book = loaded.addressing().unwrap();
+    let (corpus, declaration) = load_unit_files_with_declaration(&root).unwrap();
+    let resolved = checked_resolution(&root, &declaration, &corpus, &book).unwrap();
+    let value = resolved
+        .tags()
+        .iter()
+        .find(|tag| tag.unit().as_str() == "sec:reading:shadow")
+        .unwrap();
+    let ftoo_manifest::ResolvedTagTarget::Paper(paper) = value.resolved_target() else {
+        panic!("paper-context target has the wrong domain");
+    };
+    let row = std::fs::read_to_string(root.join("documents/paper-build/paper-tags.tsv"))
+        .unwrap()
+        .lines()
+        .find_map(|line| line.strip_prefix("src:nd\t"))
+        .unwrap()
+        .to_owned();
+    let fields: Vec<_> = row.split('\t').collect();
+    assert_eq!(paper.key, "src:nd");
+    assert_eq!(paper.spelling, "src:nd");
+    assert_eq!(paper.target, fields[0]);
+    assert_eq!(paper.target_kind, fields[1]);
+    assert_eq!(paper.declaration_sites.len(), 1);
+    let mut absent = declaration.clone();
+    absent.bytes = String::from_utf8(absent.bytes)
+        .unwrap()
+        .replace("paper-context = \"paper\"\n", "")
+        .into_bytes();
+    let error = checked_resolution(&root, &absent, &corpus, &book).unwrap_err();
+    let UnitLoadError::Admission(errors) = error else {
+        panic!("expected unit refusal");
+    };
+    assert_eq!(errors.diagnostics()[0].rule, RuleId::M042);
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        UnitFault::ResolutionFault {
+            cause: ftoo_manifest::TagResolutionFault::UnknownTag { .. }
+        }
+    ));
+    let mut invalid = declaration.clone();
+    invalid.bytes = String::from_utf8(invalid.bytes)
+        .unwrap()
+        .replace("paper-context = \"paper\"", "paper-context = \"other\"")
+        .into_bytes();
+    let error = checked_resolution(&root, &invalid, &corpus, &book).unwrap_err();
+    let UnitLoadError::Admission(errors) = error else {
+        panic!("expected declaration refusal");
+    };
+    assert_eq!(errors.diagnostics()[0].rule, RuleId::M040);
+    assert_eq!(errors.diagnostics()[0].stage, UnitStage::Metadata);
+
+    let paper_documents = std::collections::BTreeSet::from(["main".to_owned()]);
+    let fixture_text = STATEMENT.replace("The coefficient.", "Use @tag{candidate:fixture}.");
+    let fixture = load(DECLARATION, &fixture_text).unwrap();
+    for status in ["candidate", "admitted"] {
+        let error =
+            ftoo_manifest::resolve_unit_tags_with(&fixture, &book, &paper_documents, |_| {
+                Some(ftoo_manifest::PaperResolution::Unavailable {
+                    status: status.into(),
+                })
+            })
+            .unwrap_err();
+        let diagnostic = &error.diagnostics()[0];
+        assert_eq!(diagnostic.rule, RuleId::M042);
+        assert_eq!(diagnostic.stage, UnitStage::Resolution);
+        assert_eq!(diagnostic.site.file, "units/statements/one.toml");
+        assert_eq!(
+            diagnostic.fault,
+            UnitFault::PaperTagUnavailable {
+                input: "candidate:fixture".into(),
+                status: status.into(),
+            }
+        );
+    }
+    let admitted = load(
+        DECLARATION,
+        &STATEMENT.replace("The coefficient.", "Use @tag{eq:dyn:flow}."),
+    )
+    .unwrap();
+    let error = ftoo_manifest::resolve_unit_tags_with(&admitted, &book, &paper_documents, |_| {
+        Some(ftoo_manifest::PaperResolution::Unavailable {
+            status: "admitted".into(),
+        })
+    })
+    .unwrap_err();
+    assert_eq!(error.diagnostics()[0].rule, RuleId::M042);
+    assert_eq!(
+        error.diagnostics()[0].fault,
+        UnitFault::PaperTagUnavailable {
+            input: "eq:dyn:flow".into(),
+            status: "admitted".into(),
+        }
+    );
+    documentary_paper_fallback_is_terminal(&root, &corpus);
+}
+fn documentary_paper_fallback_is_terminal(root: &std::path::Path, corpus: &LanguageCheckedUnits) {
+    let projection = std::fs::read(root.join("generated/manifest.json")).unwrap();
+    let loaded = ftoo_manifest::load_projection(&projection).unwrap();
+    let book = loaded.addressing().unwrap();
+    let markdown = crate::load_markdown_files(root).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(corpus, &markdown).unwrap();
+    let registry_joint = joint
+        .with_paper_mints(
+            crate::documents::registry::paper_mint_rows(
+                &std::fs::read(root.join(crate::documents::registry::PAPER_MINTS)).unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let documentary_book = book
+        .with_documentary(
+            &registry_joint,
+            crate::documents::registry::load(&crate::documents::registry::read(root).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+    let documentary = load(
+        DECLARATION,
+        &STATEMENT.replace("The coefficient.", "Use @tag{B:belief}."),
+    )
+    .unwrap();
+    let paper_documents = std::collections::BTreeSet::from(["main".to_owned()]);
+    let fallback_calls = std::cell::Cell::new(0);
+    let error = ftoo_manifest::resolve_unit_tags_with(
+        &documentary,
+        &documentary_book,
+        &paper_documents,
+        |key| {
+            fallback_calls.set(fallback_calls.get() + 1);
+            let site = ftoo_manifest::PaperEvidenceSite {
+                file: "paper-tags.tsv".into(),
+                line: 1,
+            };
+            Some(ftoo_manifest::PaperResolution::Available(
+                ftoo_manifest::PaperTagValue {
+                    key: key.into(),
+                    spelling: key.into(),
+                    target: "fixture:paper".into(),
+                    target_kind: "node".into(),
+                    lookup_site: site.clone(),
+                    alias_site: None,
+                    declaration_sites: vec![site],
+                },
+            ))
+        },
+    )
+    .unwrap_err();
+    assert_eq!(fallback_calls.get(), 0);
+    let diagnostic = &error.diagnostics()[0];
+    assert_eq!(diagnostic.rule, RuleId::M042);
+    assert_eq!(diagnostic.stage, UnitStage::Resolution);
+    assert_eq!(diagnostic.site.file, "units/statements/one.toml");
+    assert!(matches!(
+        &diagnostic.fault,
+        UnitFault::DocumentaryTagTarget { input, .. } if input == "B:belief"
+    ));
+}
 fn source(file: &str, text: &str) -> UnitSource {
     UnitSource {
         file: file.to_owned(),
@@ -677,7 +840,7 @@ fn u04_declaration_missing_extra_fields() {
             "schema=1\ndocuments={main={required-languages=['en'],extra=1}}",
             vec!["documents", "main", "extra"],
             "extra",
-            vec!["required-languages", "targets"],
+            vec!["paper-context", "required-languages", "targets"],
         ),
     ] {
         assert_fault(

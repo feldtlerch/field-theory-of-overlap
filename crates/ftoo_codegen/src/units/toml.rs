@@ -360,6 +360,51 @@ fn targets(table: &Node) -> Result<Vec<DocumentOutput>, Box<UnitDiagnostic>> {
     }
     Ok(selected)
 }
+fn paper_context(table: &Node) -> Result<Option<String>, Box<UnitDiagnostic>> {
+    let Some(field) = table
+        .fields
+        .iter()
+        .find(|(key, _, _)| key == "paper-context")
+        .map(|(_, _, value)| value)
+    else {
+        return Ok(None);
+    };
+    let value = string(field)?;
+    if value.value != "paper" {
+        return Err(error(
+            RuleId::M040,
+            UnitStage::Metadata,
+            value.site,
+            UnitFault::UnknownToken {
+                value: value.value,
+                expected: vec!["paper".into()],
+            },
+        ));
+    }
+    Ok(Some(value.value))
+}
+pub(crate) fn paper_contexts(
+    source: &UnitSource,
+) -> Result<BTreeMap<String, String>, ftoo_manifest::UnitErrors> {
+    let result: Result<BTreeMap<String, String>, Box<UnitDiagnostic>> = (|| {
+        let text = encoding(source)?;
+        let tree = parse(&source.file, text)?;
+        numeric(&tree, text)?;
+        shape_inner(&tree, text, true)?;
+        let root = fixed(&tree, &["schema", "documents"])?;
+        let contexts = dynamic(root[1])?
+            .into_iter()
+            .map(|(name, _, table)| Ok((name.clone(), paper_context(table)?)))
+            .collect::<Result<Vec<_>, Box<UnitDiagnostic>>>()?;
+        Ok(contexts
+            .into_iter()
+            .filter_map(|(name, context)| context.map(|context| (name, context)))
+            .collect())
+    })();
+    result.map_err(|error: Box<UnitDiagnostic>| {
+        ftoo_manifest::UnitErrors::from_diagnostics(vec![*error]).expect("one diagnostic")
+    })
+}
 pub(crate) fn selected_targets(
     source: &UnitSource,
 ) -> Result<BTreeMap<String, Vec<DocumentOutput>>, ftoo_manifest::UnitErrors> {
@@ -404,17 +449,25 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
     if declarations {
         let mut documents = BTreeMap::new();
         for (name, key_site, table) in dynamic(root[1])? {
-            let selected = table.fields.iter().any(|(key, _, _)| key == "targets");
-            let fields = if selected {
-                fixed(table, &["required-languages", "targets"])?
-            } else {
-                fixed(table, &["required-languages"]).map_err(|mut error| {
-                    if let UnitFault::UnknownField { expected, .. } = &mut error.fault {
-                        expected.push("targets".into());
-                    }
-                    error
-                })?
-            };
+            let mut keys = vec!["required-languages"];
+            if table.fields.iter().any(|(key, _, _)| key == "targets") {
+                keys.push("targets");
+            }
+            if table
+                .fields
+                .iter()
+                .any(|(key, _, _)| key == "paper-context")
+            {
+                keys.push("paper-context");
+            }
+            let fields = fixed(table, &keys).map_err(|mut error| {
+                if let UnitFault::UnknownField { expected, .. } = &mut error.fault {
+                    expected.extend(["targets".into(), "paper-context".into()]);
+                    expected.sort();
+                    expected.dedup();
+                }
+                error
+            })?;
             let array = typed(fields[0], ShapeKind::Array)?;
             let required_languages = array
                 .elements
@@ -422,6 +475,7 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
                 .map(string)
                 .collect::<Result<Vec<_>, _>>()?;
             targets(table)?;
+            paper_context(table)?;
             documents.insert(
                 name.clone(),
                 DocumentEntryDraft {

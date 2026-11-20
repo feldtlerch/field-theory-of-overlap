@@ -42,6 +42,7 @@ fn context_graph(
         unit: UNIT.into(),
         depth: None,
         quotation: false,
+        paragraph: false,
         site: site.clone(),
         runs: runs(0, unit, "en", &welded, &BTreeMap::new()),
     };
@@ -1572,6 +1573,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
             unit: UNIT.into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: site.clone(),
             runs: vec![Inline::Text("Caption.".into())],
             pending_names: BTreeMap::new(),

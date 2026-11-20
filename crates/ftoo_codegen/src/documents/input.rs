@@ -204,6 +204,10 @@ fn section(
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Unit(position(fields[1], count)?))
                 }
+                "paragraph" => {
+                    let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
+                    Ok(SkeletonChild::Paragraph(position(fields[1], count)?))
+                }
                 "quotation" => {
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Quotation(position(fields[1], count)?))
@@ -218,7 +222,12 @@ fn section(
                         AssemblySite::Source(site),
                         AssemblyFault::UnknownToken {
                             value: discriminator.value,
-                            expected: vec!["unit".into(), "quotation".into(), "section".into()],
+                            expected: vec![
+                                "unit".into(),
+                                "paragraph".into(),
+                                "quotation".into(),
+                                "section".into(),
+                            ],
                         },
                     ))
                 }
@@ -298,13 +307,17 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
             None
         };
         if let Some(kind) = &kind {
-            if kind.value != "unit" && kind.value != "quotation" && kind.value != "section" {
+            if kind.value != "unit"
+                && kind.value != "paragraph"
+                && kind.value != "quotation"
+                && kind.value != "section"
+            {
                 if unknown.is_none() {
                     unknown = Some(kind.clone());
                 }
                 continue;
             }
-            if kind.value == "unit" || kind.value == "quotation" {
+            if kind.value == "unit" || kind.value == "paragraph" || kind.value == "quotation" {
                 let fields = toml::fixed(node, &["kind", "unit"])?;
                 toml::string(fields[1])?;
                 continue;
@@ -425,7 +438,12 @@ fn unknown_kind(value: LocatedString) -> super::AssemblyDiagnostic {
         site: AssemblySite::Source(site),
         fault: AssemblyFault::UnknownToken {
             value: value.value,
-            expected: vec!["unit".into(), "quotation".into(), "section".into()],
+            expected: vec![
+                "unit".into(),
+                "paragraph".into(),
+                "quotation".into(),
+                "section".into(),
+            ],
         },
     }
 }

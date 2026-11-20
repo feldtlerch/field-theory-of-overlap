@@ -1,5 +1,6 @@
 """Refusal controls for finite bindings and rendered-label leakage."""
 import pathlib
+import json
 import collections
 import shutil
 import tempfile
@@ -7,7 +8,7 @@ import unittest
 import re
 import tomllib
 from common import read, write, timed
-from identities import bindings, holds
+from identities import _assignment_line, assembly_json, bindings, holds
 from ledger import leaks, occurrence_differences, ledger_binding, check_destination
 from prepare import declared_fragments, versioned, paper_master, FRAGMENTS
 
@@ -15,14 +16,22 @@ from prepare import declared_fragments, versioned, paper_master, FRAGMENTS
 class Identities(unittest.TestCase):
     def test_declared_fragment_slots_refuse_label_marker_and_authored_copy(self):
         source=pathlib.Path(__file__).resolve().parents[2]
-        for *_, name, _ in FRAGMENTS:
-            target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
-            shutil.copyfile(source/name,target)
+        for path, _, fragment, _ in FRAGMENTS:
+            for name in (path, fragment):
+                target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copyfile(source/name,target)
         rows=read(source/'documents/paper-build/sources.tsv').splitlines()
         declared_fragments(self.root,rows)
+        for path, unit, _, _ in FRAGMENTS:
+            self.replace(path,'% generated: '+unit+'\n','% ordinary comment\n% generated: '+unit+'\n')
+            declared_fragments(self.root,rows)
+            self.replace(path,'% ordinary comment\n% generated: '+unit+'\n','% generated: '+unit+'\n')
         fragment='generated/documents/explainer-pilot/sec-say-direction.tex'
         original=read(self.root/fragment)
         write(self.root/fragment,original.replace('sec:say:direction','sec:say:other'))
+        with self.assertRaisesRegex(ValueError,'Fragment label/declaration differs'):
+            declared_fragments(self.root,rows)
+        write(self.root/fragment,original.replace('paperrefrain','refrain'))
         with self.assertRaisesRegex(ValueError,'Fragment label/declaration differs'):
             declared_fragments(self.root,rows)
         write(self.root/fragment,original)
@@ -31,6 +40,15 @@ class Identities(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'Fragment marker/declaration differs'):
             declared_fragments(self.root,rows)
         self.replace(marker,'% generated: sec:say:other','% generated: sec:say:direction')
+        self.replace(marker,'% generated: sec:say:direction\n','')
+        with self.assertRaisesRegex(ValueError,'Fragment marker/declaration differs'):
+            declared_fragments(self.root,rows)
+        shutil.copyfile(source/marker,self.root/marker)
+        with (self.root/marker).open('a') as output:
+            output.write('% generated: sec:say:direction\n')
+        with self.assertRaisesRegex(ValueError,'Fragment marker/declaration differs'):
+            declared_fragments(self.root,rows)
+        shutil.copyfile(source/marker,self.root/marker)
         with (self.root/marker).open('a') as output:
             output.write('% generated: sec:say:other\n')
         with self.assertRaisesRegex(ValueError,'Undeclared fragment marker'):
@@ -45,18 +63,41 @@ class Identities(unittest.TestCase):
             output.write('\\paperrefrain{}{Direction tells which way two fates lean, never how much fate there is to lean.}\n')
         with self.assertRaisesRegex(ValueError,'Authored refrain duplicates'):
             declared_fragments(self.root,rows)
+        self.replace(marker,'\\paperrefrain{}{Direction tells which way two fates lean, never how much fate there is to lean.}\n','')
+        paragraph='generated/documents/paper-pilot/sec-reading-shadow.tex'
+        original=read(self.root/paragraph)
+        for changed, fault in [
+            (original.replace('\\ftag{src:nd}', '\\ftag{src:none}'),
+             'M055: Fragment tag binding differs'),
+            (original.replace('One may assume', '{One may assume'),
+             'M055: Fragment body differs'),
+            (original.replace('One may assume', '\\textbf One may assume'),
+             'M055: Fragment body differs'),
+            (original.replace('the fact is', 'the\nfact is'),
+             'M055: Fragment body differs'),
+        ]:
+            write(self.root/paragraph,changed)
+            with self.assertRaisesRegex(ValueError,fault):
+                declared_fragments(self.root,rows)
+        write(self.root/paragraph,original)
+        body=read(self.root/paragraph).split('}{',1)[1].removesuffix('}\n')
+        paper='documents/paper/parts/front.tex'
+        self.replace(paper,'% generated: sec:reading:shadow\n',
+                     '% generated: sec:reading:shadow\n'+body.replace(' the ', '\n the ', 1)+'\n')
+        with self.assertRaisesRegex(ValueError,'M055: Authored paragraph duplicates a declared fragment'):
+            declared_fragments(self.root,rows)
 
-    def test_fragment_padding_body_mint_and_source_declaration_refuse(self):
+    def test_fragment_comments_body_mint_and_source_declaration_refuse(self):
         source=pathlib.Path(__file__).resolve().parents[2]
-        for *_, name, _ in FRAGMENTS:
-            target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
-            shutil.copyfile(source/name,target)
+        for path, _, fragment, _ in FRAGMENTS:
+            for name in (path, fragment):
+                target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copyfile(source/name,target)
         rows=read(source/'documents/paper-build/sources.tsv').splitlines()
         marker='documents/paper/explainer/explainer.tex'
         self.replace(marker,'% generated: sec:say:direction\n%\n',
                      '% generated: sec:say:direction\n% padding\n')
-        with self.assertRaisesRegex(ValueError,'Fragment padding differs'):
-            declared_fragments(self.root,rows)
+        declared_fragments(self.root,rows)
         self.replace(marker,'% generated: sec:say:direction\n% padding\n',
                      '% generated: sec:say:direction\n%\n')
         fragment='generated/documents/explainer-pilot/sec-say-direction.tex'
@@ -114,17 +155,43 @@ class Identities(unittest.TestCase):
         self.root=pathlib.Path(self.temp.name)
         source=pathlib.Path(__file__).resolve().parents[2]
         for name in ['documents/paper-build/paper-tags.tsv','documents/paper-build/reader-tags.toml',
+                     'documents/paper-build/reader-hooks.tex',
                      'documents/paper-build/provisional-tags.toml','registry/documentary-tags.toml','generated/manifest.json',
                      'documents/paper-build/label-mints.tsv','documents/paper-build/sources.tsv']:
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
         shutil.copytree(source/'documents/paper',self.root/'documents/paper')
+        for name in ('tools/paper/identities.py', 'tools/paper/common.py'):
+            target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(source/name,target)
 
     def tearDown(self):self.temp.cleanup()
 
     def replace(self,file,old,new):
         path=self.root/file; text=read(path)
         self.assertIn(old,text); write(path,text.replace(old,new,1))
+
+    def test_assembly_json_evidence_and_refusals(self):
+        value=json.loads(assembly_json(self.root))
+        self.assertEqual(list(value), ['schema','inputs','bindings'])
+        self.assertEqual(value['schema'], 1)
+        self.assertEqual([entry['path'] for entry in value['inputs']],
+                         sorted({entry['path'] for entry in value['inputs']}))
+        rows={row['key']:row for row in value['bindings']}
+        alias=rows['dyn:exact']
+        self.assertEqual(alias['status'], 'alias')
+        self.assertEqual(alias['alias_site']['file'],
+                         'documents/paper-build/reader-tags.toml')
+        self.assertEqual(alias['lookup_site']['file'],
+                         'documents/paper-build/paper-tags.tsv')
+        self.assertIn({'file':'documents/paper/data/ftoo_manifest.tex','line':7832},
+                      alias['declaration_sites'])
+        self.assertTrue(all(row['target'] is None and row['target_kind'] is None
+                            for row in rows.values() if row['status']=='candidate'))
+        for lines in ('', 'key = "dyn:exact"\nkey = "dyn:exact"\n'):
+            with self.assertRaisesRegex(ValueError,
+                                        'M063: key evidence differs: dyn:exact'):
+                _assignment_line(lines,'dyn:exact','reader-tags.toml')
 
     def test_release_refuses_explicit_candidates(self):
         rows=bindings(self.root,True)

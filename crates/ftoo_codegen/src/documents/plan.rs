@@ -27,6 +27,10 @@ pub(super) enum Inline {
         token: String,
         site: UnitSite,
     },
+    PaperTag {
+        value: ftoo_manifest::PaperTagValue,
+        site: UnitSite,
+    },
     Math {
         definition_site: UnitSite,
         key: String,
@@ -98,6 +102,12 @@ fn flush_text(output: &mut Vec<Recovered>, text: &mut String) {
 fn inline_handle(run: &Inline) -> Option<&str> {
     match run {
         Inline::Tag { handle, .. }
+        | Inline::PaperTag {
+            value: ftoo_manifest::PaperTagValue {
+                spelling: handle, ..
+            },
+            ..
+        }
         | Inline::Citation {
             identity: super::CitationIdentity { handle, .. },
             ..
@@ -467,6 +477,11 @@ fn expected_runs_in_context(block: &Block, target: DocumentTarget, prose: bool) 
                     label: label.clone(),
                     token: (target == DocumentTarget::Latex).then(|| token.clone()),
                 },
+                Inline::PaperTag { value, .. } => Recovered::Tag {
+                    handle: value.spelling.clone(),
+                    label: value.target.clone(),
+                    token: None,
+                },
                 Inline::Math {
                     markdown, latex, ..
                 } => Recovered::Math(
@@ -645,6 +660,11 @@ fn excerpt_text(source: &str) -> Option<String> {
     };
     Some(value.clone())
 }
+fn excerpt_paragraph(source: &str, block: &Block) -> Option<String> {
+    let actual = recover_markdown(source, block.runs.iter().filter_map(inline_handle))?;
+    (actual == expected_runs(block, DocumentTarget::Markdown))
+        .then(|| block.runs.iter().map(canonical_run).collect())
+}
 fn excerpt_unit(source: &str) -> Option<(&str, &str, &str, &str)> {
     let (metadata, body) = source.split_once('\n')?;
     let fields = metadata.strip_prefix("<!-- unit ")?.strip_suffix(" -->")?;
@@ -712,7 +732,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
     let mut first_range = None;
     let start = source.find("<!-- unit ").unwrap_or(source.len());
     let mut cursor = start;
-    let mut refrain_index = 0;
+    let mut body_index = 0;
     for chunk in source[start..]
         .strip_suffix('\n')
         .expect("checked envelope")
@@ -746,6 +766,8 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 };
                 let text = if index == 0 {
                     body.strip_prefix("# ").and_then(excerpt_text)
+                } else if block.paragraph {
+                    excerpt_paragraph(body, block)
                 } else {
                     excerpt_refrain(body).map(|value| value.0)
                 };
@@ -759,8 +781,35 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     site: block.site.clone(),
                 });
                 if index > 0 {
-                    if let Some((_, destinations, handle, label, role)) = excerpt_refrain(body) {
-                        let site = screen.refrains[index - 1].site.clone();
+                    if block.paragraph {
+                        if let Some(found) =
+                            recover_markdown(body, block.runs.iter().filter_map(inline_handle))
+                        {
+                            for (run, recovered) in block.runs.iter().zip(found) {
+                                if let (
+                                    Inline::PaperTag { site, .. },
+                                    Recovered::Tag { label, .. },
+                                ) = (run, recovered)
+                                {
+                                    actual.push(EmissionRecord {
+                                        kind: EmissionKind::Tag,
+                                        unit: unit.into(),
+                                        language: language.into(),
+                                        target: DocumentTarget::Markdown,
+                                        occurrence: site.occurrence,
+                                        value: label,
+                                        site: site.clone(),
+                                    });
+                                }
+                            }
+                        }
+                    } else if let Some((_, destinations, handle, label, role)) =
+                        excerpt_refrain(body)
+                    {
+                        let site = screen.refrains
+                            [refrain_index(&plan.blocks, index).expect("refrain")]
+                        .site
+                        .clone();
                         for destination in destinations {
                             let kind = if role == RefrainRole::Quoted {
                                 let (owner, language, fragment, _) = parse_public_href(
@@ -785,7 +834,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                                 unit: unit.into(),
                                 language: language.into(),
                                 target: DocumentTarget::Markdown,
-                                occurrence: Some(refrain_index),
+                                occurrence: refrain_index(&plan.blocks, index),
                                 value: destination,
                                 site: site.clone(),
                             });
@@ -799,12 +848,12 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                             unit: unit.into(),
                             language: language.into(),
                             target: DocumentTarget::Markdown,
-                            occurrence: Some(refrain_index),
+                            occurrence: refrain_index(&plan.blocks, index),
                             value: handle,
                             site,
                         });
                     }
-                    refrain_index += 1;
+                    body_index += 1;
                 }
             } else {
                 actual.push(unknown_block(
@@ -816,10 +865,10 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 ));
             }
         } else {
-            let gap_index = refrain_index;
+            let gap_index = body_index;
             let position = if gap_index == 0 {
                 GapPosition::Before
-            } else if gap_index == screen.refrains.len() {
+            } else if gap_index + 1 == plan.blocks.len() {
                 GapPosition::After
             } else {
                 GapPosition::Between
@@ -962,6 +1011,7 @@ pub(super) struct Block {
     pub unit: String,
     pub depth: Option<usize>,
     pub quotation: bool,
+    pub paragraph: bool,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
 }
@@ -1188,6 +1238,7 @@ impl Coverage {
             unit: String::new(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: self.site.clone(),
             runs: self.runs.clone(),
         }
@@ -1503,6 +1554,14 @@ pub(super) struct ScreenPlan {
     pub gaps: Vec<ScreenGap>,
     pub refrains: Vec<ScreenRefrain>,
 }
+pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
+    (index > 0 && !blocks[index].paragraph).then(|| {
+        blocks[1..index]
+            .iter()
+            .filter(|block| !block.paragraph)
+            .count()
+    })
+}
 #[derive(Clone, Debug)]
 pub(super) struct ScreenGap {
     pub position: GapPosition,
@@ -1603,7 +1662,15 @@ pub(super) fn check_excerpt_shape(
         && plan.blocks[1..].iter().all(|block| {
             block.depth.is_none()
                 && block.displays.is_empty()
-                && matches!(block.runs.as_slice(), [Inline::Text(_)])
+                && if block.paragraph {
+                    !block.runs.is_empty()
+                        && block
+                            .runs
+                            .iter()
+                            .all(|run| matches!(run, Inline::Text(_) | Inline::PaperTag { .. }))
+                } else {
+                    matches!(block.runs.as_slice(), [Inline::Text(_)])
+                }
         });
     if shape {
         Ok(())
@@ -1769,7 +1836,7 @@ pub(super) fn plan_screens(
             ));
         }
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            if block.quotation {
+            if block.quotation || block.paragraph {
                 continue;
             }
             let site = positions[index].site();
@@ -1863,6 +1930,9 @@ pub(super) fn plan_screens(
         }
         let mut refrains = Vec::new();
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            if block.paragraph {
+                continue;
+            }
             let source_document = skeletons
                 .corpus()
                 .units()
@@ -1975,6 +2045,7 @@ impl DocumentPlan {
                 let (kind, value, site) = match run {
                     Inline::Text(_) => continue,
                     Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
+                    Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
                     Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
                     Inline::Citation {
                         text,
@@ -2022,8 +2093,8 @@ impl DocumentPlan {
             if target == DocumentTarget::Markdown
                 && let Some(screen) = &self.screen
             {
-                if index > 0 {
-                    let refrain = &screen.refrains[index - 1];
+                if let Some(refrain_index) = refrain_index(&self.blocks, index) {
+                    let refrain = &screen.refrains[refrain_index];
                     if let Some(quotation) = &refrain.quotation {
                         records.push(EmissionRecord {
                             kind: EmissionKind::QuotationLink {
@@ -2035,7 +2106,7 @@ impl DocumentPlan {
                             unit: block.unit.clone(),
                             language: self.language.clone(),
                             target,
-                            occurrence: Some(index - 1),
+                            occurrence: Some(refrain_index),
                             value: quotation.href.clone(),
                             site: refrain.site.clone(),
                         });
@@ -2047,7 +2118,7 @@ impl DocumentPlan {
                             unit: block.unit.clone(),
                             language: self.language.clone(),
                             target,
-                            occurrence: Some(index - 1),
+                            occurrence: Some(refrain_index),
                             value: refrain.fragment.clone(),
                             site: refrain.site.clone(),
                         });
@@ -2065,7 +2136,7 @@ impl DocumentPlan {
                         unit: block.unit.clone(),
                         language: self.language.clone(),
                         target,
-                        occurrence: Some(index - 1),
+                        occurrence: Some(refrain_index),
                         value: refrain.handle.clone(),
                         site: refrain.site.clone(),
                     });
@@ -2227,7 +2298,12 @@ pub(super) fn build(
                     unit: position.unit().into(),
                     depth: position.depth(),
                     quotation: position.quotation(),
-                    site: metadata[position.unit()].clone(),
+                    paragraph: position.paragraph(),
+                    site: if position.paragraph() {
+                        unit.texts()[language].site().clone()
+                    } else {
+                        metadata[position.unit()].clone()
+                    },
                     runs,
                 };
                 if let Err(error) = block.map_citations(book, document, language) {
@@ -2388,7 +2464,6 @@ fn runs(
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     equations: &Equations,
 ) -> Vec<Inline> {
-    let book = welded.integrated().resolved().book();
     let text = &unit.texts()[language];
     let mut replacements = Vec::new();
     for occurrence in text.tag_occurrences() {
@@ -2397,19 +2472,33 @@ fn runs(
             .decoded
             .clone()
             .expect("admitted occurrence");
-        let target = book
-            .resolve(occurrence.input())
-            .expect("same resolved book");
+        let target = welded
+            .integrated()
+            .resolved()
+            .tags()
+            .iter()
+            .find(|tag| {
+                tag.unit() == unit.label()
+                    && tag.language() == language
+                    && tag.occurrence().site() == occurrence.site()
+            })
+            .expect("resolved occurrence from checked corpus");
         replacements.push((
             range,
-            Inline::Tag {
-                handle: occurrence.input().into(),
-                label: target.label().into(),
-                token: format!(
-                    "u{index}-t{}",
-                    occurrence.site().occurrence.expect("insertion index")
-                ),
-                site: occurrence.site().clone(),
+            match target.resolved_target() {
+                ftoo_manifest::ResolvedTagTarget::Theory(node) => Inline::Tag {
+                    handle: occurrence.input().into(),
+                    label: node.semantic_name().into(),
+                    token: format!(
+                        "u{index}-t{}",
+                        occurrence.site().occurrence.expect("insertion index")
+                    ),
+                    site: occurrence.site().clone(),
+                },
+                ftoo_manifest::ResolvedTagTarget::Paper(value) => Inline::PaperTag {
+                    value: value.clone(),
+                    site: occurrence.site().clone(),
+                },
             },
         ));
     }
@@ -2564,6 +2653,7 @@ fn canonical_run(run: &Inline) -> String {
     match run {
         Inline::Text(text) => text.clone(),
         Inline::Tag { handle, .. } => format!("@tag{{{handle}}}"),
+        Inline::PaperTag { value, .. } => format!("@tag{{{}}}", value.key),
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
         Inline::Mention { text, .. } => format!("``{text}``"),
@@ -2785,6 +2875,7 @@ fn region_records(
             let (kind, value, site) = match run {
                 Inline::Text(_) => return None,
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
+                Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
                 Inline::Citation {
                     text,
@@ -2916,6 +3007,7 @@ pub(super) fn display_plans(
                 unit: unit.label().as_str().into(),
                 depth: None,
                 quotation: false,
+                paragraph: false,
                 site: region.site(&region.source().site),
                 runs,
                 displays: BTreeMap::new(),
@@ -3642,6 +3734,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         unit: unit.label().as_str().into(),
         depth: None,
         quotation: false,
+        paragraph: false,
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),

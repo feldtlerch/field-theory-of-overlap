@@ -1,14 +1,19 @@
 """Validate the paper's tag lookup and emit the review lookup, never admissions."""
 import argparse
+import hashlib
 import json
 import pathlib
 import re
+import sys
 import tomllib
 from common import read, require, timed, write
 
 INPUTS = ['tools/paper/identities.py', 'documents/paper-build/paper-tags.tsv',
           'documents/paper-build/reader-tags.toml', 'documents/paper-build/provisional-tags.toml',
           'documents/paper-build/reader-hooks.tex', 'documents/paper/data/ftoo_manifest.tex']
+CHECK_INPUTS = ['tools/paper/common.py', 'documents/paper-build/label-mints.tsv',
+                'documents/paper-build/sources.tsv', 'generated/manifest.json',
+                'registry/documentary-tags.toml']
 TAG = re.compile(r'[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9][A-Za-z0-9_-]*\Z')
 KEY = re.compile(r'[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z0-9_-]+)+\Z')
 
@@ -18,9 +23,37 @@ def holds(line, key):
     return re.search(r'(?<![A-Za-z0-9_:-])'+re.escape(key)+r'(?![A-Za-z0-9_:-])', line) is not None
 
 
-def label_mints(repo):
+class CapturedInputs:
+    """Keep validation reads and their reported digests on one byte snapshot."""
+    def __init__(self, repo):
+        self.repo = repo
+        self.bytes = {}
+
+    def read_bytes(self, path):
+        name = path.relative_to(self.repo).as_posix()
+        if name not in self.bytes:
+            self.bytes[name] = path.read_bytes()
+        return self.bytes[name]
+
+    def read(self, path):
+        return self.read_bytes(path).decode('utf-8')
+
+    def verify(self):
+        for name, data in self.bytes.items():
+            require((self.repo/name).read_bytes() == data,
+                    'M063: checked input changed: '+name)
+
+
+def input_paths(repo, captured=None):
+    """Enumerate every declared validity read without adding PDF byte inputs."""
+    read_text = captured.read if captured else read
+    sources = read_text(repo/'documents/paper-build/sources.tsv').splitlines()
+    return sorted(set(INPUTS + CHECK_INPUTS + sources))
+
+
+def label_mints(repo, read_text=read):
     numbered = [(number, line.split('\t')) for number, line in
-                enumerate(read(repo/'documents/paper-build/label-mints.tsv').splitlines(), 1)
+                enumerate(read_text(repo/'documents/paper-build/label-mints.tsv').splitlines(), 1)
                 if not line.startswith('#')]
     for number, row in numbered:
         require(len(row) == 2, 'M063: malformed label mint row '+str(number))
@@ -32,24 +65,25 @@ def label_mints(repo):
     for key, _ in rows:
         require(key not in seen, 'M063: duplicate label mint key: '+key)
         seen.add(key)
-    declared = set(read(repo/'documents/paper-build/sources.tsv').splitlines())
+    declared = set(read_text(repo/'documents/paper-build/sources.tsv').splitlines())
     sources = {}
     for key, file in rows:
         if file not in sources:
             path = repo/file
             require(path.is_file(), 'M063: label mint file is absent: '+file)
             require(file in declared, 'M063: label mint file is not declared: '+file)
-            sources[file] = read(path).split('\n')
+            sources[file] = read_text(path).split('\n')
         lines = sources[file]
         require(any(holds(line, key) for line in lines),
                 'M063: label mint file does not hold its key: '+key+' at '+file)
     return rows
 
 
-def bindings(repo, release=False):
+def bindings(repo, release=False, captured=None):
     root = repo/'documents/paper-build'
-    paper_bytes = (root/'paper-tags.tsv').read_bytes()
-    label_mints(repo)
+    read_text = captured.read if captured else read
+    paper_bytes = captured.read_bytes(root/'paper-tags.tsv') if captured else (root/'paper-tags.tsv').read_bytes()
+    label_mints(repo, read_text)
     paper = {}
     for line in paper_bytes.decode('utf-8').splitlines():
         if line.startswith('#'): continue
@@ -59,7 +93,7 @@ def bindings(repo, release=False):
         require(TAG.fullmatch(tag) and KEY.fullmatch(target), 'M063: malformed paper tag pair')
         require(tag not in paper and kind in ('node','evidence'), 'M063: duplicate paper tag binding')
         paper[tag] = target
-    source = read(repo/'documents/paper/data/ftoo_manifest.tex')
+    source = read_text(repo/'documents/paper/data/ftoo_manifest.tex')
     pattern = re.compile(r'\\prop_gput:Nnn \\g_ftoo_(evidence_)?tag_to_id_prop \{ ([^{}]+) \} \{ ([^{}]+) \}')
     declared = {}
     for evidence, tag, target in pattern.findall(source):
@@ -90,16 +124,16 @@ def bindings(repo, release=False):
                 collect(v)
         elif isinstance(value,list):
             for item in value: collect(item)
-    collect(json.loads(read(repo/'generated/manifest.json')))
+    collect(json.loads(read_text(repo/'generated/manifest.json')))
     theory_reserved = reserved.copy()
-    documentary = tomllib.loads(read(repo/'registry/documentary-tags.toml'))
+    documentary = tomllib.loads(read_text(repo/'registry/documentary-tags.toml'))
     handles = {event['handle'] for event in documentary.get('events', [])}
     require(len({handle.casefold() for handle in handles}) == len(handles), 'M063: case-insensitive registry collision')
     require(not {handle.casefold() for handle in handles} & theory_reserved, 'M063: documentary spelling collides with theory')
     collect(documentary)
     require(not set(paper.values()) & reserved_targets, 'M063: paper tag target collides with a permanent identity')
-    table = tomllib.loads(read(root/'reader-tags.toml'))
-    candidates = tomllib.loads(read(root/'provisional-tags.toml'))['candidates']
+    table = tomllib.loads(read_text(root/'reader-tags.toml'))
+    candidates = tomllib.loads(read_text(root/'provisional-tags.toml'))['candidates']
     result = {}; spellings = {}
     admissions={event['handle']:event for event in documentary.get('events',[]) if event['change']=='admit'}
     retired={event['handle'] for event in documentary.get('events',[]) if event['change']=='retire'}
@@ -128,9 +162,71 @@ def bindings(repo, release=False):
             if status != 'alias':
                 require(spelling.casefold() not in spellings, 'M063: spelling collision: '+spelling)
                 spellings[spelling.casefold()] = key
-            result[key] = dict(row, status='paper' if status in ('paper','alias') else 'admitted' if status=='admitted' else row['status'], target=paper.get(spelling,key))
+            result[key] = dict(row, status='paper' if status in ('paper','alias') else 'admitted' if status=='admitted' else row['status'], target=paper.get(spelling,key), source_status=status)
     require(set(paper) == {k for k,v in result.items() if k == v['spelling'] and v['status']=='paper'}, 'M063: paper tag coverage differs')
     return result
+
+
+def _site(file, line):
+    return {'file': file, 'line': line}
+
+
+def _assignment_line(text, key, file):
+    pattern = re.compile(r'^[ \t]*key[ \t]*=[ \t]*"'+re.escape(key)+r'"[ \t]*$', re.M)
+    found = list(pattern.finditer(text))
+    require(len(found) == 1, 'M063: key evidence differs: '+key+' at '+file)
+    return _site(file, text.count('\n', 0, found[0].start()) + 1)
+
+
+def assembly_json(repo):
+    """Serialize checked bindings and the captured validity closure for assembly."""
+    captured = CapturedInputs(repo)
+    rows = bindings(repo, captured=captured)
+    paths = input_paths(repo, captured)
+    for path in paths:
+        captured.read_bytes(repo/path)
+    paper_file = 'documents/paper-build/paper-tags.tsv'
+    source_file = 'documents/paper/data/ftoo_manifest.tex'
+    paper_lines = {}
+    for number, line in enumerate(captured.read(repo/paper_file).splitlines(), 1):
+        if not line.startswith('#'):
+            paper_lines[line.split('\t')[0]] = number
+    declarations = {}
+    source = captured.read(repo/source_file)
+    pattern = re.compile(r'\\prop_gput:Nnn \\g_ftoo_(evidence_)?tag_to_id_prop \{ ([^{}]+) \} \{ ([^{}]+) \}')
+    for match in pattern.finditer(source):
+        declarations.setdefault(match[2], []).append(_site(source_file,
+                                    source.count('\n', 0, match.start()) + 1))
+    alias_file = 'documents/paper-build/reader-tags.toml'
+    candidate_file = 'documents/paper-build/provisional-tags.toml'
+    wire = []
+    for key, row in sorted(rows.items()):
+        status = row['source_status']
+        spelling = row['spelling']
+        canonical = spelling if status == 'alias' else key
+        if status in ('paper', 'alias'):
+            target = row['target']
+            kind = next(line.split('\t')[2] for line in captured.read(repo/paper_file).splitlines()
+                        if not line.startswith('#') and line.split('\t')[0] == canonical)
+            lookup = _site(paper_file, paper_lines[canonical])
+            alias = _assignment_line(captured.read(repo/alias_file), key, alias_file) if status == 'alias' else None
+            evidence = sorted(declarations[canonical], key=lambda site: (site['file'], site['line']))
+        else:
+            target = key if status == 'admitted' else None
+            kind = 'documentary' if status == 'admitted' else None
+            file = alias_file if status == 'admitted' else candidate_file
+            lookup = _assignment_line(captured.read(repo/file), key, file)
+            alias = None
+            evidence = []
+        wire.append({'key': key, 'spelling': spelling, 'status': status, 'target': target,
+                     'target_kind': kind, 'lookup_site': lookup, 'alias_site': alias,
+                     'declaration_sites': evidence})
+    result = {'schema': 1,
+              'inputs': [{'path': path, 'sha256': hashlib.sha256(captured.bytes[path]).hexdigest()}
+                         for path in paths],
+              'bindings': wire}
+    captured.verify()
+    return json.dumps(result, ensure_ascii=False, separators=(',', ':'))+'\n'
 
 
 def emit(repo, work):
@@ -145,7 +241,16 @@ def emit(repo, work):
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('repository',type=pathlib.Path)
-    parser.add_argument('--release',action='store_true')
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument('--release',action='store_true')
+    mode.add_argument('--assembly-json',action='store_true')
     args=parser.parse_args()
-    with timed('identity-bindings'):
-        print('Checked bindings:',len(bindings(args.repository,args.release)))
+    try:
+        if args.assembly_json:
+            sys.stdout.write(assembly_json(args.repository))
+        else:
+            with timed('identity-bindings'):
+                print('Checked bindings:',len(bindings(args.repository,args.release)))
+    except (ValueError, OSError, UnicodeError) as error:
+        print(error, file=sys.stderr)
+        raise SystemExit(1) from None

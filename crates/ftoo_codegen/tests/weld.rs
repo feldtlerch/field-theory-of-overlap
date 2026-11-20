@@ -1,5 +1,6 @@
 use ftoo_codegen::{
-    WeldCheckSummary, check_projection, check_weld_files, load_markdown_files, load_unit_files,
+    UnitSource, WeldCheckSummary, check_projection, check_weld_files, load_markdown_files,
+    load_unit_files, load_unit_sources,
 };
 use ftoo_manifest::{
     LabelMember, LabelUseSite, PathPart, SourceAnchor, UnitSite, integrate_labels,
@@ -56,6 +57,7 @@ fn expected_weld_summary(
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // Full-corpus and permanent-domain controls retain their independent inventories.
 fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     check_projection(&root).unwrap();
@@ -75,7 +77,29 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     assert_eq!(labels.units, expected.units);
     assert_eq!(labels.texts, expected.texts);
     assert_eq!(labels.tag_sites, expected.tag_sites);
-    let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+    let permanent = load_unit_sources(
+        UnitSource {
+            file: "units/documents.toml".into(),
+            bytes: std::fs::read(root.join("units/documents.toml")).unwrap(),
+        },
+        std::fs::read_dir(root.join("units/statements"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.extension().is_some_and(|ext| ext == "toml")
+                    && path.file_name().unwrap() != "reading-shadow.toml"
+            })
+            .map(|path| UnitSource {
+                file: format!(
+                    "units/statements/{}",
+                    path.file_name().unwrap().to_string_lossy()
+                ),
+                bytes: std::fs::read(path).unwrap(),
+            })
+            .collect(),
+    )
+    .unwrap();
+    let resolved = resolve_unit_tags(&permanent, &book).unwrap();
     let integrated = integrate_labels(&resolved, &markdown).unwrap();
     let welded = weld_units(&integrated).unwrap();
     assert!(std::ptr::eq(welded.integrated(), &raw const integrated));
@@ -85,13 +109,13 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             .iter()
             .map(ftoo_manifest::WeldedUnit::unit)
             .collect::<Vec<_>>(),
-        corpus
+        permanent
             .units()
             .iter()
             .map(|unit| unit.label().as_str())
             .collect::<Vec<_>>()
     );
-    for (welded_unit, source_unit) in welded.units().iter().zip(corpus.units()) {
+    for (welded_unit, source_unit) in welded.units().iter().zip(permanent.units()) {
         assert_eq!(
             welded_unit
                 .languages()
@@ -173,7 +197,9 @@ fn assert_first(first: &ftoo_manifest::WeldedLanguage) {
             text_site,
             members: vec![ftoo_manifest::TagMember {
                 input: "c:1".into(),
-                target: ftoo_manifest::NodeId::LangevinCoefficientOne,
+                target: ftoo_manifest::ResolvedTagTarget::Theory(
+                    ftoo_manifest::NodeId::LangevinCoefficientOne,
+                ),
                 sites: vec![tag_site]
             }]
         }
@@ -233,7 +259,7 @@ fn assert_context(second: &ftoo_manifest::WeldedLanguage) {
             .iter()
             .map(|m| (
                 m.input.as_str(),
-                m.target,
+                m.target.clone(),
                 m.sites
                     .iter()
                     .map(|s| (s.decoded.clone(), s.occurrence))
@@ -243,12 +269,16 @@ fn assert_context(second: &ftoo_manifest::WeldedLanguage) {
         vec![
             (
                 "c:1",
-                ftoo_manifest::NodeId::LangevinCoefficientOne,
+                ftoo_manifest::ResolvedTagTarget::Theory(
+                    ftoo_manifest::NodeId::LangevinCoefficientOne,
+                ),
                 vec![(Some(51..60), Some(1))]
             ),
             (
                 "v:1",
-                ftoo_manifest::NodeId::LangevinCoefficientOneValue,
+                ftoo_manifest::ResolvedTagTarget::Theory(
+                    ftoo_manifest::NodeId::LangevinCoefficientOneValue,
+                ),
                 vec![(Some(16..25), Some(0))]
             ),
         ]

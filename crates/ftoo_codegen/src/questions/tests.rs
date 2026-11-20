@@ -485,6 +485,14 @@ fn m069_empty_about_in_the_store_reaches_admission_and_refuses() {
 fn open_labels_enter_no_citation_domain_yet() {
     // A unit text citing a record is refused as an unresolved unit citation.
     let fixture = Fixture::new();
+    fs::remove_file(fixture.root.join("units/statements/reading-shadow.toml")).unwrap();
+    let declarations = fixture.root.join("units/documents.toml");
+    let source = fs::read_to_string(&declarations).unwrap();
+    fs::write(
+        &declarations,
+        source.replace("paper-context = \"paper\"\n", ""),
+    )
+    .unwrap();
     let unit = fixture.root.join("units/statements/value-context.toml");
     let text = fs::read_to_string(&unit).unwrap();
     fs::write(

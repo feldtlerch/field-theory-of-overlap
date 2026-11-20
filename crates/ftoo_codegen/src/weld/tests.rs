@@ -1,8 +1,9 @@
 use super::*;
+use crate::{UnitLoadError, load_unit_files};
 use ftoo_manifest::{
-    LabelSide, LabelSite, LabelUseSite, NodeId, PathPart, ReferenceDomain, RuleId, SourceAnchor,
-    TagMember, TagSide, UnitDiagnostic, UnitFault, UnitSite, UnitStage, WeldDiagnostic, WeldFault,
-    WeldStage,
+    LabelSide, LabelSite, LabelUseSite, NodeId, PathPart, ReferenceDomain, ResolvedTagTarget,
+    RuleId, SourceAnchor, TagMember, TagSide, UnitDiagnostic, UnitFault, UnitSite, UnitStage,
+    WeldDiagnostic, WeldFault, WeldStage, resolve_unit_tags,
 };
 use std::{
     collections::BTreeMap,
@@ -78,7 +79,7 @@ fn assert_literal_sites(
                 text_site: expected(None, None),
                 members: vec![TagMember {
                     input: "c:1".into(),
-                    target: NodeId::LangevinCoefficientOne,
+                    target: ResolvedTagTarget::Theory(NodeId::LangevinCoefficientOne),
                     sites: vec![expected(Some(19..28), Some(0))]
                 }]
             }
@@ -329,7 +330,7 @@ fn tags(
             .iter()
             .map(|(input, target, start, end, index)| TagMember {
                 input: (*input).into(),
-                target: *target,
+                target: ResolvedTagTarget::Theory(*target),
                 sites: vec![site(language, en, fr, Some(*start..*end), Some(*index))],
             })
             .collect(),
@@ -422,14 +423,23 @@ fn debug_tags(side: &TagSide) -> String {
         .members
         .iter()
         .map(|m| {
-            let target = match m.target {
-                NodeId::LangevinCoefficientOne => "LangevinCoefficientOne",
-                NodeId::LangevinCoefficientOneValue => "LangevinCoefficientOneValue",
-                NodeId::LangevinCoefficientThree => "LangevinCoefficientThree",
-                NodeId::LangevinCoefficientThreeValue => "LangevinCoefficientThreeValue",
+            let target = match &m.target {
+                ResolvedTagTarget::Theory(NodeId::LangevinCoefficientOne) => {
+                    "LangevinCoefficientOne"
+                }
+                ResolvedTagTarget::Theory(NodeId::LangevinCoefficientOneValue) => {
+                    "LangevinCoefficientOneValue"
+                }
+                ResolvedTagTarget::Theory(NodeId::LangevinCoefficientThree) => {
+                    "LangevinCoefficientThree"
+                }
+                ResolvedTagTarget::Theory(NodeId::LangevinCoefficientThreeValue) => {
+                    "LangevinCoefficientThreeValue"
+                }
+                ResolvedTagTarget::Paper(_) => "Paper",
             };
             format!(
-                "TagMember {{ input: {:?}, target: {target}, sites: [{}] }}",
+                "TagMember {{ input: {:?}, target: Theory({target}), sites: [{}] }}",
                 m.input,
                 m.sites
                     .iter()

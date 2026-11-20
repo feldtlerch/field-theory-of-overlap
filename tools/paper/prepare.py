@@ -9,17 +9,18 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-harm-enlargement.tex", "generated/documents/paper-pilot/sec-say-wonder-beauty.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-harm-enlargement.tex", "generated/documents/paper-pilot/sec-say-wonder-beauty.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex", "generated/documents/paper-pilot/sec-reading-shadow.tex"]
 SOURCES = 'documents/paper/'
 FRAGMENTS = (
-    ('documents/paper/parts/partA.tex', 184, 184, 'generated/documents/paper-pilot/sec-say-direction.tex', 'sec:say:direction'),
-    ('documents/paper/parts/partA.tex', 601, 601, 'generated/documents/paper-pilot/sec-say-harm-enlargement.tex', 'sec:say:harm-enlargement'),
-    ('documents/paper/parts/partA.tex', 675, 675, 'generated/documents/paper-pilot/sec-say-wonder-beauty.tex', 'sec:say:wonder-beauty'),
-    ('documents/paper/explainer/explainer.tex', 319, 320, 'generated/documents/explainer-pilot/sec-say-direction.tex', 'sec:say:direction'),
-    ('documents/paper/parts/partD.tex', 298, 298, 'generated/documents/paper-pilot/sec-say-enemy-to-none.tex', 'sec:say:enemy-to-none'),
-    ('documents/paper/explainer/explainer.tex', 687, 687, 'generated/documents/explainer-pilot/sec-say-enemy-to-none.tex', 'sec:say:enemy-to-none'),
-    ('documents/paper/parts/coda.tex', 112, 112, 'generated/documents/paper-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
-    ('documents/paper/explainer/explainer.tex', 972, 973, 'generated/documents/explainer-pilot/sec-coda-record-limit.tex', 'sec:coda:record-limit'),
+    ('documents/paper/parts/front.tex', 'sec:reading:shadow', 'generated/documents/paper-pilot/sec-reading-shadow.tex', 'paragraph'),
+    ('documents/paper/parts/partA.tex', 'sec:say:direction', 'generated/documents/paper-pilot/sec-say-direction.tex', 'refrain'),
+    ('documents/paper/parts/partA.tex', 'sec:say:harm-enlargement', 'generated/documents/paper-pilot/sec-say-harm-enlargement.tex', 'refrain'),
+    ('documents/paper/parts/partA.tex', 'sec:say:wonder-beauty', 'generated/documents/paper-pilot/sec-say-wonder-beauty.tex', 'refrain'),
+    ('documents/paper/explainer/explainer.tex', 'sec:say:direction', 'generated/documents/explainer-pilot/sec-say-direction.tex', 'quotation'),
+    ('documents/paper/parts/partD.tex', 'sec:say:enemy-to-none', 'generated/documents/paper-pilot/sec-say-enemy-to-none.tex', 'refrain'),
+    ('documents/paper/explainer/explainer.tex', 'sec:say:enemy-to-none', 'generated/documents/explainer-pilot/sec-say-enemy-to-none.tex', 'quotation'),
+    ('documents/paper/parts/coda.tex', 'sec:coda:record-limit', 'generated/documents/paper-pilot/sec-coda-record-limit.tex', 'refrain'),
+    ('documents/paper/explainer/explainer.tex', 'sec:coda:record-limit', 'generated/documents/explainer-pilot/sec-coda-record-limit.tex', 'quotation'),
 )
 
 
@@ -40,41 +41,63 @@ def paper_master(text, version):
 
 
 def declared_fragments(repository, rows):
-    """Validate the bounded source slots and return their replacement first lines."""
+    """Validate unique source markers and return their replacement lines."""
     replacements = {}
+    marker_at = {}
     bodies = set()
-    for source, first, last, fragment, unit in FRAGMENTS:
-        require(source in rows and first > 0 and last >= first, 'Fragment source declaration differs: '+source)
+    paragraph_bodies = []
+    declared = {(source, unit) for source, unit, _, _ in FRAGMENTS}
+    require(len(declared) == len(FRAGMENTS), 'Duplicate fragment slot')
+    for source, unit, fragment, role in FRAGMENTS:
+        require(source in rows, 'Fragment source declaration differs: '+source)
         lines = (repository/source).read_bytes().splitlines(keepends=True)
-        require(last <= len(lines) and lines[first-1] == ('% generated: '+unit+'\n').encode(),
-                'Fragment marker/declaration differs: '+source+':'+str(first))
-        require(all(line == b'%\n' for line in lines[first:last]), 'Fragment padding differs: '+source)
+        marker = ('% generated: '+unit+'\n').encode()
+        positions = [number for number, line in enumerate(lines, 1) if line == marker]
+        require(len(positions) == 1, 'Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
-        expected_macro = b'paperrefrain' if source.startswith('documents/paper/explainer/') else b'refrain'
+        expected_macro = {'quotation': b'paperrefrain', 'refrain': b'refrain',
+                          'paragraph': b'PaperNativeParagraph'}[role]
         prefix = b'\\'+expected_macro+b'{'+unit.encode()+b'}{'
         require(data.startswith(prefix) and data.endswith(b'}\n') and data.count(b'\n') == 1,
-                'Fragment label/declaration differs: '+fragment)
+                ('M055: Fragment body differs: ' if role == 'paragraph'
+                 else 'Fragment label/declaration differs: ')+fragment)
         body = data[len(prefix):-2]
-        require(body and b'{' not in body and b'}' not in body, 'Fragment body differs: '+fragment)
-        bodies.add(b' '.join(body.split()))
-        replacements[(source, first)] = data
+        if role == 'paragraph':
+            require(body and re.fullmatch(rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\})+', body),
+                    'M055: Fragment body differs: '+fragment)
+            from identities import bindings
+            available = bindings(repository)
+            for key in re.findall(rb'\\ftag\{([^{}]+)\}', body):
+                row = available.get(key.decode('ascii'))
+                require(row is not None and row['source_status'] in ('paper', 'alias'),
+                        'M055: Fragment tag binding differs: '+fragment)
+            paragraph_bodies.append(b' '.join(body.split()))
+        else:
+            require(body and b'{' not in body and b'}' not in body,
+                    'Fragment body differs: '+fragment)
+            bodies.add(b' '.join(body.split()))
+        replacements[(source, positions[0])] = data
+        marker_at[(source, positions[0])] = marker.rstrip(b'\n')
     for source in rows:
         data = (repository/source).read_bytes()
         for match in re.finditer(rb'\\(?:paper)?refrain\{([^}]*)\}\{([^}]*)\}', data, re.S):
             label, body = match.groups()
-            require(label not in {unit.encode() for *_, unit in FRAGMENTS}
+            require(label not in {unit.encode() for _, unit, _, _ in FRAGMENTS}
                     and b' '.join(body.split()) not in bodies,
                     'Authored refrain duplicates a declared fragment: '+source)
-        for *_, unit in FRAGMENTS:
+        for _, unit, _, _ in FRAGMENTS:
             require(not re.search(rb'\\label\{'+re.escape(unit.encode())+rb'\}', data),
                     'Authored mint duplicates a declared fragment: '+source)
-    declared = {(source, first) for source, first, *_ in FRAGMENTS}
-    require(len(declared) == len(FRAGMENTS), 'Duplicate fragment slot')
-    require(all(fragment in INPUTS for _, _, _, fragment, _ in FRAGMENTS),
+        normalized = b' '.join(data.split())
+        for paragraph_body in paragraph_bodies:
+            require(paragraph_body not in normalized,
+                    'M055: Authored paragraph duplicates a declared fragment: '+source)
+    require(all(fragment in INPUTS for _, _, fragment, _ in FRAGMENTS),
             'Declared fragment absent from receipt inputs')
     for source in rows:
         for number, line in enumerate((repository/source).read_bytes().splitlines(), 1):
-            require(not re.match(rb'\s*%\s*generated\s*:', line) or (source, number) in declared,
+            marker = re.match(rb'\s*%\s*generated\s*:', line)
+            require(not marker or marker_at.get((source, number)) == line,
                     'Undeclared fragment marker: '+source+':'+str(number))
     return replacements
 

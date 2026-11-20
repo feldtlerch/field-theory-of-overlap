@@ -1,5 +1,6 @@
 use ftoo_codegen::{
-    LabelFileError, check_label_files, check_projection, load_markdown_files, load_unit_files,
+    LabelFileError, UnitSource, check_label_files, check_projection, load_markdown_files,
+    load_unit_files, load_unit_sources,
 };
 use ftoo_manifest::{
     LabelDiagnostic, LabelFault, LabelSite, LabelStage, MintKind, MintOrigin, NodeId,
@@ -31,6 +32,13 @@ fn fixture(full: bool) -> PathBuf {
     ] {
         fs::copy(root().join(file), directory.join(file)).unwrap();
     }
+    let declaration = directory.join("units/documents.toml");
+    let text = fs::read_to_string(&declaration).unwrap();
+    fs::write(
+        &declaration,
+        text.replace("paper-context = \"paper\"\n", ""),
+    )
+    .unwrap();
     if full {
         for source in load_markdown_files(&root()).unwrap().sources() {
             let path = directory.join(&source.file);
@@ -286,7 +294,23 @@ fn w06_committed_projection_and_rust_books_have_identical_label_authority() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let snapshot = ftoo_manifest::Snapshot::capture(&graph);
-    let corpus = load_unit_files(&root).unwrap();
+    let declaration = UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: fs::read(root.join("units/documents.toml")).unwrap(),
+    };
+    let statements = fs::read_dir(root.join("units/statements"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.file_name().unwrap() != "reading-shadow.toml")
+        .map(|path| UnitSource {
+            file: format!(
+                "units/statements/{}",
+                path.file_name().unwrap().to_string_lossy()
+            ),
+            bytes: fs::read(path).unwrap(),
+        })
+        .collect();
+    let corpus = load_unit_sources(declaration, statements).unwrap();
     let markdown = load_markdown_files(&root).unwrap();
     let resolved = resolve_unit_tags(&corpus, &book).unwrap();
     let integrated = integrate_labels(&resolved, &markdown).unwrap();

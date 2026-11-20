@@ -19,6 +19,7 @@ pub struct SkeletonSection {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SkeletonChild {
     Unit(LocatedString),
+    Paragraph(LocatedString),
     Quotation(LocatedString),
     Section(SkeletonSection),
 }
@@ -27,6 +28,7 @@ pub struct SkeletonPosition {
     unit: String,
     depth: Option<usize>,
     quotation: bool,
+    paragraph: bool,
     site: UnitSite,
 }
 impl SkeletonPosition {
@@ -41,6 +43,10 @@ impl SkeletonPosition {
     #[must_use]
     pub const fn quotation(&self) -> bool {
         self.quotation
+    }
+    #[must_use]
+    pub const fn paragraph(&self) -> bool {
+        self.paragraph
     }
     #[must_use]
     pub const fn site(&self) -> &UnitSite {
@@ -136,9 +142,9 @@ pub fn check_skeletons<'a>(
             .sections
             .iter()
             .rev()
-            .map(|s| (Some(s), &s.heading, Some(1), false))
+            .map(|s| (Some(s), &s.heading, Some(1), false, false))
             .collect();
-        while let Some((section, location, depth, quotation)) = stack.pop() {
+        while let Some((section, location, depth, quotation, paragraph)) = stack.pop() {
             if depth.is_some_and(|d| d > 6) {
                 return Err(vec![diagnostic(
                     document,
@@ -177,17 +183,24 @@ pub fn check_skeletons<'a>(
                 unit: location.value.clone(),
                 depth,
                 quotation,
+                paragraph,
                 site: location.site.clone(),
             });
             if let Some(section) = section {
                 for child in section.children.iter().rev() {
                     match child {
-                        SkeletonChild::Unit(unit) => stack.push((None, unit, None, false)),
-                        SkeletonChild::Quotation(unit) => stack.push((None, unit, None, true)),
+                        SkeletonChild::Unit(unit) => stack.push((None, unit, None, false, false)),
+                        SkeletonChild::Paragraph(unit) => {
+                            stack.push((None, unit, None, false, true));
+                        }
+                        SkeletonChild::Quotation(unit) => {
+                            stack.push((None, unit, None, true, false));
+                        }
                         SkeletonChild::Section(section) => stack.push((
                             Some(section),
                             &section.heading,
                             Some(depth.unwrap_or(0) + 1),
+                            false,
                             false,
                         )),
                     }

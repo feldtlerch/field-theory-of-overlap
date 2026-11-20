@@ -2,6 +2,81 @@ use super::*;
 use ftoo_manifest::{PathPart, ShapeKind, UnitDiagnostic, UnitErrors, UnitFault, UnitStage};
 
 #[test]
+fn paper_lookup_snapshot_refuses_a_second_version() {
+    let path = "generated/manifest.json".to_owned();
+    let mut inputs = BTreeMap::new();
+    merge_checked_input(&mut inputs, path.clone(), b"first".to_vec()).unwrap();
+    merge_checked_input(&mut inputs, path.clone(), b"first".to_vec()).unwrap();
+    assert_eq!(
+        merge_checked_input(&mut inputs, path.clone(), b"second".to_vec()),
+        Err(DocumentError::PaperLookup(registry::PaperLookupError {
+            rule: RuleId::M063,
+            site: path.clone(),
+            fault: registry::PaperLookupFault::InputChanged { path },
+        }))
+    );
+    assert_eq!(inputs["generated/manifest.json"], b"first");
+}
+
+#[test]
+fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = NativeSupport::from_environment(&root).map_err(|error| format!("{error:?}"))?;
+    let prepared = prepare_documents(&root, &support)?;
+    let artifact = |path: &str| {
+        prepared
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.path() == path)
+            .unwrap()
+    };
+    let fragment = "generated/documents/paper-pilot/sec-reading-shadow.tex";
+    assert_eq!(
+        artifact(fragment).bytes(),
+        std::fs::read(root.join(fragment))?
+    );
+    let source = std::str::from_utf8(artifact(fragment).bytes())?;
+    assert!(source.starts_with("\\PaperNativeParagraph{sec:reading:shadow}{"));
+    assert!(source.contains("other way --- the fact"));
+    assert!(source.contains("center's population"));
+    assert!(source.contains("(\\ftag{src:nd}).}"));
+    for path in [
+        "generated/documents/paper-pilot/en.md",
+        "generated/documents/paper-pilot/en.labels.md",
+    ] {
+        let bytes = artifact(path).bytes();
+        let rendered = std::str::from_utf8(bytes)?;
+        assert_eq!(rendered.matches("Not yet converted:").count(), 7);
+        assert!(rendered.contains("other way — the fact"));
+        assert!(rendered.contains("center’s population"));
+        assert!(rendered.contains("&#40;src:nd"));
+    }
+    let site = input::site("units/statements/reading-shadow.toml");
+    let broken = plan::Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: "sec:reading:shadow".into(),
+        depth: None,
+        quotation: false,
+        paragraph: true,
+        site: site.clone(),
+        runs: vec![plan::Inline::Text("one—-two".into())],
+    };
+    assert_eq!(
+        fragment_line(&broken),
+        Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(site),
+            AssemblyFault::UnsupportedParagraphBody {
+                reason: "adjacent hyphen or em-dash marks".into(),
+            },
+        )),
+    );
+    Ok(())
+}
+
+#[test]
 fn native_literal_runtime_prefix_is_not_a_protocol_record() {
     use std::os::unix::process::ExitStatusExt;
     let output = std::process::Output {
@@ -825,6 +900,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                         for child in children {
                             match child {
                                 ftoo_manifest::SkeletonChild::Unit(unit)
+                                | ftoo_manifest::SkeletonChild::Paragraph(unit)
                                 | ftoo_manifest::SkeletonChild::Quotation(unit) => {
                                     paths.push(format!(
                                         "generated/documents/{document}/{}.tex",
@@ -1181,6 +1257,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
             unit: "sec:fixture:heading".into(),
             depth: Some(1),
             quotation: false,
+            paragraph: false,
             site: input::site("units/statements/fixture.toml"),
             runs: vec![
                 plan::Inline::Text("Before ".into()),
@@ -1266,6 +1343,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 unit: format!("sec:fixture:{name}"),
                 depth: (name == "a").then_some(1),
                 quotation: false,
+                paragraph: false,
                 site: input::site(&format!("units/statements/{name}.toml")),
                 runs: vec![plan::Inline::Text(name.to_uppercase())],
             })
@@ -1389,6 +1467,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
             unit: "sec:fixture:unit".into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: input::site("units/statements/fixture.toml"),
             runs: ["first", "second", "first"]
                 .into_iter()
@@ -1435,6 +1514,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             unit: "sec:fixture:paragraph".into(),
             depth: None,
             quotation: false,
+            paragraph: false,
             site: site.clone(),
             runs: vec![
                 plan::Inline::Tag {
@@ -1780,6 +1860,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     unit: "sec:fixture:unit".into(),
                     depth,
                     quotation: false,
+                    paragraph: false,
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
@@ -1795,6 +1876,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     unit: "sec:fixture:unit".into(),
                     depth: None,
                     quotation: false,
+                    paragraph: false,
                     site: origin.clone(),
                     runs: std::mem::take(&mut plan.blocks[0].runs),
                     displays: BTreeMap::new(),
@@ -1805,6 +1887,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     unit: "sec:fixture:unit".into(),
                     depth: None,
                     quotation: false,
+                    paragraph: false,
                     site: input::site("units/displays/fixture.toml"),
                     runs: vec![plan::Inline::Text("Cell.".into())],
                     displays: BTreeMap::new(),

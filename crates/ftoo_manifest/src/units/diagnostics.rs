@@ -199,6 +199,10 @@ pub enum UnitFault {
     ResolutionFault {
         cause: TagResolutionFault,
     },
+    PaperTagUnavailable {
+        input: String,
+        status: String,
+    },
     MalformedLabelSpan {
         span_index: usize,
         reason: LabelSpanReason,
@@ -238,7 +242,7 @@ impl UnitFault {
             Self::UnsupportedMathSyntax { .. } => 23,
             Self::UnknownMath { .. } => 24,
             Self::UnusedMath { .. } => 25,
-            Self::ResolutionFault { .. } => 26,
+            Self::ResolutionFault { .. } | Self::PaperTagUnavailable { .. } => 26,
             Self::DocumentaryTagTarget { .. } => 50,
             Self::UnknownToken { .. } => 51,
             Self::MalformedLabelSpan { .. } => 27,
