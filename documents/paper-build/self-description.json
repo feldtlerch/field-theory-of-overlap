@@ -125,9 +125,9 @@
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
       "start": 53475,
-      "end": 56285,
-      "sha256": "174155d02de64623b9a781c93fe0e75b71d4ca72490ced73522a494e69081d89",
-      "reading_acceptance": "The project's owner approved the qualified description of typed grade refusals; this SHA256 identifies the renewed passage bytes.",
+      "end": 56296,
+      "sha256": "cee190efbda61019f20fbec5916c13877c8f2f2d9350a86d103346d29563d7aa",
+      "reading_acceptance": "The project's owner approved the qualified description of typed grade checking and recorded spends; this SHA256 identifies the renewed passage bytes.",
       "anchor": "\\section{The Paper and Its Checks}"
     },
     {
