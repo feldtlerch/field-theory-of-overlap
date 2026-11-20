@@ -166,7 +166,7 @@ fn duplicates(mints: &Mints, stage: LabelStage) -> Vec<LabelDiagnostic> {
 /// The kind reserved for open-question labels.
 pub(crate) const OPEN_KIND: &str = "open";
 /// The kind reserved for reading declarations.
-pub(crate) const READ_KIND: &str = "read";
+pub const READ_KIND: &str = "read";
 /// The kind reserved for derived audit identities.
 pub(crate) const AUDIT_KIND: &str = "audit";
 pub(crate) fn open_kind(label: &str) -> bool {

@@ -1,0 +1,13 @@
+[package]
+name = "ftoo_readings"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ftoo_manifest = { path = "../ftoo_manifest" }

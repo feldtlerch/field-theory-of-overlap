@@ -9,6 +9,7 @@ Read the [README](README.md) for what is built, the [ADR register](docs/adr/READ
 |Location|Contents|
 |---|---|
 |`crates/ftoo_manifest/`|Typed authority, identities, validation register, tags, notation and unit admission.|
+|`crates/ftoo_readings/`|Closed reading identities and checked occurrence allocations, without a mathematical verdict.|
 |`crates/ftoo_audit/`|Claim producers, pinned engine integration and retained audit evidence.|
 |`crates/ftoo_codegen/`|Shared generation and byte checking, including the `paper` binary.|
 |`documents/paper/`|Authored LaTeX and fixed data tables for parts not yet generated from units; replaced file by file under ADRs 014 and 016.|
@@ -105,7 +106,7 @@ The ADR register records accepted status and the clauses later records govern. P
 
 The nearest written statements to a general invariant policy are ADR 009's layer-with-validator rule, ADR 010's requirement to register unenforced rules as visible debt with scope stated outside code paths, and ADRs 016–017's distinction between recorded obligations and claims of enforcement. The universal policy remains a gap below.
 
-- Closed typed graph — [ADR 001](docs/adr/001-closed-typed-graph.md), qualified by ADR 026 (`dec:graph:closed-authority`).
+- Closed typed graph — [ADR 001](docs/adr/001-closed-typed-graph.md), qualified by ADRs 025 and 026 (`dec:graph:closed-authority`).
 - Byte-gated generation — ADR 006, qualified by ADRs 018–019 (`dec:generation:byte-gated`).
 - Permanent bindings and reader handles — [ADR 003](docs/adr/003-tags-bound-to-labels.md), qualified by ADRs 016 and 017 (`dec:tags:bound-to-labels`).
 - Readers never see labels — [ADR 017](docs/adr/017-screen-rendering-contracts.md) (`dec:documents:screen-rendering-contracts`).

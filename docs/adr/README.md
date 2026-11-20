@@ -12,11 +12,11 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 
 |ADR|Decision|State|
 |---|--------|-----|
-|001|The authority is a closed typed graph|accepted; warranted structural change and historical meaning are governed by 026|
-|002|Four-axis status and declared coverage|accepted|
+|001|The authority is a closed typed graph|accepted; warranted structural change and historical meaning are governed by 026; reading identities are governed by 025|
+|002|Four-axis status and declared coverage|accepted; reading lifecycle and availability are governed by 025|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
-|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021|
+|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent docs-only changes are governed by 018 and ordinary paper-pair reuse by 019|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
@@ -27,7 +27,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |013|Workspace norms: edition, lints, toolchain|accepted|
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024|
 |015|Open questions are records|accepted|
-|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024|
+|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025|
 |017|Screen rendering contracts|accepted; mathematics transport is governed by 022; named passage-renewal acceptance is governed by 024|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
@@ -36,4 +36,5 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
+|025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
 |026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|

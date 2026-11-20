@@ -12,8 +12,11 @@
 - **Bite** — one reviewed, gated, signed change; the unit of this repository's history (`rec:adr:009-process`).
 - **Slice** — the audited part of the theory at a given moment, as the coverage declaration states it.
 - **Display** — a figure or table: a unit whose bodies are authored per rendering target rather than shared across them.
-- **Skeleton** — a document's ordered tree of sections, structure only, naming the units each section contains.
-- **Reading** — in the theory, a field-anchored or latent way of reading a quantity; reads-through applies only to field-anchored readings. In documents, the paper's or explainer's ordered structure; M073 reserves the `read` label kind, but no document reading identity is admitted yet.
+- **Skeleton** — the ordered unit composition supplying ownership and order for a generator-example document or for a reading until its transfer to an identified reading tree.
+- **Reading** — in the theory, a field-anchored or latent way of reading a quantity; reads-through applies only to field-anchored readings. In documents, the paper's or explainer's ordered structure; eight occurrence identities are admitted under the reserved `read` kind, without a root or placement.
+- **Structural decision** — a separately identified fact with fixed outcomes on which reading structure may branch.
+- **Branch** — a reading position selecting a structural ordering or alternative by a structural decision's outcome.
+- **Discharge** — the realization of a reached node as text, a figure or a display, without changing its reading structure.
 - **Explainer** — a companion publication writing the paper's ideas for a reader who will not read the proofs; authored as units like the paper, with its own declared language set.
 - **Projection** — the generated artifact that carries the authority into the toolchain: the one data file the typesetting runtime and the audit both consume.
 - **Pin** — the recorded public commit of the calculation engine the audit depends on; moved only along that repository's main branch, by review.
@@ -21,5 +24,5 @@
 - **Ruling** — a registered editorial judgment of the theory (a classification the authority records as an object of its own, with status like any other).
 - **Open question** — a question the repository's content leaves unsettled and on which a published statement depends, held as a record of the strict open-question store with a closed state, typed references and a criterion for its settlement (`rec:adr:015-open-questions`).
 - **Documentary target** — the label a documentary handle is bound to, minted in Markdown, in unit metadata, by a unit's closed documentary-target metadata when its admitted name does not fit the unit-label grammar, or, while unconverted sources remain, in the paper's label-mint inventory (`rec:adr:016-admission-and-native-documents`).
-- **Quotation-use** — a typed reference to a unit in another document's skeleton, rendering its shared text and linking to its destination without a second mint or authored copy (`rec:adr:016-admission-and-native-documents`).
+- **Quotation-use** — a shared-unit reference whose destination is supplied by its checked skeleton until transfer and by the owning reading occurrence afterward, without a second text or mint (`rec:adr:016-admission-and-native-documents`).
 - **Evidence warrant** — a link record connecting a claim to the evidence that supports it, such as one named by the paper's `ev:` handles, kept distinct under its existing handle; it is not a mathematical premise of the claim, and recording it does not establish the evidence (`rec:adr:016-admission-and-native-documents`).

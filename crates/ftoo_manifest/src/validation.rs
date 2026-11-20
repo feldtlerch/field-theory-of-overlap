@@ -84,6 +84,7 @@ pub enum RuleId {
     M071,
     M072,
     M073,
+    M074,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -105,7 +106,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 73] = [
+pub const RULES: [RuleSpec; 74] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -616,6 +617,13 @@ pub const RULES: [RuleSpec; 73] = [
         number: RuleId::M073,
         statement: "No Rust theory identity, Markdown mint, unit metadata, paper label-mint key, paper tag target or documentary admission target uses label kind read or audit; those kinds are kept for reading declarations and derived audit identities.",
         scope: "The joint mint inventory, the paper's label-mint keys and tag targets, and the label field of documentary admission events.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M074,
+        statement: "Constructed reading names satisfy the semantic-label grammar with the reserved reading kind; identifiers and names are unique, specifications match their fixed declarations, and each quotation names an allocated owning occurrence in another reading.",
+        scope: "Every constructed reading declaration.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

@@ -34,6 +34,7 @@ pub use notation::{
 };
 pub use notation::{RenderOwner, RenderTarget};
 mod labels;
+pub use labels::READ_KIND;
 pub use labels::{
     CheckedMarkdown, JointMints, LabelDiagnostic, LabelErrors, LabelFault, LabelIntegratedUnits,
     LabelOccurrence, LabelSite, LabelSourceError, LabelSourceFault, LabelStage, MarkdownSource,
@@ -70,6 +71,12 @@ pub use units::{
     UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite, UnitStage, admit_unit_drafts,
     resolve_unit_tags,
 };
+
+/// Check the closed three-component semantic-label spelling.
+#[must_use]
+pub fn is_semantic_label(value: &str) -> bool {
+    units::label_name(value)
+}
 
 pub use wire::{
     BudgetExport, CapabilityExport, LoadedProjection, ProducerExport, ProjectionDiagnostic,

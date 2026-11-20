@@ -547,7 +547,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
-        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073,
+        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -557,7 +557,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
             M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
-            M071, M072, M073
+            M071, M072, M073, M074
         ]
     );
     for rule in RULES {
@@ -568,7 +568,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
             | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
-            | M071 | M073 => RuleState::Enforced,
+            | M071 | M073 | M074 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
             M072 => RuleState::DeferredPaperUnits,
@@ -632,7 +632,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 73);
+    assert_eq!(RULES.len(), 74);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -712,7 +712,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        62
+        63
     );
     assert_eq!(
         RULES
@@ -1121,6 +1121,19 @@ fn reserved_graph_rule_literal() {
         rule.scope,
         "The joint mint inventory, the paper's label-mint keys and tag targets, and the label field of documentary admission events."
     );
+    assert_eq!(rule.state, RuleState::Enforced);
+    assert_eq!(rule.deferred_reason, None);
+}
+
+#[test]
+fn reading_rule_literal() {
+    let rule = RULES[73];
+    assert_eq!(rule.number, RuleId::M074);
+    assert_eq!(
+        rule.statement,
+        "Constructed reading names satisfy the semantic-label grammar with the reserved reading kind; identifiers and names are unique, specifications match their fixed declarations, and each quotation names an allocated owning occurrence in another reading."
+    );
+    assert_eq!(rule.scope, "Every constructed reading declaration.");
     assert_eq!(rule.state, RuleState::Enforced);
     assert_eq!(rule.deferred_reason, None);
 }

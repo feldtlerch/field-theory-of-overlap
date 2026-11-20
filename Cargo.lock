@@ -104,6 +104,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ftoo_readings"
+version = "0.0.0"
+dependencies = [
+ "ftoo_manifest",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
