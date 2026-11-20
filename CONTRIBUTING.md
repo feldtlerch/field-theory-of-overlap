@@ -12,8 +12,8 @@ Read the [README](README.md) for what is built, the [ADR register](docs/adr/READ
 |`crates/ftoo_readings/`|Closed reading identities and checked occurrence allocations, without a mathematical verdict.|
 |`crates/ftoo_audit/`|Claim producers, pinned engine integration and retained audit evidence.|
 |`crates/ftoo_codegen/`|Shared generation and byte checking, including the `paper` binary.|
-|`documents/paper/`|Authored LaTeX and fixed data tables for parts not yet generated from units; replaced file by file under ADRs 014 and 016.|
-|`documents/paper-build/`|Records checking still-authored sources: source list, settings, tag bindings, mint evidence and accepted passages; each ends with the source it checks under ADR 016.|
+|`documents/paper/`|Authored sources for content not yet native; passages and table bodies must be native at the complete-document release gate by release 0.6.0. Inherited files other than passage and table bodies, including typesetting support and checking machinery with the declarations it reads, may remain after this gate but must be replaced by release 0.7.0 under ADR 030; any passage or table body such a file produces must be native by release 0.6.0.|
+|`documents/paper-build/`|Records checking still-authored sources: source list, settings, tag bindings, mint evidence and accepted passages; each ends with the source it checks under ADR 016, and the tag bindings (`paper-tags.tsv`) and mint evidence (`label-mints.tsv`) must end by release 0.7.0 under ADR 030.|
 |`units/`|Authored statement texts, per-target display bodies, declarations and skeletons.|
 |`registry/`|Documentary tags, confirmation evidence and open questions; theory tags live in the manifest crate.|
 |`generated/`|Committed projections, notation, addressing, audit evidence, question register, documents, fragments and PDFs.|
@@ -110,7 +110,7 @@ The nearest written statements to a general invariant policy are ADR 009's layer
 - Byte-gated generation — ADR 006, qualified by ADRs 018–019 (`dec:generation:byte-gated`).
 - Permanent bindings and reader handles — [ADR 003](docs/adr/003-tags-bound-to-labels.md), qualified by ADRs 016 and 017 (`dec:tags:bound-to-labels`).
 - Readers never see labels — [ADR 017](docs/adr/017-screen-rendering-contracts.md) (`dec:documents:screen-rendering-contracts`).
-- Native-source obligations — ADR 016 (`dec:documents:admission-and-native-renderings`).
+- Native-source obligations — ADR 016, qualified by ADR 030 (`dec:documents:admission-and-native-renderings`, `dec:publication:version-boundaries`).
 - Reproducible paired PDFs — [ADR 014](docs/adr/014-paper-pair.md) and ADR 019 (`dec:paper:authored-latex`, `dec:generation:reused-paper-pair`).
 - Public inputs and publication audit — ADR 008 (`dec:publication:fresh-history`).
 

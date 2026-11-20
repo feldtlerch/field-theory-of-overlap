@@ -25,10 +25,10 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |011|Serialization is strict everywhere|accepted|
 |012|The weld: equal address sets across a unit's texts|accepted|
 |013|Workspace norms: edition, lints, toolchain|accepted|
-|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024|
+|014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024; the complete-document release gate and complete-graph boundary are governed by 030|
 |015|Open questions are records|accepted|
-|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025|
-|017|Screen rendering contracts|accepted; mathematics transport is governed by 022; named passage-renewal acceptance is governed by 024|
+|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030|
+|017|Screen rendering contracts|accepted; mathematics transport is governed by 022; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
@@ -38,3 +38,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
 |026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
+|030|Native renderings, complete graph and native model|accepted; establishes the complete-document release gate, complete-graph boundary and native-model boundary; amends 014, 016 and 017|
