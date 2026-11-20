@@ -67,6 +67,8 @@ class Identities(unittest.TestCase):
         paragraph='generated/documents/paper-pilot/sec-reading-shadow.tex'
         original=read(self.root/paragraph)
         for changed, fault in [
+            (original.replace('\\PaperNativeParagraph{', '\\refrain{', 1),
+             'M055: Fragment label/declaration differs'),
             (original.replace('\\ftag{src:nd}', '\\ftag{src:none}'),
              'M055: Fragment tag binding differs'),
             (original.replace('One may assume', '{One may assume'),

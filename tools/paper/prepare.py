@@ -58,7 +58,10 @@ def declared_fragments(repository, rows):
         expected_macro = {'quotation': b'paperrefrain', 'refrain': b'refrain',
                           'paragraph': b'PaperNativeParagraph'}[role]
         prefix = b'\\'+expected_macro+b'{'+unit.encode()+b'}{'
-        require(data.startswith(prefix) and data.endswith(b'}\n') and data.count(b'\n') == 1,
+        require(data.startswith(prefix),
+                ('M055: Fragment label/declaration differs: ' if role == 'paragraph'
+                 else 'Fragment label/declaration differs: ')+fragment)
+        require(data.endswith(b'}\n') and data.count(b'\n') == 1,
                 ('M055: Fragment body differs: ' if role == 'paragraph'
                  else 'Fragment label/declaration differs: ')+fragment)
         body = data[len(prefix):-2]

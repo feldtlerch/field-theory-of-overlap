@@ -157,7 +157,6 @@ impl CheckedPaperLookup {
     pub(crate) fn inputs(&self) -> &BTreeMap<String, Vec<u8>> {
         &self.inputs
     }
-    #[allow(clippy::too_many_lines)] // The bounded response is validated in wire order before retaining any binding.
     pub(crate) fn check(root: &Path) -> Result<Self, PaperLookupError> {
         Self::check_with(root, "python3")
     }

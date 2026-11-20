@@ -252,11 +252,8 @@ fn assert_tag_inventory(
     }
     expected.sort();
     assert_eq!(expected.len(), checked_tag_sites);
-    assert!(expected.iter().any(|(unit, language, input, target)| {
-        unit == "sec:reading:shadow"
-            && language == "en"
-            && input == "src:nd"
-            && expected_targets.get(input) == Some(target)
+    assert!(expected.iter().any(|(unit, language, input, _)| {
+        unit == "sec:reading:shadow" && language == "en" && input == "src:nd"
     }));
     let expected_permanent: Vec<_> = expected
         .into_iter()

@@ -43,6 +43,10 @@ fn paper_protocol_is_bound() {
     let baseline = format!(
         r#"{{"schema":1,"inputs":[{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}}]}}"#
     );
+    let without_declaration_sites = baseline.replace(
+        r#""declaration_sites":[{"file":"documents/paper-build/paper-tags.tsv","line":1}]"#,
+        r#""declaration_sites":[]"#,
+    );
     let script = root.join("tools/paper/identities.py");
     let write_response = |response: &str| {
         std::fs::write(
@@ -173,11 +177,15 @@ fn paper_protocol_is_bound() {
             "src:nd",
         ),
         (
-            baseline.replacen("\"status\":\"paper\"", "\"status\":\"candidate\"", 1),
+            without_declaration_sites
+                .replacen("\"status\":\"paper\"", "\"status\":\"candidate\"", 1)
+                .replacen("\"target_kind\":\"node\"", "\"target_kind\":null", 1),
             "src:nd",
         ),
         (
-            baseline.replacen("\"status\":\"paper\"", "\"status\":\"admitted\"", 1),
+            without_declaration_sites
+                .replacen("\"status\":\"paper\"", "\"status\":\"admitted\"", 1)
+                .replacen("\"target\":\"node\"", "\"target\":\"src:nd\"", 1),
             "src:nd",
         ),
         (
@@ -221,11 +229,26 @@ fn paper_protocol_is_bound() {
         error.fault,
         PaperLookupFault::ProtocolInvalid { .. }
     ));
+    std::fs::create_dir(root.join("fixtures/directory")).unwrap();
+    write_response(&baseline.replacen("fixtures/input.txt", "fixtures/directory", 1));
+    let directory_input = CheckedPaperLookup::check(root).unwrap_err();
+    assert_eq!(directory_input.rule, RuleId::M063);
+    assert_eq!(directory_input.site, "fixtures/directory");
+    assert_eq!(
+        directory_input.fault,
+        PaperLookupFault::ProtocolInvalid {
+            reason: "input is not a file".into()
+        }
+    );
     write_response(&baseline);
     let missing = CheckedPaperLookup::check_with(root, "no-such-python-executable").unwrap_err();
     assert_eq!(missing.rule, RuleId::M063);
     assert_eq!(missing.fault, PaperLookupFault::ProcessFailed);
-    std::fs::write(&script, "import sys\nsys.stdout.write('x' * 4194305)\n").unwrap();
+    std::fs::write(
+        &script,
+        "import sys, time\nsys.stdout.write('x' * 4194305)\nsys.stdout.flush()\nwhile True:\n time.sleep(60)\n",
+    )
+    .unwrap();
     let oversized = CheckedPaperLookup::check(root).unwrap_err();
     assert_eq!(oversized.rule, RuleId::M063);
     assert_eq!(oversized.site, "assembly-json");

@@ -1645,7 +1645,9 @@ fn wrong_dynamic_tables(token: &str, actual: ShapeKind) {
 
 #[test]
 fn u01_non_utf8_names_special_entries_and_displays() {
-    use std::os::unix::ffi::OsStringExt;
+    #[cfg(target_os = "linux")]
+    use std::os::fd::AsRawFd;
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
     let fixture = Fixture::new();
     fixture.restore();
     let bad = fixture
@@ -1667,7 +1669,23 @@ fn u01_non_utf8_names_special_entries_and_displays() {
     fs::remove_file(bad).unwrap();
     fixture.restore();
     let socket = fixture.root.join("units/statements/socket.toml");
-    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    #[cfg(target_os = "linux")]
+    let directory = (socket.as_os_str().as_bytes().len() >= 108)
+        .then(|| fs::File::open(socket.parent().unwrap()).unwrap());
+    #[cfg(target_os = "linux")]
+    let binding = directory.as_ref().map_or_else(
+        || socket.clone(),
+        |directory| {
+            PathBuf::from(format!(
+                "/proc/self/fd/{}/socket.toml",
+                directory.as_raw_fd()
+            ))
+        },
+    );
+    #[cfg(not(target_os = "linux"))]
+    let binding = socket.clone();
+    let listener = std::os::unix::net::UnixListener::bind(&binding)
+        .unwrap_or_else(|error| panic!("socket fixture cannot bind: {error}; shorten TMPDIR"));
     assert_eq!(
         checked_files(&fixture.root),
         Err(UnitLoadError::Input(UnitInputFault::UnexpectedEntry {

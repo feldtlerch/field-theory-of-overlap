@@ -203,6 +203,8 @@ pub fn prepare_documents(
 ) -> Result<PreparedDocuments, DocumentError> {
     prepare_context(root, support, None)
 }
+// The direct snapshot control cannot detect a caller that bypasses this merge;
+// every checker and Rust read of the same path must pass through it.
 fn merge_checked_input(
     inputs: &mut BTreeMap<String, Vec<u8>>,
     path: String,
