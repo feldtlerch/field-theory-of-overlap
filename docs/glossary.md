@@ -13,6 +13,7 @@
 - **Slice** — the audited part of the theory at a given moment, as the coverage declaration states it.
 - **Display** — a figure or table: a unit whose bodies are authored per rendering target rather than shared across them.
 - **Skeleton** — a document's ordered tree of sections, structure only, naming the units each section contains.
+- **Reading** — in the theory, a field-anchored or latent way of reading a quantity; reads-through applies only to field-anchored readings. In documents, the paper's or explainer's ordered structure; M073 reserves the `read` label kind, but no document reading identity is admitted yet.
 - **Explainer** — a companion publication writing the paper's ideas for a reader who will not read the proofs; authored as units like the paper, with its own declared language set.
 - **Projection** — the generated artifact that carries the authority into the toolchain: the one data file the typesetting runtime and the audit both consume.
 - **Pin** — the recorded public commit of the calculation engine the audit depends on; moved only along that repository's main branch, by review.

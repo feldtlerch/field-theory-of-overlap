@@ -12,7 +12,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 
 |ADR|Decision|State|
 |---|--------|-----|
-|001|The authority is a closed typed graph|accepted|
+|001|The authority is a closed typed graph|accepted; warranted structural change and historical meaning are governed by 026|
 |002|Four-axis status and declared coverage|accepted|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted|
@@ -36,3 +36,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
+|026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
