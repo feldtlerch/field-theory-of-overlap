@@ -83,6 +83,7 @@ pub enum RuleId {
     M070,
     M071,
     M072,
+    M073,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -104,7 +105,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 72] = [
+pub const RULES: [RuleSpec; 73] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -610,6 +611,13 @@ pub const RULES: [RuleSpec; 72] = [
         deferred_reason: Some(
             "The paper's appendices are authored LaTeX under ADR 014; the table is generated once they are statement units.",
         ),
+    },
+    RuleSpec {
+        number: RuleId::M073,
+        statement: "No Rust theory identity, Markdown mint, unit metadata, paper label-mint key, paper tag target or documentary admission target uses label kind read or audit; those kinds are kept for reading declarations and derived audit identities.",
+        scope: "The joint mint inventory, the paper's label-mint keys and tag targets, and the label field of documentary admission events.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
     },
 ];
 

@@ -99,6 +99,10 @@ pub enum LabelFault {
         label: String,
         origin: MintOrigin,
     },
+    ReservedGraphKind {
+        label: String,
+        origin: MintOrigin,
+    },
     MintContextMismatch {
         expected: std::collections::BTreeMap<String, MintOrigin>,
         actual: std::collections::BTreeMap<String, MintOrigin>,

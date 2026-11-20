@@ -163,27 +163,45 @@ fn duplicates(mints: &Mints, stage: LabelStage) -> Vec<LabelDiagnostic> {
         })
         .collect()
 }
-/// The label kind only the open-question store mints.
+/// The kind reserved for open-question labels.
 pub(crate) const OPEN_KIND: &str = "open";
+/// The kind reserved for reading declarations.
+pub(crate) const READ_KIND: &str = "read";
+/// The kind reserved for derived audit identities.
+pub(crate) const AUDIT_KIND: &str = "audit";
 pub(crate) fn open_kind(label: &str) -> bool {
     label.split(':').next() == Some(OPEN_KIND)
+}
+/// Match only the kind segment of a label; public handles have separate spelling rules.
+pub(crate) fn graph_kind(label: &str) -> bool {
+    let kind = label.split(':').next();
+    kind == Some(READ_KIND) || kind == Some(AUDIT_KIND)
 }
 fn reserved(mints: &Mints) -> Vec<LabelDiagnostic> {
     mints
         .iter()
-        .filter(|(label, _)| open_kind(label))
         .flat_map(|(label, origins)| {
             origins
                 .iter()
-                .filter(|origin| origin.kind != MintKind::OpenQuestion)
+                .filter(|origin| {
+                    graph_kind(label) || (open_kind(label) && origin.kind != MintKind::OpenQuestion)
+                })
                 .map(move |origin| {
+                    let graph = graph_kind(label);
                     diagnostic(
-                        RuleId::M068,
+                        if graph { RuleId::M073 } else { RuleId::M068 },
                         LabelStage::Namespace,
                         origin.site.clone(),
-                        LabelFault::ReservedOpenKind {
-                            label: label.clone(),
-                            origin: origin.clone(),
+                        if graph {
+                            LabelFault::ReservedGraphKind {
+                                label: label.clone(),
+                                origin: origin.clone(),
+                            }
+                        } else {
+                            LabelFault::ReservedOpenKind {
+                                label: label.clone(),
+                                origin: origin.clone(),
+                            }
                         },
                     )
                 })
@@ -518,7 +536,7 @@ impl JointMints<'_, '_> {
     /// Extend the documentary target context with the paper's label-mint inventory.
     /// These origins cannot serve as confirmation records, which remain Markdown mints.
     /// # Errors
-    /// Refuses a paper key of the store-reserved kind, then a paper key that already has
+    /// Refuses a paper key of a reserved kind, then a paper key that already has
     /// any joint mint or another paper mint.
     pub fn with_paper_mints(mut self, rows: Vec<(String, String)>) -> Result<Self, LabelErrors> {
         let mut candidates: BTreeMap<String, Vec<MintOrigin>> = self
@@ -589,7 +607,7 @@ impl JointMints<'_, '_> {
         Ok(self)
     }
 }
-/// Refuse paper tag targets of the kind only the open-question store mints.
+/// Refuse paper tag targets of the kinds reserved for other identity domains.
 /// # Errors
 /// Names every reserved target with its row in the tag lookup.
 pub fn check_paper_tag_targets(
@@ -615,7 +633,7 @@ pub fn check_paper_tag_targets(
 }
 /// Admit one complete joint mint inventory without resolving authored tags.
 /// # Errors
-/// Refuses every use of the store-reserved kind, then every duplicate in the joint
+/// Refuses every use of a reserved kind, then every duplicate in the joint
 /// permanent namespace.
 pub fn collect_joint_mints<'u, 'm>(
     corpus: &'u crate::LanguageCheckedUnits,

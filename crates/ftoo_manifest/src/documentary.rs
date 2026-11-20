@@ -85,6 +85,9 @@ pub enum RegistryFault {
     UnknownTarget {
         label: String,
     },
+    ReservedGraphKind {
+        label: String,
+    },
     TargetDomain {
         label: String,
         actual: MintOrigin,
@@ -194,13 +197,10 @@ impl DocumentaryBinding {
     }
 }
 fn error(stage: RegistryStage, site: &UnitSite, fault: RegistryFault) -> RegistryDiagnostic {
-    let rule = if matches!(
-        fault,
-        RegistryFault::InvalidHandle { .. } | RegistryFault::HandleCollision { .. }
-    ) {
-        RuleId::M031
-    } else {
-        RuleId::M060
+    let rule = match fault {
+        RegistryFault::InvalidHandle { .. } | RegistryFault::HandleCollision { .. } => RuleId::M031,
+        RegistryFault::ReservedGraphKind { .. } => RuleId::M073,
+        _ => RuleId::M060,
     };
     RegistryDiagnostic {
         rule,
@@ -308,11 +308,13 @@ fn fault_order(fault: &RegistryFault) -> u8 {
         RegistryFault::EventMetadata { .. } => 5,
         RegistryFault::RetireBeforeAdmission { .. } => 6,
         RegistryFault::RetireTwice { .. } => 7,
-        RegistryFault::UnknownTarget { .. } => 8,
-        RegistryFault::TargetDomain { .. } => 9,
-        RegistryFault::ConcurrentLiveTarget { .. } => 10,
-        RegistryFault::AuthorityRecord { .. } => 11,
-        RegistryFault::DocumentaryPartition { .. } => 12,
+        // A reserved target is ordered before a missing target at the same field.
+        RegistryFault::ReservedGraphKind { .. } => 8,
+        RegistryFault::UnknownTarget { .. } => 9,
+        RegistryFault::TargetDomain { .. } => 10,
+        RegistryFault::ConcurrentLiveTarget { .. } => 11,
+        RegistryFault::AuthorityRecord { .. } => 12,
+        RegistryFault::DocumentaryPartition { .. } => 13,
     }
 }
 fn history(
@@ -418,6 +420,17 @@ fn targets(
             ));
         }
         if let Some(label) = &event.label {
+            // Reservation is checked at the located label before mint lookup.
+            if crate::labels::graph_kind(&label.value) {
+                errors.push(error(
+                    RegistryStage::Targets,
+                    &label.site,
+                    RegistryFault::ReservedGraphKind {
+                        label: label.value.clone(),
+                    },
+                ));
+                continue;
+            }
             let origin = match mints.mints().get(&label.value) {
                 None => {
                     errors.push(error(

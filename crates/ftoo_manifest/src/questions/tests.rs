@@ -433,7 +433,7 @@ fn m069_record_about_nothing_refuses() {
 }
 #[test]
 fn m069_each_kind_refuses_a_value_outside_its_domain() {
-    // Each value exists in some other domain, so only per-kind resolution refuses it.
+    // Cross-domain values and an unallocated rule refuse in their own domains.
     let cases = [
         (ReferenceKind::Node, "M001"),
         (ReferenceKind::Rule, "def:langevin:coefficient-one"),
@@ -442,7 +442,7 @@ fn m069_each_kind_refuses_a_value_outside_its_domain() {
         (ReferenceKind::Paper, "docs/glossary.md"),
         (ReferenceKind::File, "tbl:debts"),
         (ReferenceKind::Open, "open:test:missing"),
-        (ReferenceKind::Rule, "M073"),
+        (ReferenceKind::Rule, "M999"),
     ];
     for (kind, value) in cases {
         let mut drafts = store_of(&["a"]);
@@ -844,7 +844,7 @@ fn m068_store_labels_are_checked_against_the_joint_inventory_and_a_second_mint_r
 fn register_pins_the_open_question_rules() {
     use RuleId::{M066, M067, M068, M069, M070, M071, M072};
     assert_eq!(
-        RULES[65..]
+        RULES[65..72]
             .iter()
             .map(|r| (r.number, r.state))
             .collect::<Vec<_>>(),

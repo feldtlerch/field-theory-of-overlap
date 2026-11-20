@@ -86,6 +86,30 @@ fn paper_mint_targets_reuse_admission_without_becoming_confirmation_records() {
 }
 
 #[test]
+fn reserved_graph_documentary_target() {
+    let graph = seed().unwrap();
+    let corpus = corpus();
+    let markdown = markdown();
+    let joint = collect_joint_mints(&corpus, &markdown).unwrap();
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:fixture:target");
+        let mut draft = event(0, "fixture", Some(LABEL));
+        draft.label.as_mut().unwrap().value = label.clone();
+        let actual = addressing(&graph)
+            .unwrap()
+            .with_documentary(&joint, vec![draft])
+            .unwrap_err();
+        let wanted = RegistryErrors(vec![RegistryDiagnostic {
+            rule: RuleId::M073,
+            stage: RegistryStage::Targets,
+            site: site(0, "label"),
+            fault: RegistryFault::ReservedGraphKind { label },
+        }]);
+        assert_eq!(actual, wanted);
+    }
+}
+
+#[test]
 fn documentary_phases_sort_by_event_then_field_and_restore() {
     let graph = seed().unwrap();
     let corpus = corpus();
@@ -438,13 +462,12 @@ fn expected(
     fault: RegistryFault,
 ) -> RegistryErrors {
     RegistryErrors(vec![RegistryDiagnostic {
-        rule: if matches!(
-            fault,
-            RegistryFault::InvalidHandle { .. } | RegistryFault::HandleCollision { .. }
-        ) {
-            RuleId::M031
-        } else {
-            RuleId::M060
+        rule: match fault {
+            RegistryFault::InvalidHandle { .. } | RegistryFault::HandleCollision { .. } => {
+                RuleId::M031
+            }
+            RegistryFault::ReservedGraphKind { .. } => RuleId::M073,
+            _ => RuleId::M060,
         },
         stage,
         site: site(index, field),

@@ -81,6 +81,96 @@ fn metadata_origin(label: &str) -> MintOrigin {
         },
     }
 }
+
+fn graph_refusal(label: &str, origin: MintOrigin) -> LabelDiagnostic {
+    diagnostic(
+        RuleId::M073,
+        LabelStage::Namespace,
+        origin.site.clone(),
+        LabelFault::ReservedGraphKind {
+            label: label.into(),
+            origin,
+        },
+    )
+}
+
+#[test]
+fn reserved_graph_theory_origin() {
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:test:subject");
+        let origin = identity_origin();
+        let mints = BTreeMap::from([(label.clone(), vec![origin.clone()])]);
+        assert_eq!(reserved(&mints), vec![graph_refusal(&label, origin)]);
+    }
+}
+
+#[test]
+fn reserved_graph_markdown_mint() {
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:test:subject");
+        let text = format!("# X · `{label}`\n");
+        let markdown = check_markdown_sources(vec![source("fixture.md", &text)]).unwrap();
+        let origin = MintOrigin {
+            kind: MintKind::Markdown,
+            site: markdown_site("fixture.md", 4..text.len() - 1),
+        };
+        let error = collect_joint_mints(&corpus("sec:fixture:unit"), &markdown).unwrap_err();
+        assert_eq!(error.diagnostics(), &[graph_refusal(&label, origin)]);
+    }
+}
+
+#[test]
+fn reserved_graph_unit_mint() {
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:test:subject");
+        let markdown = check_markdown_sources(vec![source("fixture.md", "")]).unwrap();
+        let error = collect_joint_mints(&corpus(&label), &markdown).unwrap_err();
+        assert_eq!(
+            error.diagnostics(),
+            &[graph_refusal(&label, metadata_origin(&label))]
+        );
+    }
+}
+
+#[test]
+fn reserved_graph_paper_mint() {
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:test:subject");
+        let markdown = check_markdown_sources(vec![source("fixture.md", "")]).unwrap();
+        let units = corpus("sec:fixture:unit");
+        let joint = collect_joint_mints(&units, &markdown).unwrap();
+        let error = joint
+            .with_paper_mints(vec![(label.clone(), "documents/paper/main.tex".into())])
+            .unwrap_err();
+        let origin = MintOrigin {
+            kind: MintKind::PaperTex,
+            site: LabelSite::PaperMintFile {
+                file: "documents/paper/main.tex".into(),
+            },
+        };
+        assert_eq!(error.diagnostics(), &[graph_refusal(&label, origin)]);
+    }
+}
+
+#[test]
+fn reserved_graph_paper_target() {
+    for kind in ["read", "audit"] {
+        let label = format!("{kind}:test:subject");
+        let error = check_paper_tag_targets(
+            "documents/paper-build/paper-tags.tsv",
+            &[("ordinary-handle".into(), label.clone(), 7)],
+        )
+        .unwrap_err();
+        let origin = MintOrigin {
+            kind: MintKind::PaperTex,
+            site: LabelSite::PaperTagRow {
+                file: "documents/paper-build/paper-tags.tsv".into(),
+                line: 7,
+            },
+        };
+        assert_eq!(error.diagnostics(), &[graph_refusal(&label, origin)]);
+    }
+}
 fn duplicate(label: &str, origins: Vec<MintOrigin>) -> LabelDiagnostic {
     LabelDiagnostic {
         rule: RuleId::M043,
