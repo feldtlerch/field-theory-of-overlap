@@ -183,6 +183,27 @@ sites = ["fixture"]
                 self.assertEqual(str(caught.exception),expected)
                 write(path,original)
 
+    def test_paper_source_coverage_refuses_extra_changed_and_conflicting_targets(self):
+        rows='documents/paper-build/paper-tags.tsv'
+        source='documents/paper/data/ftoo_manifest.tex'
+        original=read(self.root/rows)
+        write(self.root/rows,original+'Q:fixture\tsec:fixture:extra\tnode\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),
+                         'M063: paper tag source coverage differs: missing= extra=Q:fixture changed=')
+        write(self.root/rows,original.replace('sem:claim:broker-suppression-thresholds',
+                                              'sec:fixture:changed',1))
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),
+                         'M063: paper tag source coverage differs: missing= extra= changed=J:broker')
+        write(self.root/rows,original)
+        original_source=read(self.root/source)
+        write(self.root/source,original_source+
+              '\\prop_gput:Nnn \\g_ftoo_tag_to_id_prop { J:broker } { sec:fixture:other }\n')
+        with self.assertRaises(ValueError) as caught:bindings(self.root)
+        self.assertEqual(str(caught.exception),
+                         'M063: paper tag source has conflicting targets: J:broker')
+
     def test_label_mint_file_evidence_survives_line_moves(self):
         baseline=bindings(self.root)
         path=self.root/'documents/paper-build/label-mints.tsv'

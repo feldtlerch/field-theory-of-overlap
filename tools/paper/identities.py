@@ -8,7 +8,7 @@ from common import read, require, timed, write
 
 INPUTS = ['tools/paper/identities.py', 'documents/paper-build/paper-tags.tsv',
           'documents/paper-build/reader-tags.toml', 'documents/paper-build/provisional-tags.toml',
-          'documents/paper-build/reader-hooks.tex']
+          'documents/paper-build/reader-hooks.tex', 'documents/paper/data/ftoo_manifest.tex']
 TAG = re.compile(r'[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9][A-Za-z0-9_-]*\Z')
 KEY = re.compile(r'[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z0-9_-]+)+\Z')
 

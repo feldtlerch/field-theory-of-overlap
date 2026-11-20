@@ -126,6 +126,23 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
     assert_tag_inventory(&corpus, &book);
 }
 
+fn expected_tag_targets(root: &std::path::Path) -> BTreeMap<String, String> {
+    let projection: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("generated/manifest.json")).unwrap())
+            .unwrap();
+    projection["tags"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            (
+                row["tag"].as_str().unwrap().to_owned(),
+                row["target"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect()
+}
+
 fn assert_tag_inventory(
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     book: &ftoo_manifest::AddressBook<'_>,
@@ -165,6 +182,48 @@ fn assert_tag_inventory(
     for tag in resolved.tags() {
         assert!(resolved.book().graph().node(tag.target()).is_some());
     }
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let expected_targets = expected_tag_targets(&root);
+    let mut expected = Vec::new();
+    for entry in std::fs::read_dir(root.join("units/statements")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|extension| extension != "toml") {
+            continue;
+        }
+        let source: toml_edit::DocumentMut =
+            std::fs::read_to_string(path).unwrap().parse().unwrap();
+        let unit = source["unit"]["id"].as_str().unwrap();
+        for (language, value) in source["unit"]["texts"].as_table().unwrap() {
+            let text = value.as_str().unwrap();
+            for (at, _) in text.match_indices("@tag{") {
+                let tail = &text[at + 5..];
+                let input = &tail[..tail.find('}').unwrap()];
+                if let Some(target) = expected_targets.get(input) {
+                    expected.push((
+                        unit.to_owned(),
+                        language.to_owned(),
+                        input.to_owned(),
+                        target.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    expected.sort();
+    let mut actual: Vec<_> = resolved
+        .tags()
+        .iter()
+        .map(|tag| {
+            (
+                tag.unit().as_str().to_owned(),
+                tag.language().to_owned(),
+                tag.occurrence().input().to_owned(),
+                tag.target().semantic_name().to_owned(),
+            )
+        })
+        .collect();
+    actual.sort();
+    assert_eq!(actual, expected);
 }
 
 #[test]
