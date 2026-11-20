@@ -1,6 +1,6 @@
 # Renewal evidence for two self-description passages
 
-The renewed bytes of passages 10 and 14 differ from the previously accepted bytes only by one layout instruction each. A reviewer other than the change's author accepted both renewals through independent review of `registry/paper-layout/passages-10-14-renewal.md`; the `reading_acceptance` fields record that verdict and this evidence path.
+The renewed bytes of passages 10 and 14 differ from the previously accepted bytes only by one layout instruction each. A reviewer other than the change's author accepted both renewals through independent review of `registry/paper-layout/passages-10-14-renewal.md`; the acceptance text for these layout renewals recorded that verdict and this evidence path, while later passage renewals may replace that text.
 
 The exact source passages below are delimited by fenced blocks; the insertion is identified outside each block so the block preserves the source bytes. Each instruction prints nothing, sets line-breaking values for its paragraph, and restores the previous values afterward. Removing the marked insertion from each new passage yields its old passage byte for byte.
 

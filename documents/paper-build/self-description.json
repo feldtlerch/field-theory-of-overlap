@@ -89,16 +89,16 @@
       "id": 10,
       "file": "documents/paper/parts/appendices.tex",
       "start": 44771,
-      "end": 47380,
-      "sha256": "24d2a6660d0fdc9d5024fa627ee4db46277ec2944c0196879d792721ea3a6e0f",
-      "reading_acceptance": "The project's owner approved the qualified typed-layer certification; this SHA256 identifies the accepted passage bytes.",
+      "end": 47453,
+      "sha256": "48aa328c0967d09f96bb29cfcdd0b898b4600e20c67a9b683a08b19dd67ad115",
+      "reading_acceptance": "The project's owner approved the qualified typed-layer grade claim; this SHA256 identifies the renewed passage bytes.",
       "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
     },
     {
       "id": 11,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52839,
-      "end": 52955,
+      "start": 52912,
+      "end": 53028,
       "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
@@ -106,8 +106,8 @@
     {
       "id": 12,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52981,
-      "end": 53069,
+      "start": 53054,
+      "end": 53142,
       "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
@@ -125,9 +125,9 @@
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
       "start": 53475,
-      "end": 56196,
-      "sha256": "0204ef8616c7c00a63f28a2b2deae49923cd68a7df472a1d1839c3e4a7d88099",
-      "reading_acceptance": "Renewed bytes differ from the previously accepted bytes only by one layout instruction; accepted through independent review of registry/paper-layout/passages-10-14-renewal.md by a reviewer other than the change's author.",
+      "end": 56285,
+      "sha256": "174155d02de64623b9a781c93fe0e75b71d4ca72490ced73522a494e69081d89",
+      "reading_acceptance": "The project's owner approved the qualified description of typed grade refusals; this SHA256 identifies the renewed passage bytes.",
       "anchor": "\\section{The Paper and Its Checks}"
     },
     {
