@@ -938,6 +938,23 @@ fn skeleton_ownership_keeps_heading_and_leaf_multiplicities()
     Ok(())
 }
 
+fn declared_positions(section: &ftoo_manifest::SkeletonSection, out: &mut Vec<(String, bool)>) {
+    out.push((section.heading.value.clone(), false));
+    for child in &section.children {
+        match child {
+            ftoo_manifest::SkeletonChild::Unit(unit) => {
+                out.push((unit.value.clone(), false));
+            }
+            ftoo_manifest::SkeletonChild::Quotation(unit) => {
+                out.push((unit.value.clone(), true));
+            }
+            ftoo_manifest::SkeletonChild::Section(section) => {
+                declared_positions(section, out);
+            }
+        }
+    }
+}
+
 #[test]
 fn quotation_use_requires_an_existing_unit_owned_by_another_document()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -962,16 +979,19 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         &document_sites,
     )
     .map_err(|errors| format!("{errors:?}"))?;
-    assert_eq!(checked.documents()["paper-pilot"].len(), 6);
-    assert_eq!(checked.documents()["explainer-pilot"].len(), 4);
-    assert!(!checked.documents()["paper-pilot"][1].quotation());
-    assert!(checked.documents()["explainer-pilot"][1].quotation());
-    assert!(!checked.documents()["paper-pilot"][2].quotation());
-    assert!(checked.documents()["explainer-pilot"][2].quotation());
-    assert!(!checked.documents()["paper-pilot"][3].quotation());
-    assert!(!checked.documents()["paper-pilot"][4].quotation());
-    assert!(!checked.documents()["paper-pilot"][5].quotation());
-    assert!(checked.documents()["explainer-pilot"][3].quotation());
+    for draft in &drafts {
+        let mut expected = Vec::new();
+        for section in &draft.sections {
+            declared_positions(section, &mut expected);
+        }
+        assert_eq!(
+            checked.documents()[&draft.document.value]
+                .iter()
+                .map(|position| (position.unit().to_owned(), position.quotation()))
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
     let selected = crate::units::toml::selected_targets(&declaration)
         .map_err(|errors| format!("{errors:?}"))?;
     let mut checked_fragments = 0;

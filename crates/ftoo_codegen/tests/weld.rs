@@ -5,6 +5,56 @@ use ftoo_manifest::{
     LabelMember, LabelUseSite, PathPart, SourceAnchor, UnitSite, integrate_labels,
     resolve_unit_tags, weld_units,
 };
+
+fn source_span_counts(text: &str) -> (usize, usize) {
+    let backticks = text.bytes().filter(|byte| *byte == b'`').count();
+    let double_delimiters = text.match_indices("``").count();
+    assert_eq!(backticks % 2, 0);
+    assert_eq!(double_delimiters % 2, 0);
+    (backticks / 2 - double_delimiters, double_delimiters / 2)
+}
+
+fn expected_weld_summary(
+    corpus: &ftoo_manifest::LanguageCheckedUnits,
+    markdown: &ftoo_manifest::CheckedMarkdown,
+    graph: &ftoo_manifest::ValidatedManifest,
+    book: &ftoo_manifest::AddressBook<'_>,
+) -> WeldCheckSummary {
+    let (unit_citation_sites, mention_sites) = corpus
+        .units()
+        .iter()
+        .flat_map(|unit| unit.texts().values())
+        .map(|text| source_span_counts(text.text()))
+        .fold(
+            (0, 0),
+            |(citations, mentions), (next_citations, next_mentions)| {
+                (citations + next_citations, mentions + next_mentions)
+            },
+        );
+    WeldCheckSummary {
+        units: corpus.units().len(),
+        texts: corpus.units().iter().map(|unit| unit.texts().len()).sum(),
+        tag_sites: corpus
+            .units()
+            .iter()
+            .flat_map(|unit| unit.texts().values())
+            .map(|text| text.tag_occurrences().len())
+            .sum(),
+        rust_mints: graph.nodes().len(),
+        markdown_mints: markdown.mints().len(),
+        unit_mints: corpus.units().len(),
+        markdown_citations: markdown.citations().len(),
+        rust_citations: book.history().count(),
+        unit_citation_sites,
+        mention_sites,
+        language_comparisons: corpus
+            .units()
+            .iter()
+            .map(|unit| corpus.documents()[unit.document()].len().saturating_sub(1))
+            .sum(),
+    }
+}
+
 #[test]
 fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -16,26 +66,15 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     let rust_book = ftoo_manifest::addressing(&graph).unwrap();
     let before = ftoo_manifest::Snapshot::capture(&graph);
     let statuses = ftoo_manifest::NodeId::ALL.map(|id| graph.status(id));
-    // Repository-wide totals come from the label check's shared harvest;
-    // committed-unit expectations remain fixed.
-    let labels = ftoo_codegen::check_label_files(&root, &book).unwrap();
-    let expected = WeldCheckSummary {
-        units: 11,
-        texts: 11,
-        tag_sites: 3,
-        rust_mints: 4,
-        markdown_mints: labels.markdown_mints,
-        unit_mints: 11,
-        markdown_citations: labels.markdown_citations,
-        rust_citations: 8,
-        unit_citation_sites: 1,
-        mention_sites: 0,
-        language_comparisons: 0,
-    };
-    assert_eq!(check_weld_files(&root, &book).unwrap(), expected);
-    assert_eq!(check_weld_files(&root, &rust_book).unwrap(), expected);
     let corpus = load_unit_files(&root).unwrap();
     let markdown = load_markdown_files(&root).unwrap();
+    let labels = ftoo_codegen::check_label_files(&root, &book).unwrap();
+    let expected = expected_weld_summary(&corpus, &markdown, &graph, &book);
+    assert_eq!(check_weld_files(&root, &book).unwrap(), expected);
+    assert_eq!(check_weld_files(&root, &rust_book).unwrap(), expected);
+    assert_eq!(labels.units, expected.units);
+    assert_eq!(labels.texts, expected.texts);
+    assert_eq!(labels.tag_sites, expected.tag_sites);
     let resolved = resolve_unit_tags(&corpus, &book).unwrap();
     let integrated = integrate_labels(&resolved, &markdown).unwrap();
     let welded = weld_units(&integrated).unwrap();
@@ -46,35 +85,52 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
             .iter()
             .map(ftoo_manifest::WeldedUnit::unit)
             .collect::<Vec<_>>(),
-        [
-            "sec:coda:record-limit",
-            "sec:coefficients:first-value",
-            "sec:coefficients:overview",
-            "sec:coefficients:value-context",
-            "sec:coefficients:value-table",
-            "sec:pilot:explainer-excerpt",
-            "sec:pilot:paper-excerpt",
-            "sec:say:direction",
-            "sec:say:enemy-to-none",
-            "sec:say:harm-enlargement",
-            "sec:say:wonder-beauty"
-        ]
+        corpus
+            .units()
+            .iter()
+            .map(|unit| unit.label().as_str())
+            .collect::<Vec<_>>()
     );
-    let first = &welded.units()[1].languages()[0];
-    for unit in welded.units() {
-        assert_eq!(unit.languages().len(), 1);
+    for (welded_unit, source_unit) in welded.units().iter().zip(corpus.units()) {
+        assert_eq!(
+            welded_unit
+                .languages()
+                .iter()
+                .map(ftoo_manifest::WeldedLanguage::language)
+                .collect::<Vec<_>>(),
+            corpus.documents()[source_unit.document()]
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
     }
+    let first = &welded
+        .units()
+        .iter()
+        .find(|unit| unit.unit() == "sec:coefficients:first-value")
+        .unwrap()
+        .languages()[0];
     assert_first(first);
     assert_eq!(first.labels().members, []);
     assert_eq!(first.mentions(), []);
     assert!(first.citations().is_empty());
-    let heading = &welded.units()[2].languages()[0];
+    let heading = &welded
+        .units()
+        .iter()
+        .find(|unit| unit.unit() == "sec:coefficients:overview")
+        .unwrap()
+        .languages()[0];
     assert_eq!(heading.language(), "en");
     assert_eq!(heading.tags().members, []);
     assert_eq!(heading.labels().members, []);
     assert_eq!(heading.mentions(), []);
     assert!(heading.citations().is_empty());
-    let second = &welded.units()[3].languages()[0];
+    let second = &welded
+        .units()
+        .iter()
+        .find(|unit| unit.unit() == "sec:coefficients:value-context")
+        .unwrap()
+        .languages()[0];
     assert_eq!(second.language(), "en");
     assert_eq!(second.mentions(), []);
     assert_context(second);

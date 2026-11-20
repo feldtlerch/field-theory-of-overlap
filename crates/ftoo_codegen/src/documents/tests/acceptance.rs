@@ -799,31 +799,70 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
     let (retained, prepared) = crate::retention::check_release_with_documents(&root, &support)?;
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: input::read(&root, "units/documents.toml")?,
+    };
+    let selected = crate::units::toml::selected_targets(&declaration)
+        .map_err(|errors| format!("{errors:?}"))?;
+    let skeleton_sources =
+        input::sources(&root, &input::discover(&root, "units/skeletons", false)?)?;
+    let drafts = input::skeletons(&skeleton_sources)?;
+    let mut expected = Vec::new();
+    for (document, targets) in selected {
+        let draft = drafts
+            .iter()
+            .find(|draft| draft.document.value == document)
+            .unwrap();
+        for target in targets {
+            match target {
+                DocumentOutput::Fragment => {
+                    fn collect(
+                        children: &[ftoo_manifest::SkeletonChild],
+                        paths: &mut Vec<String>,
+                        document: &str,
+                    ) {
+                        for child in children {
+                            match child {
+                                ftoo_manifest::SkeletonChild::Unit(unit)
+                                | ftoo_manifest::SkeletonChild::Quotation(unit) => {
+                                    paths.push(format!(
+                                        "generated/documents/{document}/{}.tex",
+                                        unit.value.replace(':', "-")
+                                    ));
+                                }
+                                ftoo_manifest::SkeletonChild::Section(section) => {
+                                    collect(&section.children, paths, document);
+                                }
+                            }
+                        }
+                    }
+                    for section in &draft.sections {
+                        collect(&section.children, &mut expected, &document);
+                    }
+                }
+                DocumentOutput::Markdown => {
+                    expected.push(format!("generated/documents/{document}/en.labels.md"));
+                    expected.push(format!("generated/documents/{document}/en.md"));
+                }
+                DocumentOutput::Latex => {
+                    expected.push(format!("generated/documents/{document}/en.tex"));
+                }
+                DocumentOutput::Html => panic!("HTML is not an admitted generated target"),
+            }
+        }
+    }
+    expected.extend([
+        "generated/notation.tex".into(),
+        "generated/addressing.tex".into(),
+    ]);
     assert_eq!(
         prepared
             .artifacts()
             .iter()
             .map(DocumentArtifact::path)
             .collect::<Vec<_>>(),
-        [
-            "generated/documents/explainer-pilot/sec-say-direction.tex",
-            "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex",
-            "generated/documents/explainer-pilot/sec-coda-record-limit.tex",
-            "generated/documents/explainer-pilot/en.labels.md",
-            "generated/documents/explainer-pilot/en.md",
-            "generated/documents/main/en.labels.md",
-            "generated/documents/main/en.md",
-            "generated/documents/main/en.tex",
-            "generated/documents/paper-pilot/sec-say-direction.tex",
-            "generated/documents/paper-pilot/sec-say-harm-enlargement.tex",
-            "generated/documents/paper-pilot/sec-say-wonder-beauty.tex",
-            "generated/documents/paper-pilot/sec-say-enemy-to-none.tex",
-            "generated/documents/paper-pilot/sec-coda-record-limit.tex",
-            "generated/documents/paper-pilot/en.labels.md",
-            "generated/documents/paper-pilot/en.md",
-            "generated/notation.tex",
-            "generated/addressing.tex"
-        ]
+        expected.iter().map(String::as_str).collect::<Vec<_>>()
     );
     let projection = fs::read(root.join("generated/manifest.json"))?;
     assert_eq!(prepared.projection(), projection);

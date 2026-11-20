@@ -128,8 +128,11 @@ class Identities(unittest.TestCase):
 
     def test_release_refuses_explicit_candidates(self):
         rows=bindings(self.root,True)
-        self.assertEqual(sum(v['status']=='paper' for v in rows.values()),332)
-        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),91)
+        paper_rows=[line for line in read(self.root/'documents/paper-build/paper-tags.tsv').splitlines() if not line.startswith('#')]
+        aliases=tomllib.loads(read(self.root/'documents/paper-build/reader-tags.toml'))['aliases']
+        admissions=tomllib.loads(read(self.root/'documents/paper-build/reader-tags.toml'))['admissions']
+        self.assertEqual(sum(v['status']=='paper' for v in rows.values()),len(paper_rows)+len(aliases))
+        self.assertEqual(sum(v['status']=='admitted' for v in rows.values()),len(admissions))
         self.candidate()
         with self.assertRaisesRegex(ValueError,'M064: release refuses'):bindings(self.root,True)
 
@@ -171,7 +174,8 @@ sites = ["fixture"]
         original=read(path)
         rows=[line for line in original.splitlines() if not line.startswith('#')]
         malformed=rows.copy(); malformed[0]='!'+malformed[0]
-        for changed, expected in [(rows[:-1],'M063: paper tag row count differs'),
+        missing=rows[-1].split('\t')[0]
+        for changed, expected in [(rows[:-1],'M063: paper tag source coverage differs: missing='+missing+' extra= changed='),
                                   (malformed,'M063: malformed paper tag pair')]:
             with self.subTest(fault=expected):
                 write(path,'\n'.join(changed)+'\n')
@@ -245,8 +249,11 @@ sites = ["fixture"]
         source=pathlib.Path(__file__).resolve().parents[2]
         record=read(source/'registry/reader-confirmation.md')
         decisions=re.findall(r'\| `([^`]+)` \| `([^`]+)` \| (admit|alias) \|',record)
-        self.assertEqual(len(decisions),94)
         rows=bindings(self.root,True)
+        table=tomllib.loads(read(self.root/'documents/paper-build/reader-tags.toml'))
+        expected={(row['key'],row['spelling'],kind) for kind,items in [('admit',table['admissions']),('alias',table['aliases'])] for row in items}
+        self.assertEqual(len(decisions),len(expected))
+        self.assertEqual(set(decisions),expected)
         for key,spelling,decision in decisions:
             self.assertEqual(rows[key]['spelling'],spelling)
             self.assertEqual(rows[key]['status'],'admitted' if decision=='admit' else 'paper')

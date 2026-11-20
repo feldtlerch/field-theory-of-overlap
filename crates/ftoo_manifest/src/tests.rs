@@ -1097,7 +1097,7 @@ fn paper_rule_consumers_are_explicit() {
         vec![
             (
                 RuleId::M063,
-                "The paper's tag lookup with 329 paper spellings, 91 admissions, three aliases and an empty provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
+                "The paper's tag lookup with paper spellings, admissions, aliases and a provisional list, permanent registries and reserved histories; consumed by paper preparation before typesetting and documentary admission.",
                 RuleState::Enforced
             ),
             (

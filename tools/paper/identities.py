@@ -59,8 +59,26 @@ def bindings(repo, release=False):
         require(TAG.fullmatch(tag) and KEY.fullmatch(target), 'M063: malformed paper tag pair')
         require(tag not in paper and kind in ('node','evidence'), 'M063: duplicate paper tag binding')
         paper[tag] = target
-    # A confirmed admission removes its paper tag row and updates this inventory count.
-    require(len(paper) == 329, 'M063: paper tag row count differs')
+    source = read(repo/'documents/paper/data/ftoo_manifest.tex')
+    pattern = re.compile(r'\\prop_gput:Nnn \\g_ftoo_(evidence_)?tag_to_id_prop \{ ([^{}]+) \} \{ ([^{}]+) \}')
+    declared = {}
+    for evidence, tag, target in pattern.findall(source):
+        kind = 'evidence' if evidence else 'node'
+        pair = (target, kind)
+        require(tag not in declared or declared[tag] == pair,
+                'M063: paper tag source has conflicting targets: '+tag)
+        declared[tag] = pair
+    actual = {}
+    for line in paper_bytes.decode('utf-8').splitlines():
+        if line.startswith('#'): continue
+        tag, target, kind = line.split('\t')
+        actual[tag] = (target, kind)
+    missing = sorted(declared.keys() - actual.keys())
+    extra = sorted(actual.keys() - declared.keys())
+    changed = sorted(tag for tag in declared.keys() & actual.keys() if declared[tag] != actual[tag])
+    require(not (missing or extra or changed),
+            'M063: paper tag source coverage differs: missing='+','.join(missing)+
+            ' extra='+','.join(extra)+' changed='+','.join(changed))
     require(len({tag.casefold() for tag in paper}) == len(paper), 'M063: duplicate paper tag spelling')
     require(len(set(paper.values()))==len(paper), 'M063: paper tag target has two spellings')
     reserved = set(); reserved_targets=set()

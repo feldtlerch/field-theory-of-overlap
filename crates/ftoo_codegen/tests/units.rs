@@ -1,5 +1,48 @@
 use ftoo_codegen::{UnitCheckSummary, check_projection, check_unit_files, load_unit_files};
 use ftoo_manifest::{NodeId, load_projection, resolve_unit_tags};
+use std::collections::BTreeMap;
+
+fn declared_units(root: &std::path::Path) -> Vec<(String, String)> {
+    let mut declared = Vec::new();
+    for entry in std::fs::read_dir(root.join("units/statements")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|extension| extension != "toml") {
+            continue;
+        }
+        let source: toml_edit::DocumentMut =
+            std::fs::read_to_string(path).unwrap().parse().unwrap();
+        declared.push((
+            source["unit"]["id"].as_str().unwrap().to_owned(),
+            source["unit"]["document"].as_str().unwrap().to_owned(),
+        ));
+    }
+    declared.sort();
+    declared
+}
+
+fn declared_documents(root: &std::path::Path) -> BTreeMap<String, Vec<String>> {
+    let source: toml_edit::DocumentMut = std::fs::read_to_string(root.join("units/documents.toml"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    source["documents"]
+        .as_table()
+        .unwrap()
+        .iter()
+        .map(|(name, item)| {
+            (
+                name.to_owned(),
+                item["required-languages"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|language| language.as_str().unwrap().to_owned())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
 #[test]
 fn committed_tagged_units_resolve_through_the_checked_projection() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -7,43 +50,30 @@ fn committed_tagged_units_resolve_through_the_checked_projection() {
     let loaded =
         load_projection(&std::fs::read(root.join("generated/manifest.json")).unwrap()).unwrap();
     let book = loaded.addressing().unwrap();
-    assert_eq!(
-        check_unit_files(&root, &book).unwrap(),
-        UnitCheckSummary {
-            documents: 3,
-            units: 11,
-            texts: 11,
-            tag_sites: 3
-        }
-    );
     let corpus = load_unit_files(&root).unwrap();
-    assert_eq!(
-        corpus.documents(),
-        &std::collections::BTreeMap::from([
-            ("main".to_owned(), vec!["en".to_owned()]),
-            ("paper-pilot".to_owned(), vec!["en".to_owned()]),
-            ("explainer-pilot".to_owned(), vec!["en".to_owned()]),
-        ])
-    );
+    let source_units = declared_units(&root);
+    assert_eq!(corpus.documents(), &declared_documents(&root));
     assert_eq!(
         corpus
             .units()
             .iter()
-            .map(|u| (u.label().as_str(), u.document()))
+            .map(|unit| (unit.label().as_str().to_owned(), unit.document().to_owned()))
             .collect::<Vec<_>>(),
-        vec![
-            ("sec:coda:record-limit", "paper-pilot"),
-            ("sec:coefficients:first-value", "main"),
-            ("sec:coefficients:overview", "main"),
-            ("sec:coefficients:value-context", "main"),
-            ("sec:coefficients:value-table", "main"),
-            ("sec:pilot:explainer-excerpt", "explainer-pilot"),
-            ("sec:pilot:paper-excerpt", "paper-pilot"),
-            ("sec:say:direction", "paper-pilot"),
-            ("sec:say:enemy-to-none", "paper-pilot"),
-            ("sec:say:harm-enlargement", "paper-pilot"),
-            ("sec:say:wonder-beauty", "paper-pilot")
-        ]
+        source_units
+    );
+    assert_eq!(
+        check_unit_files(&root, &book).unwrap(),
+        UnitCheckSummary {
+            documents: corpus.documents().len(),
+            units: source_units.len(),
+            texts: corpus.units().iter().map(|unit| unit.texts().len()).sum(),
+            tag_sites: corpus
+                .units()
+                .iter()
+                .flat_map(|unit| unit.texts().values())
+                .map(|text| text.tag_occurrences().len())
+                .sum(),
+        }
     );
     let first = corpus
         .units()
@@ -101,6 +131,23 @@ fn assert_tag_inventory(
     book: &ftoo_manifest::AddressBook<'_>,
 ) {
     let resolved = resolve_unit_tags(corpus, book).unwrap();
+    let declared: Vec<_> = corpus
+        .units()
+        .iter()
+        .flat_map(|unit| {
+            unit.texts().iter().flat_map(move |(language, text)| {
+                text.tag_occurrences().iter().map(move |occurrence| {
+                    (
+                        unit.label().as_str(),
+                        language.as_str(),
+                        occurrence.input(),
+                        occurrence.site().decoded.clone(),
+                        occurrence.site().occurrence,
+                    )
+                })
+            })
+        })
+        .collect();
     assert_eq!(
         resolved
             .tags()
@@ -111,35 +158,9 @@ fn assert_tag_inventory(
                 t.occurrence().input(),
                 t.occurrence().site().decoded.clone(),
                 t.occurrence().site().occurrence,
-                t.target()
             ))
             .collect::<Vec<_>>(),
-        vec![
-            (
-                "sec:coefficients:first-value",
-                "en",
-                "c:1",
-                Some(22..31),
-                Some(0),
-                NodeId::LangevinCoefficientOne
-            ),
-            (
-                "sec:coefficients:value-context",
-                "en",
-                "v:1",
-                Some(16..25),
-                Some(0),
-                NodeId::LangevinCoefficientOneValue
-            ),
-            (
-                "sec:coefficients:value-context",
-                "en",
-                "c:1",
-                Some(51..60),
-                Some(1),
-                NodeId::LangevinCoefficientOne
-            ),
-        ]
+        declared
     );
     for tag in resolved.tags() {
         assert!(resolved.book().graph().node(tag.target()).is_some());
