@@ -8,16 +8,16 @@
       "id": 1,
       "file": "documents/paper/parts/front.tex",
       "start": 5034,
-      "end": 5121,
-      "sha256": "6b210cd9230c08a2fe79c439eef23e9822c186b465c1b152632117448ecbb011",
-      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
-      "anchor": "A grading is type-checked like a dimension but carries no independent weight in a norm."
+      "end": 5114,
+      "sha256": "cd4d1023db7f2a60ae4443b8e4d6b98cc77ed7f8879eb9a9809c56d65575fd51",
+      "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
+      "anchor": "A grading is typed like a dimension but carries no independent weight in a norm."
     },
     {
       "id": 2,
       "file": "documents/paper/parts/front.tex",
-      "start": 15108,
-      "end": 15318,
+      "start": 15101,
+      "end": 15311,
       "sha256": "0a13b3add8e8ebe297ee169a623cccc1982fa7a49cc797229491010251916023",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "are two gradings, not one (\\ftag{mod:facets}): what a claim is built on is the compiler's"
@@ -35,10 +35,10 @@
       "id": 4,
       "file": "documents/paper/parts/partE.tex",
       "start": 3620,
-      "end": 3709,
-      "sha256": "44eafcc9ddbb09891a8c396613dad05e47519499e80cde0772f7859a8123510c",
-      "reading_acceptance": "Accepted text is the text identified by this SHA256.",
-      "anchor": "scale-type results --- what is run here as a type-check stands there as theorems, and the"
+      "end": 3717,
+      "sha256": "e055762c58cf84c96f00cf5c7a90cc3f6e79116faf84c6f9bc4ae27d41698b7a",
+      "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
+      "anchor": "scale-type results --- what is argued here as a type discipline stands there as theorems, and the"
     },
     {
       "id": 5,
@@ -89,16 +89,16 @@
       "id": 10,
       "file": "documents/paper/parts/appendices.tex",
       "start": 44771,
-      "end": 47453,
-      "sha256": "48aa328c0967d09f96bb29cfcdd0b898b4600e20c67a9b683a08b19dd67ad115",
-      "reading_acceptance": "The project's owner approved the qualified typed-layer grade claim; this SHA256 identifies the renewed passage bytes.",
+      "end": 47440,
+      "sha256": "5dacd09748b77c3a064991c15f170beac2df2bb9ddd0a5ee1d4de0641053572a",
+      "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
       "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
     },
     {
       "id": 11,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52912,
-      "end": 53028,
+      "start": 52899,
+      "end": 53015,
       "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
@@ -106,8 +106,8 @@
     {
       "id": 12,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 53054,
-      "end": 53142,
+      "start": 53041,
+      "end": 53129,
       "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
@@ -125,9 +125,9 @@
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
       "start": 53475,
-      "end": 56296,
-      "sha256": "cee190efbda61019f20fbec5916c13877c8f2f2d9350a86d103346d29563d7aa",
-      "reading_acceptance": "The project's owner approved the qualified description of typed grade checking and recorded spends; this SHA256 identifies the renewed passage bytes.",
+      "end": 56288,
+      "sha256": "d7dc4a49e621fd741b74a948a9c9e138d277f8448193849c5fbaf35db8965ce2",
+      "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
       "anchor": "\\section{The Paper and Its Checks}"
     },
     {
