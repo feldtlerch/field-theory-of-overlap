@@ -1,0 +1,175 @@
+{
+  "prepared_sha256": {
+    "documents/paper/parts/coda.tex": "5347907929b16b004eec51f8cb55187e5288a5d0f3d29976ec92f41d9b93a726",
+    "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823"
+  },
+  "records": [
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partB.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:flow:branch}"
+      },
+      "scope": "subsec:flow:branch",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partB.tex",
+        "kind": "box",
+        "label_token": "\\begin{statement}{mod:branch}"
+      },
+      "scope": "mod:branch",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "cont-anch",
+      "derived_rows": [
+        {
+          "cites": "a:dmp",
+          "departure": "annex",
+          "onref": "dyn:flow",
+          "stopsat": "search effort aligns with the reward gradient; the will opposes it",
+          "table": "tbl:log:concordance",
+          "tag": "e:dmp"
+        }
+      ],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partB.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:flow:confluence}"
+      },
+      "scope": "subsec:flow:confluence",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "cont-anch",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partB.tex",
+        "kind": "box",
+        "label_token": "\\hdr{dyn:flow}"
+      },
+      "scope": "dyn:flow",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partB.tex",
+        "kind": "box",
+        "label_token": "\\hdr{src:nd}"
+      },
+      "scope": "src:nd",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/coda.tex",
+        "kind": "section",
+        "label_token": "\\label{sec:coda}"
+      },
+      "scope": "sec:coda",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/coda.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:coda:tenses}"
+      },
+      "scope": "subsec:coda:tenses",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "feas",
+      "derived_rows": [
+        {
+          "cites": "a:sencapability",
+          "departure": "annex",
+          "onref": "op:vmoral",
+          "stopsat": "capability is wellbeing as freedom-to-achieve, a state; virtue-as-enlargement is the rate that moves it, the information welfarism discards",
+          "table": "tbl:log:concordance",
+          "tag": "e:capability"
+        }
+      ],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/coda.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:coda:wall}"
+      },
+      "scope": "subsec:coda:wall",
+      "spend_set": [
+        "c:lam"
+      ]
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/coda.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:coda:words}"
+      },
+      "scope": "subsec:coda:words",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/coda.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:coda:close}"
+      },
+      "scope": "subsec:coda:close",
+      "spend_set": []
+    }
+  ],
+  "run": {
+    "engine_exit": 0,
+    "log_complete": true,
+    "output_sha256": "5eb03e28dd1b2f2c53e3038e29711af92651fd67bd9a45e04403257b06b488c1",
+    "status": "complete"
+  },
+  "schema": 3
+}

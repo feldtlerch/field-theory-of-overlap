@@ -7,12 +7,18 @@ and confluence subsections, the mod:branch, dyn:flow and src:nd boxes, and the
 coda section and its four subsection audits. Row fields are the economics
 writer's arguments; rendered table cells are not observed and need their own
 comparison if the table is converted. An unselected box audit inside a selected
-window refuses. Only the checker's l3msg warning and error forms are observed,
+section window refuses even when it changes its own scope marker. An unselected
+audit, checker diagnostic or economics row in that window refuses; only the two
+outside markers at the known section boundaries close a capture window. Only the
+checker's l3msg warning and error forms are observed,
 including shorter forms routed through their six-argument form; a checker error
 yields a refused run, while package warnings, infos and notes are outside this
 capture. Clean scopes cannot prove that spends, grants or the audit's judgement
 remain live: rerun the spend, grant, diagnostic, open-spend
-and refusal variants against each converted body. A rewritten box opening may
+and refusal variants against each converted body. The source and output hashes
+describe the prepared and instrumented run, not tracked TeX or published PDFs;
+paper edits can stale every variant's provenance, while comparison ignores it
+and the full check rederives only the base fixture. A rewritten box opening may
 need a new anchor; an absent anchor refuses. The run uses the paper engine's
 fixed rerun count, not the paper-and-explainer auxiliary fixed point.
 """
@@ -233,7 +239,44 @@ def instrument_part_b(source, variant):
     return source
 
 
-def instrument_coda(source):
+def instrument_coda(source, variant):
+    body_effect = variant.endswith('-body')
+    variant = variant.removesuffix('-body')
+    if variant in ('coda-feas', 'coda-spend', 'coda-open-spend'):
+        source = unique_replace(
+            source, r'\label{subsec:coda:wall}' + '\n' + r'\secgrade{nec}%',
+            r'\label{subsec:coda:wall}' + '\n' + r'\secgrade{feas}%')
+    if variant in ('coda-spend', 'coda-grant', 'coda-open-spend', 'coda-refusal'):
+        if variant == 'coda-grant':
+            effect = (r'\ExplSyntaxOn\clist_put_right:Ne '
+                      r'\l__ftoo_grant_mask_clist {\tl_to_str:n {c:lam}}'
+                      r'\ftoo_spend:nn {c:lam}{capture}\ExplSyntaxOff')
+        elif variant == 'coda-open-spend':
+            effect = (r'\ExplSyntaxOn\prop_gput:Nnn '
+                      r'\g__ftoo_const_status_prop {c:lam}{open}'
+                      r'\ftoo_spend:nn {c:lam}{capture}\ExplSyntaxOff')
+        else:
+            effect = r'\ExplSyntaxOn\ftoo_spend:nn {c:lam}{capture}\ExplSyntaxOff'
+        if body_effect:
+            source = unique_replace(source, r'\end{econ}', effect + '\n' + r'\end{econ}')
+        else:
+            source = unique_replace(source, r'\end{econ}', r'\end{econ}' + '\n' + effect)
+    if variant == 'coda-open-spend':
+        restoration = (r'\ExplSyntaxOn\prop_gput:Nnn '
+                       r'\g__ftoo_const_status_prop {c:lam}{held}\ExplSyntaxOff')
+        source = unique_replace(source, r'\subsection{The eight words}',
+                                r'\subsection{The eight words}' + '\n' + restoration)
+    if variant == 'coda-row':
+        source = unique_replace(source,
+                                'the information welfarism discards}]',
+                                'the information welfarism discards revised}]')
+    if variant == 'coda-added-box':
+        added = (r'\ExplSyntaxOn\ftoo_capture_scope:n {e:added}\ExplSyntaxOff' + '\n' +
+                 r'\begin{definition}\grade{nec}' + '\n' +
+                 'Capture box.' + '\n' +
+                 r'\end{definition}' + '\n' +
+                 r'\ExplSyntaxOn\ftoo_capture_scope:n {subsec:coda:wall}\ExplSyntaxOff')
+        source = unique_replace(source, r'\end{econ}', r'\end{econ}' + '\n' + added)
     source = mark_after(source, r'\section{Truth and flourishing}', 'sec:coda')
     for name, _, anchor, _ in SCOPES[6:]:
         source = mark_after(source, anchor, name)
@@ -248,12 +291,28 @@ def parse_events(events, log, locations):
     rows = {name: [] for name in locations}
     seen_known_rows = set()
     active = None
+    enclosing = None
+    outside_count = 0
     for line in lines[:-1]:
         parts = [part.strip() for part in line.split('|')]
-        if parts[0] == 'FT-CHECK':
+        if parts[0] == 'FT-SCOPE':
+            if len(parts) != 2:
+                raise ValueError('Malformed scope event')
+            if parts[1] == 'outside':
+                expected = ('subsec:flow:confluence', 'subsec:coda:close')
+                if (active is not None or outside_count >= len(expected) or
+                        enclosing != expected[outside_count]):
+                    raise ValueError('Unexpected outside scope marker')
+                outside_count += 1
+                enclosing = None
+            elif parts[1] in locations and locations[parts[1]]['kind'] == 'section':
+                enclosing = parts[1]
+        elif parts[0] == 'FT-CHECK':
             if len(parts) != 6 or active is not None:
                 raise ValueError('Malformed check event')
             name, kind, grade, spends, grants = parts[1:]
+            if name not in locations and enclosing is not None:
+                raise ValueError(f'Unselected audit inside {enclosing}: {name}')
             if name in locations:
                 if locations[name]['kind'] != kind:
                     raise ValueError(f'Unselected box or wrong audit kind: {name}')
@@ -277,6 +336,8 @@ def parse_events(events, log, locations):
             if parts[3] != 'ftoo':
                 continue
             if parts[1] not in locations:
+                if enclosing is not None:
+                    raise ValueError(f'Unselected diagnostic inside {enclosing}: {parts[1]}')
                 continue
             if parts[1] != active:
                 raise ValueError('Diagnostic outside its check')
@@ -301,6 +362,8 @@ def parse_events(events, log, locations):
             scope, departure, tag, onref, cites, stopsat = parts[1:]
             if tag in ROW_SCOPES and scope != ROW_SCOPES[tag]:
                 raise ValueError(f'Economics row scope differs: {tag}')
+            if scope not in locations and enclosing is not None:
+                raise ValueError(f'Unselected economics row inside {enclosing}: {scope}')
             if scope in locations:
                 if tag in seen_known_rows:
                     raise ValueError(f'Duplicate economics row: {tag}')
@@ -309,10 +372,12 @@ def parse_events(events, log, locations):
                 rows[scope].append({'table': 'tbl:log:concordance',
                                     'departure': departure, 'tag': tag,
                                     'onref': onref, 'cites': cites, 'stopsat': stopsat})
-        elif parts[0] != 'FT-SCOPE':
+        else:
             raise ValueError(f'Unknown checking event: {parts[0]}')
     if active is not None:
         raise ValueError('Unclosed check event')
+    if outside_count != 2:
+        raise ValueError('Missing outside scope marker')
     if seen_known_rows != set(ROW_SCOPES):
         raise ValueError('Missing economics row')
     for scope, emitted in rows.items():
@@ -326,8 +391,8 @@ def parse_events(events, log, locations):
     return [found[name] for name, _, _, _ in SCOPES]
 
 
-def classify_refusal(log, engine_stream):
-    marker = 'FT-DIAG|dyn:flow|error|ftoo|grade-too-strong'
+def classify_refusal(log, engine_stream, scope):
+    marker = f'FT-DIAG|{scope}|error|ftoo|grade-too-strong'
     if log.count(marker) != 1 or marker not in engine_stream:
         raise ValueError('Failed typeset lacks the named checker refusal')
     if not re.search(r'Output written on main\.xdv \(\d+ pages, \d+ bytes\)\.\s*\Z', log):
@@ -341,7 +406,7 @@ def classify_refusal(log, engine_stream):
     if match is None:
         raise ValueError('Checker refusal text absent')
     wording = re.sub(r'(?m)^\(ftoo\)\s*', '', match.group(1))
-    return {'scope': 'dyn:flow', 'kind': 'error', 'module': 'ftoo',
+    return {'scope': scope, 'kind': 'error', 'module': 'ftoo',
             'identity': 'grade-too-strong', 'text': ' '.join(wording.split())}
 
 
@@ -409,7 +474,8 @@ def capture(repository, support, work, variant):
     typed.write_text(typed.read_text(encoding='utf-8') + tap, encoding='utf-8')
     (paper / 'parts/partB.tex').write_text(
         instrument_part_b(sources[PART_B], variant), encoding='utf-8')
-    (paper / 'parts/coda.tex').write_text(instrument_coda(sources[CODA]), encoding='utf-8')
+    (paper / 'parts/coda.tex').write_text(instrument_coda(sources[CODA], variant),
+                                          encoding='utf-8')
     appendices = paper / 'parts/appendices.tex'
     appendices.write_text(unique_replace(appendices.read_text(encoding='utf-8'),
         r'\section{Recovery}',
@@ -440,7 +506,8 @@ def capture(repository, support, work, variant):
     log_complete = bool(re.search(
         r'Output written on main\.xdv \(\d+ pages, \d+ bytes\)\.\s*\Z', log))
     if result.returncode:
-        refusal = classify_refusal(log, engine_stream)
+        refusal_scope = ('subsec:coda:wall' if variant == 'coda-refusal' else 'dyn:flow')
+        refusal = classify_refusal(log, engine_stream, refusal_scope)
         records = []
         run = {'status': 'refused', 'engine_exit': result.returncode,
                'output_sha256': None, 'log_complete': log_complete,
@@ -589,6 +656,46 @@ def selftest(fixture):
             open_diag[0]['identity'] != 'open-debt' or not open_diag[0]['text']):
         raise AssertionError('Open spend warning was not captured')
     print('open spend warning and its grade and spend changes captured')
+    coda = {name: json.loads(fixture.with_name(f'checking-capture-coda-{name}.json')
+                             .read_text(encoding='utf-8'))
+            for name in ('feas', 'spend', 'grant', 'open-spend', 'refusal', 'row')}
+    expected_coda = (
+        (base, coda['feas'], 'claimed_grade'),
+        (coda['feas'], coda['spend'], 'spend_set'),
+        (base, coda['grant'], 'grant_set'),
+        (coda['spend'], coda['open-spend'], 'diagnostics'),
+        (base, coda['row'], 'derived_rows'),
+    )
+    for left, right, field in expected_coda:
+        if compare(left, right) != [('subsec:coda:wall', field)]:
+            raise AssertionError(f'Coda {field} control changed another outcome')
+    base_row = base['records'][7]['derived_rows'][0]
+    changed_row = coda['row']['records'][7]['derived_rows'][0]
+    if [key for key in base_row if base_row[key] != changed_row[key]] != ['stopsat']:
+        raise AssertionError('Coda row control changed another argument')
+    warning_record = coda['open-spend']['records'][7]
+    coda_warning = warning_record['diagnostics']
+    if (warning_record['claimed_grade'] != 'feas' or
+            warning_record['spend_set'] != ['c:lam'] or
+            len(coda_warning) != 1 or coda_warning[0]['kind'] != 'warning' or
+            coda_warning[0]['module'] != 'ftoo' or
+            coda_warning[0]['identity'] != 'open-debt' or not coda_warning[0]['text']):
+        raise AssertionError('Coda open spend warning was not captured')
+    coda_refusal = coda['refusal']['run']
+    if (coda_refusal['status'] != 'refused' or
+            coda_refusal['diagnostic']['scope'] != 'subsec:coda:wall' or
+            coda_refusal['diagnostic']['identity'] != 'grade-too-strong' or
+            not coda_refusal['diagnostic']['text'] or
+            coda_refusal['engine_exit'] == 0 or
+            coda_refusal['output_sha256'] is not None):
+        raise AssertionError('Coda checking refusal differs')
+    expected_refusal_text = refusal['run']['diagnostic']['text'].replace(
+        "Grade 'cont-anch'", "Grade 'nec'", 1)
+    if coda_refusal['diagnostic']['text'] != expected_refusal_text:
+        raise AssertionError('Coda checker refusal text differs')
+    expect_refusal(lambda: equal(base, coda['refusal']),
+                   'coda checker refusal is not a complete record')
+    print('coda grade, spend, grant, warning and row controls differ once')
     altered = copy.deepcopy(base)
     altered['records'][2]['derived_rows'] = []
     expect_refusal(lambda: equal(base, altered), 'lost economics row')
@@ -630,6 +737,8 @@ def selftest(fixture):
         for row in record['derived_rows']:
             synthetic.append('|'.join(('FT-ROW', name, *(row[key] for key in
                                     ('departure', 'tag', 'onref', 'cites', 'stopsat')))))
+        if name in ('subsec:flow:confluence', 'subsec:coda:close'):
+            synthetic.append('FT-SCOPE|outside')
     synthetic.append('FT-COMPLETE')
     stream = '\n'.join(synthetic) + '\n'
     locations = {record['scope']: record['location'] for record in base['records']}
@@ -639,6 +748,30 @@ def selftest(fixture):
                                 'FT-CHECK|subsec:flow:branch|box|nec||')
     expect_refusal(lambda: parse_events(box_stream, '', locations),
                    'unselected box under section scope')
+    nested_box = ('FT-SCOPE|e:added\nFT-CHECK|e:added|box|nec||\n'
+                  'FT-END|e:added\nFT-SCOPE|subsec:coda:wall\n')
+    box_stream = stream.replace('FT-SCOPE|subsec:coda:words',
+                                nested_box + 'FT-SCOPE|subsec:coda:words')
+    expect_refusal(lambda: parse_events(box_stream, '', locations),
+                   'unselected box with its own scope marker')
+    diagnostic_event = 'FT-DIAG|e:added|warning|ftoo|open-debt\n'
+    diagnostic_stream = stream.replace(
+        'FT-SCOPE|subsec:coda:words',
+        'FT-SCOPE|e:added\n' + diagnostic_event +
+        'FT-SCOPE|subsec:coda:wall\nFT-SCOPE|subsec:coda:words')
+    expect_refusal(lambda: parse_events(diagnostic_stream, '', locations),
+                   'unselected checker diagnostic with its own scope marker')
+    row_event = 'FT-ROW|e:added|annex|e:new|dyn:flow|a:dmp|control\n'
+    row_stream = stream.replace(
+        'FT-SCOPE|subsec:coda:words',
+        'FT-SCOPE|e:added\n' + row_event +
+        'FT-SCOPE|subsec:coda:wall\nFT-SCOPE|subsec:coda:words')
+    expect_refusal(lambda: parse_events(row_stream, '', locations),
+                   'unselected economics row with its own scope marker')
+    hidden_stream = box_stream.replace('FT-SCOPE|e:added\n',
+                                       'FT-SCOPE|outside\n', 1)
+    expect_refusal(lambda: parse_events(hidden_stream, '', locations),
+                   'outside scope marker inside captured section')
     extra_row = 'FT-ROW|subsec:flow:confluence|annex|e:capture|dyn:flow|a:dmp|control\n'
     with_row = parse_events(stream.replace('FT-COMPLETE', extra_row + 'FT-COMPLETE'),
                             '', locations)
@@ -704,7 +837,11 @@ def main():
                                  'refusal', 'refusal-inert', 'refusal-observed',
                                  'diagnostic-inert', 'base-inert', 'first',
                                  'source-grade', 'source-dropped', 'added-row',
-                                 'open-spend', 'unselected-box'))
+                                 'open-spend', 'unselected-box', 'coda-added-box',
+                                 'coda-feas', 'coda-spend', 'coda-grant',
+                                 'coda-open-spend', 'coda-refusal', 'coda-row',
+                                 'coda-spend-body', 'coda-grant-body',
+                                 'coda-open-spend-body'))
     args = parser.parse_args()
     stored = write_capture(args.work, capture(args.repository, args.support, args.work,
                                               args.variant))
