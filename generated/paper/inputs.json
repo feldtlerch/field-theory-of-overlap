@@ -1,11 +1,12 @@
 {
   "inputs": {
     "documents/paper-build/compat.tex": "c04b14fc4cf89dd6f3844a0f4b1674698128dc147348fab31ccc3d79cdd33823",
+    "documents/paper-build/fontconfig.conf": "5bc5ffccdf5397c1cdcb325c0f94c89e6a2d19815893440afc37ba6d694bc99a",
     "documents/paper-build/paper-tags.tsv": "f02a1776046e45b3079e4e5e61172c367f0e4c32994c2b7e77cf9f0985d1bdf0",
     "documents/paper-build/provisional-tags.toml": "900078426f9c6bb5601f0a98ffc3d73eac5da8fd0f6a8620324efbb93c0959d6",
     "documents/paper-build/reader-hooks.tex": "2013d9a4a11758033c1bb5d5e858c15899b038357b6895a16cbfeb7846784ff8",
     "documents/paper-build/reader-tags.toml": "396ef2d23890e994d47b1ff3b6500e98bb41e416bce311037dacf8ad96bdc61d",
-    "documents/paper-build/runtime.toml": "442c5f0e2da4c4da324f4e052ba1f9019891cc632d7299b9576e05af8af23333",
+    "documents/paper-build/runtime.toml": "307e90ac85968e59cee1e1b2d25378d61fc1a157130c48bdf2f192f090638ebe",
     "documents/paper-build/sources.tsv": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
     "documents/paper-build/templates.toml": "e1d2a7cf086245365fe96c90bb1bd890b89e69c1543c30d3a71a86fa522c4022",
     "documents/paper/data/ftoo_index.tex": "f140c6545b660535f0abb3c31b27c96d4a61fb8b662a5c29b8ac7e2e08146f73",
@@ -45,10 +46,10 @@
     "generated/documents/paper-pilot/sec-say-harm-enlargement.tex": "c9981cfb492c326bc78d8c9e434251017b9ac8e34ea697ec50efc427f5d327fe",
     "generated/documents/paper-pilot/sec-say-wonder-beauty.tex": "75cea6bf7d490a332e24a6c57b6993c48241c497cda50b49909652a10fca5cfd",
     "tools/assembly/native-lock.toml": "4d483a627b55c1d8eabefbcdbd8c5422bffa4344787ed9e772f9c4c46190f284",
-    "tools/paper/bibroute.py": "2670cbf7a3fe5dbd78cf984201e5e6d09826748e370ed2ceb13529e150834b95",
+    "tools/paper/bibroute.py": "a03ef25a64174d95d584e8827c80e803a400441890b0f551badbe8794cd01c2d",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "ed50f87c49298ec110e13ac6e4e9adb012f917d87f2b8e5c743684ae487c2043"
+    "tools/paper/prepare.py": "e8d923f3698ff385d28e6cf0dd175152a5cfc23995be67dac9bcf6fc27f3dd91"
   }
 }

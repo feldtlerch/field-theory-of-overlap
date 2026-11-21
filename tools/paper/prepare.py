@@ -9,7 +9,7 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/fontconfig.conf", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
 SOURCES = 'documents/paper/'
 
 
@@ -154,6 +154,7 @@ def prepare(repository, support, work):
         lines[first-1] = data
         target.write_bytes(b''.join(lines))
     shutil.copyfile(root/'compat.tex',work/'compat.tex')
+    shutil.copyfile(root/'fontconfig.conf',work/'fontconfig.conf')
     emit(repository, work)
     templates = tomllib.loads(read(root/'templates.toml'))
     master = versioned(read(work/'main_explainer.tex.in'), templates['version'], 'explainer')

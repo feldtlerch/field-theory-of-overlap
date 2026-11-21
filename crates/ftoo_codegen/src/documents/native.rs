@@ -564,6 +564,9 @@ fn invoke(
         fs::write(&path, bytes)
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
     }
+    let fontconfig = scratch.join("fontconfig.conf");
+    fs::write(&fontconfig, FONTCONFIG)
+        .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &fontconfig, &e))?;
     let executable = support.root.join("runtime/bin/tectonic");
     #[cfg(test)]
     let reuse = !support.cold_format.get();
@@ -679,6 +682,9 @@ pub(super) fn bootstrap(
         let input = scratch.join("document.tex");
         fs::write(&input, source)
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &input, &e))?;
+        let fontconfig = scratch.join("fontconfig.conf");
+        fs::write(&fontconfig, FONTCONFIG)
+            .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &fontconfig, &e))?;
         support.before_consumer(lock)?;
         let output = measured_output(&mut command(support, &scratch)).map_err(|e| {
             native_support::io_error(
@@ -1055,6 +1061,11 @@ pub(super) fn decode(log: &[u8]) -> Option<(String, String, String)> {
     Some((values.next()?, values.next()?, values.next()?))
 }
 
+const FONTCONFIG: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../documents/paper-build/fontconfig.conf"
+));
+
 pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
     let executable = support.root.join("runtime/bin/tectonic");
     let mut command = Command::new(executable);
@@ -1063,6 +1074,8 @@ pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
         .current_dir(scratch)
         .env_clear()
         .env("HOME", scratch)
+        .env("FONTCONFIG_FILE", "/fontconfig.conf")
+        .env("FONTCONFIG_SYSROOT", scratch)
         .env("LANG", "C.UTF-8")
         .env("TECTONIC_CACHE_DIR", scratch.join("bundle-cache"))
         .env("XDG_CACHE_HOME", scratch.join("cache"))

@@ -63,7 +63,8 @@ class Composition(unittest.TestCase):
                      'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
                      'tools/notation/package.json', 'tools/notation/support-digests.json',
                      'tools/notation/.node-version', 'tools/notation/check.cjs',
-                     'documents/paper-build/label-mints.tsv']
+                     'documents/paper-build/label-mints.tsv',
+                     'documents/paper-build/fontconfig.conf']
             for folder in ('units/statements', 'units/skeletons', 'units/scopes', 'units/displays'):
                 fixed.extend(str(path.relative_to(repository)) for path in
                              (repository/folder).glob('*.toml'))

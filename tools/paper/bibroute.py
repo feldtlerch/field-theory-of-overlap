@@ -6,9 +6,10 @@ import pathlib
 import re
 import subprocess
 import os
+import shutil
 from common import require, digest, read, write, timed, runtime
 
-INPUTS = ["tools/paper/bibroute.py", "tools/paper/common.py", "documents/paper/references.bib"]
+INPUTS = ["tools/paper/bibroute.py", "tools/paper/common.py", "documents/paper/references.bib", "documents/paper-build/fontconfig.conf"]
 
 STOCK_BIB = '280fcfc82c0b4c49c152542b18d1cfd430b1bdbadda6207ffb3ee37f3021f003'
 DERIVED_BIB = '8e4f8f413998e962b4d78c38e4c639d3b22e8abdd5236c9a678ef8b01be38cfa'
@@ -65,6 +66,7 @@ def retirement(repository, support, runtime_lock, output, timeout):
         work.mkdir(parents=True)
         for key,value in settings['work-environment'].items():
             path=work/value;path.mkdir(parents=True,exist_ok=True);env[key]=str(path)
+        shutil.copyfile(repository/'documents/paper-build/fontconfig.conf', work/'paper/fontconfig.conf')
         write(work/(name+'.bst'), style)
         write(work/'one.bib', '@misc{one,title={One}}\n')
         write(work/(name+'.tex'), '\\documentclass{article}\n\\begin{document}Probe.\\nocite{*}\\bibliographystyle{'+name+'}\\bibliography{one}\\end{document}\n')

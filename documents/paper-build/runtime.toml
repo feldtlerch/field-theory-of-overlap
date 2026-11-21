@@ -7,11 +7,13 @@ max-pair-cycles = 6
 invocation-timeout = 300
 
 [environment]
+FONTCONFIG_FILE = '/fontconfig.conf'
 LANG = 'C.UTF-8'
 LC_ALL = 'C.UTF-8'
 TZ = 'UTC'
 
 [work-environment]
+FONTCONFIG_SYSROOT = 'paper'
 TMPDIR = 'tmp'
 TECTONIC_CACHE_DIR = 'cache/tectonic'
 XDG_CACHE_HOME = 'cache'

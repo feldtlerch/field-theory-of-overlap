@@ -211,6 +211,7 @@ def real_documents_record(parent, adapter):
         'units/displays/one.toml': b'display',
         'registry/documentary-tags.toml': b'events',
         'documents/paper-build/label-mints.tsv': b'mints',
+        'documents/paper-build/fontconfig.conf': b'fontconfig',
         'documents/paper-build/sources.tsv': ('\n'.join(source_names) + '\n').encode(),
         'documents/paper-build/paper-tags.tsv': b'paper tags',
         'documents/paper-build/reader-tags.toml': b'aliases',

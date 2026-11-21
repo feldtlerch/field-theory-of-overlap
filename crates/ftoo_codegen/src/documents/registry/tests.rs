@@ -384,6 +384,7 @@ fn preparation_joint_mints_then_registry_then_authored_tags_restore() {
     }
     for name in [
         "generated/manifest.json",
+        "documents/paper-build/fontconfig.conf",
         "tools/assembly/native-lock.toml",
         "tools/assembly/prepare-native.py",
         "tools/notation/package-lock.json",
@@ -431,6 +432,20 @@ fn preparation_joint_mints_then_registry_then_authored_tags_restore() {
     fs::write(directory.0.join("docs/collision-fixture.md"), collision).unwrap();
     let support_directory = super::super::tests::Directory::new();
     let support = super::super::NativeSupport::at(support_directory.0.clone());
+    let fontconfig = directory.0.join("documents/paper-build/fontconfig.conf");
+    fs::remove_file(&fontconfig).unwrap();
+    assert_eq!(
+        super::super::prepare_documents(&directory.0, &support).unwrap_err(),
+        DocumentError::Io {
+            operation: super::super::DocumentIoOperation::Inspect,
+            path: fontconfig.clone(),
+            kind: std::io::ErrorKind::NotFound,
+            replaced: Vec::new(),
+            removed: Vec::new(),
+            cleanup: Vec::new(),
+        }
+    );
+    fs::write(&fontconfig, &saved["documents/paper-build/fontconfig.conf"]).unwrap();
     let refuse = || {
         let before = source_snapshot(&directory.0);
         let result = super::super::prepare_documents(&directory.0, &support).unwrap_err();

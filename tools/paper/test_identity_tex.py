@@ -10,7 +10,8 @@ from pdf_text import Pdf
 
 LEAK_FIXTURE = 'tools/paper/fixtures/leak-control.tex'
 INPUTS = ['tools/paper/test_identity_tex.py', 'tools/paper/fixtures/leak-control.tex', 'tools/paper/common.py',
-          'tools/paper/identities.py', 'tools/paper/ledger.py', 'tools/paper/pdf_text.py']
+          'tools/paper/identities.py', 'tools/paper/ledger.py', 'tools/paper/pdf_text.py',
+          'documents/paper-build/fontconfig.conf']
 PREAMBLE = r'''\documentclass{article}
 \usepackage{amsmath,hyperref}
 \ExplSyntaxOn
@@ -97,18 +98,21 @@ Appendix paragraph.\par\checkoriginal
 
 
 def check(repo,support,work):
+    work=work.resolve()
     require(not work.exists(),'Control work area must be new')
     work.mkdir(parents=True)
     settings,_,engine,bundle=runtime(repo,support)
     env=dict(settings['environment'],SOURCE_DATE_EPOCH=str(settings['source-date-epoch']),FORCE_SOURCE_DATE=settings['force-source-date'])
     for name,value in settings['work-environment'].items():
         path=work/value;path.mkdir(parents=True,exist_ok=True);env[name]=str(path)
+    shutil.copyfile(repo/'documents/paper-build/fontconfig.conf', work/'paper/fontconfig.conf')
     # The leak control typesets a committed page that prints a three-part key; a missing fixture refuses.
     fixture=repo/LEAK_FIXTURE
     require(fixture.is_file(),'Leak control fixture is absent: '+LEAK_FIXTURE)
     area=work/'leak-control';area.mkdir();shutil.copyfile(fixture,area/'leak-control.tex')
     result=subprocess.run([str(engine),'--bundle',str(bundle),'--only-cached','--untrusted','--keep-logs','--reruns','0','leak-control.tex'],cwd=area,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
     (area/'engine.txt').write_bytes(result.stdout)
+    require(b'Fontconfig' not in result.stdout,'Fontconfig message in leak control engine output')
     require(result.returncode==0,'Leak control failed to typeset: '+result.stdout.decode('utf-8'))
     pages=Pdf(area/'leak-control.pdf').pages()
     found=leaks(pages[0]) if len(pages)==1 else []
@@ -129,6 +133,7 @@ def check(repo,support,work):
         write(area/(name+'.tex'),PREAMBLE+body+'\n\\end{document}\n')
         result=subprocess.run([str(engine),'--bundle',str(bundle),'--only-cached','--untrusted','--keep-logs','--keep-intermediates','--reruns','0',name+'.tex'],cwd=area,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=30)
         (area/'engine.txt').write_bytes(result.stdout)
+        require(b'Fontconfig' not in result.stdout,'Fontconfig message in expansion control: '+name)
         refusals={'missing':b'Missing printed identity absent:identity', 'concordance-differs':b'Concordance output hook differs'}
         if name in refusals:
             require(result.returncode!=0 and refusals[name] in b' '.join(result.stdout.split()),'Expected refusal absent: '+name)

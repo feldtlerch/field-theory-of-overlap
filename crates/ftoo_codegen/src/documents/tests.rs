@@ -2008,6 +2008,14 @@ fn native_invocation_has_exact_local_bundle_arguments_and_confined_environment()
             .collect::<BTreeMap<_, _>>(),
         BTreeMap::from([
             (
+                OsString::from("FONTCONFIG_FILE"),
+                Some(OsString::from("/fontconfig.conf"))
+            ),
+            (
+                OsString::from("FONTCONFIG_SYSROOT"),
+                Some(scratch.clone().into_os_string())
+            ),
+            (
                 OsString::from("HOME"),
                 Some(scratch.clone().into_os_string())
             ),

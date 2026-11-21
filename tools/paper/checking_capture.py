@@ -385,6 +385,7 @@ def resources(start, cgroup_line, before, after):
 
 
 def capture(repository, support, work, variant):
+    work = work.resolve()
     start = time.monotonic()
     if work.exists():
         raise ValueError('Capture work area must be new')

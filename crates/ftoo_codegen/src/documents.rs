@@ -243,6 +243,7 @@ pub(crate) fn prepare_context(
     crate::check_projection(root).map_err(DocumentError::Projection)?;
     let mut inputs = BTreeMap::from([("generated/manifest.json".into(), projection.clone())]);
     for file in [
+        "documents/paper-build/fontconfig.conf",
         "tools/assembly/native-lock.toml",
         "tools/assembly/prepare-native.py",
         "tools/notation/package-lock.json",

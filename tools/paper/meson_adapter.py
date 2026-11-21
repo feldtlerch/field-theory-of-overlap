@@ -87,6 +87,7 @@ def documents_record(args):
     repo = pathlib.Path(args.repository)
     paths = {
         'units/documents.toml', 'registry/documentary-tags.toml',
+        'documents/paper-build/fontconfig.conf',
         'generated/manifest.json', 'generated/notation.tex',
         'generated/addressing.tex', 'tools/assembly/native-lock.toml',
         'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',

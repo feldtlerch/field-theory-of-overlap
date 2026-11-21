@@ -11,6 +11,8 @@ export FTOO_ASSEMBLY_SUPPORT="$PWD/../paper-support"
 
 That support holds the pinned engine and complete bundle; `documents/paper-build/runtime.toml` fixes their runtime settings. Fragment generation and checking, which release checking repeats, also require the prepared notation support named by `FTOO_NOTATION_SUPPORT`. The `[version]` table of `documents/paper-build/templates.toml` is the one version setting: preparation substitutes its version number and draft name into both documents, so the paper's title page and version line and the explainer's version line and abstract read from the same value. Run these commands at the repository root. Each paper work directory must be absent; failed paper work is retained for diagnosis.
 
+The declared `documents/paper-build/fontconfig.conf` is loaded from a private Fontconfig root for each typesetting run, excluding host font configuration.
+
 ```sh
 cargo run --locked -p ftoo_codegen --bin paper -- documents-generate
 cargo run --locked -p ftoo_codegen --bin paper -- documents-check
