@@ -85,6 +85,7 @@ pub enum RuleId {
     M072,
     M073,
     M074,
+    M077,
     M078,
     M079,
 }
@@ -108,7 +109,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 76] = [
+pub const RULES: [RuleSpec; 77] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -626,6 +627,13 @@ pub const RULES: [RuleSpec; 76] = [
         number: RuleId::M074,
         statement: "Constructed reading names satisfy the semantic-label grammar with the reserved reading kind; identifiers and names are unique, specifications match their fixed declarations, and each quotation names an allocated owning occurrence in another reading.",
         scope: "Every constructed reading declaration.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M077,
+        statement: "Requested paper-pair comparisons read captured PDFs in full through the recorded extractor, retain every raw page and classify every character under the stated profile and normalization rules. They compare complete normalized document streams and ordered bookmark titles and corroborate the declared paragraph with its recorded parent source and checked captured fragment. Only verified folios, whitespace and the listed presentation ligatures receive their stated treatment; an ASCII-letter-boundary line-end hyphen is retained and its break is joined without a space in the complete stream, while corroboration removes it only where that side's decoded source confirms the joined word. Unequal line-end events for a hyphen, en dash, em dash or slash on equal streams refuse; reflow that moves a line end onto or off one of these marks refuses when the normalized streams stay equal, and a discretionary hyphen that alone separates the streams refuses. The same mark at the same line-end position on both sides does not establish whether a hyphen is lexical or discretionary or whether a following space was authored. Checked bare paper tags use the extracted small-cap spelling measured on the delivered pair, and correspondence refuses a mismatch; case inside small capitals is compared as extracted without general case folding, so a source case change there can compare equal. Invalid or changed inputs, unavailable or ambiguous extraction, unsupported profiles or syntax, invalid furniture and equality requiring unconfirmed hyphen deletion refuse; unequal compared content reports differences, and reflow after non-letter punctuation or moved floats can report a difference even when words are unchanged. A line-end mark the profile does not join refuses correspondence unless its source has the extracted spacing. Equality attests only these comparisons, not paragraph boundaries, mathematical structure, checking effects, appearance or acceptance.",
+        scope: "Explicit complete-paper-and-explainer comparison requests using the A4 plain-folio profile and a declared plain paragraph with checked bare paper tags for source corroboration; no automatic release or conversion acceptance, and no derived-locator exclusion.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

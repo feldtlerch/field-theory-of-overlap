@@ -547,8 +547,8 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
-        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M078,
-        M079,
+        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M077,
+        M078, M079,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -558,7 +558,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
             M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
-            M071, M072, M073, M074, M078, M079
+            M071, M072, M073, M074, M077, M078, M079
         ]
     );
     for rule in RULES {
@@ -569,7 +569,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
             | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
-            | M071 | M073 | M074 | M078 | M079 => RuleState::Enforced,
+            | M071 | M073 | M074 | M077 | M078 | M079 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
             M072 => RuleState::DeferredPaperUnits,
@@ -633,7 +633,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 76);
+    assert_eq!(RULES.len(), 77);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -713,7 +713,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        65
+        66
     );
     assert_eq!(
         RULES
@@ -1135,6 +1135,24 @@ fn reading_rule_literal() {
         "Constructed reading names satisfy the semantic-label grammar with the reserved reading kind; identifiers and names are unique, specifications match their fixed declarations, and each quotation names an allocated owning occurrence in another reading."
     );
     assert_eq!(rule.scope, "Every constructed reading declaration.");
+    assert_eq!(rule.state, RuleState::Enforced);
+    assert_eq!(rule.deferred_reason, None);
+}
+
+#[test]
+fn conversion_text_rule_literal() {
+    let rule = RULES
+        .iter()
+        .find(|rule| rule.number == RuleId::M077)
+        .unwrap();
+    assert_eq!(
+        rule.statement,
+        "Requested paper-pair comparisons read captured PDFs in full through the recorded extractor, retain every raw page and classify every character under the stated profile and normalization rules. They compare complete normalized document streams and ordered bookmark titles and corroborate the declared paragraph with its recorded parent source and checked captured fragment. Only verified folios, whitespace and the listed presentation ligatures receive their stated treatment; an ASCII-letter-boundary line-end hyphen is retained and its break is joined without a space in the complete stream, while corroboration removes it only where that side's decoded source confirms the joined word. Unequal line-end events for a hyphen, en dash, em dash or slash on equal streams refuse; reflow that moves a line end onto or off one of these marks refuses when the normalized streams stay equal, and a discretionary hyphen that alone separates the streams refuses. The same mark at the same line-end position on both sides does not establish whether a hyphen is lexical or discretionary or whether a following space was authored. Checked bare paper tags use the extracted small-cap spelling measured on the delivered pair, and correspondence refuses a mismatch; case inside small capitals is compared as extracted without general case folding, so a source case change there can compare equal. Invalid or changed inputs, unavailable or ambiguous extraction, unsupported profiles or syntax, invalid furniture and equality requiring unconfirmed hyphen deletion refuse; unequal compared content reports differences, and reflow after non-letter punctuation or moved floats can report a difference even when words are unchanged. A line-end mark the profile does not join refuses correspondence unless its source has the extracted spacing. Equality attests only these comparisons, not paragraph boundaries, mathematical structure, checking effects, appearance or acceptance."
+    );
+    assert_eq!(
+        rule.scope,
+        "Explicit complete-paper-and-explainer comparison requests using the A4 plain-folio profile and a declared plain paragraph with checked bare paper tags for source corroboration; no automatic release or conversion acceptance, and no derived-locator exclusion."
+    );
     assert_eq!(rule.state, RuleState::Enforced);
     assert_eq!(rule.deferred_reason, None);
 }

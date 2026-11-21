@@ -29,17 +29,6 @@ def scope_fragments(repository):
     return tuple(rows)
 
 
-def fixture_fragments():
-    """Read the script checkout's list for isolated source fixtures."""
-    return tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
-
-
-def __getattr__(name):
-    if name == 'FRAGMENTS':
-        return fixture_fragments()
-    raise AttributeError(name)
-
-
 def versioned(text, version, name):
     """Substitute the one version setting into a document master, where each placeholder occurs exactly once."""
     require(set(version) == {'VERSION', 'DRAFT'}, 'Version setting differs')
@@ -62,14 +51,7 @@ def declared_fragments(repository, rows):
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
-    if (repository/'generated/documents/inclusions.tsv').exists():
-        fragments = scope_fragments(repository)
-    else:
-        # This fallback serves only test_identities.py fixtures until they copy the list.
-        fragments = tuple((*row, next((number for number, content in
-                           enumerate((repository/row[0]).read_bytes().splitlines(), 1)
-                           if content == ('% generated: '+row[1]).encode()), 0))
-                          for row in fixture_fragments())
+    fragments = scope_fragments(repository)
     declared = {(source, unit) for source, unit, _, _, _ in fragments}
     require(len(declared) == len(fragments), 'Duplicate fragment slot')
     for source, unit, fragment, role, line in fragments:

@@ -1,6 +1,7 @@
 """Read delivered text, outline titles and destinations through the system PDF reader."""
 import ctypes as c
 import ctypes.util
+import math
 from common import require
 
 INPUTS = ['tools/paper/pdf_text.py']
@@ -22,6 +23,9 @@ class Pdf:
         self.rectangle = Rectangle
         self.layout = self.bind('poppler_page_get_text_layout',c.c_int,c.c_void_p,
                                 c.POINTER(c.POINTER(Rectangle)),c.POINTER(c.c_uint))
+        self.page_size = self.bind('poppler_page_get_size', None, c.c_void_p,
+                                   c.POINTER(c.c_double), c.POINTER(c.c_double))
+        self.page_label = self.bind('poppler_page_get_label', c.c_void_p, c.c_void_p)
         self.find = self.bind('poppler_document_find_dest', c.c_void_p, c.c_void_p, c.c_char_p)
         self.dest_free = self.bind('poppler_dest_free', None, c.c_void_p)
         self.free = self.glib.g_free
@@ -33,27 +37,59 @@ class Pdf:
         fn = getattr(self.lib,name); fn.restype=result; fn.argtypes=list(args)
         return fn
 
-    def pages(self):
+    def raw_layout_pages(self):
+        require(self.count > 0, 'PDF has no pages')
         result = []
         for n in range(self.count):
             page = self.get_page(self.doc,n)
-            text = self.get_text(page)
-            decoded=c.string_at(text).decode('utf-8')
-            areas=c.POINTER(self.rectangle)(); count=c.c_uint()
-            require(self.layout(page,c.byref(areas),c.byref(count)), 'PDF text layout unavailable')
-            require(count.value==len(decoded), 'PDF text/layout character counts differ')
+            require(page, 'PDF page unavailable')
+            text = None; label_ptr = None
+            areas=c.POINTER(self.rectangle)()
+            try:
+                text = self.get_text(page)
+                require(text, 'PDF text unavailable')
+                decoded=c.string_at(text).decode('utf-8')
+                count=c.c_uint()
+                require(self.layout(page,c.byref(areas),c.byref(count)), 'PDF text layout unavailable')
+                require(count.value==len(decoded), 'PDF text/layout character counts differ')
+                width=c.c_double(); height=c.c_double()
+                self.page_size(page,c.byref(width),c.byref(height))
+                require(math.isfinite(width.value) and math.isfinite(height.value) and
+                        width.value>0 and height.value>0, 'PDF page size invalid')
+                label_ptr=self.page_label(page)
+                require(label_ptr, 'PDF page label unavailable')
+                label=c.string_at(label_ptr).decode('utf-8')
+                rectangles=[]
+                for i in range(count.value):
+                    rect=(areas[i].x1,areas[i].y1,areas[i].x2,areas[i].y2)
+                    require(all(math.isfinite(value) for value in rect), 'PDF text layout invalid')
+                    rectangles.append(rect)
+                result.append(dict(text=decoded,rectangles=rectangles,width=width.value,
+                                   height=height.value,label=label))
+            finally:
+                if label_ptr: self.free(label_ptr)
+                if areas: self.free(areas)
+                if text: self.free(text)
+                self.unref(page)
+        return result
+
+    def raw_pages(self):
+        return [page['text'] for page in self.raw_layout_pages()]
+
+    def pages(self):
+        result=[]
+        for page in self.raw_layout_pages():
+            decoded=page['text']; areas=page['rectangles']
             spaced=[]
             for i,ch in enumerate(decoded):
-                separated = i and (areas[i].x1-areas[i-1].x2>3.0 or
-                                   areas[i].x1<areas[i-1].x1-3.0 or
-                                   abs(areas[i].y1-areas[i-1].y1)>3.0 or
-                                   abs((areas[i].y2-areas[i].y1)-(areas[i-1].y2-areas[i-1].y1))>0.5)
+                separated = i and (areas[i][0]-areas[i-1][2]>3.0 or
+                                   areas[i][0]<areas[i-1][0]-3.0 or
+                                   abs(areas[i][1]-areas[i-1][1])>3.0 or
+                                   abs((areas[i][3]-areas[i][1])-(areas[i-1][3]-areas[i-1][1]))>0.5)
                 if separated and not decoded[i-1].isspace() and not ch.isspace():
                     spaced.append(' ')
                 spaced.append(ch)
             result.append(''.join(spaced))
-            self.free(areas)
-            self.free(text); self.unref(page)
         return result
 
     def destination(self, name):
@@ -79,14 +115,14 @@ class Pdf:
         class GotoAction(c.Structure):
             _fields_ = [('kind',c.c_int),('title',c.c_char_p),('destination',c.POINTER(Destination))]
         out = []
-        def walk(it):
+        def walk(it, depth):
             if not it: return
             while True:
                 a = action(it)
                 if a:
                     title = c.cast(a,c.POINTER(AnyAction)).contents.title
-                    if title:
-                        item=dict(title=title.decode('utf-8'),page=None,anchor='')
+                    if title is not None:
+                        item=dict(title=title.decode('utf-8'),page=None,anchor='',depth=depth)
                         if c.cast(a,c.POINTER(AnyAction)).contents.kind==2:
                             dest=c.cast(a,c.POINTER(GotoAction)).contents.destination.contents
                             if dest.kind==9 and dest.name:
@@ -94,8 +130,8 @@ class Pdf:
                             else:item['page']=dest.page
                         out.append(item)
                     free_action(a)
-                walk(child(it))
+                walk(child(it), depth + 1)
                 if not advance(it): break
             free_iter(it)
-        walk(new(self.doc))
+        walk(new(self.doc), 0)
         return out

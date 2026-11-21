@@ -7,8 +7,10 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
-from prepare import FRAGMENTS, scope_fragments, declared_fragments
+from prepare import scope_fragments, declared_fragments
 import meson_adapter
+
+FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
 
 
 def checked_fragments(root, rows):
