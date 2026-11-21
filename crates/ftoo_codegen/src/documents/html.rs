@@ -127,19 +127,25 @@ fn need_faces(plan: &DocumentPlan) -> Vec<Face> {
         }
     }
     let mut selected = BTreeSet::from([REGULAR.file, BOLD.file]);
-    if plan.screen.is_some()
-        && plan
-            .blocks
-            .iter()
-            .any(|block| !block.paragraph && block.depth.is_none())
-    {
+    if plan.screen.as_ref().is_some_and(|screen| {
+        plan.blocks.iter().enumerate().any(|(index, block)| {
+            !block.paragraph && block.depth.is_none() && !screen.html_gaps.contains_key(&index)
+        })
+    }) {
         selected.insert(ITALIC.file);
     }
     visit(&plan.coverage.runs, false, false, &mut selected);
     for runs in &plan.coverage.audit {
         visit(runs, false, false, &mut selected);
     }
-    for block in &plan.blocks {
+    for (index, block) in plan.blocks.iter().enumerate() {
+        if plan
+            .screen
+            .as_ref()
+            .is_some_and(|screen| screen.html_gaps.contains_key(&index))
+        {
+            continue;
+        }
         visit(
             &block.runs,
             block.depth.is_some(),
@@ -295,26 +301,45 @@ fn inline(runs: &[Inline]) -> Vec<Node> {
                 };
                 element(name, &attrs, inline(children))
             }
-            Inline::Math { .. } => unreachable!("prose admission precedes emission"),
+            Inline::Math { .. } => unreachable!("unrealizable block withheld before emission"),
         });
     }
     nodes
 }
 
+#[allow(clippy::match_wildcard_for_single_variants)] // Unknown inline kinds also need a notice.
+pub(super) fn realizable(runs: &[Inline]) -> bool {
+    runs.iter().all(|run| match run {
+        Inline::Text(_)
+        | Inline::Tag { .. }
+        | Inline::PaperTag { .. }
+        | Inline::Citation { .. }
+        | Inline::Mention { .. } => true,
+        Inline::Styled { children, .. } => realizable(children),
+        _ => false,
+    })
+}
+
 pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
-    fn first_math(runs: &[Inline]) -> Option<&UnitSite> {
+    #[allow(clippy::match_wildcard_for_single_variants)] // Future kinds fall back to the coverage site.
+    fn first_unrealizable(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
-            Inline::Math { site, .. } => Some(site),
-            Inline::Styled { children, .. } => first_math(children),
+            Inline::Styled { children, .. } => first_unrealizable(children),
+            Inline::Tag { site, .. }
+            | Inline::PaperTag { site, .. }
+            | Inline::Citation { site, .. }
+            | Inline::Mention { site, .. }
+            | Inline::Math { site, .. } => (!realizable(std::slice::from_ref(run))).then_some(site),
             _ => None,
         })
     }
-    fn first_heading_reference(runs: &[Inline]) -> Option<&UnitSite> {
+    fn first_heading_unsupported(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
             Inline::Tag { site, .. }
             | Inline::PaperTag { site, .. }
-            | Inline::Citation { site, .. } => Some(site),
-            Inline::Styled { children, .. } => first_heading_reference(children),
+            | Inline::Citation { site, .. }
+            | Inline::Math { site, .. } => Some(site),
+            Inline::Styled { children, .. } => first_heading_unsupported(children),
             _ => None,
         })
     }
@@ -322,19 +347,45 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
         .screen
         .is_none()
         .then_some(&plan.coverage.site)
-        .or_else(|| first_math(&plan.coverage.runs))
-        .or_else(|| plan.coverage.audit.iter().find_map(|runs| first_math(runs)))
+        .or_else(|| first_unrealizable(&plan.coverage.runs))
+        .or_else(|| (!realizable(&plan.coverage.runs)).then_some(&plan.coverage.site))
         .or_else(|| {
-            plan.blocks
-                .first()
-                .and_then(|block| first_heading_reference(&block.runs))
+            plan.coverage
+                .audit
+                .iter()
+                .find_map(|runs| first_unrealizable(runs))
         })
         .or_else(|| {
-            plan.blocks.iter().find_map(|block| {
-                (!block.displays.is_empty())
-                    .then_some(&block.site)
-                    .or_else(|| first_math(&block.runs))
+            plan.coverage
+                .audit
+                .iter()
+                .any(|runs| !realizable(runs))
+                .then_some(&plan.coverage.site)
+        })
+        .or_else(|| {
+            plan.blocks.first().and_then(|block| {
+                first_heading_unsupported(&block.runs)
+                    .or_else(|| (!realizable(&block.runs)).then_some(&block.site))
             })
+        })
+        .or_else(|| {
+            plan.blocks
+                .iter()
+                .find_map(|block| (!block.displays.is_empty()).then_some(&block.site))
+        })
+        .or_else(|| {
+            plan.blocks
+                .iter()
+                .enumerate()
+                .skip(1)
+                .find_map(|(index, block)| {
+                    (plan
+                        .screen
+                        .as_ref()
+                        .is_some_and(|screen| screen.html_gaps.contains_key(&index))
+                        == realizable(&block.runs))
+                    .then_some(&block.site)
+                })
         });
     if let Some(site) = refused {
         return Err(failure(
@@ -359,7 +410,7 @@ pub(super) fn plain(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&plain(children)),
-            Inline::Math { .. } => unreachable!("prose admission precedes title"),
+            Inline::Math { .. } => unreachable!("unrealizable heading refused before title"),
         }
     }
     result
@@ -371,28 +422,58 @@ fn labels(language: &str) -> Option<(&'static str, &'static str)> {
 
 pub(super) fn check_destinations(
     plan: &DocumentPlan,
+    plans: &[DocumentPlan],
     selected: &BTreeMap<String, Vec<DocumentOutput>>,
 ) -> Result<(), DocumentError> {
-    if let Some((refrain, quotation)) = plan
-        .screen
-        .iter()
-        .flat_map(|screen| &screen.refrains)
-        .find_map(|refrain| {
-            refrain.quotation.as_ref().and_then(|quotation| {
-                (!selected
-                    .get(&quotation.owner_document)
-                    .is_some_and(|targets| targets.contains(&DocumentOutput::Html)))
-                .then_some((refrain, quotation))
+    if let Some((refrain, quotation)) = plan.screen.iter().find_map(|screen| {
+        plan.blocks
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find_map(|(index, _)| {
+                if screen.html_gaps.contains_key(&index) {
+                    return None;
+                }
+                let refrain = super::plan::refrain_index(&plan.blocks, index)
+                    .and_then(|position| screen.refrains.get(position))?;
+                refrain.quotation.as_ref().and_then(|quotation| {
+                    (!selected
+                        .get(&quotation.owner_document)
+                        .is_some_and(|targets| targets.contains(&DocumentOutput::Html))
+                        || !plans.iter().any(|owner| {
+                            owner.document == quotation.owner_document
+                                && owner.language == quotation.language
+                                && owner.screen.as_ref().is_some_and(|screen| {
+                                    owner
+                                        .blocks
+                                        .iter()
+                                        .enumerate()
+                                        .skip(1)
+                                        .any(|(index, block)| {
+                                            super::plan::refrain_index(&owner.blocks, index)
+                                                .and_then(|refrain_index| {
+                                                    screen.refrains.get(refrain_index)
+                                                })
+                                                .is_some_and(|candidate| {
+                                                    candidate.quotation.is_none()
+                                                        && candidate.fragment == quotation.fragment
+                                                        && !screen.html_gaps.contains_key(&index)
+                                                        && realizable(&block.runs)
+                                                })
+                                        })
+                                })
+                        }))
+                    .then_some((refrain, quotation))
+                })
             })
-        })
-    {
+    }) {
         return Err(failure(
             RuleId::M055,
             AssemblyStage::Emission,
             AssemblySite::Source(refrain.site.clone()),
             AssemblyFault::UnknownToken {
                 value: quotation.owner_document.clone(),
-                expected: vec!["HTML owner target".into()],
+                expected: vec!["HTML owner destination".into()],
             },
         ));
     }
@@ -455,6 +536,14 @@ pub(super) fn model(plan: &DocumentPlan, fonts: &Fonts) -> Result<Node, Document
             &[("class", "gap")],
             vec![Node::Text(screen.gaps[index - 1].message.clone())],
         ));
+        if let Some(gap) = screen.html_gaps.get(&index) {
+            main.push(element(
+                "p",
+                &[("class", "gap")],
+                vec![Node::Text(gap.message.clone())],
+            ));
+            continue;
+        }
         if block.paragraph {
             main.push(element("p", &[], inline(&block.runs)));
             continue;

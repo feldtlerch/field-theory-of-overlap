@@ -1316,6 +1316,7 @@ fn fragment_macro_follows_planned_quotation() {
     plan.screen = Some(plan::ScreenPlan {
         gaps: vec![],
         refrains: vec![],
+        html_gaps: std::collections::BTreeMap::new(),
     });
     assert_eq!(
         refuse_quoted_screen_targets(&plan, &[DocumentOutput::Markdown]),
@@ -1354,6 +1355,7 @@ fn fragment_path_collisions_refuse_before_publication() {
         bytes: b"one".to_vec(),
         origins: Vec::new(),
         emissions: Vec::new(),
+        html_gap_sites: Vec::new(),
     };
     assert!(unique_artifact_paths(&[artifact.clone(), artifact]).is_err());
 }
@@ -2775,6 +2777,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
                 bytes: b"new\n".to_vec(),
                 origins: Vec::new(),
                 emissions: Vec::new(),
+                html_gap_sites: Vec::new(),
             })
             .collect(),
         inputs: BTreeMap::new(),
@@ -2945,6 +2948,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
                 bytes: b"a\n".to_vec(),
                 origins: Vec::new(),
                 emissions: Vec::new(),
+                html_gap_sites: Vec::new(),
             })
             .collect(),
         inputs: BTreeMap::new(),
@@ -3981,6 +3985,7 @@ fn markdown_style_screen_paragraph_is_unobserved() {
     plan.screen = Some(plan::ScreenPlan {
         gaps: vec![],
         refrains: vec![],
+        html_gaps: std::collections::BTreeMap::new(),
     });
     let error = markdown::check_math_admission(&plan).unwrap_err();
     let DocumentError::Assembly(errors) = error else {

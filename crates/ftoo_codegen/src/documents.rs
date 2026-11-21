@@ -38,6 +38,7 @@ pub struct DocumentArtifact {
     bytes: Vec<u8>,
     origins: Vec<SourceOrigin>,
     emissions: Vec<EmissionRecord>,
+    html_gap_sites: Vec<UnitSite>,
 }
 impl DocumentArtifact {
     #[must_use]
@@ -128,6 +129,25 @@ impl PreparedDocuments {
     pub fn projection(&self) -> &[u8] {
         &self.inputs["generated/manifest.json"]
     }
+}
+
+pub(crate) fn refuse_release_html_gaps(
+    artifacts: &[DocumentArtifact],
+) -> Result<(), DocumentError> {
+    for artifact in artifacts {
+        if let Some(site) = artifact.html_gap_sites.first() {
+            return Err(failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Source(site.clone()),
+                AssemblyFault::UnknownToken {
+                    value: artifact.path.clone(),
+                    expected: vec!["complete HTML passage".into()],
+                },
+            ));
+        }
+    }
+    Ok(())
 }
 /// Regenerate excerpt skeleton projections before generating document artifacts.
 /// # Errors
@@ -429,6 +449,7 @@ pub(crate) fn prepare_context(
             bytes: inclusion_text.into_bytes(),
             origins: Vec::new(),
             emissions: Vec::new(),
+            html_gap_sites: Vec::new(),
         });
         let mut prepared = finish_snapshot(
             root,
@@ -595,12 +616,14 @@ fn render_artifacts(
                             bytes: annotated.into_bytes(),
                             origins: plan.origins(DocumentTarget::Markdown),
                             emissions: plan.records(DocumentTarget::Markdown),
+                            html_gap_sites: Vec::new(),
                         });
                         artifacts.push(DocumentArtifact {
                             path: reader_path,
                             bytes: reader.into_bytes(),
                             origins: plan.origins(DocumentTarget::Markdown),
                             emissions: plan.records(DocumentTarget::Markdown),
+                            html_gap_sites: Vec::new(),
                         });
                     }
                     DocumentOutput::Latex => {
@@ -625,6 +648,7 @@ fn render_artifacts(
                             bytes: tex.into_bytes(),
                             origins,
                             emissions: plan.records(DocumentTarget::Latex),
+                            html_gap_sites: Vec::new(),
                         });
                     }
                     DocumentOutput::Fragment => {
@@ -637,11 +661,12 @@ fn render_artifacts(
                                 bytes: source.into_bytes(),
                                 origins: Vec::new(),
                                 emissions: Vec::new(),
+                                html_gap_sites: Vec::new(),
                             });
                         }
                     }
                     DocumentOutput::Html => {
-                        html::check_destinations(plan, selected)?;
+                        html::check_destinations(plan, plans, selected)?;
                         let path = html::destination(html::Destination::Artifact(plan));
                         let source = html::render(plan, support, known_labels)?;
                         check_rendered_bytes(&path, source.as_bytes(), &[])?;
@@ -650,6 +675,13 @@ fn render_artifacts(
                             bytes: source.into_bytes(),
                             origins: Vec::new(),
                             emissions: Vec::new(),
+                            html_gap_sites: plan
+                                .screen
+                                .as_ref()
+                                .into_iter()
+                                .flat_map(|screen| screen.html_gaps.values())
+                                .map(|gap| gap.site.clone())
+                                .collect(),
                         });
                     }
                 }
@@ -661,18 +693,21 @@ fn render_artifacts(
             bytes: notation.declarations().as_bytes().to_vec(),
             origins: Vec::new(),
             emissions: Vec::new(),
+            html_gap_sites: Vec::new(),
         });
         artifacts.push(DocumentArtifact {
             path: "generated/notation-status.json".into(),
             bytes: notation_status,
             origins: Vec::new(),
             emissions: Vec::new(),
+            html_gap_sites: Vec::new(),
         });
         artifacts.push(DocumentArtifact {
             path: "generated/addressing.tex".into(),
             bytes: addressing.into_bytes(),
             origins: Vec::new(),
             emissions: Vec::new(),
+            html_gap_sites: Vec::new(),
         });
         unique_artifact_paths(&artifacts)?;
         Ok(artifacts)

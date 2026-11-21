@@ -737,9 +737,17 @@ fn run_documents(req: &Request) -> Result<()> {
 fn check_release_documents(req: &Request) -> Result<PathBuf> {
     let assembly = assembly_support(req)?;
     require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
-    crate::check_documents(&req.root, &assembly)
+    let documents = crate::check_documents(&req.root, &assembly)
         .map_err(|error| PaperFault::Input(error.to_string()))?;
+    release_html_gaps(documents.artifacts())?;
     Ok(assembly.directory().to_path_buf())
+}
+pub(crate) fn release_html_gaps(artifacts: &[crate::DocumentArtifact]) -> Result<()> {
+    release::part(
+        "HTML block gaps",
+        crate::documents::refuse_release_html_gaps(artifacts)
+            .map_err(|error| PaperFault::Input(error.to_string())),
+    )
 }
 fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathBuf> {
     release_support

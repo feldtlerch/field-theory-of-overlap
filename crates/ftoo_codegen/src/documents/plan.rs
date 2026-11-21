@@ -1694,6 +1694,7 @@ pub(super) struct DocumentPlan {
 pub(super) struct ScreenPlan {
     pub gaps: Vec<ScreenGap>,
     pub refrains: Vec<ScreenRefrain>,
+    pub html_gaps: BTreeMap<usize, ScreenGap>,
 }
 pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
     (index > 0 && !blocks[index].paragraph).then(|| {
@@ -1930,6 +1931,25 @@ struct OwnedDestination {
     document: String,
     refrain: ScreenRefrain,
 }
+pub(super) fn html_gaps(plan: &DocumentPlan) -> BTreeMap<usize, ScreenGap> {
+    plan.blocks
+        .iter()
+        .enumerate()
+        .skip(1)
+        .filter(|(_, block)| !super::html::realizable(&block.runs))
+        .map(|(index, block)| {
+            (
+                index,
+                ScreenGap {
+                    position: GapPosition::Between,
+                    message: "This passage is not yet available in this rendering.".into(),
+                    site: block.site.clone(),
+                    boundaries: vec![block.site.clone()],
+                },
+            )
+        })
+        .collect()
+}
 fn missing_markdown_owner(
     plan: &DocumentPlan,
     site: &UnitSite,
@@ -2145,7 +2165,12 @@ pub(super) fn plan_screens(
             }
             refrains.push(refrain);
         }
-        plan.screen = Some(ScreenPlan { gaps, refrains });
+        let html_gaps = html_gaps(plan);
+        plan.screen = Some(ScreenPlan {
+            gaps,
+            refrains,
+            html_gaps,
+        });
         check_public_anchors(plan)?;
     }
     Ok(())

@@ -40,8 +40,108 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
             },
         ],
         refrains: vec![],
+        html_gaps: std::collections::BTreeMap::new(),
     });
     plan
+}
+
+fn math(site: UnitSite) -> plan::Inline {
+    plan::Inline::Math {
+        definition_site: site.clone(),
+        key: "x".into(),
+        markdown: "x".into(),
+        latex: "x".into(),
+        pending: vec![],
+        site,
+    }
+}
+
+#[test]
+fn html_gap_planning_uses_nested_realizability() {
+    let site = input::site("gap-plan.toml");
+    let mut plan = prose_plan("Words.");
+    plan.blocks[1].runs.push(math(site.clone()));
+    assert!(plan::html_gaps(&plan).contains_key(&1));
+    plan.blocks[1].runs = vec![plan::Inline::Styled {
+        kind: plan::StyleKind::Emphasis,
+        children: vec![math(site.clone())],
+        child_sites: vec![site.clone()],
+        site: site.clone(),
+    }];
+    assert!(plan::html_gaps(&plan).contains_key(&1));
+    plan.blocks[1].runs = vec![plan::Inline::Styled {
+        kind: plan::StyleKind::Emphasis,
+        children: vec![plan::Inline::Mention {
+            text: "code".into(),
+            site: site.clone(),
+        }],
+        child_sites: vec![site.clone()],
+        site,
+    }];
+    assert!(plan::html_gaps(&plan).is_empty());
+}
+
+#[test]
+fn html_admission_refuses_gap_plan_disagreement_at_block() {
+    let mut plan = prose_plan("Words.");
+    let site = plan.blocks[1].site.clone();
+    plan.blocks[1].runs.push(math(site.clone()));
+    let error = super::super::html::prose_only(&plan).unwrap_err();
+    assert!(format!("{error:?}").contains("prose-only HTML document"));
+    let DocumentError::Assembly(errors) = error else {
+        panic!("gap plan disagreement")
+    };
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(site.clone())
+    );
+    let gaps = plan::html_gaps(&plan);
+    plan.screen.as_mut().unwrap().html_gaps = gaps;
+    plan.blocks[1].runs = vec![plan::Inline::Text("Words.".into())];
+    let error = super::super::html::prose_only(&plan).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("gap plan disagreement")
+    };
+    assert_eq!(errors.diagnostics()[0].site, AssemblySite::Source(site));
+}
+
+#[test]
+fn support_required_html_swapped_notice_and_block_refuses() {
+    let support = support();
+    let mut plan = prose_plan("First words.");
+    let site = input::site("second-block.toml");
+    plan.blocks.push(plan::Block {
+        pending_names: std::collections::BTreeMap::new(),
+        displays: std::collections::BTreeMap::new(),
+        unit: "sec:fixture:second".into(),
+        depth: None,
+        quotation: false,
+        paragraph: true,
+        site: site.clone(),
+        runs: vec![plan::Inline::Text("Second words.".into())],
+    });
+    plan.blocks[1].runs.push(math(site.clone()));
+    let gaps = plan::html_gaps(&plan);
+    let screen = plan.screen.as_mut().unwrap();
+    screen.html_gaps = gaps;
+    screen.gaps.insert(
+        1,
+        plan::ScreenGap {
+            position: GapPosition::Between,
+            message: "Middle content is unavailable.".into(),
+            site,
+            boundaries: vec![],
+        },
+    );
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[]).unwrap();
+    html_recovery::check(&plan, &fonts, &[], &rendered).unwrap();
+    let notice = "<p class=\"gap\">This passage is not yet available in this rendering.</p>";
+    let swapped = rendered
+        .replacen(notice, "<p>First words. x</p>", 1)
+        .replacen("<p>Second words.</p>", notice, 1);
+    let error = html_recovery::check(&plan, &fonts, &[], &swapped).unwrap_err();
+    assert!(format!("{error:?}").contains("HTML withheld block boundary"));
 }
 
 #[test]
@@ -51,6 +151,16 @@ fn support_required_html_prose_round_trip_and_mutations() {
     let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
     let rendered = super::super::html::render(&plan, &support, &["dec:fixture:source"]).unwrap();
     html_recovery::check(&plan, &fonts, &["dec:fixture:source"], &rendered).unwrap();
+    let paragraph_start = rendered.find("<p>See ").unwrap();
+    let paragraph_end = paragraph_start + rendered[paragraph_start..].find("</p>").unwrap() + 4;
+    let invented_notice = rendered.replacen(
+        &rendered[paragraph_start..paragraph_end],
+        "<p class=\"gap\">This passage is not yet available in this rendering.</p>",
+        1,
+    );
+    let error =
+        html_recovery::check(&plan, &fonts, &["dec:fixture:source"], &invented_notice).unwrap_err();
+    assert!(format!("{error:?}").contains("HTML paragraph boundary"));
     assert!(rendered.contains("<em>strong words</em>"));
     assert!(!rendered.contains("dec:fixture:source"));
     assert!(!rendered.contains("#missing-"));
@@ -256,7 +366,41 @@ fn support_required_html_nested_styles_and_quotation_destination() {
     let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
     let mut selected =
         std::collections::BTreeMap::from([("paper-pilot".to_owned(), vec![DocumentOutput::Html])]);
-    super::super::html::check_destinations(&plan, &selected).unwrap();
+    let mut owner = prose_plan("Owner words.");
+    owner.document = "paper-pilot".into();
+    owner.blocks[1].paragraph = false;
+    owner
+        .screen
+        .as_mut()
+        .unwrap()
+        .refrains
+        .push(plan::ScreenRefrain {
+            handle: "sec:record-limit".into(),
+            bound_label: "sec:coda:record-limit".into(),
+            fragment: "sec-crecord--limit".into(),
+            quotation: None,
+            site: input::site("owner.toml"),
+            binding_site: None,
+        });
+    super::super::html::check_destinations(&plan, std::slice::from_ref(&owner), &selected).unwrap();
+    owner.blocks[1].runs.push(plan::Inline::Math {
+        definition_site: input::site("owner.toml"),
+        key: "x".into(),
+        markdown: "x".into(),
+        latex: "x".into(),
+        pending: vec![],
+        site: input::site("owner.toml"),
+    });
+    let DocumentError::Assembly(errors) =
+        super::super::html::check_destinations(&plan, std::slice::from_ref(&owner), &selected)
+            .unwrap_err()
+    else {
+        panic!("withheld destination fault")
+    };
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(plan.screen.as_ref().unwrap().refrains[0].site.clone())
+    );
     let rendered = super::super::html::render(&plan, &support, &[]).unwrap();
     assert!(rendered.contains("<strong>A <em>B</em><code>token</code></strong>"));
     assert!(
@@ -281,11 +425,12 @@ fn support_required_html_nested_styles_and_quotation_destination() {
     let error = html_recovery::check(&plan, &fonts, &[], &changed).unwrap_err();
     assert!(format!("{error:?}").contains("HTML quotation href"));
     selected.clear();
-    assert!(super::super::html::check_destinations(&plan, &selected).is_err());
+    assert!(super::super::html::check_destinations(&plan, &[], &selected).is_err());
 }
 
 #[test]
-fn html_prose_scope_refuses_mathematics() {
+fn support_required_html_withheld_mathematics_round_trip_and_mutations() {
+    let support = support();
     let mut plan = prose_plan("Words.");
     let site = input::site("math-only.toml");
     plan.blocks[1].runs.push(plan::Inline::Math {
@@ -294,24 +439,199 @@ fn html_prose_scope_refuses_mathematics() {
         markdown: "x".into(),
         latex: "x".into(),
         pending: vec![],
-        site,
+        site: site.clone(),
     });
-    let error = super::super::html::prose_only(&plan).unwrap_err();
-    let DocumentError::Assembly(errors) = error else {
-        panic!("HTML mathematics fault")
+    plan.blocks[1].runs.push(plan::Inline::Mention {
+        text: "hidden-code".into(),
+        site: site.clone(),
+    });
+    assert!(!super::super::html::realizable(&plan.blocks[1].runs));
+    plan.screen.as_mut().unwrap().html_gaps.insert(
+        1,
+        plan::ScreenGap {
+            position: GapPosition::Between,
+            message: "This passage is not yet available in this rendering.".into(),
+            site,
+            boundaries: vec![],
+        },
+    );
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[]).unwrap();
+    html_recovery::check(&plan, &fonts, &[], &rendered).unwrap();
+    let notice = "<p class=\"gap\">This passage is not yet available in this rendering.</p>";
+    assert!(rendered.contains(notice));
+    assert!(!rendered.contains("Words."));
+    assert!(!rendered.contains("hidden-code"));
+    assert!(!rendered.contains("Inconsolata"));
+    assert!(!rendered.contains("math-only"));
+    assert_eq!(plan.screen.as_ref().unwrap().html_gaps.len(), 1);
+    let artifact = DocumentArtifact {
+        path: "generated/documents/fixture/en.html".into(),
+        bytes: rendered.as_bytes().to_vec(),
+        origins: vec![],
+        emissions: vec![],
+        html_gap_sites: vec![input::site("math-only.toml")],
+    };
+    let DocumentError::Assembly(errors) =
+        super::super::refuse_release_html_gaps(&[artifact]).unwrap_err()
+    else {
+        panic!("release gap fault")
     };
     assert_eq!(
         errors.diagnostics()[0].site,
         AssemblySite::Source(input::site("math-only.toml"))
     );
-    let absent_support = NativeSupport::at(std::env::temp_dir().join("html-mathematics-no-fonts"));
-    let error = super::super::html::render(&plan, &absent_support, &[]).unwrap_err();
+    let artifact = DocumentArtifact {
+        path: "generated/documents/fixture/en.html".into(),
+        bytes: rendered.as_bytes().to_vec(),
+        origins: vec![],
+        emissions: vec![],
+        html_gap_sites: vec![input::site("math-only.toml")],
+    };
+    let release = crate::paper::release_html_gaps(&[artifact]).unwrap_err();
+    assert!(
+        release
+            .to_string()
+            .contains("Paper release M065 refused at HTML block gaps")
+    );
+    for (changed, fault) in [
+        (
+            rendered.replacen(notice, "", 1),
+            "HTML withheld block sentence",
+        ),
+        (
+            rendered.replacen(notice, "<p>Words. x</p>", 1),
+            "HTML withheld block boundary",
+        ),
+        (
+            rendered.replacen("not yet available", "currently unavailable", 1),
+            "HTML withheld block sentence",
+        ),
+        (
+            rendered.replacen(
+                "<p class=\"gap\">Earlier content is unavailable.</p>",
+                notice,
+                1,
+            ),
+            "HTML gap sentence",
+        ),
+    ] {
+        let error = html_recovery::check(&plan, &fonts, &[], &changed).unwrap_err();
+        assert!(format!("{error:?}").contains(fault), "{error:?}");
+    }
+}
+
+#[test]
+fn support_required_html_withheld_refrain_has_no_destination_or_handle() {
+    let support = support();
+    let mut plan = prose_plan("Refrain words.");
+    let site = input::site("refrain-math.toml");
+    plan.blocks[1].paragraph = false;
+    plan.blocks[1].runs.push(plan::Inline::Math {
+        definition_site: site.clone(),
+        key: "x".into(),
+        markdown: "x".into(),
+        latex: "x".into(),
+        pending: vec![],
+        site: site.clone(),
+    });
+    let screen = plan.screen.as_mut().unwrap();
+    screen.refrains.push(plan::ScreenRefrain {
+        handle: "reading:handle".into(),
+        bound_label: "sec:fixture:refrain".into(),
+        fragment: "reading-handle".into(),
+        quotation: None,
+        site: site.clone(),
+        binding_site: None,
+    });
+    screen.html_gaps.insert(
+        1,
+        plan::ScreenGap {
+            position: GapPosition::Between,
+            message: "This passage is not yet available in this rendering.".into(),
+            site,
+            boundaries: vec![],
+        },
+    );
+    let rendered = super::super::html::render(&plan, &support, &[]).unwrap();
+    assert!(!rendered.contains("Refrain words."));
+    assert!(!rendered.contains("reading-handle"));
+    assert!(!rendered.contains("reading:handle"));
+}
+
+#[test]
+fn support_required_html_withheld_owner_and_quotation_show_two_notices() {
+    let support = support();
+    let site = input::site("quoted-math.toml");
+    let mut owner = prose_plan("Shared words.");
+    owner.document = "owner".into();
+    owner.blocks[1].paragraph = false;
+    owner.blocks[1].unit = "sec:fixture:shared".into();
+    owner.blocks[1].runs.push(math(site.clone()));
+    owner
+        .screen
+        .as_mut()
+        .unwrap()
+        .refrains
+        .push(plan::ScreenRefrain {
+            handle: "shared".into(),
+            bound_label: "sec:fixture:shared".into(),
+            fragment: "shared".into(),
+            quotation: None,
+            site: site.clone(),
+            binding_site: None,
+        });
+    owner.screen.as_mut().unwrap().html_gaps = plan::html_gaps(&owner);
+    let mut quote = prose_plan("Shared words.");
+    quote.document = "quote".into();
+    quote.blocks[1].paragraph = false;
+    quote.blocks[1].quotation = true;
+    quote.blocks[1].unit = "sec:fixture:shared".into();
+    quote.blocks[1].runs.push(math(site.clone()));
+    quote
+        .screen
+        .as_mut()
+        .unwrap()
+        .refrains
+        .push(plan::ScreenRefrain {
+            handle: "shared".into(),
+            bound_label: "sec:fixture:shared".into(),
+            fragment: "shared".into(),
+            quotation: Some(plan::ScreenQuotation {
+                owner_document: "owner".into(),
+                language: "en".into(),
+                reader_path: "generated/documents/owner/en.md".into(),
+                fragment: "shared".into(),
+                href: "../owner/en.md#shared".into(),
+                owner_site: site.clone(),
+            }),
+            site,
+            binding_site: None,
+        });
+    quote.screen.as_mut().unwrap().html_gaps = plan::html_gaps(&quote);
+    let mut selected = std::collections::BTreeMap::new();
+    selected.insert("owner".into(), vec![ftoo_manifest::DocumentOutput::Html]);
+    super::super::html::check_destinations(&quote, std::slice::from_ref(&owner), &selected)
+        .unwrap();
+    let owner_html = super::super::html::render(&owner, &support, &[]).unwrap();
+    let quote_html = super::super::html::render(&quote, &support, &[]).unwrap();
+    let notice = "<p class=\"gap\">This passage is not yet available in this rendering.</p>";
+    assert_eq!(
+        owner_html.matches(notice).count() + quote_html.matches(notice).count(),
+        2
+    );
+    assert!(!quote_html.contains("../owner/en.html#shared"));
+    assert!(!owner_html.contains("id=\"shared\""));
+
+    quote.blocks[1].runs = vec![plan::Inline::Text("Shared words.".into())];
+    quote.screen.as_mut().unwrap().html_gaps.clear();
+    let error = super::super::html::check_destinations(&quote, &[owner], &selected).unwrap_err();
     let DocumentError::Assembly(errors) = error else {
-        panic!("HTML mathematics must refuse before font loading")
+        panic!("owner anchor fault")
     };
     assert_eq!(
         errors.diagnostics()[0].site,
-        AssemblySite::Source(input::site("math-only.toml"))
+        AssemblySite::Source(quote.screen.as_ref().unwrap().refrains[0].site.clone())
     );
 }
 

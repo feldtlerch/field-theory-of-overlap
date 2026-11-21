@@ -560,6 +560,8 @@ pub(crate) fn check_release_with_documents(
     let prepared = check_retention(root)?;
     release_assessment(prepared.report().assessment())?;
     let documents = prepare_bound_documents(root, support, &prepared)?;
+    crate::documents::refuse_release_html_gaps(documents.artifacts())
+        .map_err(|error| RetentionCheckError::Documents(Box::new(error)))?;
     crate::documents::artifacts::verify(root, &documents)
         .map_err(|error| RetentionCheckError::Documents(Box::new(error)))?;
     crate::documents::artifacts::recheck(root, &documents)

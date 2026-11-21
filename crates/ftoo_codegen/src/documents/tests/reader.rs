@@ -686,7 +686,11 @@ fn excerpt_plan() -> DocumentPlan {
         binding_site: None,
     })
     .collect();
-    plan.screen = Some(ScreenPlan { gaps, refrains });
+    plan.screen = Some(ScreenPlan {
+        gaps,
+        refrains,
+        html_gaps: std::collections::BTreeMap::new(),
+    });
     plan
 }
 

@@ -234,7 +234,7 @@ fn flat(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&flat(children)),
-            Inline::Math { .. } => unreachable!("prose admission precedes recovery"),
+            Inline::Math { .. } => unreachable!("unrealizable heading refused before recovery"),
         }
     }
     result
@@ -327,7 +327,7 @@ fn runs(
                 runs(plan, known, children, actual_children, true)?;
                 at += 1;
             }
-            Inline::Math { .. } => unreachable!("prose admission precedes recovery"),
+            Inline::Math { .. } => unreachable!("unrealizable block withheld before recovery"),
         }
     }
     flush(&mut pending, &mut paper, &mut at)?;
@@ -446,18 +446,25 @@ fn check_faces(plan: &DocumentPlan, fonts: &Fonts) -> Result<(), DocumentError> 
         }
     }
     let mut used = BTreeSet::from(["texgyrepagella-regular.otf", "texgyrepagella-bold.otf"]);
-    if plan
-        .blocks
-        .iter()
-        .any(|block| !block.paragraph && block.depth.is_none())
-    {
+    if plan.screen.as_ref().is_some_and(|screen| {
+        plan.blocks.iter().enumerate().any(|(index, block)| {
+            !block.paragraph && block.depth.is_none() && !screen.html_gaps.contains_key(&index)
+        })
+    }) {
         used.insert("texgyrepagella-italic.otf");
     }
     visit(&plan.coverage.runs, false, false, &mut used);
     for runs in &plan.coverage.audit {
         visit(runs, false, false, &mut used);
     }
-    for block in &plan.blocks {
+    for (index, block) in plan.blocks.iter().enumerate() {
+        if plan
+            .screen
+            .as_ref()
+            .is_some_and(|screen| screen.html_gaps.contains_key(&index))
+        {
+            continue;
+        }
         visit(
             &block.runs,
             block.depth.is_some(),
@@ -514,6 +521,25 @@ fn check_main(plan: &DocumentPlan, known: &[&str], nodes: &[Node]) -> Result<(),
         let body = nodes
             .get(at)
             .ok_or_else(|| mismatch(plan, "HTML block inventory"))?;
+        if let Some(gap) = screen.html_gaps.get(&index) {
+            let body = element(
+                plan,
+                known,
+                body,
+                "p",
+                &[("class", "gap")],
+                "HTML withheld block boundary",
+            )?;
+            text(
+                plan,
+                known,
+                body,
+                &gap.message,
+                "HTML withheld block sentence",
+            )?;
+            at += 1;
+            continue;
+        }
         if block.paragraph {
             let body = element(plan, known, body, "p", &[], "HTML paragraph boundary")?;
             runs(plan, known, &block.runs, body, false)?;
