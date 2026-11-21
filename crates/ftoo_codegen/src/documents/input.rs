@@ -222,7 +222,11 @@ fn check_projection(
         }
         toml::fixed(entry, &fields).map_err(boundary)?;
         let expected_languages = vec!["en".to_owned()];
-        let expected_targets = vec!["fragment".to_owned(), "markdown".to_owned()];
+        let expected_targets = vec![
+            "fragment".to_owned(),
+            "markdown".to_owned(),
+            "html".to_owned(),
+        ];
         let actual_languages = toml::typed(field(entry, "required-languages")?, ShapeKind::Array)
             .map_err(boundary)?
             .elements

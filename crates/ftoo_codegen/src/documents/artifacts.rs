@@ -285,7 +285,9 @@ pub(crate) fn publish(
         .filter(|file| {
             !prepared.artifacts.iter().any(|a| &a.path == *file)
                 && !(file.starts_with("generated/documents/")
-                    && (file.as_bytes().ends_with(b".md") || file.as_bytes().ends_with(b".tex")))
+                    && (file.as_bytes().ends_with(b".md")
+                        || file.as_bytes().ends_with(b".tex")
+                        || file.as_bytes().ends_with(b".html")))
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -311,7 +313,9 @@ pub(crate) fn publish(
     for file in old {
         if !prepared.artifacts.iter().any(|a| a.path == file)
             && file.starts_with("generated/documents/")
-            && (file.as_bytes().ends_with(b".md") || file.as_bytes().ends_with(b".tex"))
+            && (file.as_bytes().ends_with(b".md")
+                || file.as_bytes().ends_with(b".tex")
+                || file.as_bytes().ends_with(b".html"))
         {
             let path = root.join(&file);
             before(DocumentIoOperation::Remove, &path)

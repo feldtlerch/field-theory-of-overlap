@@ -3,6 +3,8 @@
 pub(crate) mod artifacts;
 mod diagnostics;
 mod display;
+mod html;
+mod html_recovery;
 mod input;
 mod latex;
 mod lock_scan;
@@ -639,7 +641,16 @@ fn render_artifacts(
                         }
                     }
                     DocumentOutput::Html => {
-                        return Err(unsupported_html(plan));
+                        html::check_destinations(plan, selected)?;
+                        let path = html::destination(html::Destination::Artifact(plan));
+                        let source = html::render(plan, support, known_labels)?;
+                        check_rendered_bytes(&path, source.as_bytes(), &[])?;
+                        artifacts.push(DocumentArtifact {
+                            path,
+                            bytes: source.into_bytes(),
+                            origins: Vec::new(),
+                            emissions: Vec::new(),
+                        });
                     }
                 }
             }
@@ -836,20 +847,6 @@ fn fragment_text(block: &plan::Block) -> Result<&str, DocumentError> {
         ));
     }
     Ok(text)
-}
-
-fn unsupported_html(plan: &plan::DocumentPlan) -> DocumentError {
-    failure(
-        RuleId::M055,
-        AssemblyStage::Emission,
-        AssemblySite::Inventory {
-            path: format!("units/documents.toml: {}", plan.document),
-        },
-        AssemblyFault::UnknownToken {
-            value: "html".into(),
-            expected: vec!["implemented document output".into()],
-        },
-    )
 }
 
 fn document_sites(corpus: &ftoo_manifest::LanguageCheckedUnits) -> BTreeMap<String, UnitSite> {

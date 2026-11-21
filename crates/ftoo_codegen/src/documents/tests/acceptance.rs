@@ -936,7 +936,9 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                 DocumentOutput::Latex => {
                     expected.push(format!("generated/documents/{document}/en.tex"));
                 }
-                DocumentOutput::Html => panic!("HTML is not an admitted generated target"),
+                DocumentOutput::Html => {
+                    expected.push(format!("generated/documents/{document}/en.html"));
+                }
             }
         }
     }

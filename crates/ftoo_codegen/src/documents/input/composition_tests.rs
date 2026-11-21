@@ -66,7 +66,7 @@ fn scope_projections_refuse_changed_use_and_declaration() {
     changed.bytes = String::from_utf8(changed.bytes)
         .unwrap()
         .replace(
-            "targets = [\"fragment\", \"markdown\"]",
+            "targets = [\"fragment\", \"markdown\", \"html\"]",
             "targets = [\"fragment\"]",
         )
         .into_bytes();

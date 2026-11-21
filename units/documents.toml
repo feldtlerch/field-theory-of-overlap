@@ -6,9 +6,9 @@ targets = ["markdown", "latex"]
 
 [documents.paper-pilot]
 required-languages = ["en"]
-targets = ["fragment", "markdown"]
+targets = ["fragment", "markdown", "html"]
 paper-context = "paper"
 
 [documents.explainer-pilot]
 required-languages = ["en"]
-targets = ["fragment", "markdown"]
+targets = ["fragment", "markdown", "html"]

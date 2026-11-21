@@ -7,6 +7,7 @@ mod acceptance;
 mod brackets;
 mod displays;
 mod historical;
+mod html;
 pub(super) mod native_evidence;
 mod pending;
 mod spacing;
@@ -1310,7 +1311,7 @@ fn fragment_macro_follows_planned_quotation() {
         screen: None,
         blocks: vec![block],
     };
-    assert!(format!("{:?}", unsupported_html(&plan)).contains("html"));
+    assert!(super::html::prose_only(&plan).is_err());
     assert!(refuse_quoted_screen_targets(&plan, &[DocumentOutput::Fragment]).is_ok());
     plan.screen = Some(plan::ScreenPlan {
         gaps: vec![],
@@ -2763,6 +2764,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
     let obsolete = [
         "generated/documents/main/de.md",
         "generated/documents/main/fr.tex",
+        "generated/documents/main/zz.html",
     ];
     let prepared = PreparedDocuments {
         snapshot: None,
