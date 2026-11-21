@@ -6,7 +6,7 @@ import pathlib
 import subprocess
 import tomllib
 from common import digest, read, require, runtime, timed
-from prepare import prepare
+from prepare import prepare, scope_fragments
 
 INPUTS = ['tools/paper/inputs.py', 'tools/paper/prepare.py', 'tools/paper/common.py']
 
@@ -22,6 +22,7 @@ def inventory(repo):
                     for value in ast.literal_eval(node.value):
                         if value not in paths: paths.add(value); queue.append(value)
     paths.update(read(repo/'documents/paper-build/sources.tsv').splitlines())
+    paths.update(row[2] for row in scope_fragments(repo))
     settings = tomllib.loads(read(repo/'documents/paper-build/runtime.toml'))
     paths.add(settings['support-lock'])
     tracked = set(subprocess.check_output(['git', 'ls-files', '-z'], cwd=repo).decode('utf-8').split('\0'))

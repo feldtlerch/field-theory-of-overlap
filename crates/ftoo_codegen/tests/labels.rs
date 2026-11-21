@@ -298,10 +298,23 @@ fn w06_committed_projection_and_rust_books_have_identical_label_authority() {
         file: "units/documents.toml".into(),
         bytes: fs::read(root.join("units/documents.toml")).unwrap(),
     };
+    let all_units = load_unit_files(&root).unwrap();
+    let paper_labels = declaration.paper_context_unit_labels(&all_units).unwrap();
+    let permanent_files: std::collections::BTreeSet<_> = all_units
+        .units()
+        .iter()
+        .filter(|unit| !paper_labels.contains(unit.label().as_str()))
+        .map(|unit| unit.texts().values().next().unwrap().site().file.clone())
+        .collect();
     let statements = fs::read_dir(root.join("units/statements"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
-        .filter(|path| path.file_name().unwrap() != "reading-shadow.toml")
+        .filter(|path| {
+            permanent_files.contains(&format!(
+                "units/statements/{}",
+                path.file_name().unwrap().to_string_lossy()
+            ))
+        })
         .map(|path| UnitSource {
             file: format!(
                 "units/statements/{}",

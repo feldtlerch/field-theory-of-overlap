@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/coda.tex"
+
+[[scope.occurrences]]
+unit = "sec:coda:record-limit"
+role = "refrain"

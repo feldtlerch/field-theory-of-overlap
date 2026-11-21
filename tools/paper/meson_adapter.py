@@ -94,10 +94,10 @@ def documents_record(args):
         'tools/notation/.node-version', 'tools/notation/check.cjs',
     }
     directories = {}
-    for name in ('units/statements', 'units/skeletons', 'units/displays'):
+    for name in ('units/statements', 'units/skeletons', 'units/scopes', 'units/displays'):
         directory = repo / name
         present = directory.exists() or directory.is_symlink()
-        if not present and name != 'units/displays':
+        if not present and name not in ('units/displays', 'units/scopes'):
             raise RuntimeError('Missing document input directory: ' + name)
         if present:
             if not stat.S_ISDIR(directory.lstat().st_mode):

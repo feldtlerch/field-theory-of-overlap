@@ -40,13 +40,25 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
     assert!(source.contains("other way --- the fact"));
     assert!(source.contains("center's population"));
     assert!(source.contains("(\\ftag{src:nd}).}"));
+    let expected_gaps =
+        1 + std::fs::read_to_string(root.join("generated/documents/inclusions.tsv"))?
+            .lines()
+            .filter(|row| {
+                row.split('\t').nth(2).is_some_and(|fragment| {
+                    fragment.starts_with("generated/documents/paper-pilot/")
+                })
+            })
+            .count();
     for path in [
         "generated/documents/paper-pilot/en.md",
         "generated/documents/paper-pilot/en.labels.md",
     ] {
         let bytes = artifact(path).bytes();
         let rendered = std::str::from_utf8(bytes)?;
-        assert_eq!(rendered.matches("Not yet converted:").count(), 7);
+        assert_eq!(
+            rendered.matches("Not yet converted:").count(),
+            expected_gaps
+        );
         assert!(rendered.contains("other way — the fact"));
         assert!(rendered.contains("center’s population"));
         assert!(rendered.contains("&#40;src:nd"));
@@ -932,6 +944,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
         "generated/notation.tex".into(),
         "generated/notation-status.json".into(),
         "generated/addressing.tex".into(),
+        "generated/documents/inclusions.tsv".into(),
     ]);
     assert_eq!(
         prepared

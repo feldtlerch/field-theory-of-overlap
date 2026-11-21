@@ -86,6 +86,7 @@ pub enum RuleId {
     M073,
     M074,
     M078,
+    M079,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -107,7 +108,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 75] = [
+pub const RULES: [RuleSpec; 76] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -632,6 +633,13 @@ pub const RULES: [RuleSpec; 75] = [
         number: RuleId::M078,
         statement: "Each inherited source declaration has the admitted signature, decoded visual body and complete dependency closure, with named quantity, metric and registered-variance interfaces unchanged. Source syntax and its checked expression form a reviewed pairing, and each inherited definition has exactly one compared source declaration site among the recognised declaration and redefinition forms in the three named source files. Registered-variance declaration sites for each inherited name across those files equal its recorded count.",
         scope: "Every admitted inherited declaration in documents/paper/data/ftoo_symbols.tex, documents/paper/data/ftoo_symbols_historical.tex and documents/paper/data/ftoo_registers.tex, including its checked source bytes and declared checking interface; declaration sites in other files are outside this comparison.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M079,
+        statement: "Each excerpt occurrence is declared once in the one source scope record that names its paper source, with its document, unit and role; a second record for one source, a source outside the closed source list, an unknown document or role, or a repeated occurrence refuses, and the source holds exactly one marker line for each recorded unit (M055). Excerpt skeleton uses are ordered by the closed source list (documents/paper-build/sources.tsv) and then by marker line; document generation writes the two excerpt skeletons, and document checking refuses a committed excerpt skeleton whose uses differ before skeleton admission. Excerpt declarations remain authored and must equal the fixed excerpt template's required languages, targets and paper context. Document generation emits one inclusion list, checked byte for byte with the other generated documents; paper preparation consumes only that list and refuses a malformed row.",
+        scope: "Source scope records, excerpt document declarations and skeletons, and checked paper inclusions.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

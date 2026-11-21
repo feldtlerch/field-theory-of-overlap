@@ -15,6 +15,322 @@ use ftoo_manifest::{
 };
 use std::{collections::BTreeMap, fs, io, path::Path};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct Inclusion {
+    pub(super) source: String,
+    pub(super) unit: String,
+    pub(super) fragment: String,
+    pub(super) role: String,
+    pub(super) line: usize,
+}
+const EXCERPTS: [(&str, &str, Option<&str>); 2] = [
+    ("paper-pilot", "sec:pilot:paper-excerpt", Some("paper")),
+    ("explainer-pilot", "sec:pilot:explainer-excerpt", None),
+];
+pub(super) fn fragment_path(document: &str, unit: &str) -> String {
+    format!(
+        "generated/documents/{}/{}.tex",
+        document,
+        unit.replace(':', "-")
+    )
+}
+#[derive(Clone, Debug)]
+struct ScopeRecord {
+    source: String,
+    document: String,
+    occurrences: Vec<(String, String, UnitSite)>,
+    site: UnitSite,
+}
+fn field<'a>(node: &'a Node, name: &str) -> Result<&'a Node, DocumentError> {
+    node.fields
+        .iter()
+        .find(|(key, _, _)| key == name)
+        .map(|(_, _, value)| value)
+        .ok_or_else(|| {
+            boundary(Box::new(UnitDiagnostic {
+                rule: RuleId::M004,
+                stage: UnitStage::Shape,
+                unit: None,
+                language: None,
+                site: node.site.child(name),
+                fault: UnitFault::MissingField { name: name.into() },
+            }))
+        })
+}
+fn string_value(node: &Node) -> Result<String, DocumentError> {
+    Ok(toml::string(node).map_err(boundary)?.value)
+}
+fn mismatch(site: &UnitSite, record: &str, position: &str) -> DocumentError {
+    failure(
+        RuleId::M079,
+        AssemblyStage::Ownership,
+        AssemblySite::Source(site.clone()),
+        AssemblyFault::CompositionMismatch {
+            record: record.into(),
+            position: position.into(),
+        },
+    )
+}
+fn scope(source: &UnitSource) -> Result<ScopeRecord, DocumentError> {
+    let text = toml::encoding(source).map_err(boundary)?;
+    let tree = toml::parse(&source.file, text).map_err(boundary)?;
+    toml::numeric(&tree, text).map_err(boundary)?;
+    let root = toml::fixed(&tree, &["schema", "scope"]).map_err(boundary)?;
+    toml::typed(root[0], ShapeKind::Integer).map_err(boundary)?;
+    if toml::raw(root[0], text) != "1" {
+        return Err(boundary(Box::new(UnitDiagnostic {
+            rule: RuleId::M003,
+            stage: UnitStage::Shape,
+            unit: None,
+            language: None,
+            site: root[0].site.clone(),
+            fault: UnitFault::SchemaValue {
+                expected: "1".into(),
+                actual: toml::raw(root[0], text).into(),
+            },
+        })));
+    }
+    let scope = root[1];
+    let fields = toml::fixed(scope, &["document", "source", "occurrences"]).map_err(boundary)?;
+    let document = string_value(fields[0])?;
+    let path = string_value(fields[1])?;
+    if !path.starts_with("documents/paper/") || path.contains("..") {
+        return Err(mismatch(&fields[1].site, &source.file, "source"));
+    }
+    let occurrences = toml::typed(fields[2], ShapeKind::Array)
+        .map_err(boundary)?
+        .elements
+        .iter()
+        .enumerate()
+        .map(|(index, occurrence)| {
+            let fields = toml::fixed(occurrence, &["unit", "role"]).map_err(boundary)?;
+            let unit = string_value(fields[0])?;
+            let role = string_value(fields[1])?;
+            if !matches!(role.as_str(), "refrain" | "paragraph" | "quotation") {
+                return Err(mismatch(
+                    &fields[1].site,
+                    &source.file,
+                    &format!("occurrence {index}"),
+                ));
+            }
+            Ok((unit, role, occurrence.site.clone()))
+        })
+        .collect::<Result<Vec<_>, DocumentError>>()?;
+    Ok(ScopeRecord {
+        source: path,
+        document,
+        occurrences,
+        site: scope.site.clone(),
+    })
+}
+/// Derive excerpt uses and checked source inclusions from the source scopes.
+pub(super) fn composition(
+    root: &Path,
+    declaration: &UnitSource,
+    scope_sources: &[UnitSource],
+    skeletons: &[SkeletonDraft],
+) -> Result<Vec<Inclusion>, DocumentError> {
+    compose(root, declaration, scope_sources, Some(skeletons))
+}
+
+fn compose(
+    root: &Path,
+    declaration: &UnitSource,
+    scope_sources: &[UnitSource],
+    skeletons: Option<&[SkeletonDraft]>,
+) -> Result<Vec<Inclusion>, DocumentError> {
+    let text = toml::encoding(declaration).map_err(boundary)?;
+    let tree = toml::parse(&declaration.file, text).map_err(boundary)?;
+    let declared = field(&tree, "documents")?;
+    let master = read(root, "documents/paper-build/sources.tsv")?;
+    let master = std::str::from_utf8(&master)
+        .map_err(|_| mismatch(&declared.site, "sources.tsv", "encoding"))?;
+    let order: BTreeMap<_, _> = master
+        .lines()
+        .enumerate()
+        .map(|(index, path)| (path, index))
+        .collect();
+    let mut grouped: BTreeMap<String, Vec<(usize, Inclusion, UnitSite)>> = BTreeMap::new();
+    let mut seen_sources = std::collections::BTreeSet::new();
+    let mut seen_uses = std::collections::BTreeSet::new();
+    for source in scope_sources {
+        let record = scope(source)?;
+        if !seen_sources.insert(record.source.clone()) {
+            return Err(mismatch(&record.site, &source.file, "duplicate source"));
+        }
+        let Some(&source_order) = order.get(record.source.as_str()) else {
+            return Err(mismatch(&record.site, &source.file, "closed source list"));
+        };
+        if !EXCERPTS
+            .iter()
+            .any(|(document, _, _)| *document == record.document)
+        {
+            return Err(mismatch(&record.site, &source.file, "document"));
+        }
+        let bytes = read(root, &record.source)?;
+        for (index, (unit, role, site)) in record.occurrences.iter().enumerate() {
+            if !seen_uses.insert((record.document.clone(), unit.clone())) {
+                return Err(mismatch(site, &source.file, &format!("occurrence {index}")));
+            }
+            let marker = format!("% generated: {unit}");
+            let lines: Vec<_> = bytes.split(|byte| *byte == b'\n').collect();
+            let positions: Vec<_> = lines
+                .iter()
+                .enumerate()
+                .filter_map(|(line, bytes)| (*bytes == marker.as_bytes()).then_some(line + 1))
+                .collect();
+            if positions.len() != 1 {
+                return Err(failure(
+                    RuleId::M055,
+                    AssemblyStage::Ownership,
+                    AssemblySite::Source(site.clone()),
+                    AssemblyFault::UnknownToken {
+                        value: format!("marker {unit} in {}", record.source),
+                        expected: vec!["one declared marker line".into()],
+                    },
+                ));
+            }
+            let fragment = fragment_path(&record.document, unit);
+            let inclusion = Inclusion {
+                source: record.source.clone(),
+                unit: unit.clone(),
+                fragment,
+                role: role.clone(),
+                line: positions[0],
+            };
+            grouped.entry(record.document.clone()).or_default().push((
+                source_order,
+                inclusion,
+                site.clone(),
+            ));
+        }
+    }
+    check_projection(declared, skeletons, grouped)
+}
+
+fn check_projection(
+    declared: &Node,
+    skeletons: Option<&[SkeletonDraft]>,
+    mut grouped: BTreeMap<String, Vec<(usize, Inclusion, UnitSite)>>,
+) -> Result<Vec<Inclusion>, DocumentError> {
+    let mut result = Vec::new();
+    for (document, heading, context) in EXCERPTS {
+        let entry = field(declared, document)?;
+        let mut fields = vec!["required-languages", "targets"];
+        if context.is_some() {
+            fields.push("paper-context");
+        }
+        toml::fixed(entry, &fields).map_err(boundary)?;
+        let expected_languages = vec!["en".to_owned()];
+        let expected_targets = vec!["fragment".to_owned(), "markdown".to_owned()];
+        let actual_languages = toml::typed(field(entry, "required-languages")?, ShapeKind::Array)
+            .map_err(boundary)?
+            .elements
+            .iter()
+            .map(string_value)
+            .collect::<Result<Vec<_>, _>>()?;
+        let actual_targets = toml::typed(field(entry, "targets")?, ShapeKind::Array)
+            .map_err(boundary)?
+            .elements
+            .iter()
+            .map(string_value)
+            .collect::<Result<Vec<_>, _>>()?;
+        let actual_context = entry
+            .fields
+            .iter()
+            .find(|(name, _, _)| name == "paper-context")
+            .map(|(_, _, value)| string_value(value))
+            .transpose()?;
+        if actual_languages != expected_languages
+            || actual_targets != expected_targets
+            || actual_context.as_deref() != context
+        {
+            return Err(mismatch(&entry.site, document, "declaration"));
+        }
+        let mut uses = grouped.remove(document).unwrap_or_default();
+        uses.sort_by_key(|(order, inclusion, _)| (*order, inclusion.line));
+        if uses.is_empty() {
+            return Err(mismatch(&entry.site, document, "empty excerpt"));
+        }
+        if let Some(skeletons) = skeletons {
+            let draft = skeletons
+                .iter()
+                .find(|draft| draft.document.value == document)
+                .ok_or_else(|| mismatch(&declared.site, document, "skeleton"))?;
+            if draft.sections.len() != 1
+                || draft.sections[0].heading.value != heading
+                || draft.sections[0].children.len() != uses.len()
+            {
+                return Err(mismatch(&draft.document.site, document, "skeleton shape"));
+            }
+            for (index, (child, (_, inclusion, site))) in
+                draft.sections[0].children.iter().zip(&uses).enumerate()
+            {
+                let matches = match child {
+                    SkeletonChild::Unit(value) => {
+                        inclusion.role == "refrain" && value.value == inclusion.unit
+                    }
+                    SkeletonChild::Paragraph(value) => {
+                        inclusion.role == "paragraph" && value.value == inclusion.unit
+                    }
+                    SkeletonChild::Quotation(value) => {
+                        inclusion.role == "quotation" && value.value == inclusion.unit
+                    }
+                    SkeletonChild::Section(_) => false,
+                };
+                if !matches {
+                    return Err(mismatch(site, document, &format!("skeleton child {index}")));
+                }
+            }
+        }
+        result.extend(uses.into_iter().map(|(_, inclusion, _)| inclusion));
+    }
+    Ok(result)
+}
+
+pub(super) fn generate_projections(root: &Path) -> Result<(), DocumentError> {
+    use std::fmt::Write as _;
+    let declaration = UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: read(root, "units/documents.toml")?,
+    };
+    let files = discover(root, "units/scopes", false)?;
+    let scopes = sources(root, &files)?;
+    let inclusions = compose(root, &declaration, &scopes, None)?;
+    for (document, heading, _) in EXCERPTS {
+        let mut text = format!(
+            "schema = 1\n\n[skeleton]\ndocument = \"{document}\"\n\n[[skeleton.sections]]\nheading = \"{heading}\"\nchildren = [\n"
+        );
+        let selected: Vec<_> = inclusions
+            .iter()
+            .filter(|row| row.fragment == fragment_path(document, &row.unit))
+            .collect();
+        for (index, inclusion) in selected.iter().enumerate() {
+            let kind = if inclusion.role == "refrain" {
+                "unit"
+            } else {
+                &inclusion.role
+            };
+            let comma = if index + 1 == selected.len() { "" } else { "," };
+            writeln!(
+                text,
+                "  {{ kind = \"{kind}\", unit = \"{}\" }}{comma}",
+                inclusion.unit
+            )
+            .expect("string write");
+        }
+        text.push_str("]\n");
+        let path = root.join(format!("units/skeletons/{document}.toml"));
+        if fs::read(&path).map_err(|error| io_error(DocumentIoOperation::Read, &path, &error))?
+            != text.as_bytes()
+        {
+            fs::write(&path, text)
+                .map_err(|error| io_error(DocumentIoOperation::Write, &path, &error))?;
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn io_error(
     operation: DocumentIoOperation,
     path: &Path,
@@ -644,3 +960,6 @@ fn display_draft(tree: &Node) -> Result<ftoo_manifest::DisplayDraft, DocumentErr
     }
     Ok(ftoo_manifest::DisplayDraft { unit, kind, bodies })
 }
+
+#[cfg(test)]
+mod composition_tests;

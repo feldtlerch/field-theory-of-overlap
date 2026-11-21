@@ -89,6 +89,10 @@ pub enum AssemblyFault {
         value: String,
         expected: Vec<String>,
     },
+    CompositionMismatch {
+        record: String,
+        position: String,
+    },
     EmptySkeleton {
         document: String,
     },
@@ -280,7 +284,7 @@ impl AssemblyFault {
             Self::ReaderIdentity { .. } => 31,
             Self::DocumentaryTagTarget { .. } => 33,
             Self::Limit { .. } => 0,
-            Self::UnknownToken { .. } => 1,
+            Self::UnknownToken { .. } | Self::CompositionMismatch { .. } => 1,
             Self::EmptySkeleton { .. } => 2,
             Self::SkeletonMultiplicity { .. } => 3,
             Self::UnknownSkeletonDocument { .. } => 4,

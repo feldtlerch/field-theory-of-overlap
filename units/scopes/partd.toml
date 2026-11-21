@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/partD.tex"
+
+[[scope.occurrences]]
+unit = "sec:say:enemy-to-none"
+role = "refrain"

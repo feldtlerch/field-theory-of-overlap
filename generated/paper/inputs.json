@@ -37,6 +37,7 @@
     "generated/documents/explainer-pilot/sec-coda-record-limit.tex": "7092a8d2f9883853706207c05386ebd4938fb2cb5f9f518d1ab32a0e66dc5a86",
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
+    "generated/documents/inclusions.tsv": "f173623af5fa4e20bd1199c0239635f89f450a0f24da19969dc40b0aab6e0485",
     "generated/documents/paper-pilot/sec-coda-record-limit.tex": "5ef0afd8c91d085aaa545b7790d6ddbf4b1776e52f72d189566bc75cdbc1dc22",
     "generated/documents/paper-pilot/sec-reading-shadow.tex": "4e8117b1b6e59e3a60bf467c29f93e36d458386a17cc982e0c721ec16eff6e6e",
     "generated/documents/paper-pilot/sec-say-direction.tex": "5a6c5258c14720ead07f6ad4d4fbbce4ee0c0979cfcb8a8f9977d961d5b30c22",
@@ -47,7 +48,7 @@
     "tools/paper/bibroute.py": "2670cbf7a3fe5dbd78cf984201e5e6d09826748e370ed2ceb13529e150834b95",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
-    "tools/paper/inputs.py": "04b65bf5e937021383819ab1516c090232fc208a27d8171ee124f05c5aa82333",
-    "tools/paper/prepare.py": "d7f5e6984b8986e616f7429ac84e8a849c188b04c11a3c4f639a565986cb0452"
+    "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
+    "tools/paper/prepare.py": "ed50f87c49298ec110e13ac6e4e9adb012f917d87f2b8e5c743684ae487c2043"
   }
 }

@@ -17,7 +17,7 @@ mod retained;
 mod runtime;
 #[cfg(test)]
 mod tests;
-pub use artifacts::{check_documents, generate_documents};
+pub use artifacts::check_documents;
 pub use diagnostics::*;
 use ftoo_manifest::{
     AssemblySite, AssemblyStage, DocumentOutput, DocumentTarget, RuleId, SourceAnchor,
@@ -126,6 +126,16 @@ impl PreparedDocuments {
     pub fn projection(&self) -> &[u8] {
         &self.inputs["generated/manifest.json"]
     }
+}
+/// Regenerate excerpt skeleton projections before generating document artifacts.
+/// # Errors
+/// Reports invalid source scopes, projection writes, or document generation failures.
+pub fn generate_documents(
+    root: &Path,
+    support: &NativeSupport,
+) -> Result<PreparedDocuments, DocumentError> {
+    input::generate_projections(root)?;
+    artifacts::generate_documents(root, support)
 }
 fn failure(
     rule: RuleId,
@@ -305,10 +315,25 @@ pub(crate) fn prepare_context(
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let welded = ftoo_manifest::weld_units(&integrated).map_err(DocumentError::Weld)?;
     let skeleton_files = input::discover(root, "units/skeletons", false)?;
+    let scope_files = input::discover(root, "units/scopes", false)?;
     let display_files = input::discover(root, "units/displays", true)?;
     let sources = input::sources(root, &skeleton_files)?;
+    let scope_sources = input::sources(root, &scope_files)?;
     let display_sources = input::sources(root, &display_files)?;
     let (drafts, display_drafts) = input::assembly_sources(&sources, &display_sources)?;
+    let inclusions = input::composition(root, &declaration, &scope_sources, &drafts)?;
+    merge_checked_input(
+        &mut inputs,
+        "documents/paper-build/sources.tsv".into(),
+        input::read(root, "documents/paper-build/sources.tsv")?,
+    )?;
+    for inclusion in &inclusions {
+        merge_checked_input(
+            &mut inputs,
+            inclusion.source.clone(),
+            input::read(root, &inclusion.source)?,
+        )?;
+    }
     let (metadata, owner_sites) = metadata(&statements);
     let document_sites = document_sites(&corpus);
     let skeletons =
@@ -341,6 +366,7 @@ pub(crate) fn prepare_context(
     let sources: Vec<_> = std::iter::once(declaration)
         .chain(statements)
         .chain(sources)
+        .chain(scope_sources)
         .chain(display_sources)
         .collect();
     let snapshot = accepted
@@ -370,7 +396,7 @@ pub(crate) fn prepare_context(
         let mut plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
         plan::plan_screens(&mut plans, &selected, &book, &skeletons, &document_sites)?;
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
-        let artifacts = render_artifacts(
+        let mut artifacts = render_artifacts(
             root,
             &support,
             &book,
@@ -379,6 +405,28 @@ pub(crate) fn prepare_context(
             notation,
             &known_labels,
         )?;
+        let mut inclusion_text = String::new();
+        {
+            use std::fmt::Write as _;
+            for inclusion in &inclusions {
+                writeln!(
+                    inclusion_text,
+                    "{}\t{}\t{}\t{}\t{}",
+                    inclusion.source,
+                    inclusion.unit,
+                    inclusion.fragment,
+                    inclusion.role,
+                    inclusion.line
+                )
+                .expect("string write");
+            }
+        }
+        artifacts.push(DocumentArtifact {
+            path: "generated/documents/inclusions.tsv".into(),
+            bytes: inclusion_text.into_bytes(),
+            origins: Vec::new(),
+            emissions: Vec::new(),
+        });
         let mut prepared = finish_snapshot(
             root,
             inputs,
@@ -387,6 +435,7 @@ pub(crate) fn prepare_context(
             [
                 ("units/statements", statement_files, false),
                 ("units/skeletons", skeleton_files, false),
+                ("units/scopes", scope_files, false),
                 ("units/displays", display_files, true),
             ],
             artifacts,
@@ -405,7 +454,7 @@ fn finish_snapshot(
     mut inputs: BTreeMap<String, Vec<u8>>,
     markdown: &ftoo_manifest::CheckedMarkdown,
     sources: impl Iterator<Item = crate::UnitSource>,
-    inventories: [(&str, Vec<String>, bool); 3],
+    inventories: [(&str, Vec<String>, bool); 4],
     artifacts: Vec<DocumentArtifact>,
 ) -> Result<PreparedDocuments, DocumentError> {
     let _phase = crate::telemetry::Phase::new("documents.snapshot_io");
@@ -578,11 +627,7 @@ fn render_artifacts(
                     DocumentOutput::Fragment => {
                         for block in plan.blocks.iter().filter(|block| block.depth.is_none()) {
                             let source = fragment_line(block)?;
-                            let path = format!(
-                                "generated/documents/{}/{}.tex",
-                                plan.document,
-                                block.unit.replace(':', "-")
-                            );
+                            let path = input::fragment_path(&plan.document, &block.unit);
                             check_rendered_bytes(&path, source.as_bytes(), &[])?;
                             artifacts.push(DocumentArtifact {
                                 path,

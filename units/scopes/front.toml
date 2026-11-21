@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/front.tex"
+
+[[scope.occurrences]]
+unit = "sec:reading:shadow"
+role = "paragraph"

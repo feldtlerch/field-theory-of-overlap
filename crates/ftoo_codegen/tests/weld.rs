@@ -77,17 +77,28 @@ fn w13_committed_citation_has_complete_weld_and_unchanged_tag_indices() {
     assert_eq!(labels.units, expected.units);
     assert_eq!(labels.texts, expected.texts);
     assert_eq!(labels.tag_sites, expected.tag_sites);
+    let declaration = UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: std::fs::read(root.join("units/documents.toml")).unwrap(),
+    };
+    let paper_labels = declaration.paper_context_unit_labels(&corpus).unwrap();
+    let permanent_files: std::collections::BTreeSet<_> = corpus
+        .units()
+        .iter()
+        .filter(|unit| !paper_labels.contains(unit.label().as_str()))
+        .map(|unit| unit.texts().values().next().unwrap().site().file.clone())
+        .collect();
     let permanent = load_unit_sources(
-        UnitSource {
-            file: "units/documents.toml".into(),
-            bytes: std::fs::read(root.join("units/documents.toml")).unwrap(),
-        },
+        declaration,
         std::fs::read_dir(root.join("units/statements"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .filter(|path| {
                 path.extension().is_some_and(|ext| ext == "toml")
-                    && path.file_name().unwrap() != "reading-shadow.toml"
+                    && permanent_files.contains(&format!(
+                        "units/statements/{}",
+                        path.file_name().unwrap().to_string_lossy()
+                    ))
             })
             .map(|path| UnitSource {
                 file: format!(

@@ -434,6 +434,7 @@ fn actual_input_declarations_run_without_support() {
         "crates/ftoo_codegen/src/paper/mod.rs",
         "crates/ftoo_codegen/src/paper/tests.rs",
         "tools/paper/test_identities.py",
+        "tools/paper/test_composition.py",
         "tools/paper/ledger.py",
         "tools/paper/pdf_text.py",
         "documents/paper-build/label-mints.tsv",
@@ -441,6 +442,10 @@ fn actual_input_declarations_run_without_support() {
         "tools/paper/fixtures/leak-control.tex",
         "generated/manifest.json",
         "registry/documentary-tags.toml",
+        "units/documents.toml",
+        "units/skeletons/main.toml",
+        "units/skeletons/paper-pilot.toml",
+        "units/scopes/front.toml",
     ] {
         assert!(plan["inputs"].get(path).is_none(), "{path}");
     }
@@ -450,4 +455,12 @@ fn actual_input_declarations_run_without_support() {
         .status()
         .unwrap();
     assert!(status.success());
+    assert!(
+        Command::new("python3")
+            .args(["-B", "tools/paper/test_composition.py"])
+            .current_dir(&root)
+            .status()
+            .unwrap()
+            .success()
+    );
 }

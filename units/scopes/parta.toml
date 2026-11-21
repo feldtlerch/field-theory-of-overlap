@@ -1,0 +1,17 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/partA.tex"
+
+[[scope.occurrences]]
+unit = "sec:say:direction"
+role = "refrain"
+
+[[scope.occurrences]]
+unit = "sec:say:harm-enlargement"
+role = "refrain"
+
+[[scope.occurrences]]
+unit = "sec:say:wonder-beauty"
+role = "refrain"

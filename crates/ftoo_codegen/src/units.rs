@@ -5,7 +5,7 @@ mod tests;
 pub(crate) mod toml;
 use ftoo_manifest::{LanguageCheckedUnits, UnitDiagnostic, UnitErrors, admit_unit_drafts};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt, io,
     path::{Path, PathBuf},
 };
@@ -14,6 +14,23 @@ use std::{
 pub struct UnitSource {
     pub file: String,
     pub bytes: Vec<u8>,
+}
+impl UnitSource {
+    /// Labels of admitted units whose document declares paper context in this source.
+    /// # Errors
+    /// Refuses invalid declaration bytes through the ordinary declaration reader.
+    pub fn paper_context_unit_labels(
+        &self,
+        corpus: &LanguageCheckedUnits,
+    ) -> Result<BTreeSet<String>, UnitLoadError> {
+        let contexts = toml::paper_contexts(self).map_err(UnitLoadError::Admission)?;
+        Ok(corpus
+            .units()
+            .iter()
+            .filter(|unit| contexts.contains_key(unit.document()))
+            .map(|unit| unit.label().as_str().to_owned())
+            .collect())
+    }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnitIoOperation {

@@ -8,6 +8,39 @@ const DECLARATION: &str = "schema = 1\n[documents.main]\nrequired-languages = ['
 const STATEMENT: &str = "schema = 1\n[unit]\nid = 'sec:coefficients:first-value'\ndocument = 'main'\nmath = {}\n[unit.texts]\nen = 'The coefficient.'\n";
 
 #[test]
+fn paper_context_query_classifies_each_unit_by_declaration() {
+    let declaration = UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: b"schema = 1\n[documents.main]\nrequired-languages = ['en']\n[documents.paper]\nrequired-languages = ['en']\npaper-context = 'paper'\n".to_vec(),
+    };
+    let statements = [
+        ("one", "sec:fixture:one", "paper"),
+        ("two", "sec:fixture:two", "paper"),
+        ("three", "sec:fixture:three", "main"),
+    ]
+    .map(|(file, id, document)| UnitSource {
+        file: format!("units/statements/{file}.toml"),
+        bytes: format!("schema = 1\n[unit]\nid = '{id}'\ndocument = '{document}'\nmath = {{}}\n[unit.texts]\nen = 'A sentence.'\n").into_bytes(),
+    });
+    let corpus = load_unit_sources(declaration.clone(), statements.into()).unwrap();
+    assert_eq!(
+        declaration.paper_context_unit_labels(&corpus).unwrap(),
+        ["sec:fixture:one".to_owned(), "sec:fixture:two".to_owned()].into()
+    );
+    let mut without_context = declaration;
+    without_context.bytes = String::from_utf8(without_context.bytes)
+        .unwrap()
+        .replace("paper-context = 'paper'\n", "")
+        .into_bytes();
+    assert!(
+        without_context
+            .paper_context_unit_labels(&corpus)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn paper_context_resolution() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let projection = std::fs::read(root.join("generated/manifest.json")).unwrap();

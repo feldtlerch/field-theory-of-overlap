@@ -219,7 +219,12 @@ pub(crate) fn recheck(root: &Path, prepared: &PreparedDocuments) -> Result<(), D
             .recheck(root)
             .map_err(|error| DocumentError::Retention(Box::new(error)))?;
     }
-    for directory in ["units/statements", "units/skeletons", "units/displays"] {
+    for directory in [
+        "units/statements",
+        "units/skeletons",
+        "units/scopes",
+        "units/displays",
+    ] {
         let prefix = format!("{directory}/");
         compare_inventory(
             &prepared

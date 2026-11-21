@@ -9,19 +9,35 @@ from bibroute import derive
 from identities import emit
 from common import require, read, write, timed, runtime
 
-INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/paper-pilot/sec-say-direction.tex", "generated/documents/explainer-pilot/sec-say-direction.tex", "generated/documents/paper-pilot/sec-say-harm-enlargement.tex", "generated/documents/paper-pilot/sec-say-wonder-beauty.tex", "generated/documents/paper-pilot/sec-say-enemy-to-none.tex", "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex", "generated/documents/paper-pilot/sec-coda-record-limit.tex", "generated/documents/explainer-pilot/sec-coda-record-limit.tex", "generated/documents/paper-pilot/sec-reading-shadow.tex"]
+INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
 SOURCES = 'documents/paper/'
-FRAGMENTS = (
-    ('documents/paper/parts/front.tex', 'sec:reading:shadow', 'generated/documents/paper-pilot/sec-reading-shadow.tex', 'paragraph'),
-    ('documents/paper/parts/partA.tex', 'sec:say:direction', 'generated/documents/paper-pilot/sec-say-direction.tex', 'refrain'),
-    ('documents/paper/parts/partA.tex', 'sec:say:harm-enlargement', 'generated/documents/paper-pilot/sec-say-harm-enlargement.tex', 'refrain'),
-    ('documents/paper/parts/partA.tex', 'sec:say:wonder-beauty', 'generated/documents/paper-pilot/sec-say-wonder-beauty.tex', 'refrain'),
-    ('documents/paper/explainer/explainer.tex', 'sec:say:direction', 'generated/documents/explainer-pilot/sec-say-direction.tex', 'quotation'),
-    ('documents/paper/parts/partD.tex', 'sec:say:enemy-to-none', 'generated/documents/paper-pilot/sec-say-enemy-to-none.tex', 'refrain'),
-    ('documents/paper/explainer/explainer.tex', 'sec:say:enemy-to-none', 'generated/documents/explainer-pilot/sec-say-enemy-to-none.tex', 'quotation'),
-    ('documents/paper/parts/coda.tex', 'sec:coda:record-limit', 'generated/documents/paper-pilot/sec-coda-record-limit.tex', 'refrain'),
-    ('documents/paper/explainer/explainer.tex', 'sec:coda:record-limit', 'generated/documents/explainer-pilot/sec-coda-record-limit.tex', 'quotation'),
-)
+
+
+def scope_fragments(repository):
+    """Read the checked inclusion artifact emitted by document generation."""
+    rows = []
+    for number, row in enumerate(read(repository/'generated/documents/inclusions.tsv').splitlines(), 1):
+        fields = row.split('\t')
+        require(len(fields) == 5 and fields[4].isdecimal(),
+                'M079: Inclusion row differs: '+str(number))
+        source, unit, fragment, role, line = fields
+        require(source.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(source).parts
+                and role in ('refrain', 'paragraph', 'quotation') and int(line) > 0,
+                'M079: Inclusion row differs: '+str(number))
+        rows.append((source, unit, fragment, role, int(line)))
+    require(rows, 'M079: Checked inclusions absent')
+    return tuple(rows)
+
+
+def fixture_fragments():
+    """Read the script checkout's list for isolated source fixtures."""
+    return tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
+
+
+def __getattr__(name):
+    if name == 'FRAGMENTS':
+        return fixture_fragments()
+    raise AttributeError(name)
 
 
 def versioned(text, version, name):
@@ -46,14 +62,22 @@ def declared_fragments(repository, rows):
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
-    declared = {(source, unit) for source, unit, _, _ in FRAGMENTS}
-    require(len(declared) == len(FRAGMENTS), 'Duplicate fragment slot')
-    for source, unit, fragment, role in FRAGMENTS:
+    if (repository/'generated/documents/inclusions.tsv').exists():
+        fragments = scope_fragments(repository)
+    else:
+        # This fallback serves only test_identities.py fixtures until they copy the list.
+        fragments = tuple((*row, next((number for number, content in
+                           enumerate((repository/row[0]).read_bytes().splitlines(), 1)
+                           if content == ('% generated: '+row[1]).encode()), 0))
+                          for row in fixture_fragments())
+    declared = {(source, unit) for source, unit, _, _, _ in fragments}
+    require(len(declared) == len(fragments), 'Duplicate fragment slot')
+    for source, unit, fragment, role, line in fragments:
         require(source in rows, 'Fragment source declaration differs: '+source)
         lines = (repository/source).read_bytes().splitlines(keepends=True)
         marker = ('% generated: '+unit+'\n').encode()
-        positions = [number for number, line in enumerate(lines, 1) if line == marker]
-        require(len(positions) == 1, 'Fragment marker/declaration differs: '+source+':'+unit)
+        positions = [number for number, content in enumerate(lines, 1) if content == marker]
+        require(positions == [line], 'M055: Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
         expected_macro = {'quotation': b'paperrefrain', 'refrain': b'refrain',
                           'paragraph': b'PaperNativeParagraph'}[role]
@@ -85,18 +109,16 @@ def declared_fragments(repository, rows):
         data = (repository/source).read_bytes()
         for match in re.finditer(rb'\\(?:paper)?refrain\{([^}]*)\}\{([^}]*)\}', data, re.S):
             label, body = match.groups()
-            require(label not in {unit.encode() for _, unit, _, _ in FRAGMENTS}
+            require(label not in {unit.encode() for _, unit, _, _, _ in fragments}
                     and b' '.join(body.split()) not in bodies,
                     'Authored refrain duplicates a declared fragment: '+source)
-        for _, unit, _, _ in FRAGMENTS:
+        for _, unit, _, _, _ in fragments:
             require(not re.search(rb'\\label\{'+re.escape(unit.encode())+rb'\}', data),
                     'Authored mint duplicates a declared fragment: '+source)
         normalized = b' '.join(data.split())
         for paragraph_body in paragraph_bodies:
             require(paragraph_body not in normalized,
                     'M055: Authored paragraph duplicates a declared fragment: '+source)
-    require(all(fragment in INPUTS for _, _, fragment, _ in FRAGMENTS),
-            'Declared fragment absent from receipt inputs')
     for source in rows:
         for number, line in enumerate((repository/source).read_bytes().splitlines(), 1):
             marker = re.match(rb'\s*%\s*generated\s*:', line)
