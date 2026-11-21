@@ -19,6 +19,7 @@ from ledger import leaks, occurrence_differences, ledger_binding, check_destinat
 from prepare import declared_fragments, versioned, paper_master, scope_fragments
 
 FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
+PARENT_REVISION = '68643f63939af28693897b84478e1e4988c40e32'
 
 
 class Identities(unittest.TestCase):
@@ -42,13 +43,13 @@ class Identities(unittest.TestCase):
             path = self.root / ('before-' + document + '.pdf')
             if not path.exists():
                 path.write_bytes(compare_words.git(
-                    source, 'show', '68643f6:generated/paper/' + document + '.pdf'))
+                    source, 'show', PARENT_REVISION + ':generated/paper/' + document + '.pdf'))
             before[document] = path
         args = argparse.Namespace(repository=source, before_paper=before['paper'],
                                   before_explainer=before['explainer'],
                                   after_paper=source/'generated/paper/paper.pdf',
                                   after_explainer=source/'generated/paper/explainer.pdf',
-                                  before_source='68643f6:documents/paper/parts/front.tex:203-207',
+                                  before_source=PARENT_REVISION + ':documents/paper/parts/front.tex:203-207',
                                   unit='sec:reading:shadow', output=output)
         for key, value in (options or {}).items():
             setattr(args, key, value)
@@ -417,7 +418,7 @@ class Identities(unittest.TestCase):
         source = pathlib.Path(__file__).resolve().parents[2]
         invalid_before = self.root / 'invalid-before.pdf'
         invalid_before.write_bytes(compare_words.git(
-            source, 'show', '68643f6:generated/paper/paper.pdf') + b'!')
+            source, 'show', PARENT_REVISION + ':generated/paper/paper.pdf') + b'!')
         exit_code, result = self.conversion_run(options={'before_paper': invalid_before})
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
         self.assertEqual(result['faults'][0]['code'], 'InputInvalid')
@@ -498,13 +499,13 @@ class Identities(unittest.TestCase):
                           result['faults'][0]['detail']),
                          ('InputChanged', 'final', 'candidate PDF changed after capture'))
         historical = compare_words.source_blob(
-            source, '68643f6:documents/paper/parts/front.tex:203-207')
+            source, PARENT_REVISION + ':documents/paper/parts/front.tex:203-207')
         self.assertIn('One may assume naively', historical['body'])
         self.assertNotIn('One may assume naively',
                          ''.join((source/'documents/paper/parts/front.tex').read_text().splitlines(
                              keepends=True)[202:207]))
-        for selector in ('-bad:paragraph.tex:1-2', '68643f6:/escape:1-2',
-                         '68643f6:documents/paper/parts/front.tex:203-206'):
+        for selector in ('-bad:paragraph.tex:1-2', PARENT_REVISION + ':/escape:1-2',
+                         PARENT_REVISION + ':documents/paper/parts/front.tex:203-206'):
             with self.assertRaises(compare_words.Fault) as raised:
                 compare_words.source_blob(source, selector)
             self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
