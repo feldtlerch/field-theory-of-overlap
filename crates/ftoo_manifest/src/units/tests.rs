@@ -1,6 +1,101 @@
 use super::*;
 
 #[test]
+fn inline_style_scanner_retains_spans_and_child_identities() {
+    for kind in ["emphasis", "strong", "smallcaps", "regular"] {
+        let source =
+            format!("See @{kind}{{a `dec:weld:equal-address-sets` ``name`` @tag{{c:1}}}}.");
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = source.clone();
+        let admitted = admit_unit_drafts(documents, units).unwrap();
+        let text = &admitted.units()[0].texts()["en"];
+        let styles: Vec<_> = text.style_occurrences().collect();
+        let start = source.find('@').unwrap();
+        let end = source.rfind('}').unwrap() + 1;
+        assert_eq!(styles.len(), 1);
+        assert_eq!(styles[0].0, kind);
+        assert_eq!(styles[0].1, start + kind.len() + 2..end - 1);
+        assert_eq!(styles[0].2.decoded, Some(start..end));
+        assert_eq!(styles[0].2.occurrence, Some(0));
+        let tag_start = source.find("@tag{c:1}").unwrap();
+        assert_eq!(
+            text.tag_occurrences()[0].site().decoded,
+            Some(tag_start..tag_start + 9)
+        );
+    }
+}
+
+#[test]
+fn inline_style_scanner_refuses_located_bad_boundaries() {
+    use InsertionReason::*;
+    for (source, reason, fragment) in [
+        ("See @emphasis{", Unclosed, "@emphasis{"),
+        ("See @emphasis{}.", EmptyStyle, "@emphasis{}"),
+        ("See @emphasis{ a}.", BoundaryWhitespace, "@emphasis{ a}"),
+        ("See @emphasis{a }.", BoundaryWhitespace, "@emphasis{a }"),
+        ("See @emphasis{a @strong{b}}.", NestedStyle, "@strong{"),
+        ("See @emphasis{a{b}.", NestedBrace, "{"),
+        ("See @emphasis{a @unknown{b}}.", UnknownForm, "@u"),
+        (
+            "See @emphasis{a}@emphasis{b}.",
+            AdjacentStyle,
+            "@emphasis{b}",
+        ),
+        ("See @emphasis{@math{x}}.", StyledMath, "@math{x}"),
+        ("See @strong{@math{x}}.", StyledMath, "@math{x}"),
+        ("See @smallcaps{@math{x}}.", StyledMath, "@math{x}"),
+        ("See @regular{@math{x}}.", StyledMath, "@math{x}"),
+        ("See @emphasis{a*b}.", OwnCloser, "*"),
+        ("See @strong{a**b}.", OwnCloser, "**"),
+    ] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = source.into();
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        let diagnostic = &error.diagnostics()[0];
+        let start = if reason == AdjacentStyle {
+            source.rfind("@emphasis{").unwrap()
+        } else if reason == NestedBrace {
+            source.rfind('{').unwrap()
+        } else if matches!(reason, Unclosed | EmptyStyle | BoundaryWhitespace) {
+            source.find("@emphasis{").unwrap()
+        } else {
+            source.find(fragment).unwrap()
+        };
+        let end = if matches!(reason, Unclosed | EmptyStyle | BoundaryWhitespace) {
+            source.rfind('}').map_or(source.len(), |at| at + 1)
+        } else if reason == AdjacentStyle {
+            start + "@emphasis{".len()
+        } else {
+            start + fragment.len()
+        };
+        assert_eq!(diagnostic.site.decoded, Some(start..end), "{source}");
+        assert!(
+            matches!(&diagnostic.fault, UnitFault::MalformedInsertion { reason: actual, .. } if *actual == reason),
+            "{source}: {diagnostic:?}"
+        );
+    }
+}
+
+#[test]
+fn inline_style_fault_counts_prior_insertion_and_open_style() {
+    let source = "See @tag{c:1} @emphasis{a{b}.";
+    let (documents, mut units) = fixtures();
+    units[0].texts.get_mut("en").unwrap().value.value = source.into();
+    let error = admit_unit_drafts(documents, units).unwrap_err();
+    let diagnostic = &error.diagnostics()[0];
+    let brace = source.rfind('{').unwrap();
+    assert_eq!(diagnostic.site.decoded, Some(brace..brace + 1));
+    assert_eq!(diagnostic.site.occurrence, Some(1));
+    assert!(matches!(
+        diagnostic.fault,
+        UnitFault::MalformedInsertion {
+            reason: InsertionReason::NestedBrace,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn w07_span_grammar_exact_faults_and_first_decisive_ranges() {
     use LabelSpanReason::*;
     for (token, reason, fragment) in [
@@ -858,7 +953,7 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M041,
-            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar.",
+            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics.",
             "Every authored statement text, shared math entry and local math insertion.",
         ),
     ];

@@ -101,6 +101,12 @@ pub enum InsertionReason {
     Unclosed,
     NestedBrace,
     BadMathName,
+    NestedStyle,
+    EmptyStyle,
+    BoundaryWhitespace,
+    AdjacentStyle,
+    StyledMath,
+    OwnCloser,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

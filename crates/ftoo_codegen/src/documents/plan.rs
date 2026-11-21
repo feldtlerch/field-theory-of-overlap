@@ -8,6 +8,37 @@ use ftoo_manifest::{
     RuleId, SourceOrigin, UnitSite, WeldedUnits,
 };
 use std::collections::{BTreeMap, BTreeSet};
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum StyleKind {
+    Emphasis,
+    Strong,
+    Smallcaps,
+    Regular,
+}
+impl StyleKind {
+    fn from_checked(value: &str) -> Self {
+        match value {
+            "emphasis" => Self::Emphasis,
+            "strong" => Self::Strong,
+            "smallcaps" => Self::Smallcaps,
+            "regular" => Self::Regular,
+            _ => unreachable!("checked style kind"),
+        }
+    }
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Emphasis => "emphasis",
+            Self::Strong => "strong",
+            Self::Smallcaps => "smallcaps",
+            Self::Regular => "regular",
+        }
+    }
+}
+impl std::fmt::Display for StyleKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
 #[cfg(test)]
 #[path = "tests/citations.rs"]
 pub(super) mod citation_tests;
@@ -48,6 +79,12 @@ pub(super) enum Inline {
         text: String,
         site: UnitSite,
     },
+    Styled {
+        kind: StyleKind,
+        children: Vec<Inline>,
+        child_sites: Vec<UnitSite>,
+        site: UnitSite,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,6 +102,10 @@ enum Recovered {
         token: Option<String>,
     },
     Mention(String),
+    Styled {
+        kind: StyleKind,
+        children: Vec<Recovered>,
+    },
 }
 
 fn entity(text: &str, code: bool) -> Option<(char, usize)> {
@@ -115,6 +156,12 @@ fn inline_handle(run: &Inline) -> Option<&str> {
         _ => None,
     }
 }
+fn inline_handles(run: &Inline) -> Vec<&str> {
+    match run {
+        Inline::Styled { children, .. } => children.iter().flat_map(inline_handles).collect(),
+        _ => inline_handle(run).into_iter().collect(),
+    }
+}
 fn recover_markdown<'a>(
     body: &str,
     handles: impl Iterator<Item = &'a str>,
@@ -153,10 +200,28 @@ fn recover_markdown<'a>(
                 }
             });
             at += comment_prefix + end + 4;
+        } else if tail.starts_with('*') {
+            flush_text(&mut output, &mut text);
+            let (kind, delimiter) = if tail.starts_with("**") {
+                (StyleKind::Strong, "**")
+            } else {
+                (StyleKind::Emphasis, "*")
+            };
+            let inside = tail.strip_prefix(delimiter)?;
+            let end = inside.find(delimiter)?;
+            if end == 0 {
+                return None;
+            }
+            let children = recover_markdown(&inside[..end], handles.iter().copied())?;
+            output.push(Recovered::Styled { kind, children });
+            at += delimiter.len() * 2 + end;
         } else if let Some(tail) = tail.strip_prefix("<code>") {
             flush_text(&mut output, &mut text);
             let end = tail.find("</code>")?;
             let value = decode_code(&tail[..end])?;
+            if super::markdown::code(&value) != body[at..at + 6 + end + 7] {
+                return None;
+            }
             at += 6 + end + 7;
             output.push(Recovered::Mention(value));
         } else if let Some(tail) = tail.strip_prefix("$`") {
@@ -172,7 +237,9 @@ fn recover_markdown<'a>(
             at += n;
         } else {
             let c = tail.chars().next()?;
-            if matches!(c, '<' | '>' | '`' | '\n' | '\r') {
+            // This accepts raw ASCII punctuation that markdown::text encodes in authored text.
+            // Heading, pending-notation, coverage and refrain frames share this path; strict refusal needs separate authored and frame bytes.
+            if matches!(c, '<' | '>' | '`' | '*' | '\n' | '\r') {
                 return None;
             }
             text.push(c);
@@ -183,7 +250,13 @@ fn recover_markdown<'a>(
     (!output.iter().any(literal_recovered)).then_some(output)
 }
 fn literal_recovered(run: &Recovered) -> bool {
-    matches!(run,Recovered::Text(text)|Recovered::Mention(text) if !ftoo_manifest::reader_label_literals(text).is_empty())
+    match run {
+        Recovered::Text(text) | Recovered::Mention(text) => {
+            !ftoo_manifest::reader_label_literals(text).is_empty()
+        }
+        Recovered::Styled { children, .. } => children.iter().any(literal_recovered),
+        _ => false,
+    }
 }
 fn tex_literal(tail: &str) -> Option<(char, usize)> {
     for (spelling, c) in [
@@ -342,19 +415,61 @@ pub(super) fn check_sweep_pending(source: &str, entries: &[crate::PendingEntry])
 // commands emit a nonblank token; comments discard their endline. Explicit
 // control spaces expand independently of the input processor's blank state.
 fn recover_latex(body: &str) -> Option<Vec<Recovered>> {
-    recover_tex(body, false)
+    recover_tex(body, false, TexLine::NewLine)
 }
 fn recover_prose_latex(body: &str) -> Option<Vec<Recovered>> {
-    recover_tex(body, true)
+    recover_tex(body, true, TexLine::NewLine)
 }
-fn recover_tex(body: &str, prose: bool) -> Option<Vec<Recovered>> {
+fn tex_group_end(body: &str) -> Option<usize> {
+    let mut depth = 1usize;
+    let mut chars = body.char_indices().peekable();
+    while let Some((at, c)) = chars.next() {
+        if c == '\\'
+            && chars
+                .peek()
+                .is_some_and(|(_, next)| matches!(next, '{' | '}' | '%'))
+        {
+            chars.next();
+        } else if c == '%' {
+            while chars.peek().is_some_and(|(_, next)| *next != '\n') {
+                chars.next();
+            }
+        } else if c == '{' {
+            depth += 1;
+        } else if c == '}' {
+            depth -= 1;
+            if depth == 0 {
+                return Some(at);
+            }
+        }
+    }
+    None
+}
+#[allow(clippy::too_many_lines)] // One TeX decoder keeps style boundaries and child runs in order.
+fn recover_tex(body: &str, prose: bool, initial_line: TexLine) -> Option<Vec<Recovered>> {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut at = 0;
-    let mut line = TexLine::NewLine;
+    let mut line = initial_line;
     while at < body.len() {
         let tail = &body[at..];
-        if let Some(tail) = tail.strip_prefix(r"\FtdocTag{") {
+        if let Some((kind, prefix)) = [
+            (StyleKind::Emphasis, r"\emph{"),
+            (StyleKind::Strong, r"\textbf{"),
+            (StyleKind::Smallcaps, r"{\scshape "),
+            (StyleKind::Regular, r"{\normalfont "),
+        ]
+        .into_iter()
+        .find(|(_, prefix)| tail.starts_with(prefix))
+        {
+            flush_text(&mut output, &mut text);
+            let inside = &tail[prefix.len()..];
+            let end = tex_group_end(inside)?;
+            let children = recover_tex(&inside[..end], prose, TexLine::MidLine)?;
+            output.push(Recovered::Styled { kind, children });
+            at += prefix.len() + end + 1;
+            line = TexLine::MidLine;
+        } else if let Some(tail) = tail.strip_prefix(r"\FtdocTag{") {
             flush_text(&mut output, &mut text);
             let (handle, end) = recover_handle(tail)?;
             let rest = tail[end..].strip_prefix('{')?;
@@ -456,51 +571,59 @@ fn expected_runs_in_context(block: &Block, target: DocumentTarget, prose: bool) 
     block
         .runs
         .iter()
-        .filter_map(|run| {
-            Some(match run {
-                Inline::Text(text) if text.is_empty() => return None,
-                Inline::Text(text) => {
-                    // Recovery compares reader characters while legacy straight prose remains admitted.
-                    Recovered::Text(if prose && target == DocumentTarget::Latex {
-                        text.replace('\'', "’")
-                    } else {
-                        text.clone()
-                    })
-                }
-                Inline::Tag {
-                    handle,
-                    label,
-                    token,
-                    ..
-                } => Recovered::Tag {
-                    handle: handle.clone(),
-                    label: label.clone(),
-                    token: (target == DocumentTarget::Latex).then(|| token.clone()),
-                },
-                Inline::PaperTag { value, .. } => Recovered::Tag {
-                    handle: value.spelling.clone(),
-                    label: value.target.clone(),
-                    token: None,
-                },
-                Inline::Math {
-                    markdown, latex, ..
-                } => Recovered::Math(
-                    if target == DocumentTarget::Markdown {
-                        markdown
-                    } else {
-                        latex
-                    }
-                    .clone(),
-                ),
-                Inline::Citation { text, identity, .. } => Recovered::Citation {
-                    handle: identity.handle.clone(),
-                    label: text.clone(),
-                    token: (target == DocumentTarget::Latex).then(|| identity.token.clone()),
-                },
-                Inline::Mention { text, .. } => Recovered::Mention(text.clone()),
-            })
-        })
+        .filter_map(|run| expected_run(run, target, prose))
         .collect()
+}
+fn expected_run(run: &Inline, target: DocumentTarget, prose: bool) -> Option<Recovered> {
+    Some(match run {
+        Inline::Text(text) if text.is_empty() => return None,
+        Inline::Text(text) => {
+            // Recovery compares reader characters while legacy straight prose remains admitted.
+            Recovered::Text(if prose && target == DocumentTarget::Latex {
+                text.replace('\'', "’")
+            } else {
+                text.clone()
+            })
+        }
+        Inline::Tag {
+            handle,
+            label,
+            token,
+            ..
+        } => Recovered::Tag {
+            handle: handle.clone(),
+            label: label.clone(),
+            token: (target == DocumentTarget::Latex).then(|| token.clone()),
+        },
+        Inline::PaperTag { value, .. } => Recovered::Tag {
+            handle: value.spelling.clone(),
+            label: value.target.clone(),
+            token: None,
+        },
+        Inline::Math {
+            markdown, latex, ..
+        } => Recovered::Math(
+            if target == DocumentTarget::Markdown {
+                markdown
+            } else {
+                latex
+            }
+            .clone(),
+        ),
+        Inline::Citation { text, identity, .. } => Recovered::Citation {
+            handle: identity.handle.clone(),
+            label: text.clone(),
+            token: (target == DocumentTarget::Latex).then(|| identity.token.clone()),
+        },
+        Inline::Mention { text, .. } => Recovered::Mention(text.clone()),
+        Inline::Styled { kind, children, .. } => Recovered::Styled {
+            kind: *kind,
+            children: children
+                .iter()
+                .filter_map(|child| expected_run(child, target, prose))
+                .collect(),
+        },
+    })
 }
 #[allow(clippy::too_many_lines)] // Compare one complete candidate inventory, including captions and bodies.
 pub(super) fn check_emission(
@@ -661,7 +784,7 @@ fn excerpt_text(source: &str) -> Option<String> {
     Some(value.clone())
 }
 fn excerpt_paragraph(source: &str, block: &Block) -> Option<String> {
-    let actual = recover_markdown(source, block.runs.iter().filter_map(inline_handle))?;
+    let actual = recover_markdown(source, block.runs.iter().flat_map(inline_handles))?;
     (actual == expected_runs(block, DocumentTarget::Markdown))
         .then(|| block.runs.iter().map(canonical_run).collect())
 }
@@ -783,7 +906,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 if index > 0 {
                     if block.paragraph {
                         if let Some(found) =
-                            recover_markdown(body, block.runs.iter().filter_map(inline_handle))
+                            recover_markdown(body, block.runs.iter().flat_map(inline_handles))
                         {
                             for (run, recovered) in block.runs.iter().zip(found) {
                                 if let (
@@ -1140,13 +1263,31 @@ impl Block {
         origins
     }
     pub fn target_runs(&self, target: DocumentTarget) -> impl Iterator<Item = &Inline> {
-        self.runs.iter().chain(
-            self.displays
-                .get(&target)
-                .into_iter()
-                .flat_map(|body| body.regions.iter())
-                .flat_map(|region| region.runs.iter()),
-        )
+        let mut flattened = Vec::new();
+        flatten_runs(&self.runs, &mut flattened);
+        for region in self
+            .displays
+            .get(&target)
+            .into_iter()
+            .flat_map(|body| body.regions.iter())
+        {
+            flatten_runs(&region.runs, &mut flattened);
+        }
+        flattened.into_iter()
+    }
+}
+fn flatten_runs<'a>(runs: &'a [Inline], output: &mut Vec<&'a Inline>) {
+    for run in runs {
+        output.push(run);
+        if let Inline::Styled {
+            children,
+            child_sites,
+            ..
+        } = run
+        {
+            debug_assert_eq!(children.len(), child_sites.len());
+            flatten_runs(children, output);
+        }
     }
 }
 #[derive(Clone)]
@@ -1410,7 +1551,7 @@ fn check_coverage(
     let recovered = if target == DocumentTarget::Latex {
         recover_latex(slice)
     } else {
-        recover_markdown(slice, block.runs.iter().filter_map(inline_handle))
+        recover_markdown(slice, block.runs.iter().flat_map(inline_handles))
     };
     let declaration = if target == DocumentTarget::Latex
         && exact_literal(declaration, &plan.coverage.declaration)
@@ -1466,7 +1607,7 @@ fn check_audit_paragraphs(
         let actual = if target == DocumentTarget::Latex {
             recover_latex(source)
         } else {
-            recover_markdown(source, runs.iter().filter_map(inline_handle))
+            recover_markdown(source, runs.iter().flat_map(inline_handles))
         };
         {
             let records = |recovered: Option<&[Recovered]>, raw: &str| {
@@ -2041,9 +2182,11 @@ impl DocumentPlan {
                 },
                 site: block.site.clone(),
             });
-            for run in &block.runs {
+            let mut inline_runs = Vec::new();
+            flatten_runs(&block.runs, &mut inline_runs);
+            for run in inline_runs {
                 let (kind, value, site) = match run {
-                    Inline::Text(_) => continue,
+                    Inline::Text(_) | Inline::Styled { .. } => continue,
                     Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                     Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
                     Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
@@ -2530,22 +2673,90 @@ fn runs(
         &mut replacements,
     );
     replacements.sort_by_key(|(r, _)| r.start);
-    let mut runs = Vec::new();
-    let mut at = 0;
-    for (range, run) in replacements {
-        if at < range.start {
-            runs.push(Inline::Text(
-                text.text()[at..range.start].replace("@@", "@"),
-            ));
-        }
-        runs.push(run);
-        at = range.end;
-    }
-    if at < text.text().len() {
-        runs.push(Inline::Text(text.text()[at..].replace("@@", "@")));
-    }
+    let styles: Vec<_> = text
+        .style_occurrences()
+        .map(|(kind, body, site)| (StyleKind::from_checked(kind), body, site.clone()))
+        .collect();
+    let mut runs = scoped_runs(text.text(), 0..text.text().len(), &replacements, &styles);
     normalize(&mut runs);
     runs
+}
+fn scoped_runs(
+    source: &str,
+    scope: std::ops::Range<usize>,
+    replacements: &[(std::ops::Range<usize>, Inline)],
+    styles: &[(StyleKind, std::ops::Range<usize>, UnitSite)],
+) -> Vec<Inline> {
+    scoped_runs_with_sites(source, scope, replacements, styles, None).0
+}
+fn scoped_runs_with_sites(
+    source: &str,
+    scope: std::ops::Range<usize>,
+    replacements: &[(std::ops::Range<usize>, Inline)],
+    styles: &[(StyleKind, std::ops::Range<usize>, UnitSite)],
+    parent: Option<&UnitSite>,
+) -> (Vec<Inline>, Vec<UnitSite>) {
+    let mut runs = Vec::new();
+    let mut sites = Vec::new();
+    let mut at = scope.start;
+    while at < scope.end {
+        if let Some((kind, body, site)) = styles
+            .iter()
+            .find(|(_, _, site)| site.decoded.as_ref().is_some_and(|range| range.start == at))
+        {
+            let (children, child_sites) =
+                scoped_runs_with_sites(source, body.clone(), replacements, &[], Some(site));
+            runs.push(Inline::Styled {
+                kind: *kind,
+                children,
+                child_sites,
+                site: site.clone(),
+            });
+            sites.push(site.clone());
+            at = site.decoded.as_ref().expect("checked style span").end;
+            continue;
+        }
+        if let Some((range, run)) = replacements.iter().find(|(range, _)| range.start == at) {
+            runs.push(run.clone());
+            let mut site = match run {
+                Inline::Tag { site, .. }
+                | Inline::PaperTag { site, .. }
+                | Inline::Math { site, .. }
+                | Inline::Citation { site, .. }
+                | Inline::Mention { site, .. }
+                | Inline::Styled { site, .. } => site.clone(),
+                Inline::Text(_) => unreachable!("replacement is not text"),
+            };
+            site.decoded = Some(range.clone());
+            sites.push(site);
+            at = range.end;
+            continue;
+        }
+        let next = replacements
+            .iter()
+            .filter(|(range, _)| range.start > at)
+            .map(|(range, _)| range.start)
+            .chain(
+                styles
+                    .iter()
+                    .filter_map(|(_, _, site)| site.decoded.as_ref().map(|range| range.start))
+                    .filter(|start| *start > at),
+            )
+            .min()
+            .unwrap_or(scope.end)
+            .min(scope.end);
+        runs.push(Inline::Text(source[at..next].replace("@@", "@")));
+        let mut site = parent.cloned().unwrap_or_else(|| {
+            let mut site = super::input::site("generated/manifest.json");
+            site.decoded = Some(at..next);
+            site
+        });
+        site.decoded = Some(at..next);
+        site.occurrence = None;
+        sites.push(site);
+        at = next;
+    }
+    (runs, sites)
 }
 fn spans(
     index: usize,
@@ -2597,7 +2808,10 @@ fn spans(
 fn normalize(runs: &mut [Inline]) {
     let mut whitespace = false;
     for run in runs.iter_mut() {
-        if let Inline::Text(text) = run {
+        if let Inline::Styled { children, .. } = run {
+            normalize(children);
+            whitespace = false;
+        } else if let Inline::Text(text) = run {
             let mut output = String::new();
             for c in text.chars() {
                 if c.is_whitespace() {
@@ -2629,7 +2843,7 @@ fn recover_block(body: &str, block: &Block, target: DocumentTarget) -> Option<Ve
             .depth
             .map_or_else(String::new, |d| format!("{} ", "#".repeat(d)));
         body.strip_prefix(&heading)
-            .and_then(|body| recover_markdown(body, block.runs.iter().filter_map(inline_handle)))
+            .and_then(|body| recover_markdown(body, block.runs.iter().flat_map(inline_handles)))
     } else {
         let framed = if let Some(depth) = block.depth {
             let prefix = match depth {
@@ -2657,6 +2871,10 @@ fn canonical_run(run: &Inline) -> String {
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
         Inline::Mention { text, .. } => format!("``{text}``"),
+        Inline::Styled { kind, children, .. } => format!(
+            "@{kind}{{{}}}",
+            children.iter().map(canonical_run).collect::<String>()
+        ),
     }
 }
 fn recovered_tag_site(
@@ -2664,10 +2882,11 @@ fn recovered_tag_site(
     run: &Recovered,
     records: &[EmissionRecord],
 ) -> Option<UnitSite> {
+    let mut flattened = Vec::new();
+    flatten_runs(&block.runs, &mut flattened);
     let tag_sites: Vec<_> = if let Recovered::Tag { handle, .. } = run {
-        block
-            .runs
-            .iter()
+        flattened
+            .into_iter()
             .filter_map(|run| match run {
                 Inline::Tag {
                     handle: expected,
@@ -2696,9 +2915,10 @@ fn recovered_citation_site(
     records: &[EmissionRecord],
 ) -> Option<UnitSite> {
     if matches!(run, Recovered::Citation { .. }) {
-        let sites = block
-            .runs
-            .iter()
+        let mut flattened = Vec::new();
+        flatten_runs(&block.runs, &mut flattened);
+        let sites = flattened
+            .into_iter()
             .filter_map(|run| {
                 if let Inline::Citation { site, .. } = run {
                     Some(site)
@@ -2716,6 +2936,23 @@ fn recovered_citation_site(
         None
     }
 }
+enum RecoveryPart<'a> {
+    Open(StyleKind),
+    Close,
+    Run(&'a Recovered),
+}
+fn recovery_parts<'a>(runs: &'a [Recovered], output: &mut Vec<RecoveryPart<'a>>) {
+    for run in runs {
+        if let Recovered::Styled { kind, children } = run {
+            output.push(RecoveryPart::Open(*kind));
+            recovery_parts(children, output);
+            output.push(RecoveryPart::Close);
+        } else {
+            output.push(RecoveryPart::Run(run));
+        }
+    }
+}
+#[allow(clippy::too_many_lines)] // One record walk retains nested boundaries and identities.
 fn recovered_records(
     block: &Block,
     recovered: &[Recovered],
@@ -2725,7 +2962,20 @@ fn recovered_records(
     use std::fmt::Write;
     let mut records = vec![expected[0].clone()];
     let mut body = String::new();
-    for run in recovered {
+    let mut parts = Vec::new();
+    recovery_parts(recovered, &mut parts);
+    for part in parts {
+        let run = match part {
+            RecoveryPart::Open(kind) => {
+                write!(body, "@{kind}{{").expect("string write");
+                continue;
+            }
+            RecoveryPart::Close => {
+                body.push('}');
+                continue;
+            }
+            RecoveryPart::Run(run) => run,
+        };
         let (kind, value) = match run {
             Recovered::Text(text) => {
                 body.push_str(text);
@@ -2788,6 +3038,7 @@ fn recovered_records(
                 write!(body, "``{text}``").expect("string write");
                 (EmissionKind::Mention, text.clone())
             }
+            Recovered::Styled { .. } => unreachable!("flattened recovery part"),
         };
         let index = records.iter().filter(|r| r.kind == kind).count();
         let matching = expected
@@ -2868,12 +3119,13 @@ fn region_records(
     plan: &DocumentPlan,
     target: DocumentTarget,
 ) -> Vec<EmissionRecord> {
-    block
-        .runs
-        .iter()
+    let mut inline_runs = Vec::new();
+    flatten_runs(&block.runs, &mut inline_runs);
+    inline_runs
+        .into_iter()
         .filter_map(|run| {
             let (kind, value, site) = match run {
-                Inline::Text(_) => return None,
+                Inline::Text(_) | Inline::Styled { .. } => return None,
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                 Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
@@ -3433,38 +3685,58 @@ impl Block {
     ) -> Result<(), DocumentError> {
         let mut errors = vec![];
         let unit = self.unit.clone();
-        for run in self.runs.iter_mut().chain(
-            self.displays
-                .values_mut()
-                .flat_map(|body| body.regions.iter_mut())
-                .flat_map(|region| region.runs.iter_mut()),
-        ) {
-            if let Inline::Citation { identity, site, .. } = run {
-                let target = match &identity.position {
-                    ftoo_manifest::ReaderIdentityPosition::Citation { target, .. } => *target,
-                    _ => unreachable!("citation position"),
-                };
-                match book
-                    .reader_identity(identity.resolved.clone().expect("checked citation target"))
-                {
-                    Ok(handle) => identity.handle = handle,
-                    Err(fault) => collect_reader_error(
-                        &mut errors,
-                        reader_failure(
-                            fault,
-                            document,
-                            language,
-                            Some(&unit),
-                            target,
-                            identity.position.clone(),
-                            citation_origins(identity, site, &unit, language),
-                        ),
-                    ),
-                }
-            }
+        map_citations_in_runs(&mut self.runs, book, document, language, &unit, &mut errors);
+        for region in self
+            .displays
+            .values_mut()
+            .flat_map(|body| body.regions.iter_mut())
+        {
+            map_citations_in_runs(
+                &mut region.runs,
+                book,
+                document,
+                language,
+                &unit,
+                &mut errors,
+            );
         }
         AssemblyErrors::from_diagnostics(errors)
             .map_or(Ok(()), |errors| Err(DocumentError::Assembly(errors)))
+    }
+}
+fn map_citations_in_runs(
+    runs: &mut [Inline],
+    book: &ftoo_manifest::AddressBook<'_>,
+    document: &str,
+    language: &str,
+    unit: &str,
+    errors: &mut Vec<AssemblyDiagnostic>,
+) {
+    for run in runs {
+        if let Inline::Styled { children, .. } = run {
+            map_citations_in_runs(children, book, document, language, unit, errors);
+        } else if let Inline::Citation { identity, site, .. } = run {
+            let target = match &identity.position {
+                ftoo_manifest::ReaderIdentityPosition::Citation { target, .. } => *target,
+                _ => unreachable!("citation position"),
+            };
+            match book.reader_identity(identity.resolved.clone().expect("checked citation target"))
+            {
+                Ok(handle) => identity.handle = handle,
+                Err(fault) => collect_reader_error(
+                    errors,
+                    reader_failure(
+                        fault,
+                        document,
+                        language,
+                        Some(unit),
+                        target,
+                        identity.position.clone(),
+                        citation_origins(identity, site, unit, language),
+                    ),
+                ),
+            }
+        }
     }
 }
 
@@ -3509,9 +3781,10 @@ fn recovered_citation(
     label: &str,
     token: Option<&str>,
 ) -> super::CitationIdentity {
-    let candidates = block
-        .runs
-        .iter()
+    let mut flattened = Vec::new();
+    flatten_runs(&block.runs, &mut flattened);
+    let candidates = flattened
+        .into_iter()
         .filter_map(|run| {
             if let Inline::Citation { identity, .. } = run {
                 Some(identity)

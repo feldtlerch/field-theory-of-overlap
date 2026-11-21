@@ -21,6 +21,11 @@ pub enum AssemblyFault {
         key: String,
         definition_site: UnitSite,
     },
+    UnsupportedMarkdownStyle {
+        kind: String,
+        context: String,
+        reason: MarkdownStyleReason,
+    },
     UnsupportedPublicHandle {
         handle: String,
         character: char,
@@ -255,6 +260,24 @@ pub enum MarkdownMathReason {
     DirectMathAdjacency,
     DirectCodeMentionAdjacency,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StyleBoundarySide {
+    Start,
+    End,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StyleNeighbor {
+    Mathematics,
+    Style,
+    TagOrCitation,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MarkdownStyleReason {
+    UnsupportedKind,
+    UnobservedContext,
+    PunctuationEdge { side: StyleBoundarySide },
+    DirectAdjacency { neighbor: StyleNeighbor },
+}
 impl fmt::Display for AssemblyFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Self::DisplayTag { cause } = self {
@@ -268,6 +291,7 @@ impl AssemblyFault {
         match self {
             Self::UnsupportedParagraphBody { .. } => 48,
             Self::UnsupportedMarkdownMath { .. } => 47,
+            Self::UnsupportedMarkdownStyle { .. } => 49,
             Self::UnsupportedPublicHandle { .. } => 36,
             Self::MissingScreenTemplates { .. } => 37,
             Self::ExcerptShape { .. } => 38,

@@ -3412,8 +3412,11 @@ fn reader_fixture_corpus(text: &str) -> ftoo_manifest::LanguageCheckedUnits {
     .unwrap()
 }
 fn reader_citation_plan(book: &ftoo_manifest::AddressBook<'_>, label: &str) -> plan::DocumentPlan {
+    fixture_plan_from_text(book, &format!("See `{label}`."))
+}
+fn fixture_plan_from_text(book: &ftoo_manifest::AddressBook<'_>, text: &str) -> plan::DocumentPlan {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let corpus = reader_fixture_corpus(&format!("See `{label}`."));
+    let corpus = reader_fixture_corpus(text);
     let mut sources = crate::load_markdown_files(&root)
         .unwrap()
         .sources()
@@ -3429,6 +3432,559 @@ fn reader_citation_plan(book: &ftoo_manifest::AddressBook<'_>, label: &str) -> p
     let integrated = ftoo_manifest::integrate_labels(&resolved, &markdown).unwrap();
     let welded = ftoo_manifest::weld_units(&integrated).unwrap();
     plan::fixture_citation_plan(&welded)
+}
+
+#[test]
+fn checked_styles_cross_scanner_plan_writers_and_recovery() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    for kind in ["emphasis", "strong", "smallcaps", "regular"] {
+        let source = format!("See @{kind}{{A & B}}.");
+        let plan = fixture_plan_from_text(&book, &source);
+        let plan::Inline::Styled {
+            kind: actual,
+            children,
+            child_sites,
+            site,
+        } = &plan.blocks[0].runs[1]
+        else {
+            panic!("checked style missing")
+        };
+        assert_eq!(actual.as_str(), kind);
+        assert_eq!(children.len(), 1);
+        assert_eq!(
+            child_sites[0].decoded,
+            Some(4 + kind.len() + 2..4 + kind.len() + 7)
+        );
+        assert_eq!(child_sites[0].occurrence, None);
+        assert_eq!(site.decoded, Some(4..source.len() - 1));
+        assert_eq!(site.occurrence, Some(0));
+        let tex = latex::render(&plan);
+        let opener = match kind {
+            "emphasis" => r"\emph{",
+            "strong" => r"\textbf{",
+            "smallcaps" => r"{\scshape ",
+            "regular" => r"{\normalfont ",
+            _ => unreachable!("closed test kinds"),
+        };
+        assert!(tex.contains(&format!(r"{opener}A \& B}}")));
+        plan::check_emission(&plan, &tex, DocumentTarget::Latex).unwrap();
+        if matches!(kind, "emphasis" | "strong") {
+            markdown::check_math_admission(&plan).unwrap();
+            let md = markdown::render(&plan);
+            assert!(md.contains(if kind == "emphasis" {
+                "See *A &#38; B*."
+            } else {
+                "See **A &#38; B**."
+            }));
+            plan::check_emission(&plan, &md, DocumentTarget::Markdown).unwrap();
+        } else {
+            let error = markdown::check_math_admission(&plan).unwrap_err();
+            let DocumentError::Assembly(errors) = error else {
+                panic!("style diagnostic")
+            };
+            assert!(matches!(
+                errors.diagnostics()[0].fault,
+                AssemblyFault::UnsupportedMarkdownStyle {
+                    reason: diagnostics::MarkdownStyleReason::UnsupportedKind,
+                    ..
+                }
+            ));
+            assert_eq!(
+                errors.diagnostics()[0].site,
+                AssemblySite::Source(site.clone())
+            );
+        }
+    }
+}
+
+#[test]
+fn checked_style_recovery_refuses_boundary_and_identity_mutations() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let plan = fixture_plan_from_text(&book, "See @emphasis{one} @emphasis{two}.");
+    let md = markdown::render(&plan);
+    plan::check_emission(&plan, &md, DocumentTarget::Markdown).unwrap();
+    for mutated in [
+        md.replace("*one*", "o*ne*"),
+        md.replace("*one*", "one"),
+        md.replace("*one* *two*", "*one two*"),
+    ] {
+        let error = plan::check_emission(&plan, &mutated, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("emission diagnostic")
+        };
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::EmissionMismatch { .. }
+        ));
+    }
+    let plan = fixture_plan_from_text(
+        &book,
+        "See @emphasis{`dec:weld:equal-address-sets` and ``x&*``}.",
+    );
+    let plan::Inline::Styled {
+        children,
+        child_sites,
+        ..
+    } = &plan.blocks[0].runs[1]
+    else {
+        panic!("style")
+    };
+    assert!(matches!(children[0], plan::Inline::Citation { .. }));
+    assert!(matches!(children[2], plan::Inline::Mention { .. }));
+    let source = "See @emphasis{`dec:weld:equal-address-sets` and ``x&*``}.";
+    let cite_at = source.find("`dec:weld:equal-address-sets`").unwrap();
+    let mention_at = source.find("``x&*``").unwrap();
+    assert_eq!(child_sites[0].decoded, Some(cite_at..cite_at + 29));
+    assert_eq!(child_sites[2].decoded, Some(mention_at..mention_at + 7));
+    let tex = latex::render(&plan);
+    plan::check_emission(&plan, &tex, DocumentTarget::Latex).unwrap();
+    let md = markdown::render(&plan);
+    assert!(md.contains("<code>x&#38;&#42;</code>"));
+    plan::check_emission(&plan, &md, DocumentTarget::Markdown).unwrap();
+    let mutated = md.replace(
+        "<!-- cite dec:weld:equal-address-sets -->",
+        "<!-- cite dec:weld:other -->",
+    );
+    let error = plan::check_emission(&plan, &mutated, DocumentTarget::Markdown).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("identity diagnostic")
+    };
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::EmissionMismatch { .. }
+    ));
+}
+
+#[test]
+fn checked_style_tex_boundaries_and_markdown_context_are_checked() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    for (kind, opener) in [
+        ("emphasis", r"\emph{"),
+        ("strong", r"\textbf{"),
+        ("smallcaps", r"{\scshape "),
+        ("regular", r"{\normalfont "),
+    ] {
+        let plan = fixture_plan_from_text(&book, &format!("See @{kind}{{one}}."));
+        let tex = latex::render(&plan);
+        plan::check_emission(&plan, &tex, DocumentTarget::Latex).unwrap();
+        for changed in [
+            tex.replacen(&format!("{opener}one}}"), "one", 1),
+            tex.replacen("one}", "o}ne", 1),
+            tex.replacen(&format!("{opener}one}}"), &format!("{opener} one}}"), 1),
+        ] {
+            let error = plan::check_emission(&plan, &changed, DocumentTarget::Latex).unwrap_err();
+            let DocumentError::Assembly(errors) = error else {
+                panic!("emission diagnostic")
+            };
+            assert!(matches!(
+                errors.diagnostics()[0].fault,
+                AssemblyFault::EmissionMismatch { .. }
+            ));
+        }
+    }
+    let plan = fixture_plan_from_text(&book, "See @strong{one} @strong{two}.");
+    let md = markdown::render(&plan);
+    plan::check_emission(&plan, &md, DocumentTarget::Markdown).unwrap();
+    for changed in [
+        md.replace("**one**", "o**ne**"),
+        md.replace("**one**", "one"),
+        md.replace("**one** **two**", "**one two**"),
+    ] {
+        let error = plan::check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("emission diagnostic")
+        };
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::EmissionMismatch { .. }
+        ));
+    }
+    let pair = fixture_plan_from_text(&book, "See @emphasis{one} @emphasis{two}.");
+    let tex = latex::render(&pair);
+    let merged = tex.replace(r"\emph{one} \emph{two}", r"\emph{one two}");
+    assert_ne!(merged, tex);
+    let error = plan::check_emission(&pair, &merged, DocumentTarget::Latex).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("merged boundary diagnostic")
+    };
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::EmissionMismatch { .. }
+    ));
+    let escaped = fixture_plan_from_text(&book, "See @emphasis{A @@ B & C}.");
+    let tex = latex::render(&escaped);
+    assert!(tex.contains("A @ B"));
+    plan::check_emission(&escaped, &tex, DocumentTarget::Latex).unwrap();
+    let md = markdown::render(&escaped);
+    assert!(md.contains("A &#64; B &#38; C"));
+    plan::check_emission(&escaped, &md, DocumentTarget::Markdown).unwrap();
+}
+
+#[test]
+fn styled_children_and_canonical_markdown_are_compared() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let plan = fixture_plan_from_text(
+        &book,
+        "See @emphasis{`dec:weld:equal-address-sets` and ``x&*``}.",
+    );
+    let tex = latex::render(&plan);
+    let changed_cite = tex.replace(
+        "% cite dec:weld:equal-address-sets",
+        "% cite dec:fixture:source",
+    );
+    assert_ne!(changed_cite, tex);
+    let error = plan::check_emission(&plan, &changed_cite, DocumentTarget::Latex).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("cite identity diagnostic")
+    };
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::EmissionMismatch { .. }
+    ));
+    let md = markdown::render(&plan);
+    for changed in [
+        md.replace("<code>x&#38;&#42;</code>", "<code>y&#38;&#42;</code>"),
+        md.replace("<code>x&#38;&#42;</code>", "<code>x&amp;&#42;</code>"),
+    ] {
+        assert_ne!(changed, md);
+        let error = plan::check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("mention diagnostic")
+        };
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::EmissionMismatch { .. }
+        ));
+    }
+    let plan = fixture_plan_from_text(&book, "See @emphasis{one}.");
+    let md = markdown::render(&plan);
+    let changed = md.replace("*one*", "_one_");
+    assert_ne!(changed, md);
+    let error = plan::check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("spelling diagnostic")
+    };
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::EmissionMismatch { .. }
+    ));
+}
+
+#[test]
+fn styled_tag_keeps_its_checked_identity_through_both_writers() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let source = "See @strong{A @tag{c:1} B}.";
+    let plan = fixture_plan_from_text(&book, source);
+    let plan::Inline::Styled {
+        children,
+        child_sites,
+        ..
+    } = &plan.blocks[0].runs[1]
+    else {
+        panic!("styled run")
+    };
+    let tag_at = source.find("@tag{c:1}").unwrap();
+    assert_eq!(child_sites[1].decoded, Some(tag_at..tag_at + 9));
+    assert!(
+        matches!(&children[1], plan::Inline::Tag { label, .. } if label == "def:langevin:coefficient-one")
+    );
+    let tex = latex::render(&plan);
+    plan::check_emission(&plan, &tex, DocumentTarget::Latex).unwrap();
+    let md = markdown::render(&plan);
+    plan::check_emission(&plan, &md, DocumentTarget::Markdown).unwrap();
+    let changed = md.replace(
+        "<!-- label def:langevin:coefficient-one -->",
+        "<!-- label def:langevin:other -->",
+    );
+    assert_ne!(changed, md);
+    let error = plan::check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("tag identity diagnostic")
+    };
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::EmissionMismatch { .. }
+    ));
+}
+
+#[test]
+fn markdown_styles_refuse_unobserved_context_edges_and_math_adjacency() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    for kind in ["emphasis", "strong"] {
+        let mut plan = fixture_plan_from_text(&book, &format!("See @{kind}{{one}}."));
+        let plan::Inline::Styled { site, .. } = &plan.blocks[0].runs[1] else {
+            panic!("style")
+        };
+        let site = site.clone();
+        plan.blocks[0].depth = Some(1);
+        let error = markdown::check_math_admission(&plan).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("heading diagnostic")
+        };
+        assert_eq!(errors.diagnostics()[0].site, AssemblySite::Source(site));
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::UnsupportedMarkdownStyle {
+                reason: diagnostics::MarkdownStyleReason::UnobservedContext,
+                ..
+            }
+        ));
+    }
+    for (source, side) in [
+        (
+            "See x@emphasis{(a)} now.",
+            diagnostics::StyleBoundarySide::Start,
+        ),
+        ("@emphasis{a ``b``}x", diagnostics::StyleBoundarySide::End),
+    ] {
+        let plan = fixture_plan_from_text(&book, source);
+        let style = plan.blocks[0]
+            .runs
+            .iter()
+            .find_map(|run| match run {
+                plan::Inline::Styled { site, .. } => Some(site),
+                _ => None,
+            })
+            .unwrap();
+        let error = markdown::check_math_admission(&plan).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("edge diagnostic")
+        };
+        assert_eq!(
+            errors.diagnostics()[0].site,
+            AssemblySite::Source(style.clone())
+        );
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::UnsupportedMarkdownStyle {
+                reason: diagnostics::MarkdownStyleReason::PunctuationEdge { side: actual },
+                ..
+            } if actual == side
+        ));
+    }
+    let mut plan = fixture_plan_from_text(&book, "See @emphasis{one}.");
+    let style_site = match &plan.blocks[0].runs[1] {
+        plan::Inline::Styled { site, .. } => site.clone(),
+        _ => panic!("style"),
+    };
+    plan.blocks[0].runs.insert(
+        1,
+        plan::Inline::Math {
+            definition_site: style_site.clone(),
+            key: "x".into(),
+            markdown: "x".into(),
+            latex: "x".into(),
+            pending: vec![],
+            site: style_site.clone(),
+        },
+    );
+    let error = markdown::check_math_admission(&plan).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("math adjacency diagnostic")
+    };
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(style_site)
+    );
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::UnsupportedMarkdownStyle {
+            reason: diagnostics::MarkdownStyleReason::DirectAdjacency {
+                neighbor: diagnostics::StyleNeighbor::Mathematics
+            },
+            ..
+        }
+    ));
+}
+
+#[test]
+fn markdown_style_adjacencies_and_whitespace_edge_are_checked() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let positive = fixture_plan_from_text(&book, "See @emphasis{(a)} now.");
+    markdown::check_math_admission(&positive).unwrap();
+    let emitted = markdown::render(&positive);
+    assert!(emitted.contains("See *&#40;a&#41;* now."));
+    plan::check_emission(&positive, &emitted, DocumentTarget::Markdown).unwrap();
+    for (source, neighbor) in [
+        (
+            "See @strong{a.}@emphasis{b} now.",
+            diagnostics::StyleNeighbor::Style,
+        ),
+        (
+            "@emphasis{(a)}@strong{b}",
+            diagnostics::StyleNeighbor::Style,
+        ),
+        (
+            "See @tag{c:1}@emphasis{(a)} now.",
+            diagnostics::StyleNeighbor::TagOrCitation,
+        ),
+        (
+            "See `dec:weld:equal-address-sets`@emphasis{(a)} now.",
+            diagnostics::StyleNeighbor::TagOrCitation,
+        ),
+        (
+            "See @emphasis{(a)}@tag{c:1} now.",
+            diagnostics::StyleNeighbor::TagOrCitation,
+        ),
+    ] {
+        let plan = fixture_plan_from_text(&book, source);
+        let first_style = plan.blocks[0]
+            .runs
+            .iter()
+            .find_map(|run| match run {
+                plan::Inline::Styled { site, .. } => Some(site),
+                _ => None,
+            })
+            .unwrap();
+        let error = markdown::check_math_admission(&plan).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("style adjacency diagnostic")
+        };
+        assert_eq!(
+            errors.diagnostics()[0].site,
+            AssemblySite::Source(first_style.clone())
+        );
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::UnsupportedMarkdownStyle {
+                reason: diagnostics::MarkdownStyleReason::DirectAdjacency { neighbor: actual },
+                ..
+            } if actual == neighbor
+        ));
+    }
+    for before in [true, false] {
+        let mut plan = fixture_plan_from_text(&book, "See @emphasis{one}.");
+        let site = match &plan.blocks[0].runs[1] {
+            plan::Inline::Styled { site, .. } => site.clone(),
+            _ => panic!("styled run"),
+        };
+        plan.blocks[0].runs.insert(
+            if before { 1 } else { 2 },
+            plan::Inline::Math {
+                definition_site: site.clone(),
+                key: "x".into(),
+                markdown: "x".into(),
+                latex: "x".into(),
+                pending: vec![],
+                site: site.clone(),
+            },
+        );
+        let error = markdown::check_math_admission(&plan).unwrap_err();
+        let DocumentError::Assembly(errors) = error else {
+            panic!("math adjacency diagnostic")
+        };
+        assert_eq!(errors.diagnostics()[0].site, AssemblySite::Source(site));
+        assert!(matches!(
+            errors.diagnostics()[0].fault,
+            AssemblyFault::UnsupportedMarkdownStyle {
+                reason: diagnostics::MarkdownStyleReason::DirectAdjacency {
+                    neighbor: diagnostics::StyleNeighbor::Mathematics
+                },
+                ..
+            }
+        ));
+    }
+}
+
+fn assert_style_punctuation_outer_neighbor(source: &str, side: diagnostics::StyleBoundarySide) {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let plan = fixture_plan_from_text(&book, source);
+    let style_site = plan.blocks[0]
+        .runs
+        .iter()
+        .find_map(|run| match run {
+            plan::Inline::Styled { site, .. } => Some(site),
+            _ => None,
+        })
+        .unwrap();
+    let error = markdown::check_math_admission(&plan).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("punctuation edge diagnostic")
+    };
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(style_site.clone())
+    );
+    assert!(matches!(
+        errors.diagnostics()[0].fault,
+        AssemblyFault::UnsupportedMarkdownStyle {
+            reason: diagnostics::MarkdownStyleReason::PunctuationEdge { side: actual },
+            ..
+        } if actual == side
+    ));
+}
+
+#[test]
+fn markdown_style_degree_outer_neighbor_refuses() {
+    assert_style_punctuation_outer_neighbor(
+        "5°@emphasis{(a)} now.",
+        diagnostics::StyleBoundarySide::Start,
+    );
+}
+
+#[test]
+fn markdown_style_arrow_outer_neighbor_refuses() {
+    assert_style_punctuation_outer_neighbor(
+        "@emphasis{a ``b``}→ now.",
+        diagnostics::StyleBoundarySide::End,
+    );
+}
+
+#[test]
+fn markdown_style_soft_hyphen_outer_neighbor_refuses() {
+    assert_style_punctuation_outer_neighbor(
+        "5\u{00ad}@emphasis{(a)} now.",
+        diagnostics::StyleBoundarySide::Start,
+    );
+}
+
+#[test]
+fn markdown_style_screen_paragraph_is_unobserved() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let mut plan = fixture_plan_from_text(&book, "See @emphasis{one}.");
+    let site = match &plan.blocks[0].runs[1] {
+        plan::Inline::Styled { site, .. } => site.clone(),
+        _ => panic!("styled run"),
+    };
+    let heading = plan::Block {
+        pending_names: std::collections::BTreeMap::new(),
+        displays: std::collections::BTreeMap::new(),
+        unit: "sec:fixture:screen-heading".into(),
+        depth: Some(1),
+        quotation: false,
+        paragraph: false,
+        site: site.clone(),
+        runs: vec![plan::Inline::Text("Screen".into())],
+    };
+    plan.blocks.insert(0, heading);
+    plan.blocks[1].paragraph = true;
+    assert!(plan.blocks[1].paragraph);
+    plan.screen = Some(plan::ScreenPlan {
+        gaps: vec![],
+        refrains: vec![],
+    });
+    let error = markdown::check_math_admission(&plan).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("screen diagnostic")
+    };
+    assert_eq!(errors.diagnostics()[0].site, AssemblySite::Source(site));
+    assert!(matches!(
+        &errors.diagnostics()[0].fault,
+        AssemblyFault::UnsupportedMarkdownStyle {
+            context,
+            reason: diagnostics::MarkdownStyleReason::UnobservedContext,
+            ..
+        } if context == "refrain HTML block"
+    ));
 }
 
 #[test]

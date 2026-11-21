@@ -315,8 +315,29 @@ fn math_byte_and_group_limits_have_exact_boundary_controls()
 fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
     let previous: [RuleSpec; 52] = include!("../../tests/fixtures/assembly/rules_before.rs");
     assert_eq!(RULES[..39], previous[..39]);
-    assert_eq!(RULES[40..41], previous[40..41]);
+    for index in 39..42 {
+        let actual = &RULES[index];
+        let prior = &previous[index];
+        assert_eq!(
+            (actual.number, actual.state, actual.deferred_reason),
+            (prior.number, prior.state, prior.deferred_reason)
+        );
+    }
+    for index in 40..42 {
+        assert_eq!(RULES[index].scope, previous[index].scope);
+    }
     assert_eq!(RULES[42..46], previous[42..46]);
+    for index in 46..52 {
+        let actual = &RULES[index];
+        let prior = &previous[index];
+        assert_eq!(
+            (actual.number, actual.state, actual.deferred_reason),
+            (prior.number, prior.state, prior.deferred_reason)
+        );
+        if index < 48 {
+            assert_eq!(actual.scope, prior.scope);
+        }
+    }
     assert_eq!(
         RULES[52..57]
             .iter()
@@ -339,7 +360,7 @@ fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
             ),
             (
                 RuleId::M055,
-                "Markdown and LaTeX emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text. The only paper-key exception is the exact planned emitted spelling span of a checked paper tag run whose printed spelling equals its own source key; the same bytes in text, titles, hrefs or ids remain refused. Markdown mathematics is emitted only in admitted observed contexts, with a body that satisfies the delimiter and citation boundary, and refuses an unobserved context, forbidden body character or direct tag/citation adjacency at the mathematical use site before sizing or emission. A fragment target emits each non-heading position in its document as one TeX macro line: a plain-text refrain or quotation, or a paragraph containing only admitted text and checked paper tag runs; other bodies refuse. Paragraph target spellings preserve decoded characters and refuse merging hyphen/em-dash runs or text requiring braced, backslash or multiline output. Each declared fragment replaces exactly one unique matching marker line in its declared source; malformed, repeated, undeclared or absent markers, role disagreements and authored duplicates of a converted body refuse. Every generated artifact path is unique. A selected target or role without an emitter refuses; Markdown quotations require the checked owner destination, and LaTeX quotations remain refused.",
+                "Markdown and LaTeX emission preserves the checked block and occurrence inventory, uses the matching notation and addressing context, refuses every unavailable runtime tag at its site, and generated documents contribute no Markdown mint or citation. Styled runs preserve ordered boundaries and child identities through TeX and Markdown recovery; Markdown emits styles only in observed faithful contexts and refuses unsupported kinds or contexts, a punctuation inner edge whose outer neighbour is present and is neither ASCII whitespace nor ASCII punctuation, and direct mathematics, style, tag or citation adjacency at the style source site. Generated coverage and pending object names require a unique live tag. Every reader-document citation requires a unique live tag for its cited label and retains that label in its cite comment; literal semantic-label tokens are refused in reader text. The only paper-key exception is the exact planned emitted spelling span of a checked paper tag run whose printed spelling equals its own source key; the same bytes in text, titles, hrefs or ids remain refused. Markdown mathematics is emitted only in admitted observed contexts, with a body that satisfies the delimiter and citation boundary, and refuses an unobserved context, forbidden body character or direct tag/citation, mathematics or code-mention adjacency at the mathematical use site before sizing or emission. A fragment target emits each non-heading position in its document as one TeX macro line: a plain-text refrain or quotation, or a paragraph containing only admitted text and checked paper tag runs; other bodies refuse. Paragraph target spellings preserve decoded characters and refuse merging hyphen/em-dash runs or text requiring braced, backslash or multiline output. Each declared fragment replaces exactly one unique matching marker line in its declared source; malformed, repeated, undeclared or absent markers, role disagreements and authored duplicates of a converted body refuse. Every generated artifact path is unique. A selected target or role without an emitter refuses; Markdown quotations require the checked owner destination, and LaTeX quotations remain refused.",
                 "Every selected document target, its declared fragment source slots and generated notation and addressing support.",
                 RuleState::Enforced,
                 None

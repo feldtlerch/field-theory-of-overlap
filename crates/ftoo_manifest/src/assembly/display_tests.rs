@@ -310,6 +310,71 @@ fn display_inline_failures_keep_nested_fault_and_region_path() {
         )
     );
 }
+
+#[test]
+fn styled_display_cell_refuses_at_the_style_and_retains_prior_occurrence() {
+    let text = "| A |\n| --- |\n| @tag{c:1} @strong{x} |";
+    let start = text.find("@strong{x}").unwrap();
+    let mut expected = site();
+    expected.path.extend([
+        PathPart::Key("regions".into()),
+        PathPart::Index(2),
+        PathPart::Index(0),
+    ]);
+    expected.decoded = Some(start..start + 2);
+    expected.occurrence = Some(1);
+    assert_eq!(
+        *parse_display_body(DisplayKind::Table, DocumentTarget::Markdown, &source(text))
+            .unwrap_err(),
+        (
+            expected,
+            AssemblyInputFault::DisplayInline {
+                cause: UnitFault::MalformedInsertion {
+                    reason: InsertionReason::UnknownForm,
+                    fragment: "@s".into(),
+                },
+            },
+        )
+    );
+}
+
+#[test]
+fn quote_tabular_and_picture_refuse_style_openers_before_later_faults() {
+    for (kind, target, body, opener) in [
+        (
+            DisplayKind::Figure,
+            DocumentTarget::Markdown,
+            "> @emphasis{x} $",
+            "@e",
+        ),
+        (
+            DisplayKind::Table,
+            DocumentTarget::Latex,
+            r"\begin{tabular}{l} @strong{x} $ \\ \end{tabular}",
+            "@s",
+        ),
+        (
+            DisplayKind::Figure,
+            DocumentTarget::Latex,
+            r"\begin{picture}(1,1)\put(0,0){@emphasis{x}}\end{picture}",
+            "@e",
+        ),
+    ] {
+        let (site, fault) = *parse_display_body(kind, target, &source(body)).unwrap_err();
+        let start = body.find(opener).unwrap();
+        assert_eq!(site.decoded, Some(start..start + 2), "{body}");
+        assert_eq!(
+            fault,
+            AssemblyInputFault::DisplayInline {
+                cause: UnitFault::MalformedInsertion {
+                    reason: InsertionReason::UnknownForm,
+                    fragment: opener.into(),
+                },
+            },
+            "{body}"
+        );
+    }
+}
 #[test]
 fn display_limits_have_boundary_success_and_first_excess() {
     let header = format!("|{}|", vec![" A "; 64].join("|"));

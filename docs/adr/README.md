@@ -32,7 +32,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
-|021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause|
+|021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause; inline-style authoring syntax is governed by 033|
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
@@ -40,5 +40,6 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
 |030|Native renderings, complete graph and native model|accepted; establishes the complete-document release gate, complete-graph boundary and native-model boundary; amends 014, 016 and 017; relationship disposition at the complete-graph boundary is governed by 036; native use of the existing paper-scoped store is governed by 037|
 |032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract|
+|033|Inline styles in unit prose|accepted; decides the authoring syntax reserved by 021; retains 022's mathematics boundary|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|

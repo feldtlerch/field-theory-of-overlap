@@ -1,8 +1,9 @@
 use super::{
     diagnostics::{
         AssemblyDiagnostic, AssemblyErrors, AssemblyFault, DocumentError, MarkdownMathReason,
+        MarkdownStyleReason, StyleBoundarySide, StyleNeighbor,
     },
-    plan::{DocumentPlan, Inline},
+    plan::{DocumentPlan, Inline, StyleKind},
 };
 use ftoo_manifest::{AssemblySite, AssemblyStage, DisplayLayout, DocumentTarget, RuleId, UnitSite};
 use std::fmt::Write;
@@ -18,18 +19,9 @@ pub(super) fn text(source: &str) -> String {
     }
     output
 }
-fn code(source: &str) -> String {
+pub(super) fn code(source: &str) -> String {
     let mut output = String::from("<code>");
-    for c in source.chars() {
-        match c {
-            '&' => output.push_str("&amp;"),
-            '<' => output.push_str("&lt;"),
-            '>' => output.push_str("&gt;"),
-            '|' => output.push_str("&#124;"),
-            '`' => output.push_str("&#96;"),
-            _ => output.push(c),
-        }
-    }
+    output.push_str(&text(source));
     output.push_str("</code>");
     output
 }
@@ -57,6 +49,32 @@ fn math_failure(
                 reason,
                 key: key.into(),
                 definition_site: definition_site.clone(),
+            },
+        }])
+        .expect("one diagnostic"),
+    )
+}
+fn style_failure(
+    plan: &DocumentPlan,
+    unit: Option<&str>,
+    site: &UnitSite,
+    kind: &str,
+    context: &str,
+    reason: MarkdownStyleReason,
+) -> DocumentError {
+    DocumentError::Assembly(
+        AssemblyErrors::from_diagnostics(vec![AssemblyDiagnostic {
+            rule: RuleId::M055,
+            stage: AssemblyStage::Emission,
+            document: Some(plan.document.clone()),
+            unit: unit.map(str::to_owned),
+            language: Some(plan.language.clone()),
+            target: Some(DocumentTarget::Markdown),
+            site: AssemblySite::Source(site.clone()),
+            fault: AssemblyFault::UnsupportedMarkdownStyle {
+                kind: kind.into(),
+                context: context.into(),
+                reason,
             },
         }])
         .expect("one diagnostic"),
@@ -102,6 +120,7 @@ fn check_math_body(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // One ordered pass retains the first source fault across run kinds.
 fn check_runs(
     plan: &DocumentPlan,
     unit: Option<&str>,
@@ -110,7 +129,7 @@ fn check_runs(
     admitted: bool,
 ) -> Result<(), DocumentError> {
     let mut adjacent = None;
-    for run in runs {
+    for (index, run) in runs.iter().enumerate() {
         match run {
             Inline::Text(text) if !text.is_empty() => adjacent = None,
             Inline::Text(_) => {}
@@ -119,6 +138,85 @@ fn check_runs(
             }
             Inline::Mention { .. } => {
                 adjacent = Some(MarkdownMathReason::DirectCodeMentionAdjacency);
+            }
+            Inline::Styled {
+                kind,
+                children,
+                site,
+                ..
+            } => {
+                if !matches!(*kind, StyleKind::Emphasis | StyleKind::Strong) {
+                    return Err(style_failure(
+                        plan,
+                        unit,
+                        site,
+                        kind.as_str(),
+                        context,
+                        MarkdownStyleReason::UnsupportedKind,
+                    ));
+                }
+                if context != "ordinary prose" {
+                    return Err(style_failure(
+                        plan,
+                        unit,
+                        site,
+                        kind.as_str(),
+                        context,
+                        MarkdownStyleReason::UnobservedContext,
+                    ));
+                }
+                let previous = match adjacent.as_ref() {
+                    Some(MarkdownMathReason::DirectMathAdjacency) => {
+                        Some(StyleNeighbor::Mathematics)
+                    }
+                    Some(MarkdownMathReason::DirectTagOrCitationAdjacency) => {
+                        Some(StyleNeighbor::TagOrCitation)
+                    }
+                    _ => None,
+                };
+                if let Some(neighbor) = previous.or_else(|| next_style_neighbor(&runs[index + 1..]))
+                {
+                    return Err(style_failure(
+                        plan,
+                        unit,
+                        site,
+                        kind.as_str(),
+                        context,
+                        MarkdownStyleReason::DirectAdjacency { neighbor },
+                    ));
+                }
+                let mut emitted = String::new();
+                inline(&mut emitted, children);
+                let left = runs[..index]
+                    .iter()
+                    .rev()
+                    .find_map(|run| edge_char(run, false));
+                let right = runs[index + 1..]
+                    .iter()
+                    .find_map(|run| edge_char(run, true));
+                let side = if emitted.chars().next().is_some_and(punctuation_edge)
+                    && left.is_some_and(|character| !safe_outer_edge(character))
+                {
+                    Some(StyleBoundarySide::Start)
+                } else if emitted.chars().last().is_some_and(punctuation_edge)
+                    && right.is_some_and(|character| !safe_outer_edge(character))
+                {
+                    Some(StyleBoundarySide::End)
+                } else {
+                    None
+                };
+                if let Some(side) = side {
+                    return Err(style_failure(
+                        plan,
+                        unit,
+                        site,
+                        kind.as_str(),
+                        context,
+                        MarkdownStyleReason::PunctuationEdge { side },
+                    ));
+                }
+                check_runs(plan, unit, children, "styled span", false)?;
+                adjacent = None;
             }
             Inline::Math {
                 definition_site,
@@ -157,6 +255,39 @@ fn check_runs(
         }
     }
     Ok(())
+}
+
+fn next_style_neighbor(runs: &[Inline]) -> Option<StyleNeighbor> {
+    for run in runs {
+        match run {
+            Inline::Text(text) if text.is_empty() => {}
+            Inline::Math { .. } => return Some(StyleNeighbor::Mathematics),
+            Inline::Styled { .. } => return Some(StyleNeighbor::Style),
+            Inline::Tag { .. } | Inline::PaperTag { .. } | Inline::Citation { .. } => {
+                return Some(StyleNeighbor::TagOrCitation);
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
+fn edge_char(run: &Inline, first: bool) -> Option<char> {
+    let mut emitted = String::new();
+    inline(&mut emitted, std::slice::from_ref(run));
+    if first {
+        emitted.chars().next()
+    } else {
+        emitted.chars().last()
+    }
+}
+
+fn punctuation_edge(value: char) -> bool {
+    !value.is_alphanumeric() && !value.is_whitespace()
+}
+
+fn safe_outer_edge(value: char) -> bool {
+    value.is_ascii_whitespace() || value.is_ascii_punctuation()
 }
 
 pub(super) fn check_math_admission(plan: &DocumentPlan) -> Result<(), DocumentError> {
@@ -719,6 +850,18 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                     .expect("string write");
             }
             Inline::Mention { text, .. } => output.push_str(&code(text)),
+            Inline::Styled { kind, children, .. } => {
+                let delimiter = match *kind {
+                    StyleKind::Emphasis => "*",
+                    StyleKind::Strong => "**",
+                    StyleKind::Smallcaps | StyleKind::Regular => {
+                        unreachable!("Markdown style admission precedes writing")
+                    }
+                };
+                output.push_str(delimiter);
+                inline(output, children);
+                output.push_str(delimiter);
+            }
         }
     }
 }

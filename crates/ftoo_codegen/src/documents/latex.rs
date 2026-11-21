@@ -164,6 +164,16 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
             Inline::Mention { text: value, .. } => {
                 write!(output, "\\texttt{{{}}}", text(value)).expect("string write");
             }
+            Inline::Styled { kind, children, .. } => {
+                output.push_str(match *kind {
+                    super::plan::StyleKind::Emphasis => "\\emph{",
+                    super::plan::StyleKind::Strong => "\\textbf{",
+                    super::plan::StyleKind::Smallcaps => "{\\scshape ",
+                    super::plan::StyleKind::Regular => "{\\normalfont ",
+                });
+                emit_inline(output, children, prose);
+                output.push('}');
+            }
         }
     }
 }

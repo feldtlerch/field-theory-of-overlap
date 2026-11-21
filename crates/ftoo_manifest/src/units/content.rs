@@ -1,6 +1,24 @@
 use super::{
-    InsertionReason, LocatedString, MathOccurrence, TagOccurrence, UnitFault, UnitSite, local_name,
+    CheckedText, InsertionReason, LocatedString, MathOccurrence, TagOccurrence, UnitFault,
+    UnitSite, local_name,
 };
+use std::ops::Range;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct StyleOccurrence {
+    kind: &'static str,
+    body: Range<usize>,
+    site: UnitSite,
+}
+impl CheckedText {
+    pub fn style_occurrences(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, Range<usize>, &UnitSite)> {
+        self.styles
+            .iter()
+            .map(|style| (style.kind, style.body.clone(), &style.site))
+    }
+}
 
 fn at(source: &LocatedString, start: usize, end: usize, occurrence: Option<usize>) -> UnitSite {
     let mut site = source.site.clone();
@@ -28,6 +46,10 @@ pub(super) struct ScannedText {
     pub prose: bool,
     pub math: Vec<MathOccurrence>,
     pub tags: Vec<TagOccurrence>,
+    pub styles: Vec<StyleOccurrence>,
+}
+fn insertion_index(scanned: &ScannedText, active_style: bool) -> usize {
+    scanned.math.len() + scanned.tags.len() + scanned.styles.len() + usize::from(active_style)
 }
 enum Insertion {
     Math(MathOccurrence),
@@ -43,14 +65,16 @@ impl From<ScanFault> for AssemblyScanFault {
     }
 }
 pub(super) fn scan(source: &LocatedString) -> Result<ScannedText, ScanFault> {
-    scan_limited(source, None).map_err(|fault| match fault {
+    scan_limited(source, None, true).map_err(|fault| match fault {
         AssemblyScanFault::Content(error) => error,
         AssemblyScanFault::Limit(_) => unreachable!("no limit supplied to statement admission"),
     })
 }
+#[allow(clippy::too_many_lines)] // One scanner owns insertion and style boundaries together.
 pub(super) fn scan_limited(
     source: &LocatedString,
     maximum: Option<usize>,
+    styles: bool,
 ) -> Result<ScannedText, AssemblyScanFault> {
     let mut chars = source.value.char_indices().peekable();
     let mut span_index = 0;
@@ -58,13 +82,21 @@ pub(super) fn scan_limited(
         prose: false,
         math: Vec::new(),
         tags: Vec::new(),
+        styles: Vec::new(),
     };
+    let mut active_style: Option<(&'static str, usize, usize, usize)> = None;
+    let mut last_style: Option<(&'static str, usize)> = None;
     while let Some((start, c)) = chars.next() {
         if c == '`' {
             let span = super::spans::parse(&source.value, &source.site, start, span_index)?;
-            if maximum
-                .is_some_and(|limit| span_index + scanned.math.len() + scanned.tags.len() == limit)
-            {
+            if maximum.is_some_and(|limit| {
+                span_index
+                    + scanned.math.len()
+                    + scanned.tags.len()
+                    + scanned.styles.len()
+                    + usize::from(active_style.is_some())
+                    == limit
+            }) {
                 return Err(AssemblyScanFault::Limit(at(
                     source,
                     span.bytes.start,
@@ -77,6 +109,66 @@ pub(super) fn scan_limited(
                 chars.next();
             }
             continue;
+        }
+        if c == '}'
+            && let Some((kind, opener, body_start, index)) = active_style.take()
+        {
+            let body = &source.value[body_start..start];
+            if body.is_empty() {
+                return Err(malformed(
+                    source,
+                    opener,
+                    start + 1,
+                    index,
+                    InsertionReason::EmptyStyle,
+                )
+                .into());
+            }
+            if body.chars().next().is_some_and(char::is_whitespace)
+                || body.chars().last().is_some_and(char::is_whitespace)
+            {
+                return Err(malformed(
+                    source,
+                    opener,
+                    start + 1,
+                    index,
+                    InsertionReason::BoundaryWhitespace,
+                )
+                .into());
+            }
+            scanned.styles.push(StyleOccurrence {
+                kind,
+                body: body_start..start,
+                site: at(source, opener, start + 1, Some(index)),
+            });
+            last_style = Some((kind, start + 1));
+            continue;
+        }
+        if c == '{'
+            && let Some((_, _, _, index)) = active_style
+        {
+            return Err(malformed(
+                source,
+                start,
+                start + 1,
+                index,
+                InsertionReason::NestedBrace,
+            )
+            .into());
+        }
+        if let Some((kind, _, _, index)) = active_style
+            && matches!(kind, "emphasis" | "strong")
+            && source.value[start..].starts_with(if kind == "strong" { "**" } else { "*" })
+            && c == '*'
+        {
+            return Err(malformed(
+                source,
+                start,
+                start + if kind == "strong" { 2 } else { 1 },
+                index,
+                InsertionReason::OwnCloser,
+            )
+            .into());
         }
         if c != '@' {
             if matches!(c, '\'' | '’')
@@ -107,11 +199,68 @@ pub(super) fn scan_limited(
             scanned.prose = true;
             continue;
         }
-        let index = scanned.math.len() + scanned.tags.len();
+        if let Some((kind, width)) = styles.then_some(()).and_then(|()| {
+            ["emphasis", "strong", "smallcaps", "regular"]
+                .into_iter()
+                .find_map(|kind| {
+                    source.value[start..]
+                        .starts_with(&format!("@{kind}{{"))
+                        .then_some((kind, kind.len() + 2))
+                })
+        }) {
+            if active_style.is_some() {
+                return Err(malformed(
+                    source,
+                    start,
+                    start + width,
+                    insertion_index(&scanned, true),
+                    InsertionReason::NestedStyle,
+                )
+                .into());
+            }
+            if last_style.is_some_and(|(prior, end)| prior == kind && end == start) {
+                return Err(malformed(
+                    source,
+                    start,
+                    start + width,
+                    insertion_index(&scanned, false),
+                    InsertionReason::AdjacentStyle,
+                )
+                .into());
+            }
+            let index = insertion_index(&scanned, false);
+            let body_start = start + width;
+            if maximum.is_some_and(|limit| span_index + index == limit) {
+                return Err(AssemblyScanFault::Limit(at(
+                    source,
+                    start,
+                    body_start,
+                    Some(index),
+                )));
+            }
+            while chars.peek().is_some_and(|(at, _)| *at < body_start) {
+                chars.next();
+            }
+            active_style = Some((kind, start, body_start, index));
+            continue;
+        }
+        let index = insertion_index(&scanned, active_style.is_some());
         let insertion = insertion(source, start, index, &mut chars)?;
-        if maximum
-            .is_some_and(|limit| span_index + scanned.math.len() + scanned.tags.len() == limit)
-        {
+        if active_style.is_some() && matches!(&insertion, Insertion::Math(_)) {
+            return Err(malformed(
+                source,
+                start,
+                source.value[start..]
+                    .find('}')
+                    .map_or(source.value.len(), |end| start + end + 1),
+                index,
+                InsertionReason::StyledMath,
+            )
+            .into());
+        }
+        if maximum.is_some_and(|limit| {
+            span_index + insertion_index(&scanned, active_style.is_some()) == limit
+        }) {
             let site = match &insertion {
                 Insertion::Math(value) => value.site.clone(),
                 Insertion::Tag(value) => value.site.clone(),
@@ -122,6 +271,16 @@ pub(super) fn scan_limited(
             Insertion::Math(value) => scanned.math.push(value),
             Insertion::Tag(value) => scanned.tags.push(value),
         }
+    }
+    if let Some((_, opener, _, index)) = active_style {
+        return Err(malformed(
+            source,
+            opener,
+            source.value.len(),
+            index,
+            InsertionReason::Unclosed,
+        )
+        .into());
     }
     Ok(scanned)
 }

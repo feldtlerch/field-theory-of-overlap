@@ -99,6 +99,7 @@ pub struct CheckedText {
     source: LocatedString,
     occurrences: Vec<MathOccurrence>,
     tags: Vec<TagOccurrence>,
+    styles: Vec<content::StyleOccurrence>,
 }
 impl CheckedText {
     #[must_use]
@@ -540,6 +541,7 @@ fn check_texts(
                 prose,
                 math: occurrences,
                 tags,
+                styles,
             }) => {
                 if !prose {
                     errors.push(diagnostic(
@@ -574,6 +576,7 @@ fn check_texts(
                         source: entry.value.clone(),
                         occurrences,
                         tags,
+                        styles,
                     },
                 );
             }
@@ -815,6 +818,6 @@ pub(crate) fn assembly_inline(
     source: &LocatedString,
     maximum: usize,
 ) -> Result<(Vec<MathOccurrence>, Vec<TagOccurrence>), AssemblyScanFault> {
-    let scanned = content::scan_limited(source, Some(maximum))?;
+    let scanned = content::scan_limited(source, Some(maximum), false)?;
     Ok((scanned.math, scanned.tags))
 }
