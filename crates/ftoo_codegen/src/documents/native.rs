@@ -1086,7 +1086,7 @@ mod inherited_sweep_tests {
     use ftoo_manifest::{DefinitionId, RenderOwner};
 
     #[test]
-    fn only_generated_declarations_enter_native_sweep() {
+    fn support_required_only_generated_declarations_enter_native_sweep() {
         let graph = ftoo_manifest::seed().unwrap();
         let book = ftoo_manifest::addressing(&graph).unwrap();
         let catalogue = ftoo_manifest::notation(&book).unwrap();
