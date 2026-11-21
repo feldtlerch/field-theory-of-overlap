@@ -1,0 +1,21 @@
+{
+  "prepared_sha256": {
+    "documents/paper/parts/coda.tex": "5347907929b16b004eec51f8cb55187e5288a5d0f3d29976ec92f41d9b93a726",
+    "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823"
+  },
+  "records": [],
+  "run": {
+    "diagnostic": {
+      "identity": "grade-too-strong",
+      "kind": "error",
+      "module": "ftoo",
+      "scope": "dyn:flow",
+      "text": "Grade 'cont-anch' claimed over a body that spends beyond it. Either the grade is wrong, or a spend should be \\quoted, or the antecedent belongs in a granting scope, or the environment should declare \\defines."
+    },
+    "engine_exit": 1,
+    "log_complete": true,
+    "output_sha256": null,
+    "status": "refused"
+  },
+  "schema": 3
+}

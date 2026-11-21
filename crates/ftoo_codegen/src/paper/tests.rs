@@ -211,6 +211,15 @@ fn support_required_paper_gate() {
             .arg(scratch.0.join("identity-controls")),
     )
     .unwrap();
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/checking_capture.py", "check"])
+            .arg(&root)
+            .arg(&support)
+            .arg(scratch.0.join("checking-capture")),
+    )
+    .unwrap();
     run(&[
         "check".into(),
         "--support".into(),
@@ -218,6 +227,18 @@ fn support_required_paper_gate() {
         "--work".into(),
         scratch.0.join("build").into_os_string(),
     ])
+    .unwrap();
+}
+
+#[test]
+fn checking_capture_fixture_controls() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/checking_capture.py", "selftest"])
+            .arg(root.join("tools/paper/fixtures/checking-capture.json")),
+    )
     .unwrap();
 }
 
