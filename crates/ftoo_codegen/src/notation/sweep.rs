@@ -133,11 +133,12 @@ fn candidates(
     inventory(n, records)?;
     let mut requests = vec![];
     let mut declarations = String::new();
+    let mut context = String::new();
     for record in records {
         let site = declaration_site(record, 0);
         requests.push(Request {
             source: render::combine(
-                &declarations,
+                &context,
                 &format!("\\newcommand{{{}}}[0]{{}}", record.command),
                 site.clone(),
             )?,
@@ -145,9 +146,12 @@ fn candidates(
             site: site.clone(),
             collision: Some(record.command.clone()),
         });
-        declarations = render::combine(&declarations, &record.source, site.clone())?;
+        context = render::combine(&context, &record.source, site.clone())?;
+        if !record.inherited {
+            declarations = render::combine(&declarations, &record.source, site.clone())?;
+        }
         requests.push(Request {
-            source: declarations.clone(),
+            source: context.clone(),
             target: RenderTarget::Macro,
             site,
             collision: None,
@@ -190,6 +194,11 @@ fn candidates(
             (RenderTarget::Macro, &macro_body),
             (RenderTarget::Unicode, &unicode_body),
         ] {
+            if target == RenderTarget::Macro
+                && matches!(definition.spec().kind(), DefinitionKind::Inherited { .. })
+            {
+                continue;
+            }
             requests.push(Request {
                 source: body.source.clone(),
                 target,
@@ -231,11 +240,8 @@ fn candidates(
             owner,
             &case,
         )?;
-        let combined = render::combine(
-            &declarations,
-            &macro_form.source,
-            macro_form.site(owner, &case),
-        )?;
+        let combined =
+            render::combine(&context, &macro_form.source, macro_form.site(owner, &case))?;
         key.push(owner.token().as_bytes().to_vec());
         key.push(case.as_bytes().to_vec());
         for (target, source) in [

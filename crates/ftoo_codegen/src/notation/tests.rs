@@ -36,6 +36,138 @@ fn prepared() -> support::Support {
     support::resolve(location.as_deref()).unwrap()
 }
 
+#[test]
+fn support_required_inherited_sweep_status_and_mark_policy() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let prepared = prepare_notation(&catalogue).unwrap();
+    assert!(!prepared.declarations().contains(r"\comovfield"));
+    assert!(!prepared.declarations().contains(r"\gensym"));
+    let artifact: serde_json::Value = serde_json::from_slice(&prepared.status_artifact()).unwrap();
+    let inherited = artifact["inherited"].as_array().unwrap();
+    assert_eq!(inherited.len(), 4);
+    for id in [
+        DefinitionId::Comovfield,
+        DefinitionId::Readout,
+        DefinitionId::Willvirtue,
+        DefinitionId::Gensym,
+    ] {
+        assert!(
+            inherited
+                .iter()
+                .any(|entry| entry["definition"] == id.token()
+                    && entry["tier"] == "pending"
+                    && entry["reasons"].as_array().unwrap().len() == 1)
+        );
+        let expression = prepared
+            .check_expression(ExprDraft::Call {
+                callee: Callee::Definition(id),
+                arguments: vec![],
+            })
+            .unwrap();
+        assert_eq!(
+            expression.render(RenderTarget::Macro).unwrap().source(),
+            format!("\\{}{{}}", id.token())
+        );
+        assert!(
+            !expression
+                .render(RenderTarget::Unicode)
+                .unwrap()
+                .source()
+                .contains("pending")
+        );
+        assert_eq!(
+            expression
+                .render(RenderTarget::Unicode)
+                .unwrap()
+                .pending_entries(),
+            []
+        );
+    }
+    let object = prepared
+        .check_expression(ExprDraft::Call {
+            callee: Callee::Definition(DefinitionId::CoefficientOne),
+            arguments: vec![],
+        })
+        .unwrap();
+    assert_eq!(
+        object
+            .render(RenderTarget::Unicode)
+            .unwrap()
+            .pending_entries()
+            .len(),
+        1
+    );
+    assert!(!render::should_mark(&[
+        ftoo_manifest::PendingReason::InheritedUnbound {
+            definition: DefinitionId::Readout
+        }
+    ]));
+    assert!(render::should_mark(&[
+        ftoo_manifest::PendingReason::InheritedUnbound {
+            definition: DefinitionId::Readout
+        },
+        ftoo_manifest::PendingReason::BackingUnbound {
+            object: ftoo_manifest::NodeId::LangevinCoefficientOne
+        }
+    ]));
+    let inherited = ftoo_manifest::PendingReason::InheritedUnbound {
+        definition: DefinitionId::Comovfield,
+    };
+    let other = ftoo_manifest::PendingReason::BackingUnbound {
+        object: ftoo_manifest::NodeId::LangevinCoefficientOne,
+    };
+    let checked = ftoo_manifest::check_expression(
+        &catalogue,
+        ExprDraft::Call {
+            callee: Callee::Definition(DefinitionId::CoefficientOne),
+            arguments: vec![],
+        },
+    )
+    .unwrap();
+    let mixed = PendingEntry::fixture(
+        DefinitionId::CoefficientOne,
+        0,
+        "c_1",
+        vec![inherited.clone(), other.clone()],
+        vec![],
+    );
+    let visible = pending_uses(&[mixed], checked.uses());
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].reasons(), &[inherited.clone(), other]);
+    let inherited_only = PendingEntry::fixture(
+        DefinitionId::CoefficientOne,
+        0,
+        "c_1",
+        vec![inherited.clone()],
+        vec![],
+    );
+    assert_eq!(
+        pending_uses(&[inherited_only], checked.uses()),
+        Vec::<PendingEntry>::new()
+    );
+    let mut prepared = prepared;
+    prepared.pending.push(PendingEntry::fixture(
+        DefinitionId::CoefficientOneValue,
+        99,
+        "c_1=1/3",
+        vec![inherited.clone()],
+        vec![],
+    ));
+    let artifact: serde_json::Value = serde_json::from_slice(&prepared.status_artifact()).unwrap();
+    assert!(
+        artifact["dependents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| {
+                entry["definition"] == DefinitionId::CoefficientOneValue.token()
+                    && entry["reasons"][0] == inherited.to_string()
+            })
+    );
+}
+
 fn observed_identity(path: &Path) -> crate::SupportIdentity {
     use std::os::unix::fs::MetadataExt;
     let value = fs::symlink_metadata(path).unwrap();
@@ -349,7 +481,11 @@ fn support_required_batch_matches_single_expression_markup_errors_and_isolation(
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
     let records = render::declarations(None, &catalogue).unwrap();
-    let declarations: String = records.iter().map(|r| r.source.as_str()).collect();
+    let declarations: String = records
+        .iter()
+        .filter(|record| !record.inherited)
+        .map(|r| r.source.as_str())
+        .collect();
     let mut sources: Vec<String> = vec![
         "x".into(),
         "{x".into(),
@@ -1966,6 +2102,7 @@ fn declarations_claims_aliases_and_nested_grouping_goldens() {
     assert_eq!(
         records
             .iter()
+            .filter(|record| !record.inherited)
             .map(|r| (r.id, r.source.clone()))
             .collect::<Vec<_>>(),
         declaration_goldens()
@@ -2261,7 +2398,7 @@ fn incomplete_and_output_boundaries_have_exact_sites() {
 
 // This oracle has no descriptor, declaration or writer reads. Its closed input
 // inventory and exact strings deliberately duplicate the reviewed specification.
-const PRIMITIVES: [(PrimitiveId, &str, usize); 12] = [
+const PRIMITIVES: [(PrimitiveId, &str, usize); 16] = [
     (PrimitiveId::Alpha, "alpha", 0),
     (PrimitiveId::Beta, "beta", 0),
     (PrimitiveId::Fraction, "fraction", 2),
@@ -2274,8 +2411,12 @@ const PRIMITIVES: [(PrimitiveId, &str, usize); 12] = [
     (PrimitiveId::Juxtapose, "juxtapose", 2),
     (PrimitiveId::Parentheses, "parentheses", 1),
     (PrimitiveId::Dimension, "dimension", 1),
+    (PrimitiveId::Omega, "omega", 0),
+    (PrimitiveId::Calligraphic, "calligraphic", 1),
+    (PrimitiveId::UprightVir, "upright-vir", 0),
+    (PrimitiveId::UprightS, "upright-s", 0),
 ];
-const DEFINITIONS: [(DefinitionId, &str, usize); 7] = [
+const DEFINITIONS: [(DefinitionId, &str, usize); 11] = [
     (DefinitionId::CoefficientOne, "coefficient-one", 0),
     (DefinitionId::CoefficientThree, "coefficient-three", 0),
     (
@@ -2291,6 +2432,10 @@ const DEFINITIONS: [(DefinitionId, &str, usize); 7] = [
     (DefinitionId::FirstCoefficient, "first-coefficient", 0),
     (DefinitionId::Dimension, "dimension", 1),
     (DefinitionId::Product, "product", 2),
+    (DefinitionId::Comovfield, "comovfield", 0),
+    (DefinitionId::Readout, "readout", 0),
+    (DefinitionId::Willvirtue, "willvirtue", 0),
+    (DefinitionId::Gensym, "gensym", 0),
 ];
 fn oracle(expr: &ExprDraft, unicode: bool) -> String {
     let ExprDraft::Call { callee, arguments } = expr else {
@@ -2304,6 +2449,10 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
         Callee::Primitive(id) => match id {
             PrimitiveId::Alpha => if unicode { "α" } else { r"\alpha{}" }.into(),
             PrimitiveId::Beta => if unicode { "β" } else { r"\beta{}" }.into(),
+            PrimitiveId::Omega => if unicode { "ω" } else { r"\omega{}" }.into(),
+            PrimitiveId::Calligraphic => format!("{}{{{}}}", r"\mathcal", a[0]),
+            PrimitiveId::UprightVir => r"\mathrm{vir}".into(),
+            PrimitiveId::UprightS => r"\mathrm{S}".into(),
             PrimitiveId::Fraction => format!("\\frac{{{}}}{{{}}}", a[0], a[1]),
             PrimitiveId::Subscript => format!("{{{}}}_{{{}}}", a[0], a[1]),
             PrimitiveId::Superscript => format!("{{{}}}^{{{}}}", a[0], a[1]),
@@ -2329,6 +2478,10 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
                 DefinitionId::FirstCoefficient => r"\FtooAFirstCoefficient",
                 DefinitionId::Dimension => r"\FtooNDimension",
                 DefinitionId::Product => r"\FtooNProduct",
+                DefinitionId::Comovfield => r"\comovfield",
+                DefinitionId::Readout => r"\readout",
+                DefinitionId::Willvirtue => r"\willvirtue",
+                DefinitionId::Gensym => r"\gensym",
             };
             format!(
                 "{command}{}",
@@ -2354,6 +2507,10 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             DefinitionId::FirstCoefficient => pending(ONE),
             DefinitionId::Dimension => format!("[{{{}}}]", a[0]),
             DefinitionId::Product => format!("({{{}}}⋅{{{}}})", a[0], a[1]),
+            DefinitionId::Comovfield => "S".into(),
+            DefinitionId::Readout => r"\mathcal{M}".into(),
+            DefinitionId::Willvirtue => r"{ω}^{\mathrm{vir}}".into(),
+            DefinitionId::Gensym => r"{A}_{\mathrm{S}}".into(),
         },
     }
 }
@@ -2443,7 +2600,7 @@ fn complete_row_key_invocation_and_both_form_inventory() {
         })
         .collect();
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 237);
+    assert_eq!(actual.len(), 329);
     for (owner, case, expr) in sweep::cases(&n) {
         let checked = ftoo_manifest::check_expression(&n, expr).unwrap();
         for target in [RenderTarget::Macro, RenderTarget::Unicode] {
@@ -2684,7 +2841,11 @@ fn support_required_retained_quantity_examples_and_adversarial_atom_concatenatio
     atoms.extend(
         DEFINITIONS
             .into_iter()
-            .filter(|(_, _, a)| *a == 0)
+            .filter(|(id, _, a)| {
+                *a == 0
+                    && n.definition(*id).spec().category()
+                        != ftoo_manifest::DefinitionCategory::Inherited
+            })
             .map(|(id, _, _)| definition(id, vec![])),
     );
     let results = support
@@ -2992,6 +3153,7 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
     sweep::inventory(&n, &mutated).unwrap();
     let bundle = mutated
         .iter()
+        .filter(|record| !record.inherited)
         .map(|r| r.source.as_str())
         .collect::<String>();
     let mut expected_declarations = declaration_goldens();
@@ -3272,12 +3434,13 @@ fn retained_sweep_controls(support: &support::Support) {
                 render::declarations(None, &catalogue)
                     .unwrap()
                     .iter()
+                    .filter(|record| !record.inherited)
                     .map(|row| row.source.as_str())
                     .collect::<String>()
             );
-            assert_eq!(pending.len(), 5);
+            assert_eq!(pending.len(), 9);
         } else {
-            assert_eq!(pending, []);
+            assert_eq!(pending.len(), 4);
             let expression = ftoo_manifest::check_expression(
                 &catalogue,
                 ftoo_manifest::ExprDraft::Call {

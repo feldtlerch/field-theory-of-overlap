@@ -85,6 +85,7 @@ pub enum RuleId {
     M072,
     M073,
     M074,
+    M078,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -106,7 +107,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 74] = [
+pub const RULES: [RuleSpec; 75] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -431,43 +432,43 @@ pub const RULES: [RuleSpec; 74] = [
     },
     RuleSpec {
         number: RuleId::M047,
-        statement: "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits.",
+        statement: "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields.",
         scope: "Every primitive descriptor, definition body and submitted notation expression.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M048,
-        statement: "Definitions have their kind's signature shape and any backing equals their object; stems obey the reserved alphabetic grammar and generated names are unique; every permanent object has exactly one canonical symbol; aliases preserve that object and terminate at its canonical symbol; all definition dependencies are acyclic.",
+        statement: "Definitions have their kind's signature shape and any backing equals their object; stems obey the reserved alphabetic grammar and generated names are unique; every permanent object has exactly one canonical symbol; aliases preserve that object and terminate at its canonical symbol; all definition dependencies are acyclic. An inherited definition has a checked signature and decoded body but no theory object or backing; an identical fully expanded body with an object-bound canonical symbol or a dependency on a non-inherited definition in its own body refuses admission.",
         scope: "The complete notation definition catalogue, including absent objects and unused definitions.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M049,
-        statement: "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
-        scope: "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values.",
+        statement: "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason. An inherited definition without a theory object is pending with a missing-binding reason, which every definition using it retains; generated notation-status evidence lists every inherited definition and its reason.",
+        scope: "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values, including inherited missing bindings, transitive uses and generated/notation-status.json.",
         state: RuleState::Structural,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M050,
-        statement: "Generated notation declarations refuse collisions in the consuming typesetting context.",
-        scope: "Every emitted notation declaration and its checked KaTeX context.",
+        statement: "Generated notation declarations refuse collisions in the consuming typesetting context. Temporary inherited declarations used by the sweep and expression validation refuse collisions in that same checked KaTeX context.",
+        scope: "Every emitted notation declaration and temporary inherited declaration used in the checked KaTeX context.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M051,
-        statement: "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar.",
-        scope: "Generated declaration bodies, macro invocations and fully expanded notation expressions.",
+        statement: "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar. For inherited definitions instead, the paper form invokes the existing checked source declaration by name, whose body is source-compared with the admitted AST, and the strict screen form derives from that AST; pending marks and visible pending explanations are omitted only when every pending reason is an inherited missing binding.",
+        scope: "Generated declaration bodies, macro invocations and fully expanded notation expressions, including named inherited paper invocations and their checked source-comparison exception.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M052,
-        statement: "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart.",
-        scope: "The complete emitted command inventory, including aliases, constructors and pending symbols.",
+        statement: "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart. The KaTeX sweep includes temporary declarations and fully expanded strict screen forms for inherited definitions.",
+        scope: "The complete emitted command inventory, including aliases, constructors, pending symbols and temporary inherited declarations in KaTeX.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
@@ -494,15 +495,15 @@ pub const RULES: [RuleSpec; 74] = [
     },
     RuleSpec {
         number: RuleId::M056,
-        statement: "Every generated LaTeX document and the complete derived notation sweep pass the pinned native document context with checked dependency integrity.",
-        scope: "Prepared LaTeX documents, their actual preamble and support files, and every native sweep case.",
+        statement: "Every generated LaTeX document and every derived notation sweep case except those owned by inherited definitions pass the pinned native document context with checked dependency integrity. Inherited paper commands are held by checked source comparison and their screen forms by the strict KaTeX sweep.",
+        scope: "Prepared LaTeX documents, their actual preamble and support files, and every derived notation sweep case except those owned by inherited definitions.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
     RuleSpec {
         number: RuleId::M057,
-        statement: "Document generation and check share one preparation and writer, and the complete generated document and support inventory equals its regenerated bytes.",
-        scope: "Generated Markdown and LaTeX documents, notation.tex and addressing.tex.",
+        statement: "Document generation and check share one preparation and writer, and the complete generated document and support inventory equals its regenerated bytes. That inventory includes generated/notation-status.json.",
+        scope: "Generated Markdown and LaTeX documents, notation.tex, notation-status.json and addressing.tex.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
@@ -624,6 +625,13 @@ pub const RULES: [RuleSpec; 74] = [
         number: RuleId::M074,
         statement: "Constructed reading names satisfy the semantic-label grammar with the reserved reading kind; identifiers and names are unique, specifications match their fixed declarations, and each quotation names an allocated owning occurrence in another reading.",
         scope: "Every constructed reading declaration.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M078,
+        statement: "Each inherited source declaration has the admitted signature, decoded visual body and complete dependency closure, with named quantity, metric and registered-variance interfaces unchanged. Source syntax and its checked expression form a reviewed pairing, and each inherited definition has exactly one compared source declaration site among the recognised declaration and redefinition forms in the three named source files. Registered-variance declaration sites for each inherited name across those files equal its recorded count.",
+        scope: "Every admitted inherited declaration in documents/paper/data/ftoo_symbols.tex, documents/paper/data/ftoo_symbols_historical.tex and documents/paper/data/ftoo_registers.tex, including its checked source bytes and declared checking interface; declaration sites in other files are outside this comparison.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },

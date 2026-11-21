@@ -209,6 +209,61 @@ pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     pending: Vec<PendingEntry>,
 }
 impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
+    /// # Panics
+    /// Panics only if an admitted inherited definition has no derived status, which callers cannot arrange.
+    #[must_use]
+    pub fn status_artifact(&self) -> Vec<u8> {
+        let inherited: Vec<_> = self
+            .catalogue
+            .definitions()
+            .iter()
+            .filter(|definition| {
+                matches!(
+                    definition.spec().kind(),
+                    ftoo_manifest::DefinitionKind::Inherited { .. }
+                )
+            })
+            .map(|definition| {
+                let status = self
+                    .pending
+                    .iter()
+                    .find(|entry| entry.definition() == definition.spec().id())
+                    .expect("inherited status");
+                serde_json::json!({
+                    "definition": definition.spec().id().token(),
+                    "tier": "pending",
+                    "reasons": status.reasons().iter().map(ToString::to_string).collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let dependents: Vec<_> = self
+            .pending
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    self.catalogue.definition(entry.definition()).spec().kind(),
+                    ftoo_manifest::DefinitionKind::Canonical { .. }
+                        | ftoo_manifest::DefinitionKind::Alias { .. }
+                ) && entry
+                    .reasons()
+                    .iter()
+                    .all(|reason| matches!(reason, PendingReason::InheritedUnbound { .. }))
+            })
+            .map(|entry| {
+                serde_json::json!({
+                    "definition": entry.definition().token(),
+                    "tier": "pending",
+                    "reasons": entry.reasons().iter().map(ToString::to_string).collect::<Vec<_>>()
+                })
+            })
+            .collect();
+        let mut bytes =
+            serde_json::json!({"schema": 1, "inherited": inherited, "dependents": dependents})
+                .to_string()
+                .into_bytes();
+        bytes.push(b'\n');
+        bytes
+    }
     #[must_use]
     pub fn declarations(&self) -> &str {
         &self.declarations
@@ -224,6 +279,16 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     #[must_use]
     pub fn typesetting_calls(&self) -> usize {
         (self.rows.len() + self.pending.len()) * 2
+            - self
+                .pending
+                .iter()
+                .filter(|entry| {
+                    matches!(
+                        self.catalogue.definition(entry.definition()).spec().kind(),
+                        ftoo_manifest::DefinitionKind::Inherited { .. }
+                    )
+                })
+                .count()
     }
     #[must_use]
     pub const fn catalogue(&self) -> &'catalogue CheckedNotation<'book, 'graph> {
@@ -282,8 +347,18 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
                     RenderOwner::Expression,
                     "expression",
                 )?;
+                let context = if expression.uses().iter().any(|usage| {
+                    matches!(
+                        self.catalogue.definition(usage.definition()).spec().kind(),
+                        ftoo_manifest::DefinitionKind::Inherited { .. }
+                    )
+                }) {
+                    render::temporary_context(self.effective.as_ref(), self.catalogue)?
+                } else {
+                    self.declarations.clone()
+                };
                 let combined = render::combine(
-                    &self.declarations,
+                    &context,
                     &result.source,
                     result.site(RenderOwner::Expression, "expression"),
                 )?;
@@ -495,6 +570,13 @@ fn pending_uses(prepared: &[PendingEntry], uses: &[SymbolUse]) -> Vec<PendingEnt
             let occurrence = uses
                 .iter()
                 .find(|used| used.definition() == entry.definition)?;
+            if entry
+                .reasons
+                .iter()
+                .all(|reason| matches!(reason, PendingReason::InheritedUnbound { .. }))
+            {
+                return None;
+            }
             let mut result = entry.clone();
             result.origins = occurrence.origins().to_vec();
             Some(result)

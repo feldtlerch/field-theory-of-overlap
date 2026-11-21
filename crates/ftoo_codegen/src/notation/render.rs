@@ -1,8 +1,8 @@
 use super::{MAX_NOTATION_OUTPUT_BYTES, Result, admission, rendered_site};
 use ftoo_manifest::{
     Callee, CheckedNotation, DefinitionId, DefinitionKind, ExprDraft, NotationFault,
-    NotationOrigin, NotationPathPart, NotationResource, NotationSite, NotationStage,
-    PrimitiveOperation, RenderOwner, RenderTarget, RuleId, SymbolTier,
+    NotationOrigin, NotationPathPart, NotationResource, NotationSite, NotationStage, PendingReason,
+    PrimitiveOperation, RenderOwner, RenderTarget, RuleId,
 };
 use std::{collections::BTreeSet, rc::Rc};
 
@@ -23,6 +23,7 @@ pub(super) struct Declaration {
     pub arity: u8,
     pub source: String,
     pub range: std::ops::Range<usize>,
+    pub inherited: bool,
 }
 #[derive(Clone)]
 struct Frame<'a> {
@@ -65,11 +66,11 @@ enum Part {
 fn parts(operation: PrimitiveOperation, target: RenderTarget) -> Vec<Part> {
     use Part::{Argument as A, Fixed as F};
     use PrimitiveOperation::{
-        Add, Alpha, Beta, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate, Parentheses,
-        Subscript, Superscript,
+        Add, Alpha, Beta, Calligraphic, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate,
+        Omega, Parentheses, Subscript, Superscript, UprightS, UprightVir,
     };
     match operation {
-        Alpha | Beta => {
+        Alpha | Beta | Omega => {
             if target == RenderTarget::Macro {
                 vec![F(operation.host_tokens()[0]), F("{}")]
             } else {
@@ -78,6 +79,9 @@ fn parts(operation: PrimitiveOperation, target: RenderTarget) -> Vec<Part> {
                     .expect("closed scalar operation"))]
             }
         }
+        Calligraphic => vec![F("\\mathcal{"), A(0), F("}")],
+        UprightVir => vec![F("\\mathrm{vir}")],
+        UprightS => vec![F("\\mathrm{S}")],
         Fraction => vec![
             F(operation.host_tokens()[0]),
             F("{"),
@@ -158,19 +162,28 @@ pub(super) fn append(
     }
     Ok(())
 }
-fn pending(
+fn marked(
     effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &CheckedNotation<'_, '_>,
     id: DefinitionId,
 ) -> bool {
-    if let Some(view) = effective {
-        return view
-            .effective_status(id)
-            .is_some_and(|s| s.tier() == SymbolTier::Pending);
-    }
-    n.definition(id)
-        .status()
-        .is_some_and(|s| s.tier() == SymbolTier::Pending)
+    let reasons = effective.map_or_else(
+        || {
+            n.definition(id)
+                .status()
+                .map(ftoo_manifest::SymbolStatus::reasons)
+        },
+        |view| {
+            view.effective_status(id)
+                .map(ftoo_audit::retention::EffectiveSymbolStatus::reasons)
+        },
+    );
+    reasons.is_some_and(should_mark)
+}
+pub(super) fn should_mark(reasons: &[PendingReason]) -> bool {
+    reasons
+        .iter()
+        .any(|reason| !matches!(reason, PendingReason::InheritedUnbound { .. }))
 }
 #[derive(Clone, Copy)]
 enum Mode {
@@ -187,7 +200,8 @@ fn definition<'a>(
     stack: &mut Vec<Action<'a>>,
     unmarked: bool,
 ) {
-    if !unmarked && pending(effective, n, id) {
+    let decorate = marked(effective, n, id);
+    if !unmarked && decorate {
         stack.push(Action::Text("}_{\\text{pending}}".into(), origins.clone()));
     }
     match n.definition(id).spec().kind() {
@@ -206,16 +220,17 @@ fn definition<'a>(
                 unmarked,
             );
         }
-        DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => stack
-            .push(Action::Visit(Frame {
-                expr: body,
-                environment,
-                definition: Some(id),
-                path: vec![NotationPathPart::Field("body".into())],
-                origins: origins.clone(),
-            })),
+        DefinitionKind::Canonical { body, .. }
+        | DefinitionKind::Constructor { body }
+        | DefinitionKind::Inherited { body } => stack.push(Action::Visit(Frame {
+            expr: body,
+            environment,
+            definition: Some(id),
+            path: vec![NotationPathPart::Field("body".into())],
+            origins: origins.clone(),
+        })),
     }
-    if !unmarked && pending(effective, n, id) {
+    if !unmarked && decorate {
         stack.push(Action::Text("\\underbrace{".into(), origins));
     }
 }
@@ -424,7 +439,9 @@ fn dependencies(kind: &DefinitionKind) -> BTreeSet<DefinitionId> {
             dependencies.insert(*target);
             vec![]
         }
-        DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => vec![body],
+        DefinitionKind::Canonical { body, .. }
+        | DefinitionKind::Constructor { body }
+        | DefinitionKind::Inherited { body } => vec![body],
     };
     while let Some(expr) = stack.pop() {
         if let ExprDraft::Call { callee, arguments } = expr {
@@ -461,13 +478,16 @@ pub(super) fn declarations(
                 };
                 &alias
             }
-            DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => body,
+            DefinitionKind::Canonical { body, .. }
+            | DefinitionKind::Constructor { body }
+            | DefinitionKind::Inherited { body } => body,
         };
         let field = if matches!(d.spec().kind(), DefinitionKind::Alias { .. }) {
             "target"
         } else {
             "body"
         };
+        let inherited = matches!(d.spec().kind(), DefinitionKind::Inherited { .. });
         let mut body = emit(
             effective,
             n,
@@ -478,12 +498,16 @@ pub(super) fn declarations(
                 path: vec![NotationPathPart::Field(field.into())],
                 origins: vec![],
             })],
-            RenderTarget::Macro,
+            if inherited {
+                RenderTarget::Unicode
+            } else {
+                RenderTarget::Macro
+            },
             RenderOwner::Definition(id),
             "declaration",
             Mode::Declaration,
         )?;
-        if pending(effective, n, id) {
+        if marked(effective, n, id) && !inherited {
             body.source = combine(
                 "\\underbrace{",
                 &body.source,
@@ -525,11 +549,36 @@ pub(super) fn declarations(
             arity: d.spec().signature().arity,
             source,
             range: offset..end,
+            inherited,
         });
         offset = end;
         emitted.insert(id);
     }
     Ok(records)
+}
+
+pub(super) fn temporary_context(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
+    n: &CheckedNotation<'_, '_>,
+) -> Result<String> {
+    declarations(effective, n)?
+        .into_iter()
+        .try_fold(String::new(), |context, declaration| {
+            combine(
+                &context,
+                &declaration.source,
+                declaration_site(&declaration),
+            )
+        })
+}
+
+fn declaration_site(record: &Declaration) -> NotationSite {
+    rendered_site(
+        RenderOwner::Definition(record.id),
+        "temporary-declaration",
+        &record.source,
+        vec![],
+    )
 }
 
 /// Private explanation mode: expand every project call without status wrappers.

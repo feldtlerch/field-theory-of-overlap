@@ -15,6 +15,10 @@ pub enum PrimitiveOperation {
     Juxtapose,
     Parentheses,
     Dimension,
+    Omega,
+    Calligraphic,
+    UprightVir,
+    UprightS,
 }
 impl PrimitiveOperation {
     /// Closed host control tokens used by the renderer and the future shared
@@ -24,6 +28,9 @@ impl PrimitiveOperation {
         match self {
             Self::Alpha => &["\\alpha"],
             Self::Beta => &["\\beta"],
+            Self::Omega => &["\\omega"],
+            Self::Calligraphic => &["\\symcal"],
+            Self::UprightVir | Self::UprightS => &["\\mathrm"],
             Self::Fraction => &["\\frac"],
             Self::Multiply => &["\\cdot"],
             Self::Juxtapose => &["\\,"],
@@ -42,9 +49,13 @@ impl PrimitiveOperation {
         match self {
             Self::Alpha => Some("α"),
             Self::Beta => Some("β"),
+            Self::Omega => Some("ω"),
             Self::Negate => Some("−"),
             Self::Multiply => Some("⋅"),
             Self::Fraction
+            | Self::Calligraphic
+            | Self::UprightVir
+            | Self::UprightS
             | Self::Subscript
             | Self::Superscript
             | Self::Add
@@ -57,8 +68,8 @@ impl PrimitiveOperation {
     #[must_use]
     pub const fn arity(self) -> u8 {
         match self {
-            Self::Alpha | Self::Beta => 0,
-            Self::Negate | Self::Parentheses | Self::Dimension => 1,
+            Self::Alpha | Self::Beta | Self::Omega | Self::UprightVir | Self::UprightS => 0,
+            Self::Calligraphic | Self::Negate | Self::Parentheses | Self::Dimension => 1,
             Self::Fraction
             | Self::Subscript
             | Self::Superscript
@@ -91,9 +102,13 @@ pub enum PrimitiveId {
     Juxtapose,
     Parentheses,
     Dimension,
+    Omega,
+    Calligraphic,
+    UprightVir,
+    UprightS,
 }
 impl PrimitiveId {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 16] = [
         Self::Alpha,
         Self::Beta,
         Self::Fraction,
@@ -106,6 +121,10 @@ impl PrimitiveId {
         Self::Juxtapose,
         Self::Parentheses,
         Self::Dimension,
+        Self::Omega,
+        Self::Calligraphic,
+        Self::UprightVir,
+        Self::UprightS,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -122,6 +141,10 @@ impl PrimitiveId {
             Self::Juxtapose => "juxtapose",
             Self::Parentheses => "parentheses",
             Self::Dimension => "dimension",
+            Self::Omega => "omega",
+            Self::Calligraphic => "calligraphic",
+            Self::UprightVir => "upright-vir",
+            Self::UprightS => "upright-s",
         }
     }
     #[must_use]
@@ -139,6 +162,10 @@ impl PrimitiveId {
             Self::Juxtapose => PrimitiveOperation::Juxtapose,
             Self::Parentheses => PrimitiveOperation::Parentheses,
             Self::Dimension => PrimitiveOperation::Dimension,
+            Self::Omega => PrimitiveOperation::Omega,
+            Self::Calligraphic => PrimitiveOperation::Calligraphic,
+            Self::UprightVir => PrimitiveOperation::UprightVir,
+            Self::UprightS => PrimitiveOperation::UprightS,
         }
     }
 }

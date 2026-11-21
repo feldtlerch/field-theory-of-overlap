@@ -417,7 +417,9 @@ fn definition_body<'a>(
                 });
                 current = *target;
             }
-            DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => {
+            DefinitionKind::Canonical { body, .. }
+            | DefinitionKind::Constructor { body }
+            | DefinitionKind::Inherited { body } => {
                 let environment = Rc::new(
                     arguments
                         .iter()

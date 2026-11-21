@@ -113,11 +113,15 @@ pub enum DefinitionShapeReason {
     CanonicalMustBeNullary,
     AliasMustBeNullary,
     ConstructorArity,
+    InheritedMustBeNullary,
+    InheritedBodyConflict { canonical: DefinitionId },
+    InheritedDependency { target: DefinitionId },
     BackingObjectMismatch { expected: NodeId, actual: NodeId },
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AliasTargetReason {
     ConstructorTarget,
+    InheritedTarget,
     ObjectMismatch { expected: NodeId, actual: NodeId },
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -203,6 +207,9 @@ pub enum NotationFault {
         command: String,
         definitions: Vec<DefinitionId>,
     },
+    SourceMismatch {
+        definition: DefinitionId,
+    },
     HostCollision {
         command: String,
         message: String,
@@ -254,6 +261,7 @@ impl NotationFault {
             Self::SweepInventory { .. } => 17,
             Self::SweepCommand { .. } => 18,
             Self::SweepSignature { .. } => 19,
+            Self::SourceMismatch { .. } => 20,
         }
     }
 }

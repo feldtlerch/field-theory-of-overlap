@@ -930,6 +930,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     }
     expected.extend([
         "generated/notation.tex".into(),
+        "generated/notation-status.json".into(),
         "generated/addressing.tex".into(),
     ]);
     assert_eq!(

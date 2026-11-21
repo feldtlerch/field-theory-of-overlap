@@ -504,6 +504,8 @@ fn render_artifacts(
         notation.declarations().as_bytes(),
         &[],
     )?;
+    let notation_status = notation.status_artifact();
+    check_rendered_bytes("generated/notation-status.json", &notation_status, &[])?;
     let lock = native_support::lock(root)?;
     support.scope(&lock, || {
         let mut artifacts = Vec::new();
@@ -600,6 +602,12 @@ fn render_artifacts(
         artifacts.push(DocumentArtifact {
             path: "generated/notation.tex".into(),
             bytes: notation.declarations().as_bytes().to_vec(),
+            origins: Vec::new(),
+            emissions: Vec::new(),
+        });
+        artifacts.push(DocumentArtifact {
+            path: "generated/notation-status.json".into(),
+            bytes: notation_status,
             origins: Vec::new(),
             emissions: Vec::new(),
         });
@@ -828,7 +836,13 @@ fn consume_sweep(
 ) -> Result<(), DocumentError> {
     let mut sweep = latex::start("assembly-sweep", "en");
     let mut rows = Vec::new();
-    for row in notation.sweep_rows() {
+    // This native sweep typesets commands declared in generated notation support.
+    // Inherited paper commands use their compared source declarations (M078); their screen forms use the strict sweep.
+    for row in notation
+        .sweep_rows()
+        .iter()
+        .filter(|row| native::sweep_declared(notation.catalogue(), row.owner()))
+    {
         let mut origin = native::sweep_row(&mut sweep, row.owner(), row.case(), row.macro_source());
         let explanation = pending::sweep(row.pending_entries());
         if !plan::check_sweep_pending(&explanation, row.pending_entries()) {

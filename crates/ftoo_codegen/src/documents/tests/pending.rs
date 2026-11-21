@@ -114,7 +114,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
             kind: EmissionKind::PendingExplanation(Box::new(PendingExplanation {
                 definition, body_macro: body.into(), body_unicode: body.into(),
                 names: reasons.iter().enumerate().map(|(reason, value)| {
-                    let object = match value { PendingReason::BackingUnbound { object } | PendingReason::BackingAbsent { object } | PendingReason::FormulationProposed { object } | PendingReason::ClaimDeferred { object, .. } | PendingReason::ClaimRefuted { object } | PendingReason::ClaimUndecided { object, .. } | PendingReason::ClaimAuditDeferred { object, .. } => *object };
+                    let object = match value { PendingReason::BackingUnbound { object } | PendingReason::BackingAbsent { object } | PendingReason::FormulationProposed { object } | PendingReason::ClaimDeferred { object, .. } | PendingReason::ClaimRefuted { object } | PendingReason::ClaimUndecided { object, .. } | PendingReason::ClaimAuditDeferred { object, .. } => *object, PendingReason::InheritedUnbound { .. } => unreachable!("object-bound fixture") };
                     let (handle, label) = if object == NodeId::LangevinCoefficientOne { ("c:1", "def:langevin:coefficient-one") } else { ("c:3", "def:langevin:coefficient-three") };
                     let order = match definition { DefinitionId::CoefficientOne => 0, DefinitionId::CoefficientThree => 1, DefinitionId::FirstCoefficient => 4, _ => unreachable!() };
                     super::super::PendingReaderName { reason, role: ftoo_manifest::ReasonRole::Subject, object, handle: handle.into(), label: label.into(), token: format!("u0-p{order}-r{reason}") }

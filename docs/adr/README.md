@@ -15,7 +15,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |001|The authority is a closed typed graph|accepted; warranted structural change and historical meaning are governed by 026; reading identities are governed by 025|
 |002|Four-axis status and declared coverage|accepted; reading lifecycle and availability are governed by 025|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
-|004|The closed notation AST with two renderers and derived tiers|accepted|
+|004|The closed notation AST with two renderers and derived tiers|accepted; inherited definitions' referent prerequisite and pending presentation are governed by 032|
 |005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent docs-only changes are governed by 018 and ordinary paper-pair reuse by 019|
 |007|The audit runs on a public certified-calculation engine|accepted|
@@ -39,5 +39,6 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
 |026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
 |030|Native renderings, complete graph and native model|accepted; establishes the complete-document release gate, complete-graph boundary and native-model boundary; amends 014, 016 and 017; relationship disposition at the complete-graph boundary is governed by 036; native use of the existing paper-scoped store is governed by 037|
+|032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|

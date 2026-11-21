@@ -346,13 +346,28 @@ pub(super) fn tag_range(source: &str, token: &str) -> Option<std::ops::Range<usi
     }
     None
 }
+/// The native sweep uses generated notation support, which does not declare inherited source commands.
+pub(super) fn sweep_declared(
+    catalogue: &ftoo_manifest::CheckedNotation<'_, '_>,
+    owner: ftoo_manifest::RenderOwner,
+) -> bool {
+    match owner {
+        ftoo_manifest::RenderOwner::Definition(id) => !matches!(
+            catalogue.definition(id).spec().kind(),
+            ftoo_manifest::DefinitionKind::Inherited { .. }
+        ),
+        ftoo_manifest::RenderOwner::Primitive(_) | ftoo_manifest::RenderOwner::Expression => true,
+    }
+}
 pub(super) fn sweep_inventory(
     catalogue: &ftoo_manifest::CheckedNotation<'_, '_>,
     actual: &[NativeCase],
 ) -> Result<(), DocumentError> {
     use ftoo_manifest::{DefinitionKind, RenderOwner};
     let mut expected = Vec::new();
-    for definition in catalogue.definitions() {
+    for definition in catalogue.definitions().iter().filter(|definition| {
+        sweep_declared(catalogue, RenderOwner::Definition(definition.spec().id()))
+    }) {
         let owner = RenderOwner::Definition(definition.spec().id());
         expected.push(NativeCase::Sweep {
             owner,
@@ -1063,4 +1078,62 @@ pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
         .arg(scratch.join("output"))
         .arg(scratch.join("document.tex"));
     command
+}
+
+#[cfg(test)]
+mod inherited_sweep_tests {
+    use super::*;
+    use ftoo_manifest::{DefinitionId, RenderOwner};
+
+    #[test]
+    fn only_generated_declarations_enter_native_sweep() {
+        let graph = ftoo_manifest::seed().unwrap();
+        let book = ftoo_manifest::addressing(&graph).unwrap();
+        let catalogue = ftoo_manifest::notation(&book).unwrap();
+        let notation = crate::prepare_notation(&catalogue).unwrap();
+        let mut cases = notation
+            .sweep_rows()
+            .iter()
+            .filter(|row| sweep_declared(&catalogue, row.owner()))
+            .map(|row| NativeCase::Sweep {
+                owner: row.owner(),
+                case: row.case().into(),
+            })
+            .collect::<Vec<_>>();
+        sweep_inventory(&catalogue, &cases).unwrap();
+        let prior_definitions = [
+            DefinitionId::CoefficientOne,
+            DefinitionId::CoefficientOneValue,
+            DefinitionId::CoefficientThree,
+            DefinitionId::CoefficientThreeValue,
+            DefinitionId::FirstCoefficient,
+            DefinitionId::Dimension,
+            DefinitionId::Product,
+        ];
+        assert_eq!(
+            cases
+                .iter()
+                .filter(|case| matches!(case, NativeCase::Sweep { owner: RenderOwner::Definition(id), .. } if prior_definitions.contains(id)))
+                .count(),
+            21
+        );
+        for id in [
+            DefinitionId::Comovfield,
+            DefinitionId::Readout,
+            DefinitionId::Willvirtue,
+            DefinitionId::Gensym,
+        ] {
+            assert!(!sweep_declared(&catalogue, RenderOwner::Definition(id)));
+        }
+        cases.push(NativeCase::Sweep {
+            owner: RenderOwner::Definition(DefinitionId::Comovfield),
+            case: "base".into(),
+        });
+        assert!(sweep_inventory(&catalogue, &cases).is_err());
+        cases.pop();
+        cases.retain(|case| {
+            !matches!(case, NativeCase::Sweep { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case } if case == "base")
+        });
+        assert!(sweep_inventory(&catalogue, &cases).is_err());
+    }
 }

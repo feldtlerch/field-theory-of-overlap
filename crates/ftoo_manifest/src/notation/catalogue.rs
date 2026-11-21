@@ -8,6 +8,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) const FILE: &str = "crates/ftoo_manifest/src/notation/catalogue.rs";
 pub(super) const PRIMITIVES: &str = "crates/ftoo_manifest/src/notation/primitives.rs";
+const SYMBOLS: &str = include_str!("../../../../documents/paper/data/ftoo_symbols.tex");
+const HISTORICAL: &str =
+    include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
+const REGISTERS: &str = include_str!("../../../../documents/paper/data/ftoo_registers.tex");
+pub(super) struct InheritedSources<'a> {
+    pub symbols: &'a str,
+    pub historical: &'a str,
+    pub registers: &'a str,
+}
+const SOURCES: InheritedSources<'static> = InheritedSources {
+    symbols: SYMBOLS,
+    historical: HISTORICAL,
+    registers: REGISTERS,
+};
 
 /// Closed authored definitions, distinct from permanent theory identities.
 /// ```compile_fail,E0599
@@ -22,9 +36,13 @@ pub enum DefinitionId {
     FirstCoefficient,
     Dimension,
     Product,
+    Comovfield,
+    Readout,
+    Willvirtue,
+    Gensym,
 }
 impl DefinitionId {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 11] = [
         Self::CoefficientOne,
         Self::CoefficientThree,
         Self::CoefficientOneValue,
@@ -32,6 +50,10 @@ impl DefinitionId {
         Self::FirstCoefficient,
         Self::Dimension,
         Self::Product,
+        Self::Comovfield,
+        Self::Readout,
+        Self::Willvirtue,
+        Self::Gensym,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -43,6 +65,10 @@ impl DefinitionId {
             Self::FirstCoefficient => "first-coefficient",
             Self::Dimension => "dimension",
             Self::Product => "product",
+            Self::Comovfield => "comovfield",
+            Self::Readout => "readout",
+            Self::Willvirtue => "willvirtue",
+            Self::Gensym => "gensym",
         }
     }
 }
@@ -61,6 +87,9 @@ pub enum DefinitionKind {
     Constructor {
         body: ExprDraft,
     },
+    Inherited {
+        body: ExprDraft,
+    },
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DefinitionCategory {
@@ -68,6 +97,7 @@ pub enum DefinitionCategory {
     Object,
     Alias,
     Constructor,
+    Inherited,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DefinitionSpec {
@@ -107,6 +137,7 @@ impl DefinitionSpec {
             },
             DefinitionKind::Alias { .. } => DefinitionCategory::Alias,
             DefinitionKind::Constructor { .. } => DefinitionCategory::Constructor,
+            DefinitionKind::Inherited { .. } => DefinitionCategory::Inherited,
         }
     }
     pub(super) fn command(&self) -> String {
@@ -115,14 +146,19 @@ impl DefinitionSpec {
             DefinitionCategory::Object => 'O',
             DefinitionCategory::Alias => 'A',
             DefinitionCategory::Constructor => 'N',
+            DefinitionCategory::Inherited => 'I',
         };
-        format!("\\Ftoo{category}{}", self.stem)
+        if matches!(self.kind, DefinitionKind::Inherited { .. }) {
+            format!("\\{}", self.token)
+        } else {
+            format!("\\Ftoo{category}{}", self.stem)
+        }
     }
     pub(super) fn body(&self) -> Option<&ExprDraft> {
         match &self.kind {
-            DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => {
-                Some(body)
-            }
+            DefinitionKind::Canonical { body, .. }
+            | DefinitionKind::Constructor { body }
+            | DefinitionKind::Inherited { body } => Some(body),
             DefinitionKind::Alias { .. } => None,
         }
     }
@@ -145,10 +181,11 @@ pub(super) fn call(id: DefinitionId, arguments: Vec<ExprDraft>) -> ExprDraft {
         arguments,
     }
 }
+#[allow(clippy::too_many_lines)] // The closed catalogue keeps source identities and bodies together.
 pub(super) fn catalogue() -> Vec<DefinitionSpec> {
     use DefinitionId::{
-        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Dimension,
-        FirstCoefficient, Product,
+        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Comovfield,
+        Dimension, FirstCoefficient, Gensym, Product, Readout, Willvirtue,
     };
     use NodeId::{
         LangevinCoefficientOne, LangevinCoefficientOneValue, LangevinCoefficientThree,
@@ -237,6 +274,49 @@ pub(super) fn catalogue() -> Vec<DefinitionSpec> {
                 body: primitive(
                     PrimitiveId::Multiply,
                     vec![ExprDraft::Slot { index: 0 }, ExprDraft::Slot { index: 1 }],
+                ),
+            },
+        },
+        DefinitionSpec {
+            id: Comovfield,
+            token: Comovfield.token(),
+            stem: "Comovfield",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited { body: literal("S") },
+        },
+        DefinitionSpec {
+            id: Readout,
+            token: Readout.token(),
+            stem: "Readout",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(PrimitiveId::Calligraphic, vec![literal("M")]),
+            },
+        },
+        DefinitionSpec {
+            id: Willvirtue,
+            token: Willvirtue.token(),
+            stem: "Willvirtue",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Superscript,
+                    vec![
+                        primitive(PrimitiveId::Omega, vec![]),
+                        primitive(PrimitiveId::UprightVir, vec![]),
+                    ],
+                ),
+            },
+        },
+        DefinitionSpec {
+            id: Gensym,
+            token: Gensym.token(),
+            stem: "Gensym",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Subscript,
+                    vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
                 ),
             },
         },
@@ -444,6 +524,10 @@ fn definition_shapes(definitions: &[DefinitionSpec], errors: &mut Vec<NotationDi
                     .then_some(DefinitionShapeReason::ConstructorArity),
                 None,
             ),
+            DefinitionKind::Inherited { .. } => (
+                (d.signature.arity != 0).then_some(DefinitionShapeReason::InheritedMustBeNullary),
+                None,
+            ),
         };
         if let Some(reason) = reason {
             errors.push(diagnostic(
@@ -471,6 +555,24 @@ fn definition_shapes(definitions: &[DefinitionSpec], errors: &mut Vec<NotationDi
                     },
                 },
             ));
+        }
+        if let DefinitionKind::Inherited { body } = &d.kind {
+            for (target, use_site) in ast::calls(body, site(i, d.id).field("body")) {
+                if definitions.iter().any(|candidate| {
+                    candidate.id == target
+                        && !matches!(candidate.kind, DefinitionKind::Inherited { .. })
+                }) {
+                    errors.push(diagnostic(
+                        RuleId::M048,
+                        NotationStage::Catalogue,
+                        use_site,
+                        NotationFault::DefinitionShape {
+                            definition: d.id,
+                            reason: DefinitionShapeReason::InheritedDependency { target },
+                        },
+                    ));
+                }
+            }
         }
     }
     for (command, entries) in names {
@@ -526,6 +628,7 @@ fn references(definitions: &[DefinitionSpec]) -> Result<(), NotationErrors> {
                     DefinitionKind::Constructor { .. } => {
                         Some(AliasTargetReason::ConstructorTarget)
                     }
+                    DefinitionKind::Inherited { .. } => Some(AliasTargetReason::InheritedTarget),
                     DefinitionKind::Canonical { object: actual, .. }
                     | DefinitionKind::Alias { object: actual, .. }
                         if actual != object =>
@@ -571,7 +674,9 @@ pub(super) fn dependencies(definitions: &[DefinitionSpec]) -> Dependencies {
                 DefinitionKind::Alias { target, .. } => {
                     vec![(*target, site(i, d.id).field("target"))]
                 }
-                DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => {
+                DefinitionKind::Canonical { body, .. }
+                | DefinitionKind::Constructor { body }
+                | DefinitionKind::Inherited { body } => {
                     ast::calls(body, site(i, d.id).field("body"))
                 }
             };
@@ -616,7 +721,7 @@ fn cycle_path(
     }
     false
 }
-fn cycles(edges: &Dependencies) -> Result<(), NotationErrors> {
+pub(super) fn cycles(edges: &Dependencies) -> Result<(), NotationErrors> {
     let mut remaining: Vec<_> = DefinitionId::ALL.to_vec();
     remaining.sort_by_key(|id| id.token());
     let mut handled = BTreeSet::<DefinitionId>::new();
@@ -643,11 +748,299 @@ fn cycles(edges: &Dependencies) -> Result<(), NotationErrors> {
     }
     finish(errors)
 }
+fn fully_expanded(
+    expr: &ExprDraft,
+    definitions: &[DefinitionSpec],
+    slots: &[ExprDraft],
+    remaining: &mut usize,
+) -> Option<ExprDraft> {
+    if *remaining == 0 {
+        return None;
+    }
+    *remaining -= 1;
+    match expr {
+        ExprDraft::Literal { .. } => Some(expr.clone()),
+        ExprDraft::Slot { index } => slots.get(usize::from(*index)).cloned(),
+        ExprDraft::Call { callee, arguments } => {
+            let arguments = arguments
+                .iter()
+                .map(|argument| fully_expanded(argument, definitions, slots, remaining))
+                .collect::<Option<Vec<_>>>()?;
+            match callee {
+                Callee::Primitive(_) => Some(ExprDraft::Call {
+                    callee: *callee,
+                    arguments,
+                }),
+                Callee::Definition(id) => {
+                    let definition = definitions.iter().find(|d| d.id == *id)?;
+                    match &definition.kind {
+                        DefinitionKind::Alias { target, .. } => {
+                            fully_expanded(&call(*target, vec![]), definitions, &[], remaining)
+                        }
+                        DefinitionKind::Canonical { body, .. }
+                        | DefinitionKind::Constructor { body }
+                        | DefinitionKind::Inherited { body } => {
+                            fully_expanded(body, definitions, &arguments, remaining)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+fn expanded_body_conflicts(definitions: &[DefinitionSpec]) -> Result<(), NotationErrors> {
+    let mut errors = vec![];
+    for (i, inherited) in definitions.iter().enumerate() {
+        let DefinitionKind::Inherited { body } = &inherited.kind else {
+            continue;
+        };
+        let mut remaining = ast::MAX_EXPANSION_NODES;
+        let expanded = fully_expanded(body, definitions, &[], &mut remaining)
+            .expect("validated inherited body expands within limits");
+        for canonical in definitions
+            .iter()
+            .filter(|d| matches!(d.kind, DefinitionKind::Canonical { .. }))
+        {
+            let mut remaining = ast::MAX_EXPANSION_NODES;
+            let other = fully_expanded(
+                canonical.body().expect("canonical body exists"),
+                definitions,
+                &[],
+                &mut remaining,
+            )
+            .expect("validated canonical body expands within limits");
+            if expanded == other {
+                errors.push(diagnostic(
+                    RuleId::M048,
+                    NotationStage::Catalogue,
+                    site(i, inherited.id).field("body"),
+                    NotationFault::DefinitionShape {
+                        definition: inherited.id,
+                        reason: DefinitionShapeReason::InheritedBodyConflict {
+                            canonical: canonical.id,
+                        },
+                    },
+                ));
+            }
+        }
+    }
+    finish(errors)
+}
+pub(super) fn source_matches(source: &str, bytes: &str) -> bool {
+    source.matches(bytes).count() == 1
+}
+fn declared_name(source: &str) -> Option<&str> {
+    let source = source.trim_start_matches(char::is_whitespace);
+    let source = source
+        .strip_prefix('*')
+        .unwrap_or(source)
+        .trim_start_matches(char::is_whitespace);
+    let source = source
+        .strip_prefix('{')
+        .unwrap_or(source)
+        .trim_start_matches(char::is_whitespace);
+    let name = source.strip_prefix('\\')?;
+    let len = name
+        .bytes()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b':'))
+        .count();
+    (len > 0).then(|| &name[..len])
+}
+fn csname_name(source: &str) -> Option<&str> {
+    let source = source.trim_start_matches(char::is_whitespace);
+    let len = source
+        .bytes()
+        .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b':'))
+        .count();
+    let (name, rest) = source.split_at(len);
+    (len > 0
+        && rest
+            .trim_start_matches(char::is_whitespace)
+            .starts_with("\\endcsname"))
+    .then_some(name)
+}
+fn uncommented(source: &str) -> String {
+    let mut result = String::with_capacity(source.len());
+    let mut escaped = false;
+    let mut comment = false;
+    for scalar in source.chars() {
+        if comment {
+            if scalar == '\n' {
+                comment = false;
+                result.push(scalar);
+            }
+            continue;
+        }
+        if scalar == '%' && !escaped {
+            comment = true;
+            continue;
+        }
+        result.push(scalar);
+        escaped = scalar == '\\' && !escaped;
+    }
+    result
+}
+fn declaration_target(source: &str) -> Option<&str> {
+    let source = source.trim_start_matches(char::is_whitespace);
+    let source = source
+        .strip_prefix('*')
+        .unwrap_or(source)
+        .trim_start_matches(char::is_whitespace);
+    let source = source
+        .strip_prefix('{')
+        .unwrap_or(source)
+        .trim_start_matches(char::is_whitespace);
+    if let Some(source) = source.strip_prefix("\\csname") {
+        csname_name(source)
+    } else {
+        declared_name(source)
+    }
+}
+fn declaration_sites(source: &str, name: &str) -> usize {
+    let source = uncommented(source);
+    [
+        "\\NewDocumentCommand",
+        "\\RenewDocumentCommand",
+        "\\DeclareDocumentCommand",
+        "\\ProvideDocumentCommand",
+        "\\NewExpandableDocumentCommand",
+        "\\RenewExpandableDocumentCommand",
+        "\\DeclareExpandableDocumentCommand",
+        "\\ProvideExpandableDocumentCommand",
+        "\\DeclareRobustCommand",
+        "\\NewCommandCopy",
+        "\\RenewCommandCopy",
+        "\\DeclareCommandCopy",
+        "\\DeclareQuantity",
+        "\\newcommand",
+        "\\renewcommand",
+        "\\providecommand",
+        "\\def",
+        "\\gdef",
+        "\\edef",
+        "\\xdef",
+        "\\let",
+        "\\cs_set:Npn",
+    ]
+    .into_iter()
+    .map(|command| {
+        source
+            .match_indices(command)
+            .filter(|(at, _)| declaration_target(&source[*at + command.len()..]) == Some(name))
+            .count()
+    })
+    .sum()
+}
+fn registered_variance_sites(source: &str, name: &str) -> usize {
+    let source = uncommented(source);
+    source
+        .match_indices("\\RegisterVariance")
+        .filter(|(at, _)| declared_name(&source[*at + "\\RegisterVariance".len()..]) == Some(name))
+        .count()
+}
+pub(super) fn inherited_source(
+    definitions: &[DefinitionSpec],
+    sources: &InheritedSources<'_>,
+) -> Result<(), NotationErrors> {
+    let expected = [
+        (
+            DefinitionId::Comovfield,
+            sources.symbols,
+            "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
+            literal("S"),
+        ),
+        (
+            DefinitionId::Readout,
+            sources.historical,
+            "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
+            primitive(PrimitiveId::Calligraphic, vec![literal("M")]),
+        ),
+        (
+            DefinitionId::Willvirtue,
+            sources.historical,
+            "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
+            primitive(
+                PrimitiveId::Superscript,
+                vec![
+                    primitive(PrimitiveId::Omega, vec![]),
+                    primitive(PrimitiveId::UprightVir, vec![]),
+                ],
+            ),
+        ),
+        (
+            DefinitionId::Gensym,
+            sources.registers,
+            "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+            primitive(
+                PrimitiveId::Subscript,
+                vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
+            ),
+        ),
+    ];
+    let expected_ids: BTreeSet<_> = expected.iter().map(|(id, ..)| *id).collect();
+    let mut errors = vec![];
+    for (id, source, bytes, body) in expected {
+        let actual = definitions
+            .iter()
+            .find(|d| d.id == id)
+            .expect("complete definitions");
+        let sites = [sources.symbols, sources.historical, sources.registers]
+            .into_iter()
+            .map(|text| declaration_sites(text, id.token()))
+            .sum::<usize>();
+        let variance_sites = [sources.symbols, sources.historical, sources.registers]
+            .into_iter()
+            .map(|text| registered_variance_sites(text, id.token()))
+            .sum::<usize>();
+        if !matches!(actual.kind, DefinitionKind::Inherited { .. })
+            || sites != 1
+            || variance_sites != usize::from(id == DefinitionId::Comovfield)
+            || !source_matches(source, bytes)
+            || (id == DefinitionId::Comovfield
+                && !source_matches(
+                    sources.registers,
+                    "\\RegisterVariance{\\comovfield}{operator}\n",
+                ))
+            || actual.body() != Some(&body)
+            || actual.signature.arity != 0
+        {
+            errors.push(diagnostic(
+                RuleId::M078,
+                NotationStage::Catalogue,
+                site(
+                    definitions
+                        .iter()
+                        .position(|d| d.id == id)
+                        .expect("complete definitions"),
+                    id,
+                )
+                .field("source"),
+                NotationFault::SourceMismatch { definition: id },
+            ));
+        }
+    }
+    for (i, definition) in definitions.iter().enumerate() {
+        if matches!(definition.kind, DefinitionKind::Inherited { .. })
+            && !expected_ids.contains(&definition.id)
+        {
+            errors.push(diagnostic(
+                RuleId::M078,
+                NotationStage::Catalogue,
+                site(i, definition.id).field("source"),
+                NotationFault::SourceMismatch {
+                    definition: definition.id,
+                },
+            ));
+        }
+    }
+    finish(errors)
+}
 pub(super) fn admit(
     primitives: &[PrimitiveSpec],
     definitions: &[DefinitionSpec],
 ) -> Result<Dependencies, NotationErrors> {
     shape(primitives, definitions)?;
+    inherited_source(definitions, &SOURCES)?;
     references(definitions)?;
     let mut errors = vec![];
     for (i, d) in definitions.iter().enumerate() {
@@ -672,9 +1065,9 @@ pub(super) fn admit(
                 alias_body = call(*target, vec![]);
                 (&alias_body, "target")
             }
-            DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => {
-                (body, "body")
-            }
+            DefinitionKind::Canonical { body, .. }
+            | DefinitionKind::Constructor { body }
+            | DefinitionKind::Inherited { body } => (body, "body"),
         };
         if let Err(error) = ast::expand(
             body,
@@ -686,5 +1079,6 @@ pub(super) fn admit(
         }
     }
     finish(errors)?;
+    expanded_body_conflicts(definitions)?;
     Ok(edges)
 }

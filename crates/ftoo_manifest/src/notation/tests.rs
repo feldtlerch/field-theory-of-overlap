@@ -58,7 +58,9 @@ fn exact(error: &NotationErrors, expected: &[NotationDiagnostic], display: &str)
 }
 fn body_mut(d: &mut DefinitionSpec) -> &mut ExprDraft {
     match &mut d.kind {
-        DefinitionKind::Canonical { body, .. } | DefinitionKind::Constructor { body } => body,
+        DefinitionKind::Canonical { body, .. }
+        | DefinitionKind::Constructor { body }
+        | DefinitionKind::Inherited { body } => body,
         DefinitionKind::Alias { .. } => panic!("fixture needs a body"),
     }
 }
@@ -67,15 +69,386 @@ fn backing_mut(d: &mut DefinitionSpec) -> &mut Option<NodeId> {
         DefinitionKind::Canonical { backing, .. } | DefinitionKind::Alias { backing, .. } => {
             backing
         }
-        DefinitionKind::Constructor { .. } => panic!("fixture needs binding"),
+        DefinitionKind::Constructor { .. } | DefinitionKind::Inherited { .. } => {
+            panic!("fixture needs binding")
+        }
     }
+}
+
+#[test]
+fn inherited_coda_definitions_are_checked_and_unbound() -> TestResult {
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let notation = notation(&book)?;
+    for id in [
+        DefinitionId::Comovfield,
+        DefinitionId::Readout,
+        DefinitionId::Willvirtue,
+        DefinitionId::Gensym,
+    ] {
+        let definition = notation.definition(id);
+        assert!(matches!(
+            definition.spec().kind(),
+            DefinitionKind::Inherited { .. }
+        ));
+        assert_eq!(definition.spec().signature().arity, 0);
+        assert_eq!(definition.command(), format!("\\{}", id.token()));
+        assert_eq!(definition.status().unwrap().tier(), SymbolTier::Pending);
+        assert_eq!(
+            definition.status().unwrap().reasons(),
+            &[PendingReason::InheritedUnbound { definition: id }]
+        );
+        check_expression(&notation, call(id, vec![]))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn inherited_source_and_body_changes_refuse() {
+    let source = include_str!("../../../../documents/paper/data/ftoo_symbols.tex");
+    let original = "\\ensuremath{S}";
+    assert!(catalogue::source_matches(source, original));
+    assert!(!catalogue::source_matches(source, "\\ensuremath{X}"));
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[7]) = literal("X");
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Comovfield
+        }
+    )));
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[8]) = call(DefinitionId::Comovfield, vec![]);
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Readout
+        }
+    )));
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[10]) = primitive(
+        PrimitiveId::Superscript,
+        vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
+    );
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Gensym
+        }
+    )));
+}
+
+#[test]
+fn inherited_source_bytes_and_declaration_sites_refuse_changes() {
+    let symbols = include_str!("../../../../documents/paper/data/ftoo_symbols.tex");
+    let historical = include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
+    let registers = include_str!("../../../../documents/paper/data/ftoo_registers.tex");
+    let definitions = catalogue::catalogue();
+    for (source, before, after, id) in [
+        (
+            symbols,
+            "\\ensuremath{S}",
+            "\\ensuremath{X}",
+            DefinitionId::Comovfield,
+        ),
+        (
+            historical,
+            "\\symcal{M}",
+            "\\symcal{N}",
+            DefinitionId::Readout,
+        ),
+        (
+            historical,
+            "\\mathrm{vir}",
+            "\\mathrm{via}",
+            DefinitionId::Willvirtue,
+        ),
+        (
+            registers,
+            "variance=operator",
+            "variance=operatpr",
+            DefinitionId::Gensym,
+        ),
+        (
+            registers,
+            "\\RegisterVariance{\\comovfield}{operator}",
+            "\\RegisterVariance{\\comovfield}{operatpr}",
+            DefinitionId::Comovfield,
+        ),
+    ] {
+        let changed = source.replacen(before, after, 1);
+        assert_ne!(changed, source);
+        let sources = catalogue::InheritedSources {
+            symbols: if std::ptr::eq(source, symbols) {
+                &changed
+            } else {
+                symbols
+            },
+            historical: if std::ptr::eq(source, historical) {
+                &changed
+            } else {
+                historical
+            },
+            registers: if std::ptr::eq(source, registers) {
+                &changed
+            } else {
+                registers
+            },
+        };
+        let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+        assert!(error.diagnostics().iter().any(
+            |d| matches!(d.fault, NotationFault::SourceMismatch { definition } if definition == id)
+        ));
+    }
+    let duplicate = format!("{historical}\\RenewDocumentCommand{{\\comovfield}}{{}}{{X}}\n");
+    let sources = catalogue::InheritedSources {
+        symbols,
+        historical: &duplicate,
+        registers,
+    };
+    let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Comovfield
+        }
+    )));
+    for declaration in [
+        r"\renewcommand*{\comovfield}{X}",
+        r"\renewcommand\comovfield{X}",
+        r"\DeclareDocumentCommand\comovfield{}{X}",
+        r"\ProvideDocumentCommand\comovfield{}{X}",
+        r"\NewExpandableDocumentCommand\comovfield{}{X}",
+        r"\RenewExpandableDocumentCommand\comovfield{}{X}",
+        r"\DeclareExpandableDocumentCommand\comovfield{}{X}",
+        r"\ProvideExpandableDocumentCommand\comovfield{}{X}",
+        r"\DeclareRobustCommand\comovfield{X}",
+        r"\NewCommandCopy\comovfield\otherfield",
+        r"\RenewCommandCopy\comovfield\otherfield",
+        r"\DeclareCommandCopy\comovfield\otherfield",
+        r"\cs_set:Npn \comovfield {X}",
+        r"\expandafter\def\csname comovfield\endcsname{X}",
+    ] {
+        let duplicate = format!("{historical}{declaration}\n");
+        let sources = catalogue::InheritedSources {
+            symbols,
+            historical: &duplicate,
+            registers,
+        };
+        let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+        assert!(error.diagnostics().iter().any(|d| matches!(
+            d.fault,
+            NotationFault::SourceMismatch {
+                definition: DefinitionId::Comovfield
+            }
+        )));
+    }
+    let duplicate = format!("{historical}\\RenewDocumentCommand\\comovfield{{}}{{X}}\n");
+    let sources = catalogue::InheritedSources {
+        symbols,
+        historical: &duplicate,
+        registers,
+    };
+    let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Comovfield
+        }
+    )));
+    let duplicate = format!("{registers}\\def\\comovfield{{X}}\n");
+    let sources = catalogue::InheritedSources {
+        symbols,
+        historical,
+        registers: &duplicate,
+    };
+    let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Comovfield
+        }
+    )));
+    for (line, id) in [
+        (
+            r"\RegisterVariance{\comovfield}{vector}",
+            DefinitionId::Comovfield,
+        ),
+        (r"\RegisterVariance{\gensym}{scalar}", DefinitionId::Gensym),
+        (
+            r"\RegisterVariance{\readout}{scalar}",
+            DefinitionId::Readout,
+        ),
+    ] {
+        let changed = format!("{registers}{line}\n");
+        let sources = catalogue::InheritedSources {
+            symbols,
+            historical,
+            registers: &changed,
+        };
+        let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+        assert!(error.diagnostics().iter().any(
+            |d| matches!(d.fault, NotationFault::SourceMismatch { definition } if definition == id)
+        ));
+    }
+    let mentions = format!(
+        "{historical}\\let\\saved\\comovfield\n\\NewCommandCopy\\saved\\comovfield\n\\csname comovfield\\endcsname\n% \\renewcommand\\comovfield{{X}}\n\\renewcommand\\comovfield_aux:n{{X}}\n"
+    );
+    let sources = catalogue::InheritedSources {
+        symbols,
+        historical: &mentions,
+        registers,
+    };
+    assert_eq!(catalogue::inherited_source(&definitions, &sources), Ok(()));
+}
+
+#[test]
+fn inherited_source_rows_and_kinds_are_bijective() {
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut definitions = catalogue::catalogue();
+    definitions[5].kind = DefinitionKind::Inherited { body: literal("x") };
+    let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Dimension
+        }
+    )));
+    let mut definitions = catalogue::catalogue();
+    definitions[7].kind = DefinitionKind::Constructor { body: literal("S") };
+    let error = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::SourceMismatch {
+            definition: DefinitionId::Comovfield
+        }
+    )));
+}
+
+#[test]
+fn inherited_body_cannot_depend_on_object_bound_definition() {
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[7]) = call(DefinitionId::CoefficientOne, vec![]);
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::DefinitionShape {
+            reason: DefinitionShapeReason::InheritedDependency {
+                target: DefinitionId::CoefficientOne
+            },
+            ..
+        }
+    )));
+}
+
+#[test]
+fn inherited_cycle_and_wrong_arity_refuse() -> TestResult {
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[7]) = call(DefinitionId::Comovfield, vec![]);
+    let edges = catalogue::dependencies(&definitions);
+    let cycle = catalogue::cycles(&edges).unwrap_err();
+    assert!(
+        cycle
+            .diagnostics()
+            .iter()
+            .any(|d| matches!(d.fault, NotationFault::DefinitionCycle { .. }))
+    );
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let notation = notation(&book)?;
+    let arity =
+        check_expression(&notation, call(DefinitionId::Gensym, vec![literal("x")])).unwrap_err();
+    assert!(arity.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::CallArity {
+            expected: 0,
+            actual: 1,
+            ..
+        }
+    )));
+    Ok(())
+}
+
+#[test]
+fn inherited_reason_propagates_and_canonical_body_collision_refuses() -> TestResult {
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[2]) = primitive(
+        PrimitiveId::Add,
+        vec![call(DefinitionId::Comovfield, vec![]), literal("x")],
+    );
+    let notation = construct(&book, primitives::catalogue(), definitions)?;
+    assert!(
+        notation
+            .definition(DefinitionId::CoefficientOneValue)
+            .status()
+            .unwrap()
+            .reasons()
+            .contains(&PendingReason::InheritedUnbound {
+                definition: DefinitionId::Comovfield
+            })
+    );
+    assert!(
+        notation
+            .definition(DefinitionId::CoefficientOneValue)
+            .status()
+            .unwrap()
+            .reasons()
+            .iter()
+            .any(|reason| !matches!(reason, PendingReason::InheritedUnbound { .. }))
+    );
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[0]) = literal("S");
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::DefinitionShape {
+            reason: DefinitionShapeReason::InheritedBodyConflict { .. },
+            ..
+        }
+    )));
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[0]) = call(DefinitionId::Comovfield, vec![]);
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::DefinitionShape {
+            reason: DefinitionShapeReason::InheritedBodyConflict { .. },
+            ..
+        }
+    )));
+    Ok(())
+}
+
+#[test]
+fn inherited_source_rule_is_pinned() {
+    let rule = crate::RULES
+        .iter()
+        .find(|r| r.number == RuleId::M078)
+        .unwrap();
+    assert_eq!(
+        rule.statement,
+        "Each inherited source declaration has the admitted signature, decoded visual body and complete dependency closure, with named quantity, metric and registered-variance interfaces unchanged. Source syntax and its checked expression form a reviewed pairing, and each inherited definition has exactly one compared source declaration site among the recognised declaration and redefinition forms in the three named source files. Registered-variance declaration sites for each inherited name across those files equal its recorded count."
+    );
+    assert_eq!(
+        rule.scope,
+        "Every admitted inherited declaration in documents/paper/data/ftoo_symbols.tex, documents/paper/data/ftoo_symbols_historical.tex and documents/paper/data/ftoo_registers.tex, including its checked source bytes and declared checking interface; declaration sites in other files are outside this comparison."
+    );
 }
 
 #[test]
 fn n01_primitive_inventory_and_signatures() -> TestResult {
     use PrimitiveId::{
-        Add, Alpha, Beta, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate, Parentheses,
-        Subscript, Superscript,
+        Add, Alpha, Beta, Calligraphic, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate,
+        Omega, Parentheses, Subscript, Superscript, UprightS, UprightVir,
     };
     let graph = seed()?;
     let book = addressing(&graph)?;
@@ -92,6 +465,10 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         (Juxtapose, "juxtapose", 2),
         (Parentheses, "parentheses", 1),
         (Dimension, "dimension", 1),
+        (Omega, "omega", 0),
+        (Calligraphic, "calligraphic", 1),
+        (UprightVir, "upright-vir", 0),
+        (UprightS, "upright-s", 0),
     ];
     let n = notation(&book)?;
     assert_eq!(
@@ -142,7 +519,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            primitive_site(Alpha, 11, &["id"]),
+            primitive_site(Alpha, 15, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
@@ -150,7 +527,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 11, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 15, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
     );
     let mut p = primitives::catalogue();
     let mut duplicate = p[0].clone();
@@ -166,10 +543,10 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 12],
+                positions: vec![0, 16],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 12] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 16] }\n",
     );
     let mut p = primitives::catalogue();
     p[1].token = "alpha";
@@ -455,7 +832,7 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            registry_site(CoefficientOne, 6, &["id"]),
+            registry_site(CoefficientOne, 10, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
@@ -463,10 +840,11 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 6, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 10, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
     );
     for (target, reason) in [
         (Dimension, AliasTargetReason::ConstructorTarget),
+        (DefinitionId::Comovfield, AliasTargetReason::InheritedTarget),
         (
             DefinitionId::CoefficientThree,
             AliasTargetReason::ObjectMismatch {
@@ -1177,22 +1555,22 @@ fn n16_exact_appended_register() {
         [
             (
                 RuleId::M047,
-                "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits.",
+                "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields.",
                 "Every primitive descriptor, definition body and submitted notation expression.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M048,
-                "Definitions have their kind's signature shape and any backing equals their object; stems obey the reserved alphabetic grammar and generated names are unique; every permanent object has exactly one canonical symbol; aliases preserve that object and terminate at its canonical symbol; all definition dependencies are acyclic.",
+                "Definitions have their kind's signature shape and any backing equals their object; stems obey the reserved alphabetic grammar and generated names are unique; every permanent object has exactly one canonical symbol; aliases preserve that object and terminate at its canonical symbol; all definition dependencies are acyclic. An inherited definition has a checked signature and decoded body but no theory object or backing; an identical fully expanded body with an object-bound canonical symbol or a dependency on a non-inherited definition in its own body refuses admission.",
                 "The complete notation definition catalogue, including absent objects and unused definitions.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M049,
-                "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
-                "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values.",
+                "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason. An inherited definition without a theory object is pending with a missing-binding reason, which every definition using it retains; generated notation-status evidence lists every inherited definition and its reason.",
+                "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values, including inherited missing bindings, transitive uses and generated/notation-status.json.",
                 RuleState::Structural,
                 None
             ),
@@ -1244,22 +1622,22 @@ fn n16_renderer_register_has_no_existing_transitions() {
         [
             (
                 RuleId::M050,
-                "Generated notation declarations refuse collisions in the consuming typesetting context.",
-                "Every emitted notation declaration and its checked KaTeX context.",
+                "Generated notation declarations refuse collisions in the consuming typesetting context. Temporary inherited declarations used by the sweep and expression validation refuse collisions in that same checked KaTeX context.",
+                "Every emitted notation declaration and temporary inherited declaration used in the checked KaTeX context.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M051,
-                "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar.",
-                "Generated declaration bodies, macro invocations and fully expanded notation expressions.",
+                "Both notation forms derive from the same checked AST with explicit token boundaries and within the output limit; full Unicode expansion contains no project commands and every returned expression passes the pinned KaTeX grammar. For inherited definitions instead, the paper form invokes the existing checked source declaration by name, whose body is source-compared with the admitted AST, and the strict screen form derives from that AST; pending marks and visible pending explanations are omitted only when every pending reason is an inherited missing binding.",
+                "Generated declaration bodies, macro invocations and fully expanded notation expressions, including named inherited paper invocations and their checked source-comparison exception.",
                 RuleState::Enforced,
                 None
             ),
             (
                 RuleId::M052,
-                "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart.",
-                "The complete emitted command inventory, including aliases, constructors and pending symbols.",
+                "A generated sweep typesets every emitted notation command with its declared arguments and checks its fully expanded counterpart. The KaTeX sweep includes temporary declarations and fully expanded strict screen forms for inherited definitions.",
+                "The complete emitted command inventory, including aliases, constructors, pending symbols and temporary inherited declarations in KaTeX.",
                 RuleState::Enforced,
                 None
             ),
@@ -1278,7 +1656,7 @@ fn n16_renderer_register_has_no_existing_transitions() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (74, 63, 5, 6)
+        (75, 64, 5, 6)
     );
 }
 
@@ -1338,10 +1716,10 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 7],
+                positions: vec![0, 11],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 7] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 11] }\n",
     );
     let mut d = catalogue::catalogue();
     d[1].token = "coefficient-one";
@@ -1381,7 +1759,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
             diag(
                 RuleId::M047,
                 NotationStage::Catalogue,
-                primitive_site(PrimitiveId::Beta, 12, &["operation"]),
+                primitive_site(PrimitiveId::Beta, 16, &["operation"]),
                 NotationFault::CatalogMultiplicity {
                     entry: RegistryEntry::Primitive(PrimitiveId::Beta),
                     expected: 1,
@@ -1390,7 +1768,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 },
             ),
         ],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 12, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 16, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
     );
     notation(&book)?;
     Ok(())
@@ -1470,8 +1848,8 @@ fn n03_all_argument_errors_and_alias_self_cycle() -> TestResult {
 #[test]
 fn n05_seed_exact_statuses_and_catalogue_bodies() -> TestResult {
     use DefinitionId::{
-        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Dimension,
-        FirstCoefficient, Product,
+        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Comovfield,
+        Dimension, FirstCoefficient, Gensym, Product, Readout, Willvirtue,
     };
     use NodeId::{
         LangevinCoefficientOne as One, LangevinCoefficientOneValue as OneValue,
@@ -1579,6 +1957,53 @@ fn n05_seed_exact_statuses_and_catalogue_bodies() -> TestResult {
                 body: primitive(
                     PrimitiveId::Multiply,
                     vec![ExprDraft::Slot { index: 0 }, ExprDraft::Slot { index: 1 }],
+                ),
+            },
+        ),
+        (
+            Comovfield,
+            "comovfield",
+            "Comovfield",
+            "\\comovfield",
+            0,
+            DefinitionKind::Inherited { body: literal("S") },
+        ),
+        (
+            Readout,
+            "readout",
+            "Readout",
+            "\\readout",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(PrimitiveId::Calligraphic, vec![literal("M")]),
+            },
+        ),
+        (
+            Willvirtue,
+            "willvirtue",
+            "Willvirtue",
+            "\\willvirtue",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Superscript,
+                    vec![
+                        primitive(PrimitiveId::Omega, vec![]),
+                        primitive(PrimitiveId::UprightVir, vec![]),
+                    ],
+                ),
+            },
+        ),
+        (
+            Gensym,
+            "gensym",
+            "Gensym",
+            "\\gensym",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Subscript,
+                    vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
                 ),
             },
         ),
@@ -1761,14 +2186,14 @@ fn complete_seed_consumer() {
     let graph = seed().unwrap();
     let book = addressing(&graph).unwrap();
     let n = notation(&book).unwrap();
-    assert_eq!(n.definitions().len(), 7);
-    assert_eq!(n.primitives().len(), 12);
+    assert_eq!(n.definitions().len(), 11);
+    assert_eq!(n.primitives().len(), 16);
     assert_eq!(
         n.definitions()
             .iter()
             .filter(|d| d.status().is_some())
             .count(),
-        5
+        9
     );
     for object in NodeId::ALL {
         assert_eq!(

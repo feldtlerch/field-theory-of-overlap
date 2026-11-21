@@ -1,7 +1,7 @@
 use super::{
     AssemblyInputFault as Fault, AssemblyResource as Resource, MathSyntaxReason as Reason,
 };
-use crate::{Callee, CheckedNotation, DefinitionId, ExprDraft, PrimitiveId};
+use crate::{Callee, CheckedNotation, DefinitionId, DefinitionKind, ExprDraft, PrimitiveId};
 use std::ops::Range;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -364,6 +364,28 @@ impl Parser<'_, '_, '_> {
     }
     fn command(&mut self, token: Token, callee: Callee, arity: u8) -> Result<Node> {
         self.take();
+        if let Callee::Definition(id) = callee
+            && matches!(
+                self.catalogue.definition(id).spec().kind(),
+                DefinitionKind::Inherited { .. }
+            )
+            && arity == 0
+            && self.is("{")
+            && self
+                .tokens
+                .get(self.at + 1)
+                .is_none_or(|next| next.text != "}")
+        {
+            return Err(Box::new((
+                self.token().bytes,
+                Fault::MathArguments {
+                    command: token.text,
+                    expected: 0,
+                    actual: 1,
+                    argument: 0,
+                },
+            )));
+        }
         let mut arguments = Vec::new();
         let mut ranges = Vec::new();
         for argument in 0..arity {
@@ -442,6 +464,7 @@ impl Parser<'_, '_, '_> {
         ))
     }
 }
+
 /// Parse the complete authored entry without evaluating any TeX.
 /// # Errors
 /// Returns the first decisive decoded range and complete parser fault.
@@ -489,4 +512,34 @@ fn parse_inner(catalogue: &CheckedNotation<'_, '_>, source: &str) -> Result<Pars
         commands: parser.commands,
         ranges,
     })
+}
+
+#[cfg(test)]
+mod inherited_tests {
+    use super::*;
+    use crate::{addressing, check_expression, notation, seed};
+
+    #[test]
+    fn source_names_parse_with_located_refusals() {
+        let graph = seed().unwrap();
+        let book = addressing(&graph).unwrap();
+        let catalogue = notation(&book).unwrap();
+        for id in [
+            DefinitionId::Comovfield,
+            DefinitionId::Readout,
+            DefinitionId::Willvirtue,
+            DefinitionId::Gensym,
+        ] {
+            let source = format!("\\{}", id.token());
+            let parsed = parse_assembly_math(&catalogue, &source).unwrap();
+            assert_eq!(parsed.commands()[0].bytes, 0..source.len());
+            check_expression(&catalogue, parsed.into_draft()).unwrap();
+        }
+        let (bytes, fault) = parse_assembly_math(&catalogue, r"\unknown").unwrap_err();
+        assert_eq!(bytes, 0..8);
+        assert!(matches!(fault, Fault::UnknownMathCommand { .. }));
+        let (bytes, fault) = parse_assembly_math(&catalogue, r"\gensym{x}").unwrap_err();
+        assert_eq!(bytes, 7..8);
+        assert!(matches!(fault, Fault::MathArguments { expected: 0, .. }));
+    }
 }

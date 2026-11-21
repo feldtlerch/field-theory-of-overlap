@@ -12,6 +12,9 @@ pub enum SymbolTier {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PendingReason {
+    InheritedUnbound {
+        definition: DefinitionId,
+    },
     BackingUnbound {
         object: NodeId,
     },
@@ -78,6 +81,7 @@ impl PendingReason {
     }
     fn key(&self) -> (u8, &'static str, String) {
         match self {
+            Self::InheritedUnbound { definition } => (7, definition.token(), String::new()),
             Self::BackingUnbound { object } => (0, object.semantic_name(), String::new()),
             Self::BackingAbsent { object } => (1, object.semantic_name(), String::new()),
             Self::FormulationProposed { object } => (2, object.semantic_name(), String::new()),
@@ -101,6 +105,12 @@ impl PendingReason {
             ReasonRole,
         };
         let (before, object, after) = match self {
+            Self::InheritedUnbound { definition } => {
+                return vec![Text(format!(
+                    "inherited definition {} awaits graph binding",
+                    definition.token()
+                ))];
+            }
             Self::BackingUnbound { object } => ("backing object ", *object, " is unbound".into()),
             Self::BackingAbsent { object } => ("backing object ", *object, " is absent".into()),
             Self::FormulationProposed { object } => {
@@ -255,6 +265,9 @@ fn collect(
             object, backing, ..
         } => reasons.extend(own(book, object, backing)),
         DefinitionKind::Constructor { .. } => {}
+        DefinitionKind::Inherited { .. } => {
+            reasons.push(PendingReason::InheritedUnbound { definition: id });
+        }
     }
     for (child, _) in &edges[&id] {
         collect(*child, book, definitions, edges, reasons);

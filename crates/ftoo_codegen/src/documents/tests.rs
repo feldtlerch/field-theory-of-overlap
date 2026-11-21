@@ -614,6 +614,14 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             case: case.into(),
         }));
     }
+    assert_eq!(rows.len(), 21);
+    assert!(rows.iter().all(|row| matches!(
+        row,
+        NativeCase::Sweep {
+            owner: RenderOwner::Definition(_),
+            ..
+        }
+    )));
     let primitives = [
         (P::Alpha, 0),
         (P::Beta, 0),
@@ -627,6 +635,10 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
         (P::Juxtapose, 2),
         (P::Parentheses, 1),
         (P::Dimension, 1),
+        (P::Omega, 0),
+        (P::Calligraphic, 1),
+        (P::UprightVir, 0),
+        (P::UprightS, 0),
     ];
     for (id, arity) in primitives {
         rows.push(NativeCase::Sweep {
@@ -647,6 +659,10 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
                 "juxtapose",
                 "parentheses",
                 "dimension",
+                "omega",
+                "calligraphic",
+                "upright-vir",
+                "upright-s",
             ] {
                 rows.push(NativeCase::Sweep {
                     owner: RenderOwner::Primitive(id),
@@ -655,7 +671,7 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             }
         }
     }
-    assert_eq!(rows.len(), 237);
+    assert_eq!(rows.len(), 325);
     assert_eq!(native::sweep_inventory(&catalogue, &rows), Ok(()));
     let missing = NativeCase::Sweep {
         owner: RenderOwner::Definition(D::Dimension),

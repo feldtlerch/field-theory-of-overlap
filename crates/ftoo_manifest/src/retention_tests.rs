@@ -113,8 +113,8 @@ fn retention_register_has_complete_independent_records() {
         RULES[48],
         RuleSpec {
             number: RuleId::M049,
-            statement: "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason.",
-            scope: "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values.",
+            statement: "Symbol tiers are derived from the supplied graph, an accepted retained audit context where supplied, and transitive symbol uses; an alias takes the lesser of its own binding tier and its target tier, retaining every pending reason. An inherited definition without a theory object is pending with a missing-binding reason, which every definition using it retains; generated notation-status evidence lists every inherited definition and its reason.",
+            scope: "Base checked notation catalogues, accepted retained notation views and all exposed symbol-status values, including inherited missing bindings, transitive uses and generated/notation-status.json.",
             state: RuleState::Structural,
             deferred_reason: None
         }
@@ -154,6 +154,6 @@ fn retention_register_has_complete_independent_records() {
                 .filter(|rule| rule.deferred_reason.is_some())
                 .count()
         ),
-        (74, 63, 5, 6)
+        (75, 64, 5, 6)
     );
 }
