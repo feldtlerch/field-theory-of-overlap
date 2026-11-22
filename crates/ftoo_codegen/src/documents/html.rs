@@ -1,9 +1,10 @@
 use super::{
     NativeSupport,
     diagnostics::{AssemblyFault, DocumentError},
-    failure,
+    failure, html_recovery,
     plan::{DocumentPlan, Inline, StyleKind},
 };
+use crate::RenderableNotation;
 use ftoo_manifest::{AssemblySite, AssemblyStage, DocumentOutput, RuleId, UnitSite};
 use sha2::{Digest, Sha256};
 use std::{
@@ -43,6 +44,11 @@ pub(super) struct Face {
     pub(super) weight: u16,
     pub(super) italic: bool,
     pub(super) notice: &'static str,
+}
+impl Face {
+    pub(super) fn is_math(&self) -> bool {
+        self.file == MATH.file
+    }
 }
 
 const REGULAR: Face = Face {
@@ -85,6 +91,22 @@ const MONO: Face = Face {
     italic: false,
     notice: include_str!("../../../../licenses/fonts/notices/Inconsolatazi4-Regular.otf.txt"),
 };
+const MATH: Face = Face {
+    file: "texgyrepagella-math.otf",
+    digest: "1f9e010f60e947d0e925910009b2ea85ad54edc7cefb106f8cdefb9ffd1d5f2f",
+    family: "Pagella Math",
+    weight: 400,
+    italic: false,
+    notice: include_str!("../../../../licenses/fonts/notices/texgyrepagella-math.otf.txt"),
+};
+
+#[derive(Clone)]
+pub(super) struct MathRun {
+    pub(super) block: usize,
+    pub(super) run: usize,
+    pub(super) source: String,
+    pub(super) node: Node,
+}
 
 pub(super) struct Fonts(pub(super) Vec<(Face, Vec<u8>)>);
 
@@ -98,6 +120,81 @@ fn font_failure(plan: &DocumentPlan, file: &str) -> DocumentError {
             expected: vec!["pinned embedded font face".into()],
         },
     )
+}
+fn math_failure(site: &UnitSite, value: &str, expected: &str) -> DocumentError {
+    failure(
+        RuleId::M055,
+        AssemblyStage::Emission,
+        AssemblySite::Source(site.clone()),
+        AssemblyFault::UnknownToken {
+            value: value.into(),
+            expected: vec![expected.into()],
+        },
+    )
+}
+
+fn admitted_source(source: &str) -> bool {
+    matches!(
+        source,
+        "({\\underbrace{{c}_{1}}_{\\text{pending}}}={\\frac{1}{3}})" | "{c}_{1}"
+    )
+}
+
+pub(super) fn checked_math_fragment(
+    fragment: &Node,
+    source: &str,
+    site: &UnitSite,
+) -> Result<Node, DocumentError> {
+    html_recovery::math_profile(fragment, source)
+        .ok_or_else(|| math_failure(site, source, "bounded MathML coefficient profile"))
+}
+
+pub(super) fn prepare_math(
+    plan: &DocumentPlan,
+    notation: Option<&RenderableNotation<'_, '_, '_>>,
+) -> Result<Vec<MathRun>, DocumentError> {
+    let mut prepared = Vec::new();
+    for (block, section) in plan.blocks.iter().enumerate() {
+        if !section.paragraph
+            || plan
+                .screen
+                .as_ref()
+                .is_some_and(|screen| screen.html_gaps.contains_key(&block))
+        {
+            continue;
+        }
+        for (run, item) in section.runs.iter().enumerate() {
+            let Inline::Math {
+                markdown: source,
+                site,
+                ..
+            } = item
+            else {
+                continue;
+            };
+            if !admitted_source(source) {
+                return Err(math_failure(site, source, "realizable mathematical source"));
+            }
+            let adapter =
+                notation.ok_or_else(|| math_failure(site, source, "prepared notation adapter"))?;
+            let returned = adapter
+                .mathml_inline(source)
+                .map_err(|error| {
+                    math_failure(site, &format!("{error:?}"), "pinned strict MathML adapter")
+                })?
+                .map_err(|error| math_failure(site, &error, "strict MathML expression"))?;
+            let fragment = html_recovery::library_fragment(&returned)
+                .ok_or_else(|| math_failure(site, source, "bounded MathML fragment"))?;
+            let node = checked_math_fragment(&fragment, source, site)?;
+            prepared.push(MathRun {
+                block,
+                run,
+                source: source.clone(),
+                node,
+            });
+        }
+    }
+    Ok(prepared)
 }
 
 fn need_faces(plan: &DocumentPlan) -> Vec<Face> {
@@ -121,6 +218,9 @@ fn need_faces(plan: &DocumentPlan) -> Vec<Face> {
                 }
                 Inline::Mention { .. } => {
                     selected.insert(MONO.file);
+                }
+                Inline::Math { .. } => {
+                    selected.insert(MATH.file);
                 }
                 _ => {}
             }
@@ -153,7 +253,7 @@ fn need_faces(plan: &DocumentPlan) -> Vec<Face> {
             &mut selected,
         );
     }
-    [REGULAR, ITALIC, BOLD, BOLD_ITALIC, MONO]
+    [REGULAR, ITALIC, BOLD, BOLD_ITALIC, MONO, MATH]
         .into_iter()
         .filter(|face| selected.contains(face.file))
         .collect()
@@ -166,13 +266,39 @@ pub(super) fn load_fonts(
     let mut fonts = Vec::new();
     for face in need_faces(plan) {
         let path = support.directory().join("bundle").join(face.file);
-        let bytes = fs::read(path).map_err(|_| font_failure(plan, face.file))?;
+        let fault = || {
+            if face.is_math() {
+                let site = plan
+                    .blocks
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| {
+                        !plan
+                            .screen
+                            .as_ref()
+                            .is_some_and(|screen| screen.html_gaps.contains_key(index))
+                    })
+                    .flat_map(|(_, block)| &block.runs)
+                    .find_map(|run| {
+                        if let Inline::Math { site, .. } = run {
+                            Some(site)
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("math face requires a math run");
+                math_failure(site, face.file, "pinned embedded mathematics face")
+            } else {
+                font_failure(plan, face.file)
+            }
+        };
+        let bytes = fs::read(path).map_err(|_| fault())?;
         let mut digest = String::new();
         for byte in Sha256::digest(&bytes) {
             write!(digest, "{byte:02x}").expect("string write");
         }
         if digest != face.digest {
-            return Err(font_failure(plan, face.file));
+            return Err(fault());
         }
         fonts.push((face, bytes));
     }
@@ -216,6 +342,9 @@ fn css(fonts: &Fonts) -> String {
             "code{font-family:'Inconsolata',monospace;font-weight:400;font-style:normal}\n",
         );
     }
+    if fonts.0.iter().any(|(face, _)| face.is_math()) {
+        result.push_str("math{font-family:'Pagella Math';font-weight:400;font-style:normal}math mtext{font-family:'Pagella',serif}\n");
+    }
     result
 }
 
@@ -229,6 +358,9 @@ fn licence_nodes(fonts: &Fonts) -> Vec<Node> {
     const APACHE: &str = include_str!("../../../../licenses/fonts/Apache-2.0.txt");
     const INCONSOLATA_README: &str =
         include_str!("../../../../licenses/fonts/README-Inconsolata.txt");
+    const MATH_README: &str = include_str!("../../../../licenses/fonts/README-TeX-Gyre-Math.txt");
+    const PAGELLA_MATH_README: &str =
+        include_str!("../../../../licenses/fonts/README-TeX-Gyre-Pagella-Math.txt");
     let mut files = vec![
         ("GUST-FONT-LICENSE.txt", GUST),
         ("LPPL-1.3c.txt", LPPL),
@@ -241,6 +373,12 @@ fn licence_nodes(fonts: &Fonts) -> Vec<Node> {
             ("OFL-Inconsolata.txt", INCONSOLATA_OFL),
             ("Apache-2.0.txt", APACHE),
             ("README-Inconsolata.txt", INCONSOLATA_README),
+        ]);
+    }
+    if fonts.0.iter().any(|(face, _)| face.is_math()) {
+        files.extend([
+            ("README-TeX-Gyre-Math.txt", MATH_README),
+            ("README-TeX-Gyre-Pagella-Math.txt", PAGELLA_MATH_README),
         ]);
     }
     files.extend(fonts.0.iter().map(|(face, _)| (face.file, face.notice)));
@@ -277,9 +415,9 @@ pub(super) fn destination(value: Destination<'_>) -> String {
     }
 }
 
-fn inline(runs: &[Inline]) -> Vec<Node> {
+fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
     let mut nodes = Vec::new();
-    for run in runs {
+    for (run_index, run) in runs.iter().enumerate() {
         nodes.push(match run {
             Inline::Text(text) => Node::Text(text.clone()),
             Inline::Tag { handle, .. } => Node::Text(handle.clone()),
@@ -299,47 +437,53 @@ fn inline(runs: &[Inline]) -> Vec<Node> {
                     }
                     _ => vec![],
                 };
-                element(name, &attrs, inline(children))
+                element(name, &attrs, inline(children, &[], block))
             }
-            Inline::Math { .. } => unreachable!("unrealizable block withheld before emission"),
+            Inline::Math { .. } => prepared
+                .iter()
+                .find(|item| item.block == block && item.run == run_index)
+                .expect("prepared mathematics run")
+                .node
+                .clone(),
         });
     }
     nodes
 }
 
-#[allow(clippy::match_wildcard_for_single_variants)] // Unknown inline kinds also need a notice.
-pub(super) fn realizable(runs: &[Inline]) -> bool {
+pub(super) fn realizable(runs: &[Inline], math_allowed: bool) -> bool {
     runs.iter().all(|run| match run {
         Inline::Text(_)
         | Inline::Tag { .. }
         | Inline::PaperTag { .. }
         | Inline::Citation { .. }
         | Inline::Mention { .. } => true,
-        Inline::Styled { children, .. } => realizable(children),
-        _ => false,
+        Inline::Styled { children, .. } => realizable(children, false),
+        Inline::Math { markdown, .. } => math_allowed && admitted_source(markdown),
     })
 }
 
 pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
-    #[allow(clippy::match_wildcard_for_single_variants)] // Future kinds fall back to the coverage site.
-    fn first_unrealizable(runs: &[Inline]) -> Option<&UnitSite> {
+    fn first_math(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
-            Inline::Styled { children, .. } => first_unrealizable(children),
-            Inline::Tag { site, .. }
-            | Inline::PaperTag { site, .. }
-            | Inline::Citation { site, .. }
-            | Inline::Mention { site, .. }
-            | Inline::Math { site, .. } => (!realizable(std::slice::from_ref(run))).then_some(site),
+            Inline::Math { site, .. } => Some(site),
+            Inline::Styled { children, .. } => first_math(children),
             _ => None,
         })
     }
-    fn first_heading_unsupported(runs: &[Inline]) -> Option<&UnitSite> {
+    fn first_unrealizable(runs: &[Inline]) -> Option<&UnitSite> {
+        runs.iter().find_map(|run| match run {
+            Inline::Styled { children, .. } => first_unrealizable(children),
+            Inline::Math { site, .. } => Some(site),
+            _ => None,
+        })
+    }
+    fn first_heading_fault(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
             Inline::Tag { site, .. }
             | Inline::PaperTag { site, .. }
             | Inline::Citation { site, .. }
             | Inline::Math { site, .. } => Some(site),
-            Inline::Styled { children, .. } => first_heading_unsupported(children),
+            Inline::Styled { children, .. } => first_heading_fault(children),
             _ => None,
         })
     }
@@ -348,7 +492,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
         .is_none()
         .then_some(&plan.coverage.site)
         .or_else(|| first_unrealizable(&plan.coverage.runs))
-        .or_else(|| (!realizable(&plan.coverage.runs)).then_some(&plan.coverage.site))
+        .or_else(|| (!realizable(&plan.coverage.runs, false)).then_some(&plan.coverage.site))
         .or_else(|| {
             plan.coverage
                 .audit
@@ -359,19 +503,22 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             plan.coverage
                 .audit
                 .iter()
-                .any(|runs| !realizable(runs))
+                .any(|runs| !realizable(runs, false))
                 .then_some(&plan.coverage.site)
         })
         .or_else(|| {
             plan.blocks.first().and_then(|block| {
-                first_heading_unsupported(&block.runs)
-                    .or_else(|| (!realizable(&block.runs)).then_some(&block.site))
+                first_heading_fault(&block.runs)
+                    .or_else(|| (!realizable(&block.runs, false)).then_some(&block.site))
             })
         })
         .or_else(|| {
-            plan.blocks
-                .iter()
-                .find_map(|block| (!block.displays.is_empty()).then_some(&block.site))
+            plan.blocks.iter().find_map(|block| {
+                if !block.displays.is_empty() {
+                    return first_math(&block.runs).or(Some(&block.site));
+                }
+                None
+            })
         })
         .or_else(|| {
             plan.blocks
@@ -383,7 +530,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
                         .screen
                         .as_ref()
                         .is_some_and(|screen| screen.html_gaps.contains_key(&index))
-                        == realizable(&block.runs))
+                        == realizable(&block.runs, block.paragraph))
                     .then_some(&block.site)
                 })
         });
@@ -394,7 +541,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             AssemblySite::Source(site.clone()),
             AssemblyFault::UnknownToken {
                 value: plan.document.clone(),
-                expected: vec!["prose-only HTML document".into()],
+                expected: vec!["checked HTML block realization and notice inventory".into()],
             },
         ));
     }
@@ -458,7 +605,7 @@ pub(super) fn check_destinations(
                                                     candidate.quotation.is_none()
                                                         && candidate.fragment == quotation.fragment
                                                         && !screen.html_gaps.contains_key(&index)
-                                                        && realizable(&block.runs)
+                                                        && realizable(&block.runs, block.paragraph)
                                                 })
                                         })
                                 })
@@ -481,7 +628,11 @@ pub(super) fn check_destinations(
 }
 
 #[allow(clippy::too_many_lines)] // Each document section is assembled in its visible order.
-pub(super) fn model(plan: &DocumentPlan, fonts: &Fonts) -> Result<Node, DocumentError> {
+pub(super) fn model(
+    plan: &DocumentPlan,
+    fonts: &Fonts,
+    prepared: &[MathRun],
+) -> Result<Node, DocumentError> {
     prose_only(plan)?;
     let screen = plan.screen.as_ref().expect("checked screen");
     let heading = &plan.blocks[0];
@@ -513,11 +664,11 @@ pub(super) fn model(plan: &DocumentPlan, fonts: &Fonts) -> Result<Node, Document
         &[],
         vec![Node::Text(plan.coverage.declaration.clone())],
     )];
-    coverage.push(element("p", &[], inline(&plan.coverage.runs)));
+    coverage.push(element("p", &[], inline(&plan.coverage.runs, &[], 0)));
     for runs in &plan.coverage.audit {
-        coverage.push(element("p", &[], inline(runs)));
+        coverage.push(element("p", &[], inline(runs, &[], 0)));
     }
-    let heading_nodes = inline(&heading.runs);
+    let heading_nodes = inline(&heading.runs, &[], 0);
     let title = plain(&heading.runs);
     let mut body = vec![element("section", &[("id", "coverage")], coverage)];
     body.push(element(
@@ -545,7 +696,7 @@ pub(super) fn model(plan: &DocumentPlan, fonts: &Fonts) -> Result<Node, Document
             continue;
         }
         if block.paragraph {
-            main.push(element("p", &[], inline(&block.runs)));
+            main.push(element("p", &[], inline(&block.runs, prepared, index)));
             continue;
         }
         let refrain =
@@ -555,7 +706,7 @@ pub(super) fn model(plan: &DocumentPlan, fonts: &Fonts) -> Result<Node, Document
         } else {
             vec![("class", "refrain")]
         };
-        main.push(element("p", &attrs, inline(&block.runs)));
+        main.push(element("p", &attrs, inline(&block.runs, &[], index)));
         let handle = &refrain.handle;
         let attribution = if let Some(quotation) = &refrain.quotation {
             let href = destination(Destination::Quotation(quotation));
@@ -617,7 +768,7 @@ fn escape(source: &str, output: &mut String) {
     }
 }
 
-fn serialize(node: &Node, output: &mut String) {
+pub(super) fn serialize(node: &Node, output: &mut String) {
     match node {
         Node::Text(value) => escape(value, output),
         Node::Element {
@@ -652,15 +803,17 @@ pub(super) fn render(
     plan: &DocumentPlan,
     support: &NativeSupport,
     known_labels: &[&str],
+    notation: Option<&RenderableNotation<'_, '_, '_>>,
 ) -> Result<String, DocumentError> {
     prose_only(plan)?;
+    let prepared = prepare_math(plan, notation)?;
     let fonts = load_fonts(plan, support)?;
-    let tree = model(plan, &fonts)?;
+    let tree = model(plan, &fonts, &prepared)?;
     let mut output = String::from("<!doctype html>");
     serialize(&tree, &mut output);
     if output.len() > MAX_HTML_BYTES {
         return Err(font_failure(plan, "HTML document byte limit"));
     }
-    super::html_recovery::check(plan, &fonts, known_labels, &output)?;
+    super::html_recovery::check(plan, &fonts, &prepared, known_labels, &output)?;
     Ok(output)
 }

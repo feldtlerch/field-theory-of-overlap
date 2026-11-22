@@ -209,6 +209,15 @@ pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     pending: Vec<PendingEntry>,
 }
 impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
+    /// Render a checked expanded source as `MathML` through the pinned strict adapter.
+    /// # Errors
+    /// Refuses unavailable or changed notation support and returns parser refusals unchanged.
+    pub(crate) fn mathml_inline(
+        &self,
+        source: &str,
+    ) -> std::result::Result<std::result::Result<String, String>, NotationAdapterFault> {
+        katex::invoke_mathml(&self.support, source)
+    }
     /// # Panics
     /// Panics only if an admitted inherited definition has no derived status, which callers cannot arrange.
     #[must_use]

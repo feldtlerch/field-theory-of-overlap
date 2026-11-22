@@ -1,7 +1,7 @@
 use super::{
     diagnostics::{AssemblyFault, DocumentError},
     failure,
-    html::{Fonts, Node},
+    html::{Fonts, MathRun, Node},
     plan::{DocumentPlan, Inline, StyleKind},
 };
 use ftoo_manifest::{AssemblySite, AssemblyStage, RuleId};
@@ -16,6 +16,7 @@ struct Parser<'a> {
     source: &'a str,
     at: usize,
     nodes: usize,
+    library: bool,
 }
 impl Parser<'_> {
     fn consume(&mut self, expected: &str) -> bool {
@@ -53,9 +54,12 @@ impl Parser<'_> {
                     ("&gt;", '>'),
                     ("&quot;", '"'),
                     ("&#39;", '\''),
+                    ("&#x27;", '\''),
                 ]
                 .into_iter()
-                .find(|(entity, _)| rest.starts_with(entity))?;
+                .find(|(entity, _)| {
+                    rest.starts_with(entity) && (self.library || *entity != "&#x27;")
+                })?;
                 result.push(value);
                 self.at += entity.len();
             } else {
@@ -77,7 +81,13 @@ impl Parser<'_> {
         let name = self.token(|c| c.is_ascii_lowercase() || c.is_ascii_digit())?;
         let mut attributes = Vec::new();
         while self.consume(" ") {
+            if self.library && self.source[self.at..].starts_with("/>") {
+                break;
+            }
             let key = self.token(|c| c.is_ascii_lowercase() || c == '-')?;
+            if self.library {
+                self.consume(" ");
+            }
             if !self.consume("=\"") || attributes.iter().any(|(prior, _)| prior == &key) {
                 return None;
             }
@@ -87,11 +97,13 @@ impl Parser<'_> {
             }
             attributes.push((key, value));
         }
-        if !self.consume(">") {
+        let empty = self.library && self.consume("/>");
+        if !empty && !self.consume(">") {
             return None;
         }
         let mut children = Vec::new();
-        if name == "style" {
+        if empty {
+        } else if name == "style" {
             let end = self.source[self.at..].find("</style>")? + self.at;
             let raw = &self.source[self.at..end];
             if raw.contains('<') || raw.contains('&') {
@@ -121,6 +133,114 @@ impl Parser<'_> {
             children,
         })
     }
+}
+
+pub(super) fn library_fragment(source: &str) -> Option<Node> {
+    if source.len() > 262_144 {
+        return None;
+    }
+    let mut parser = Parser {
+        source,
+        at: 0,
+        nodes: 0,
+        library: true,
+    };
+    let root = parser.element(0)?;
+    (parser.at == source.len()).then_some(root)
+}
+
+// The admitted coefficient profile is recorded at reg:documents:html-mathematics-observations.
+pub(super) fn math_profile(fragment: &Node, expanded: &str) -> Option<Node> {
+    fn node<'a>(value: &'a Node, name: &str, attrs: &[(&str, &str)]) -> Option<&'a [Node]> {
+        let Node::Element {
+            name: actual,
+            attributes,
+            children,
+        } = value
+        else {
+            return None;
+        };
+        (actual == name
+            && attributes
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .eq(attrs.iter().copied()))
+        .then_some(children)
+    }
+    fn e(name: &str, attrs: &[(&str, &str)], children: Vec<Node>) -> Node {
+        Node::Element {
+            name: name.into(),
+            attributes: attrs
+                .iter()
+                .map(|(k, v)| ((*k).into(), (*v).into()))
+                .collect(),
+            children,
+        }
+    }
+    fn leaf(name: &str, attrs: &[(&str, &str)], value: &str) -> Node {
+        e(name, attrs, vec![Node::Text(value.into())])
+    }
+    let sub = || {
+        e(
+            "msub",
+            &[],
+            vec![leaf("mi", &[], "c"), leaf("mn", &[], "1")],
+        )
+    };
+    let expected = match expanded {
+        "({\\underbrace{{c}_{1}}_{\\text{pending}}}={\\frac{1}{3}})" => e(
+            "mrow",
+            &[],
+            vec![
+                leaf("mo", &[("stretchy", "false")], "("),
+                e(
+                    "munder",
+                    &[],
+                    vec![
+                        e(
+                            "munder",
+                            &[],
+                            vec![sub(), leaf("mo", &[("stretchy", "true")], "⏟")],
+                        ),
+                        leaf("mtext", &[], "pending"),
+                    ],
+                ),
+                leaf("mo", &[], "="),
+                e(
+                    "mfrac",
+                    &[],
+                    vec![leaf("mn", &[], "1"), leaf("mn", &[], "3")],
+                ),
+                leaf("mo", &[("stretchy", "false")], ")"),
+            ],
+        ),
+        "{c}_{1}" => e("mrow", &[], vec![sub()]),
+        _ => return None,
+    };
+    let span = node(fragment, "span", &[("class", "katex")])?;
+    let [math] = span else { return None };
+    let semantics = node(
+        math,
+        "math",
+        &[("xmlns", "http://www.w3.org/1998/Math/MathML")],
+    )?;
+    let [semantics] = semantics else { return None };
+    let children = node(semantics, "semantics", &[])?;
+    let [visible, annotation] = children else {
+        return None;
+    };
+    if visible != &expected {
+        return None;
+    }
+    let text = node(
+        annotation,
+        "annotation",
+        &[("encoding", "application/x-tex")],
+    )?;
+    if !matches!(text, [Node::Text(value)] if value == expanded) {
+        return None;
+    }
+    Some(math.clone())
 }
 
 fn mismatch(plan: &DocumentPlan, aspect: &str) -> DocumentError {
@@ -234,20 +354,26 @@ fn flat(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&flat(children)),
-            Inline::Math { .. } => unreachable!("unrealizable heading refused before recovery"),
+            Inline::Math { .. } => {
+                unreachable!("mathematics in a heading is refused before recovery")
+            }
         }
     }
     result
 }
 
+#[allow(clippy::too_many_lines)] // Each inline kind has its own recovery comparison.
 fn runs(
     plan: &DocumentPlan,
     known: &[&str],
     source: &[Inline],
     actual: &[Node],
     inside_style: bool,
+    block: usize,
+    prepared: &[MathRun],
 ) -> Result<(), DocumentError> {
     let mut at = 0;
+    let mut math_at = 0;
     let mut pending = String::new();
     let mut paper = Vec::new();
     let flush = |pending: &mut String,
@@ -282,7 +408,7 @@ fn runs(
         }
         Ok(())
     };
-    for run in source {
+    for (run_index, run) in source.iter().enumerate() {
         match run {
             Inline::Text(value) => {
                 pending.push_str(value);
@@ -324,10 +450,34 @@ fn runs(
                 };
                 let actual_children =
                     element(plan, known, node, name, attrs, "HTML style boundary")?;
-                runs(plan, known, children, actual_children, true)?;
+                runs(plan, known, children, actual_children, true, block, &[])?;
                 at += 1;
             }
-            Inline::Math { .. } => unreachable!("unrealizable block withheld before recovery"),
+            Inline::Math { markdown, site, .. } => {
+                flush(&mut pending, &mut paper, &mut at)?;
+                let expected = prepared
+                    .iter()
+                    .filter(|item| item.block == block)
+                    .nth(math_at)
+                    .ok_or_else(|| math_mismatch(site, "HTML mathematical occurrence"))?;
+                math_at += 1;
+                if expected.run != run_index || expected.source != *markdown {
+                    return Err(math_mismatch(site, "HTML mathematical source occurrence"));
+                }
+                let node = actual
+                    .get(at)
+                    .ok_or_else(|| math_mismatch(site, "HTML mathematical inventory"))?;
+                math_text(plan, known, site, node)?;
+                let annotation = math_annotation(node)
+                    .ok_or_else(|| math_mismatch(site, "HTML mathematical annotation"))?;
+                if annotation != markdown {
+                    return Err(math_mismatch(site, "HTML mathematical annotation"));
+                }
+                if node != &expected.node {
+                    return Err(math_mismatch(site, "HTML mathematical presentation"));
+                }
+                at += 1;
+            }
         }
     }
     flush(&mut pending, &mut paper, &mut at)?;
@@ -335,6 +485,71 @@ fn runs(
         return Err(mismatch(plan, "HTML inline boundary"));
     }
     Ok(())
+}
+
+fn math_mismatch(site: &ftoo_manifest::UnitSite, aspect: &str) -> DocumentError {
+    failure(
+        RuleId::M055,
+        AssemblyStage::Emission,
+        AssemblySite::Source(site.clone()),
+        AssemblyFault::UnknownToken {
+            value: aspect.into(),
+            expected: vec!["checked mathematical occurrence".into()],
+        },
+    )
+}
+fn math_text(
+    plan: &DocumentPlan,
+    known: &[&str],
+    site: &ftoo_manifest::UnitSite,
+    node: &Node,
+) -> Result<(), DocumentError> {
+    match node {
+        Node::Text(value) => public_text(plan, known, value)
+            .map_err(|_| math_mismatch(site, "HTML reader label literal")),
+        Node::Element {
+            attributes,
+            children,
+            ..
+        } => {
+            for (_, value) in attributes {
+                public_text(plan, known, value)
+                    .map_err(|_| math_mismatch(site, "HTML reader label literal"))?;
+            }
+            for child in children {
+                math_text(plan, known, site, child)?;
+            }
+            Ok(())
+        }
+    }
+}
+fn math_annotation(node: &Node) -> Option<&str> {
+    let Node::Element { children: math, .. } = node else {
+        return None;
+    };
+    let [
+        Node::Element {
+            children: semantics,
+            ..
+        },
+    ] = math.as_slice()
+    else {
+        return None;
+    };
+    let [
+        _,
+        Node::Element {
+            children: annotation,
+            ..
+        },
+    ] = semantics.as_slice()
+    else {
+        return None;
+    };
+    let [Node::Text(value)] = annotation.as_slice() else {
+        return None;
+    };
+    Some(value)
 }
 
 fn base64_value(c: u8) -> Option<u8> {
@@ -413,6 +628,15 @@ fn stylesheet(plan: &DocumentPlan, fonts: &Fonts, nodes: &[Node]) -> Result<(), 
     {
         return Err(mismatch(plan, "HTML monospace face"));
     }
+    let math = fonts.0.iter().any(|(face, _)| face.is_math());
+    if math
+        && lines.next()
+            != Some(
+                "math{font-family:'Pagella Math';font-weight:400;font-style:normal}math mtext{font-family:'Pagella',serif}",
+            )
+    {
+        return Err(mismatch(plan, "HTML mathematical face"));
+    }
     if lines.next().is_some() {
         return Err(mismatch(plan, "HTML stylesheet inventory"));
     }
@@ -440,6 +664,9 @@ fn check_faces(plan: &DocumentPlan, fonts: &Fonts) -> Result<(), DocumentError> 
                 }
                 Inline::Mention { .. } => {
                     used.insert("Inconsolatazi4-Regular.otf");
+                }
+                Inline::Math { .. } => {
+                    used.insert("texgyrepagella-math.otf");
                 }
                 _ => {}
             }
@@ -480,7 +707,12 @@ fn check_faces(plan: &DocumentPlan, fonts: &Fonts) -> Result<(), DocumentError> 
 }
 
 #[allow(clippy::too_many_lines)] // Each block and gap retains a separate plan comparison.
-fn check_main(plan: &DocumentPlan, known: &[&str], nodes: &[Node]) -> Result<(), DocumentError> {
+fn check_main(
+    plan: &DocumentPlan,
+    known: &[&str],
+    prepared: &[MathRun],
+    nodes: &[Node],
+) -> Result<(), DocumentError> {
     let screen = plan
         .screen
         .as_ref()
@@ -496,7 +728,15 @@ fn check_main(plan: &DocumentPlan, known: &[&str], nodes: &[Node]) -> Result<(),
         &[("id", "content")],
         "HTML heading",
     )?;
-    runs(plan, known, &plan.blocks[0].runs, heading, false)?;
+    runs(
+        plan,
+        known,
+        &plan.blocks[0].runs,
+        heading,
+        false,
+        0,
+        prepared,
+    )?;
     let mut at = 1;
     for (index, block) in plan.blocks.iter().enumerate().skip(1) {
         let gap = nodes
@@ -542,7 +782,7 @@ fn check_main(plan: &DocumentPlan, known: &[&str], nodes: &[Node]) -> Result<(),
         }
         if block.paragraph {
             let body = element(plan, known, body, "p", &[], "HTML paragraph boundary")?;
-            runs(plan, known, &block.runs, body, false)?;
+            runs(plan, known, &block.runs, body, false, index, prepared)?;
             at += 1;
             continue;
         }
@@ -555,7 +795,7 @@ fn check_main(plan: &DocumentPlan, known: &[&str], nodes: &[Node]) -> Result<(),
             vec![("class", "refrain"), ("id", refrain.fragment.as_str())]
         };
         let body = element(plan, known, body, "p", &attrs, "HTML refrain fragment")?;
-        runs(plan, known, &block.runs, body, false)?;
+        runs(plan, known, &block.runs, body, false, index, prepared)?;
         at += 1;
         let attribution = nodes
             .get(at)
@@ -682,6 +922,18 @@ fn check_licences(
             ),
         ]);
     }
+    if fonts.0.iter().any(|(face, _)| face.is_math()) {
+        files.extend([
+            (
+                "README-TeX-Gyre-Math.txt",
+                include_str!("../../../../licenses/fonts/README-TeX-Gyre-Math.txt"),
+            ),
+            (
+                "README-TeX-Gyre-Pagella-Math.txt",
+                include_str!("../../../../licenses/fonts/README-TeX-Gyre-Pagella-Math.txt"),
+            ),
+        ]);
+    }
     files.extend(fonts.0.iter().map(|(face, _)| (face.file, face.notice)));
     if nodes.len() != files.len() + 1 {
         return Err(mismatch(plan, "HTML licence inventory"));
@@ -706,6 +958,7 @@ fn check_licences(
 pub(super) fn check(
     plan: &DocumentPlan,
     fonts: &Fonts,
+    prepared: &[MathRun],
     known_labels: &[&str],
     source: &str,
 ) -> Result<(), DocumentError> {
@@ -724,6 +977,7 @@ pub(super) fn check(
         source,
         at: 0,
         nodes: 0,
+        library: false,
     };
     if !parser.consume("<!doctype html>") {
         return Err(mismatch(plan, "HTML doctype"));
@@ -834,7 +1088,15 @@ pub(super) fn check(
             &[],
             "HTML coverage paragraph",
         )?;
-        runs(plan, known_labels, source_runs, paragraph, false)?;
+        runs(
+            plan,
+            known_labels,
+            source_runs,
+            paragraph,
+            false,
+            usize::MAX,
+            &[],
+        )?;
     }
     let nav = element(
         plan,
@@ -863,7 +1125,7 @@ pub(super) fn check(
         "HTML navigation title",
     )?;
     let main = element(plan, known_labels, main, "main", &[], "HTML main")?;
-    check_main(plan, known_labels, main)?;
+    check_main(plan, known_labels, prepared, main)?;
     check_licences(plan, known_labels, fonts, licences, licences_label)?;
     Ok(())
 }

@@ -668,7 +668,7 @@ fn render_artifacts(
                     DocumentOutput::Html => {
                         html::check_destinations(plan, plans, selected)?;
                         let path = html::destination(html::Destination::Artifact(plan));
-                        let source = html::render(plan, support, known_labels)?;
+                        let source = html::render(plan, support, known_labels, Some(notation))?;
                         check_rendered_bytes(&path, source.as_bytes(), &[])?;
                         artifacts.push(DocumentArtifact {
                             path,

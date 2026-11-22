@@ -28,12 +28,12 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024; the complete-document release gate and complete-graph boundary are governed by 030; native use of the paper-scoped store is governed by 037|
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030; retirement of residual authored-source machinery is governed by 036; native use of the paper-scoped store is governed by 037|
-|017|Screen rendering contracts|accepted; mathematics transport is governed by 022; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030|
+|017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause; inline-style authoring syntax is governed by 033|
-|022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation|
+|022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation; its reserved HTML-delivery question is governed by 042|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
@@ -44,4 +44,5 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
+|042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|

@@ -3052,9 +3052,10 @@ fn committed_adapter_and_ci_pins_are_fixed() {
     let script = include_str!("../../../../tools/notation/check.cjs");
     assert!(script.contains("require(entry)"));
     assert!(script.contains("throwOnError: true, strict: 'error', trust: false"));
-    assert!(
-        script.contains("output: 'htmlAndMathml', displayMode: false, maxExpand: 1000, macros: {}")
-    );
+    assert!(script.contains("function options(mathml = false)"));
+    assert!(script.contains("output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: false, maxExpand: 1000, macros: {}"));
+    assert!(script.contains("'--mathml-inline'"));
+    assert!(!script.contains("--mathml-display"));
 }
 
 #[test]
@@ -3467,5 +3468,25 @@ fn retained_sweep_controls(support: &support::Support) {
                 "({{c}_{1}}={\\frac{1}{3}})"
             );
         }
+    }
+}
+#[test]
+fn support_required_html_math_strict_inline_mode() {
+    let support = prepared();
+    let source = r"({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})";
+    let rendered = katex::invoke_mathml(&support, source).unwrap().unwrap();
+    assert!(rendered.starts_with("<span class=\"katex\"><math "));
+    assert!(rendered.contains("<mtext>pending</mtext>"));
+    assert!(!rendered.contains("<span class=\"katex-html\""));
+    assert!(
+        katex::invoke_mathml(&support, r"\UnknownHTMLMathCommand")
+            .unwrap()
+            .is_err()
+    );
+    let link = katex::invoke_mathml(&support, r"\href{https://example.com}{c}").unwrap();
+    if let Ok(markup) = link {
+        assert!(!markup.contains("<a "));
+        assert!(!markup.contains("href="));
+        assert!(markup.contains("<mstyle mathcolor=\"#cc0000\"><mtext>\\href</mtext></mstyle>"));
     }
 }

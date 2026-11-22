@@ -1806,10 +1806,12 @@ pub(super) fn check_excerpt_shape(
                 && block.displays.is_empty()
                 && if block.paragraph {
                     !block.runs.is_empty()
-                        && block
-                            .runs
-                            .iter()
-                            .all(|run| matches!(run, Inline::Text(_) | Inline::PaperTag { .. }))
+                        && block.runs.iter().all(|run| {
+                            matches!(
+                                run,
+                                Inline::Text(_) | Inline::PaperTag { .. } | Inline::Math { .. }
+                            )
+                        })
                 } else {
                     matches!(block.runs.as_slice(), [Inline::Text(_)])
                 }
@@ -1936,7 +1938,7 @@ pub(super) fn html_gaps(plan: &DocumentPlan) -> BTreeMap<usize, ScreenGap> {
         .iter()
         .enumerate()
         .skip(1)
-        .filter(|(_, block)| !super::html::realizable(&block.runs))
+        .filter(|(_, block)| !super::html::realizable(&block.runs, block.paragraph))
         .map(|(index, block)| {
             (
                 index,

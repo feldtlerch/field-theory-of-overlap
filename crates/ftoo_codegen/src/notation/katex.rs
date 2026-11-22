@@ -511,7 +511,11 @@ fn collected_output(child: ChildGuard) -> io::Result<Output> {
         })
     })
 }
-fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapterFault> {
+fn run(
+    support: &Support,
+    source: Option<&[u8]>,
+    mathml: bool,
+) -> Result<Output, NotationAdapterFault> {
     let _phase = crate::telemetry::Phase::new(if source.is_some() {
         "notation.expression_process"
     } else {
@@ -523,7 +527,11 @@ fn run(support: &Support, source: Option<&[u8]>) -> Result<Output, NotationAdapt
     let child = Command::new(&support.runtime)
         .arg(adapter)
         .arg(if source.is_some() {
-            "--expression"
+            if mathml {
+                "--mathml-inline"
+            } else {
+                "--expression"
+            }
         } else {
             "--version"
         })
@@ -583,7 +591,7 @@ pub(super) fn invoke(
         crate::telemetry::counter("notation.logical_requests", 1);
     }
     invoke_with(support, source.is_none(), || {
-        run(support, source.map(str::as_bytes))
+        run(support, source.map(str::as_bytes), false)
     })
 }
 #[cfg(test)]
@@ -592,7 +600,16 @@ pub(super) fn invoke_bytes(
     source: &[u8],
 ) -> Result<Result<String, String>, NotationAdapterFault> {
     crate::telemetry::counter("notation.logical_requests", 1);
-    invoke_with(support, false, || run(support, Some(source)))
+    invoke_with(support, false, || run(support, Some(source), false))
+}
+pub(super) fn invoke_mathml(
+    support: &Support,
+    source: &str,
+) -> Result<Result<String, String>, NotationAdapterFault> {
+    crate::telemetry::counter("notation.logical_requests", 1);
+    invoke_with(support, false, || {
+        run(support, Some(source.as_bytes()), true)
+    })
 }
 pub(super) fn invoke_with(
     support: &Support,

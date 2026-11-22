@@ -272,7 +272,7 @@ fn next_style_neighbor(runs: &[Inline]) -> Option<StyleNeighbor> {
     None
 }
 
-fn edge_char(run: &Inline, first: bool) -> Option<char> {
+fn edge_char(run: &Inline, first: bool) -> Option<std::primitive::char> {
     let mut emitted = String::new();
     inline(&mut emitted, std::slice::from_ref(run));
     if first {

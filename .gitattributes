@@ -1,1 +1,4 @@
 generated/documents/*/en.html whitespace=-blank-at-eol
+registry/html-mathematics/*.html whitespace=-blank-at-eol
+licenses/fonts/README-TeX-Gyre-Math.txt whitespace=-blank-at-eol
+licenses/fonts/README-TeX-Gyre-Pagella-Math.txt whitespace=-blank-at-eol
