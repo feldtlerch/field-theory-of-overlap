@@ -14,7 +14,7 @@ from unittest import mock
 import argparse
 from common import read, write, timed
 import compare_words
-from identities import _assignment_line, assembly_json, bindings, holds
+from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds
 from ledger import leaks, occurrence_differences, ledger_binding, check_destination
 from prepare import declared_fragments, versioned, paper_master, scope_fragments
 
@@ -23,6 +23,535 @@ PARENT_REVISION = '68643f63939af28693897b84478e1e4988c40e32'
 
 
 class Identities(unittest.TestCase):
+    def test_source_line_end_interpretations(self):
+        cases = (
+            ('the dependence', 'the de-\npendence', 'remove-discretionary'),
+            ('the dependence', 'the de- \npendence', 'remove-discretionary'),
+            ('the non-linear', 'the non-\nlinear', 'keep-lexical'),
+            ('the pre- and', 'the pre-\nand', 'keep-lexical'),
+            ('a—b', 'a—\nb', 'keep-without-separator'),
+            ('a — b', 'a —\nb', 'keep-with-separator'),
+            ('a–b', 'a–\nb', 'keep-without-separator'),
+            ('a – b', 'a –\nb', 'keep-with-separator'),
+            ('a/b', 'a/\nb', 'keep-without-separator'),
+            ('a / b', 'a /\nb', 'keep-with-separator'),
+        )
+        for source, raw, decision in cases:
+            with self.subTest(source=source):
+                decoded = compare_words.decode_located(source, {})
+                locations = [[1, i] for i in range(len(raw))]
+                stream, offsets, events = compare_words.normalize(raw, locations)
+                extracted = dict(stream=stream, offsets=offsets, events=events,
+                                 raw_pages=[dict(text=raw)])
+                proof = compare_words.align_located(decoded, extracted, 'paper', 'before')
+                self.assertEqual(proof['canonical'], decoded['extracted'])
+                self.assertEqual(compare_words.canonicalize(extracted, proof)[0],
+                                 decoded['extracted'])
+                self.assertEqual([row['decision'] for row in proof['decisions']], [decision])
+                self.assertEqual(proof['decisions'][0]['source_range'],
+                                 decoded['tokens'][proof['decisions'][0]['token_ordinal']]
+                                 ['source_range'])
+                if ' ' in source:
+                    changed = source.replace(' ', '  ', 1)
+                    other = compare_words.decode_located(changed, {})
+                    self.assertEqual(other['extracted'], decoded['extracted'])
+                changed_source = source.replace('b', 'c') if 'b' in source else source + 'x'
+                changed_raw = raw.replace('b', 'c') if 'b' in raw else raw + 'x'
+                changed_decoded = compare_words.decode_located(changed_source, {})
+                changed_stream, changed_offsets, changed_events = compare_words.normalize(
+                    changed_raw, [[1, i] for i in range(len(changed_raw))])
+                changed_extracted = dict(stream=changed_stream, offsets=changed_offsets,
+                                         events=changed_events, raw_pages=[dict(text=changed_raw)])
+                changed_proof = compare_words.align_located(changed_decoded,
+                                                             changed_extracted,
+                                                             'paper', 'after')
+                self.assertNotEqual(proof['canonical'], changed_proof['canonical'])
+                if source.startswith('a') and ' b' in source:
+                    changed_separator = compare_words.decode_located(
+                        source.replace(' b', 'b'), {})
+                    changed_proof = compare_words.align_located(
+                        changed_separator, extracted, 'paper', 'after')
+                    self.assertNotEqual(proof['canonical'], changed_proof['canonical'])
+        first, second = 'the de-', 'pendence'
+        raw = first + '\n' + second
+        locations = ([[1, i] for i in range(len(first) + 1)] +
+                     [[2, i] for i in range(len(second))])
+        stream, offsets, events = compare_words.normalize(raw, locations)
+        proof = compare_words.align_located(
+            compare_words.decode_located('the dependence', {}),
+            dict(stream=stream, offsets=offsets, events=events,
+                 raw_pages=[dict(text=first), dict(text=second)]), 'paper', 'before')
+        self.assertEqual(proof['canonical'], 'the dependence')
+        self.assertEqual(proof['decisions'][0]['newline_kind'], 'page')
+        original_sources = compare_words.selected_sources
+        def changed_sources(*args):
+            before, after = original_sources(*args)
+            after = dict(after, body=after['body'].replace(b'dependence', b'dependance', 1),
+                         blob_bytes=after['blob_bytes'].replace(b'dependence', b'dependance', 1))
+            return before, after
+        def changed_body(path, document, side, value):
+            if document == 'paper' and side == 'after':
+                value['stream'] = value['stream'].replace('dependence', 'dependance', 1)
+                value['offsets'] = [[1, index] for index in range(len(value['stream']))]
+        with mock.patch.object(compare_words, 'selected_sources', side_effect=changed_sources):
+            exit_code, result = self.conversion_run(changed_body)
+        self.assertEqual((exit_code, result['verdict']), (1, 'different'))
+        self.assertIn('source/body', [row['part'] for row in result['differences']])
+        stream_change = next(row for row in result['differences'] if row['part'] == 'stream')
+        self.assertEqual(stream_change['location']['after'],
+                         dict(raw=[[1, result['documents']['paper']['after']['stream'].index(
+                             'dependance') + 6]], source=None))
+
+    def test_unique_correspondence(self):
+        def extracted(raw):
+            stream, offsets, events = compare_words.normalize(raw,
+                                                                 [[1, i] for i in range(len(raw))])
+            return dict(stream=stream, offsets=offsets, events=events,
+                        raw_pages=[dict(text=raw)])
+        decoded = compare_words.decode_located('the dependence', {})
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.align_located(decoded,
+                                        extracted('the dependence and the dependence'),
+                                        'paper', 'before')
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['stage']),
+                         ('CorrespondenceInvalid', 'correspondence'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.unique_proof(
+                [dict(range=[1, 3], canonical='ab', source_ranges=[[0, 2]]),
+                 dict(range=[1, 3], canonical='ab', source_ranges=[[4, 6]])],
+                'paper', 'after')
+        self.assertEqual(raised.exception.row['code'], 'LineEndAmbiguous')
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.unique_proof(
+                [dict(range=[1, 3], canonical='ab', source_ranges=[[0, 2]]),
+                 dict(range=[1, 3], canonical='ab', source_ranges=[[4, 6]]),
+                 dict(range=[5, 7], canonical='ab', source_ranges=[[8, 10]])],
+                'paper', 'after')
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.align_located(decoded, extracted('the dependance'),
+                                        'paper', 'before')
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        search = raised.exception.row['search']
+        self.assertEqual(search['matches_found'], 0)
+        self.assertEqual(search['remaining_state_budget'],
+                         search['limit'] - search['expanded_states'])
+        for source in ('a' * 65537, 'a ' * 16385):
+            with self.assertRaises(compare_words.Fault) as raised:
+                compare_words.decode_located(source, {})
+            self.assertEqual(raised.exception.row['code'], 'CorrespondenceLimit')
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.decode_located('ab\\unknown', {}, 'example.tex')
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['stage']),
+                         ('SyntaxUnsupported', 'snapshot'))
+        self.assertIn('example.tex:2:', raised.exception.row['detail'])
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.decode_located('ab\\unknown', {}, 'recorded.tex', 100)
+        self.assertIn('recorded.tex:102:', raised.exception.row['detail'])
+        shifted = compare_words.decode_located('an example', {}, 'recorded.tex', 100)
+        self.assertEqual(shifted['tokens'][0]['source_range'], [100, 102])
+        self.assertEqual(shifted['tokens'][1]['source_range'], [103, 110])
+
+    def test_repeated_word_location(self):
+        repo = pathlib.Path(__file__).resolve().parents[2]
+        fragment = read(repo/'generated/documents/paper-pilot/sec-reading-shadow.tex')
+        body = fragment.split('}{', 1)[1].removesuffix('}\n')
+        decoded = compare_words.decode_located(body, bindings(repo))
+        text = decoded['extracted']
+        positions = [match.start() for match in re.finditer('dependence', text)]
+        self.assertEqual(len(positions), 2)
+        found = []
+        for position in positions:
+            raw = text[:position] + 'de-\npendence' + text[position + 10:]
+            stream, offsets, events = compare_words.normalize(
+                raw, [[1, index] for index in range(len(raw))])
+            proof = compare_words.align_located(
+                decoded, dict(stream=stream, offsets=offsets, events=events,
+                              raw_pages=[dict(text=raw)]), 'paper', 'after')
+            found.append(proof['decisions'][0])
+        self.assertNotEqual(found[0]['token_ordinal'], found[1]['token_ordinal'])
+        self.assertNotEqual(found[0]['source_range'], found[1]['source_range'])
+        altered = copy.deepcopy(decoded)
+        altered['tokens'][found[1]['token_ordinal']]['source_range'] = found[0]['source_range']
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.align_located(
+                altered, dict(stream=stream, offsets=offsets, events=events,
+                              raw_pages=[dict(text=raw)]), 'paper', 'after')
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+
+    def test_unchanged_event_keys(self):
+        split = 'de-\npendence'
+        stream, offsets, events = compare_words.normalize(
+            split, [[1, index] for index in range(len(split))])
+        selected_pdf = dict(stream=stream, offsets=offsets, events=events,
+                            raw_pages=[dict(text=split)])
+        decoded = compare_words.decode_located('dependence', {})
+        selected_before = compare_words.align_located(
+            decoded, selected_pdf, 'paper', 'before')
+        selected_after = compare_words.align_located(
+            decoded, selected_pdf, 'paper', 'after')
+        altered = copy.deepcopy(selected_after)
+        altered['decisions'][0]['raw_line'] = 'de- \npendence'
+        self.assertFalse(compare_words.unchanged_paragraph_events(
+            b'dependence', b'dependence', selected_before, altered))
+        self.assertFalse(compare_words.unchanged_paragraph_events(
+            b'dependence', b'de-pendence', selected_before, selected_after))
+        self.assertTrue(compare_words.unchanged_paragraph_events(
+            b'dependence', b'dependence', selected_before, selected_after))
+        self.assertEqual(selected_before['decisions'][0]['decision'],
+                         'unchanged-paragraph')
+        def interpreted(raw):
+            stream, offsets, events = compare_words.normalize(raw,
+                                                                 [[1, i] for i in range(len(raw))])
+            pdf = dict(stream=stream, offsets=offsets, events=events,
+                       raw_pages=[dict(text=raw)])
+            proof = compare_words.align_located(
+                compare_words.decode_located('dependence', {}), pdf, 'paper', 'before')
+            return pdf, proof, compare_words.residual_events(pdf, proof, 'paper', 'before')
+        before, before_match, left = interpreted('dependence\npre-\nand')
+        after, after_match, right = interpreted('de-\npendence\npre-\nand')
+        envelope = dict(available=True)
+        self.assertNotEqual(left[-1]['normalized_offset'], right[-1]['normalized_offset'])
+        self.assertTrue(compare_words.residual_proof(
+            before, after, left, right, envelope, before_match, after_match))
+        self.assertEqual(left[-1]['decision'], 'unchanged-residual')
+        self.assertEqual(left[-1]['residual_key'], right[-1]['residual_key'])
+        changed_line = copy.deepcopy(right)
+        changed_line[-1]['raw_line'] = 'pre- \nand'
+        self.assertFalse(compare_words.residual_proof(before, after, left,
+                                                       changed_line, envelope,
+                                                       before_match, after_match))
+        changed_key = copy.deepcopy(right)
+        changed_key[-1]['residual_key'][-1] += 1
+        self.assertFalse(compare_words.residual_proof(before, after, left,
+                                                       changed_key, envelope,
+                                                       before_match, after_match))
+        self.assertFalse(compare_words.residual_proof(before, after, left, right,
+                                                       dict(available=False),
+                                                       before_match, after_match))
+        changed_text = dict(after, stream=after['stream'].replace('pre-and', 'pro-and'))
+        failure = []
+        self.assertFalse(compare_words.residual_proof(
+            before, changed_text, left, right, envelope, before_match, after_match, failure))
+        self.assertEqual(failure, ['residual compared text differs'])
+        unbound = compare_words.negative_witness('non-linear', list(range(10)))
+        midline = compare_words.negative_witness('nonlinear', list(range(9)))
+        self.assertEqual(unbound['stream'], midline['stream'])
+
+    def test_unchanged_legacy_after_local_reflow(self):
+        def located(raw):
+            stream, offsets, events = compare_words.normalize(
+                raw, [[1, index] for index in range(len(raw))])
+            pdf = dict(stream=stream, offsets=offsets, events=events,
+                       raw_pages=[dict(text=raw)])
+            paragraph = compare_words.decode_located('dependence', {})
+            proof = compare_words.align_located(paragraph, pdf, 'paper', 'before')
+            return pdf, proof, compare_words.residual_events(pdf, proof, 'paper', 'before')
+
+        before, before_match, old_events = located('dependence\npre-\nand')
+        after, after_match, new_events = located('de-\npendence\npre-\nand')
+        self.assertNotEqual(old_events[-1]['normalized_offset'],
+                            new_events[-1]['normalized_offset'])
+        self.assertEqual(old_events[-1]['residual_key'], new_events[-1]['residual_key'])
+        self.assertTrue(compare_words.residual_proof(
+            before, after, old_events, new_events, dict(available=True),
+            before_match, after_match))
+        self.assertEqual(old_events[-1]['decision'], 'unchanged-residual')
+        changed_width = dict(available=False, reasons=['paper input differs: master measure'])
+        self.assertFalse(compare_words.residual_proof(
+            before, after, old_events, new_events, changed_width,
+            before_match, after_match))
+        raw = 'pre-\nand'
+        stream, offsets, events = compare_words.normalize(
+            raw, [[1, index] for index in range(len(raw))])
+        companion = dict(stream=stream, offsets=offsets, events=events,
+                         raw_pages=[dict(text=raw)])
+        rows = compare_words.residual_events(companion, None, 'explainer', 'before')
+        self.assertEqual(rows[0]['residual_key'][1], 0)
+
+    def test_selector_and_envelope(self):
+        repo = pathlib.Path(__file__).resolve().parents[2]
+        parent_dir = self.root/'old-snapshot'
+        candidate_dir = self.root/'new-snapshot'
+        parent = compare_words.parent_snapshot(repo, 'HEAD', parent_dir)
+        held = CapturedInputs(repo)
+        inputs = compare_words.snapshot_inputs(repo, candidate_dir, held)
+        args = argparse.Namespace(unit='sec:reading:shadow', before_source=None,
+                                  before_revision='HEAD')
+        before, after = compare_words.selected_sources(repo, args, parent,
+                                                        parent_dir, candidate_dir)
+        envelope = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                  inputs, before, after, args.unit)
+        self.assertTrue(envelope['available'], envelope['reasons'])
+        with mock.patch.object(args, 'before_source',
+                               'HEAD:documents/paper/parts/front.tex:203-207'):
+            with self.assertRaises(compare_words.Fault) as raised:
+                compare_words.selected_sources(repo, args, parent, parent_dir, candidate_dir)
+        self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
+        args.before_revision = None
+        args.before_source = 'HEAD:documents/paper/parts/front.tex:203-207'
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.selected_sources(repo, args, parent, parent_dir, candidate_dir)
+        self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
+        args.before_source = None
+        args.before_revision = 'HEAD'
+        missing = copy.deepcopy(parent)
+        missing['fragments'] = [row for row in missing['fragments']
+                                if row[1] != args.unit]
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.selected_sources(repo, args, missing, parent_dir, candidate_dir)
+        self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
+        fragment = parent_dir/before['path']
+        original = fragment.read_bytes()
+        fragment.write_bytes(original.replace(b'PaperNativeParagraph', b'PaperOtherParagraph'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.selected_sources(repo, args, parent, parent_dir, candidate_dir)
+        self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
+        fragment.write_bytes(original)
+        source = parent_dir/before['source']
+        original = source.read_bytes()
+        source.write_bytes(original.replace(b'% generated: sec:reading:shadow', b'% other: sec:reading:shadow'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.selected_sources(repo, args, parent, parent_dir, candidate_dir)
+        self.assertEqual(raised.exception.row['code'], 'SourceInvalid')
+        source.write_bytes(original)
+        legacy = copy.deepcopy(parent)
+        legacy['fragments'] = [row for row in parent['fragments']
+                               if row[1] != args.unit]
+        body = 'One\nparagraph\nwith\nfive\nlines\n'
+        source_name = after['source']
+        candidate_bytes = (candidate_dir/source_name).read_bytes()
+        marker_start, marker_end = after['marker']
+        old_bytes = (candidate_bytes[:marker_start] + body.encode() +
+                     candidate_bytes[marker_end:])
+        authored = dict(commit=parent['commit'], path=source_name, first=after['line'],
+                        last=after['line'] + 4,
+                        bytes=[marker_start, marker_start + len(body.encode())],
+                        body=body, blob_bytes=old_bytes, blob='fixture-blob')
+        args.before_revision = None
+        args.before_source = 'HEAD:' + source_name + ':203-207'
+        with mock.patch.object(compare_words, 'source_blob', return_value=authored):
+            authored_before, authored_after = compare_words.selected_sources(
+                repo, args, legacy, parent_dir, candidate_dir)
+        self.assertEqual(authored_before['kind'], 'authored')
+        self.assertEqual(authored_after['marker'], after['marker'])
+        selector_cases = (
+            (dict(authored, path='documents/paper/parts/stray.tex'), legacy,
+             'source selector misses inclusion place'),
+            (authored, dict(legacy, receipt=dict(legacy['receipt'],
+                inputs={key: value for key, value in legacy['receipt']['inputs'].items()
+                        if key != source_name})), 'source selector is outside declared inputs'),
+            (dict(authored, first=after['line'] + 1), legacy,
+             'source selector misses inclusion place'),
+            (dict(authored, bytes=[marker_start + 1,
+                                   marker_start + 1 + len(body.encode())]), legacy,
+             'source differs outside selected paragraph'),
+            (dict(authored, blob_bytes=old_bytes + b'% unrelated edit\n'), legacy,
+             'source differs outside selected paragraph'),
+        )
+        for changed_source, changed_parent, detail in selector_cases:
+            with self.subTest(selector=detail, source=changed_source['path']):
+                with mock.patch.object(compare_words, 'source_blob',
+                                       return_value=changed_source):
+                    with self.assertRaises(compare_words.Fault) as raised:
+                        compare_words.selected_sources(repo, args, changed_parent,
+                                                       parent_dir, candidate_dir)
+                self.assertEqual((raised.exception.row['code'],
+                                  raised.exception.row['detail']), ('SourceInvalid', detail))
+        args.before_source = None
+        args.before_revision = 'HEAD'
+        inclusion = candidate_dir/'generated/documents/inclusions.tsv'
+        original = inclusion.read_bytes()
+        lines = original.splitlines(keepends=True)
+        inclusion.write_bytes(b''.join([lines[1], lines[0], *lines[2:]]))
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertIn('inclusion order differs from generator order', changed['reasons'])
+        inclusion.write_bytes(original)
+        inclusion.write_bytes(b''.join([lines[6], *lines[:6], *lines[7:]]))
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertIn('inclusion order differs from generator order', changed['reasons'])
+        inclusion.write_bytes(original)
+        inclusion.write_bytes(original.replace(b'\trefrain\t', b'\tquotation\t', 1))
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertFalse(changed['available'])
+        self.assertIn('other inclusion identities differ', changed['reasons'])
+        inclusion.write_bytes(original)
+        receipt = candidate_dir/'generated/paper/inputs.json'
+        original = receipt.read_bytes()
+        changed_receipt = json.loads(original)
+        changed_receipt['inputs']['unexpected.tex'] = '0' * 64
+        receipt.write_text(json.dumps(changed_receipt))
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertFalse(changed['available'])
+        self.assertIn('paper input membership differs', changed['reasons'])
+        receipt.write_bytes(original)
+        changed_receipt = json.loads(original)
+        changed_receipt['inputs']['documents/paper/main.tex'] = '0' * 64
+        receipt.write_text(json.dumps(changed_receipt))
+        with mock.patch.object(compare_words, 'inventory',
+                               return_value=compare_words.inventory(repo)):
+            with self.assertRaises(compare_words.Fault) as raised:
+                compare_words.snapshot_inputs(candidate_dir, self.root/'bad-receipt-copy',
+                                              CapturedInputs(candidate_dir))
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('InputChanged', 'paper receipt differs from source inventory'))
+        receipt.write_bytes(original)
+        other = candidate_dir/'documents/paper-build/compat.tex'
+        original_other = other.read_bytes()
+        other.write_bytes(original_other + b'% changed\n')
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertFalse(changed['available'])
+        self.assertIn('paper input differs: documents/paper-build/compat.tex',
+                      changed['reasons'])
+        other.write_bytes(original_other)
+        original_master = (candidate_dir/'documents/paper/main.tex').read_bytes()
+        (candidate_dir/'documents/paper/main.tex').write_bytes(
+            original_master.replace(b'textwidth=6.0in', b'textwidth=4.2in'))
+        changed = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertIn('paper input differs: documents/paper/main.tex', changed['reasons'])
+        (candidate_dir/'documents/paper/main.tex').write_bytes(original_master)
+
+        def encoded(rows):
+            return ''.join('\t'.join(map(str, row)) + '\n' for row in rows).encode()
+        old_rows = list(legacy['fragments'])
+        new_rows = list(compare_words.scope_fragments(candidate_dir))
+        direction = next(row for row in new_rows if row[1] == 'sec:say:direction' and
+                         row[3] == 'refrain')
+        old_direction = (source_name, direction[1], direction[2], direction[3], 250)
+        new_direction = (source_name, direction[1], direction[2], direction[3], 246)
+        old_rows = [old_direction if row == direction else row for row in old_rows]
+        new_rows = [new_direction if row == direction else row for row in new_rows]
+        source_order = (candidate_dir/'documents/paper-build/sources.tsv').read_text().splitlines()
+        def row_order(row):
+            return (0 if 'paper-pilot' in row[2] else 1,
+                    source_order.index(row[0]), row[4])
+        old_rows.sort(key=row_order)
+        new_rows.sort(key=row_order)
+        synthetic_parent = dict(legacy, fragments=old_rows)
+        parent_source = parent_dir/source_name
+        parent_source.write_bytes(old_bytes)
+        parent_inclusion = parent_dir/'generated/documents/inclusions.tsv'
+        parent_inclusion.write_bytes(encoded(old_rows))
+        inclusion.write_bytes(encoded(new_rows))
+        with mock.patch.object(compare_words, 'scope_fragments', return_value=new_rows):
+            equal = compare_words.source_envelope(
+                synthetic_parent, parent_dir, candidate_dir, inputs,
+                authored_before, authored_after, args.unit)
+        self.assertEqual(equal['inclusion_shift'], -4)
+        self.assertTrue(equal['available'], equal['reasons'])
+        wrong_rows = [tuple([*row[:4], 247]) if row == new_direction else row
+                      for row in new_rows]
+        inclusion.write_bytes(encoded(wrong_rows))
+        with mock.patch.object(compare_words, 'scope_fragments', return_value=wrong_rows):
+            changed = compare_words.source_envelope(
+                synthetic_parent, parent_dir, candidate_dir, inputs,
+                authored_before, authored_after, args.unit)
+        self.assertFalse(changed['available'])
+        self.assertIn('inclusion line differs: sec:say:direction', changed['reasons'])
+
+    def test_independent_side_sources(self):
+        def proof(source, raw, side):
+            decoded = compare_words.decode_located(source, {})
+            stream, offsets, events = compare_words.normalize(
+                raw, [[1, index] for index in range(len(raw))])
+            pdf = dict(stream=stream, offsets=offsets, events=events,
+                       raw_pages=[dict(text=raw)])
+            match = compare_words.align_located(decoded, pdf, 'paper', side)
+            return decoded, match, compare_words.canonicalize(pdf, match)[0]
+        for old_source, new_source, raw in (
+                ('non-linear', 'nonlinear', 'non-\nlinear'),
+                ('dependence', 'de-pendence', 'de-\npendence')):
+            with self.subTest(old=old_source, new=new_source):
+                old, old_match, old_stream = proof(old_source, raw, 'before')
+                new, new_match, new_stream = proof(new_source, raw, 'after')
+                self.assertNotEqual(old['semantic'], new['semantic'])
+                self.assertNotEqual(old_stream, new_stream)
+                self.assertEqual(old_match['decisions'][0]['raw'],
+                                 new_match['decisions'][0]['raw'])
+                self.assertNotEqual(old_match['decisions'][0]['decision'],
+                                    new_match['decisions'][0]['decision'])
+        old, _, old_stream = proof('dependence', 'de-\npendence', 'before')
+        new, _, new_stream = proof('independence', 'in-\ndependence', 'after')
+        self.assertNotEqual(old['semantic'], new['semantic'])
+        self.assertNotEqual(old_stream, new_stream)
+        lookup = bindings(pathlib.Path(__file__).resolve().parents[2])
+        changed_lookup = copy.deepcopy(lookup)
+        changed_lookup['src:nd']['target'] = 'node:changed'
+        before = compare_words.decode_located('A \\ftag{src:nd}', lookup)
+        after = compare_words.decode_located('A \\ftag{src:nd}', changed_lookup)
+        self.assertEqual(before['extracted'], after['extracted'])
+        self.assertNotEqual(before['tags'], after['tags'])
+        split_lookup = copy.deepcopy(lookup)
+        split_lookup['src:nd']['spelling'] = 'foo-bar'
+        tagged = compare_words.decode_located('A \\ftag{src:nd}', split_lookup)
+        raw = 'A FOO-\nBAR'
+        stream, offsets, events = compare_words.normalize(
+            raw, [[1, i] for i in range(len(raw))])
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.align_located(tagged, dict(stream=stream, offsets=offsets,
+                events=events, raw_pages=[dict(text=raw)]), 'paper', 'after')
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+
+    def test_negative_witness(self):
+        def residual(path, document, side, value):
+            if document != 'paper':
+                return
+            value['stream'] = value['stream'].replace('Closing', 'pre-and')
+            value['offsets'] = [[1, index] for index in range(len(value['stream']))]
+            position = value['stream'].rindex('pre-and') + 3
+            value['raw_pages'] = [dict(text=value['stream'] + '\n')]
+            value['events'] = [dict(operation='LineEndPunctuation',
+                                   normalized_offset=position, raw=[1, position],
+                                   spelling='-', intervening_space=False,
+                                   raw_line='pre-\nand', newline=[1, len(value['stream'])],
+                                   continuation=[1, position + 1])]
+        with mock.patch.object(compare_words, 'source_envelope', return_value=dict(
+                available=False, reasons=['captured width differs'], rows=[])):
+            exit_code, record = self.conversion_run(residual)
+        self.assertEqual((exit_code, record['verdict']), (2, 'refused'))
+        self.assertEqual(record['faults'][0]['code'], 'SourceEnvelopeChanged')
+        self.assertIn('captured width differs', record['faults'][0]['detail'])
+        self.assertEqual(record['coverage']['unresolved'], 2)
+        def changed_residual(path, document, side, value):
+            residual(path, document, side, value)
+            if document == 'paper' and side == 'after':
+                value['stream'] = value['stream'].replace('pre-and', 'pre and')
+        exit_code, record = self.conversion_run(changed_residual)
+        self.assertEqual((exit_code, record['verdict']), (2, 'refused'))
+        self.assertEqual(record['faults'][0]['code'], 'LineEndUnresolved')
+        self.assertEqual(record['faults'][0]['detail'], 'residual compared text differs')
+        def title_change(path, document, side, value):
+            residual(path, document, side, value)
+            if document == 'paper' and side == 'after':
+                value['titles'] = ['Other title']
+        with mock.patch.object(compare_words, 'source_envelope', return_value=dict(
+                available=False, reasons=['captured width differs'], rows=[])):
+            exit_code, record = self.conversion_run(title_change)
+        self.assertEqual((exit_code, record['verdict']), (1, 'different'))
+        self.assertEqual(record['differences'][0]['part'], 'titles')
+        self.assertEqual(record['differences'][0]['proof'], 'direct')
+        self.assertEqual(record['faults'], [])
+
+    def test_tag_targets_in_comparison(self):
+        real_bindings = compare_words.bindings
+        def changed_target(root):
+            rows = real_bindings(root)
+            if root.name == 'snapshot':
+                rows['src:nd'] = dict(rows['src:nd'], target='node:another')
+            return rows
+        with mock.patch.object(compare_words, 'bindings', side_effect=changed_target):
+            exit_code, record = self.conversion_run()
+        self.assertEqual((exit_code, record['verdict']), (1, 'different'))
+        self.assertEqual([(row['part'], row['proof']) for row in record['differences']],
+                         [('source/tags', 'direct')])
+        self.assertEqual(record['faults'], [])
+
     def conversion_run(self, change=None, options=None):
         source = pathlib.Path(__file__).resolve().parents[2]
         fragment = read(source/'generated/documents/paper-pilot/sec-reading-shadow.tex')
@@ -43,13 +572,13 @@ class Identities(unittest.TestCase):
             path = self.root / ('before-' + document + '.pdf')
             if not path.exists():
                 path.write_bytes(compare_words.git(
-                    source, 'show', PARENT_REVISION + ':generated/paper/' + document + '.pdf'))
+                    source, 'show', 'HEAD:generated/paper/' + document + '.pdf'))
             before[document] = path
         args = argparse.Namespace(repository=source, before_paper=before['paper'],
                                   before_explainer=before['explainer'],
                                   after_paper=source/'generated/paper/paper.pdf',
                                   after_explainer=source/'generated/paper/explainer.pdf',
-                                  before_source=PARENT_REVISION + ':documents/paper/parts/front.tex:203-207',
+                                  before_source=None, before_revision='HEAD',
                                   unit='sec:reading:shadow', output=output)
         for key, value in (options or {}).items():
             setattr(args, key, value)
@@ -66,6 +595,37 @@ class Identities(unittest.TestCase):
     def test_conversion_complete_stream(self):
         exit_code, result = self.conversion_run()
         self.assertEqual((exit_code, result['verdict']), (0, 'equal'))
+        occurrence = result['units'][0]['occurrences'][0]
+        for side in ('before', 'after'):
+            self.assertEqual(occurrence['tokens'][side][0]['source_range'][0],
+                             occurrence['sources'][side]['range'][0])
+        def split_word(path, document, side, value, change_word=False):
+            if document != 'paper' or side != 'after':
+                return
+            raw = value['stream'].replace('dependence', 'de-\npendence', 1)
+            if change_word:
+                raw = raw.replace('Closing', 'Clasing')
+            stream, offsets, events = compare_words.normalize(
+                raw, [[1, index] for index in range(len(raw))])
+            value.update(stream=stream, offsets=offsets, events=events,
+                         raw_pages=[dict(text=raw)])
+        exit_code, result = self.conversion_run(split_word)
+        self.assertEqual((exit_code, result['verdict']), (0, 'equal'))
+        self.assertNotEqual(result['documents']['paper']['before']['stream'],
+                            result['documents']['paper']['after']['stream'])
+        self.assertEqual(result['documents']['paper']['before']['canonical_stream'],
+                         result['documents']['paper']['after']['canonical_stream'])
+        self.assertIn('remove-discretionary',
+                      [row['decision'] for row in result['line_events']])
+        exit_code, result = self.conversion_run(
+            lambda path, document, side, value: split_word(
+                path, document, side, value, True))
+        self.assertEqual((exit_code, result['verdict']), (1, 'different'))
+        changed = [row for row in result['differences'] if row['part'] == 'stream']
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(changed[0]['proof'], 'direct')
+        changed_at = result['documents']['paper']['after']['raw_pages'][0]['text'].index('Clasing') + 2
+        self.assertEqual(changed[0]['location']['after']['raw'], [[1, changed_at]])
         for document in ('paper', 'explainer'):
             for place in ('first', 'middle', 'last'):
                 for mutation in ('insert', 'delete', 'replace'):
@@ -156,54 +716,55 @@ class Identities(unittest.TestCase):
         self.assertNotEqual(before, changed_digit)
 
     def test_conversion_correspondence(self):
+        def located(source, raw, lookup=None):
+            stream, offsets, events = compare_words.normalize(
+                raw, [[1, index] for index in range(len(raw))])
+            pdf = dict(stream=stream, offsets=offsets, events=events,
+                       raw_pages=[dict(text=raw)])
+            return compare_words.align_located(
+                compare_words.decode_located(source, lookup or {}), pdf,
+                'paper', 'before')
+
         raw = 'the de-\npendence and pre-\nand'
         normalized, offsets, events = compare_words.normalize(
             raw, [[1, i] for i in range(len(raw))])
         self.assertEqual(normalized, 'the de-pendence and pre-and')
-        extracted = {'stream': normalized, 'offsets': offsets, 'events': events}
-        match = compare_words.corroborate('the dependence and pre-and',
-                                           extracted, 'paper', 'before')
-        self.assertEqual(len(match['confirmed_joins']), 1)
-        self.assertEqual(match['confirmed_joins'][0]['joined'], 'dependence')
-        self.assertEqual(match['confirmed_joins'][0]['extracted'], 'de-pendence')
-        lexical = compare_words.corroborate('the de-pendence and pre-and',
-                                            extracted, 'paper', 'after')
-        self.assertEqual(lexical['confirmed_joins'], [])
+        match = located('the dependence and pre-and', raw)
+        self.assertEqual([row['decision'] for row in match['decisions']],
+                         ['remove-discretionary', 'keep-lexical'])
+        lexical = located('the de-pendence and pre-and', raw)
+        self.assertEqual([row['decision'] for row in lexical['decisions']],
+                         ['keep-lexical', 'keep-lexical'])
         page_break = 'de-\npendence'
         locations = [[1, i] for i in range(4)] + [[2, i] for i in range(8)]
         across, across_offsets, across_events = compare_words.normalize(page_break, locations)
-        confirmed = compare_words.corroborate('dependence',
-                                               {'stream': across, 'offsets': across_offsets,
-                                                'events': across_events}, 'paper', 'before')
-        self.assertEqual(confirmed['confirmed_joins'][0]['raw'][0], 1)
+        confirmed = compare_words.align_located(
+            compare_words.decode_located('dependence', {}),
+            dict(stream=across, offsets=across_offsets, events=across_events,
+                 raw_pages=[dict(text='de-\n'), dict(text='pendence')]), 'paper', 'before')
+        self.assertEqual(confirmed['decisions'][0]['raw'][0], 1)
         suspended = 'the pre-\nand'
-        suspended_stream, suspended_offsets, suspended_events = compare_words.normalize(
-            suspended, [[1, i] for i in range(len(suspended))])
-        with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.corroborate('the pre- and',
-                                      {'stream': suspended_stream, 'offsets': suspended_offsets,
-                                       'events': suspended_events}, 'paper', 'before')
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['stage']),
-                         ('CorrespondenceInvalid', 'correspondence'))
+        self.assertEqual(located('the pre- and', suspended)['decisions'][0]['decision'],
+                         'keep-lexical')
         digits, _, _ = compare_words.normalize('rate 1\n2', [[1, i] for i in range(8)])
         self.assertEqual(digits, 'rate 1 2')
-        repeated = {'stream': normalized + ' ' + normalized,
-                    'offsets': [[1, i] for i in range(2 * len(normalized) + 1)],
-                    'events': []}
         with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.corroborate('the de-pendence and pre-and',
-                                      repeated, 'paper', 'before')
-        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
-        embedded = {'stream': 'breathe dependence',
-                    'offsets': [[1, i] for i in range(len('breathe dependence'))],
-                    'events': []}
-        with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.corroborate('the dependence', embedded, 'paper', 'before')
+            located('the de-pendence and pre-and', raw + ' ' + raw)
         self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
         with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.corroborate('the dependance and pre-and',
-                                       extracted, 'paper', 'before')
+            located('the dependence', 'breathe dependence')
         self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        with self.assertRaises(compare_words.Fault) as raised:
+            located('the dependance and pre-and', raw)
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        def absent_after(path, document, side, value):
+            if document == 'paper' and side == 'after':
+                value['stream'] = value['stream'].replace('dependence', 'dependance', 1)
+        exit_code, record = self.conversion_run(absent_after)
+        self.assertEqual((exit_code, record['verdict']), (2, 'refused'))
+        self.assertEqual(record['faults'][0]['code'], 'CorrespondenceInvalid')
+        search = record['units'][0]['occurrences'][0]['search']
+        self.assertEqual(set(search), {'before', 'after'})
         with self.assertRaises(compare_words.Fault) as raised:
             compare_words.decode_paragraph('a \\unknown{b}', {})
         self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
@@ -213,84 +774,66 @@ class Identities(unittest.TestCase):
                 compare_words.decode_paragraph('a' + scalar + 'b', {})
             self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
             self.assertEqual(raised.exception.row['stage'], 'snapshot')
-        for source_text in ('a--b', "a''b"):
+        self.assertEqual(compare_words.decode_paragraph('a--b', {})[0], 'a–b')
+        for source_text in ("a''b", 'a--–b'):
             with self.assertRaises(compare_words.Fault) as raised:
                 compare_words.decode_paragraph(source_text, {})
             self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
         source = pathlib.Path(__file__).resolve().parents[2]
         lookup = bindings(source)
-        wrong, _, _ = compare_words.decode_paragraph(
-            'The ground is \\ftag{snk:two}.', lookup)
-        original, _, _ = compare_words.decode_paragraph(
-            'The ground is \\ftag{src:nd}.', lookup)
-        self.assertNotEqual(wrong, original)
-        value = {'stream': original, 'offsets': [[1, i] for i in range(len(original))],
-                 'events': []}
+        original = compare_words.decode_located('The ground is \\ftag{src:nd}.', lookup)
+        wrong = compare_words.decode_located('The ground is \\ftag{snk:two}.', lookup)
+        self.assertNotEqual(wrong['extracted'], original['extracted'])
         with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.corroborate(wrong, value, 'paper', 'after')
+            located('The ground is \\ftag{snk:two}.', original['extracted'], lookup)
         self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        tagged = compare_words.decode_located('A \\ftag{src:nd}word', lookup)
+        raw = 'A SRC:ND-\nword'
+        stream, offsets, events = compare_words.normalize(
+            raw, [[1, index] for index in range(len(raw))])
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.align_located(
+                tagged, dict(stream=stream, offsets=offsets, events=events,
+                             raw_pages=[dict(text=raw)]), 'paper', 'after')
+        self.assertEqual(raised.exception.row['code'], 'CorrespondenceInvalid')
+        def absent_match(path, document, side, value):
+            if document == 'paper' and side == 'before':
+                value['stream'] = value['stream'].replace('dependence', 'dependance')
+                value['offsets'] = [[1, index] for index in range(len(value['stream']))]
+        exit_code, result = self.conversion_run(absent_match)
+        self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
+        self.assertEqual(result['faults'][0]['code'], 'CorrespondenceInvalid')
+        search = result['units'][0]['occurrences'][0]['search']['before']
+        self.assertEqual(search['matches_found'], 0)
+        self.assertGreater(search['expanded_states'], 0)
         def uncertain(path, document, side, value):
             if document == 'paper' and side == 'after':
                 value['stream'] = value['stream'].replace('Closing', 'C-losing')
                 position = value['stream'].rindex('C-losing') + 1
                 value['offsets'] = [[1, i] for i in range(len(value['stream']))]
-                value['events'] = [{'operation': 'HyphenUnconfirmed',
-                                    'normalized_offset': position, 'raw': [1, position]}]
+                value['raw_pages'] = [dict(text=value['stream'] + '\n')]
+                value['events'] = [dict(operation='LineEndPunctuation',
+                                        normalized_offset=position, raw=[1, position],
+                                        spelling='-', intervening_space=False,
+                                        raw_line='C-\n', newline=[1, len(value['stream'])],
+                                        continuation=[1, position + 1])]
         exit_code, result = self.conversion_run(uncertain)
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
-        self.assertEqual(result['faults'][0]['code'], 'HyphenUnconfirmed')
-        for broken_side in ('before', 'after'):
-            for spelling in ('non-linear', 'pre-and'):
-                def break_event(path, document, side, value):
-                    if document == 'paper':
-                        value['stream'] = value['stream'].replace('Closing', spelling)
-                        value['offsets'] = [[1, i] for i in range(len(value['stream']))]
-                        if side == broken_side:
-                            position = value['stream'].index('-')
-                            value['events'] = [{'operation': 'HyphenUnconfirmed',
-                                                'normalized_offset': position,
-                                                'raw': [1, position]}]
-                exit_code, result = self.conversion_run(break_event)
-                self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
-                self.assertEqual(result['faults'][0]['code'], 'HyphenUnconfirmed')
-        for mark in ('-', '—', '/'):
-            def added_space(path, document, side, value):
-                if document == 'paper':
-                    value['stream'] = value['stream'].replace('Closing', 'pre' + mark + ' and')
-                    value['offsets'] = [[1, i] for i in range(len(value['stream']))]
-                    position = value['stream'].index(mark)
-                    value['events'] = [{'operation': 'LineEndPunctuation',
-                                        'normalized_offset': position,
-                                        'raw': [1, position], 'spelling': mark,
-                                        'intervening_space': side == 'after'}]
-            exit_code, result = self.conversion_run(added_space)
-            self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
-            self.assertEqual(result['faults'][0]['code'], 'ProfileUnsupported')
-        for mark in ('–', '—'):
-            def one_sided(path, document, side, value):
-                if document == 'paper':
-                    value['stream'] = value['stream'].replace('Closing', 'pre ' + mark + ' and')
-                    value['offsets'] = [[1, i] for i in range(len(value['stream']))]
-                    if side == 'after':
-                        position = value['stream'].index(mark)
-                        value['events'] = [{'operation': 'LineEndPunctuation',
-                                            'normalized_offset': position, 'raw': [1, position],
-                                            'spelling': mark, 'intervening_space': False}]
-            exit_code, result = self.conversion_run(one_sided)
-            self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
-            self.assertEqual(result['faults'][0]['code'], 'ProfileUnsupported')
-        def changed_mark(path, document, side, value):
-            if document == 'paper':
-                value['stream'] = value['stream'].replace('Closing', 'pre—and')
+        self.assertEqual(result['faults'][0]['code'], 'LineEndUnresolved')
+        self.assertEqual(result['faults'][0]['stage'], 'comparison')
+        self.assertEqual(result['coverage']['unresolved'], 1)
+        self.assertEqual(result['negative_witness']['paper']['before']['stream'],
+                         result['negative_witness']['paper']['after']['stream'])
+        def independent_difference(path, document, side, value):
+            uncertain(path, document, side, value)
+            if document == 'paper' and side == 'after':
+                value['stream'] = value['stream'].replace('C-losing', 'C-lozing')
                 value['offsets'] = [[1, i] for i in range(len(value['stream']))]
-                position = value['stream'].index('—')
-                value['events'] = [{'operation': 'LineEndPunctuation',
-                                    'normalized_offset': position, 'raw': [1, position],
-                                    'spelling': '—' if side == 'before' else '/',
-                                    'intervening_space': False}]
-        exit_code, result = self.conversion_run(changed_mark)
-        self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
-        self.assertEqual(result['faults'][0]['code'], 'ProfileUnsupported')
+                value['raw_pages'][0]['text'] = value['stream'] + '\n'
+        exit_code, result = self.conversion_run(independent_difference)
+        self.assertEqual((exit_code, result['verdict']), (1, 'different'))
+        self.assertEqual(result['differences'][0]['proof'], 'witness')
+        self.assertEqual(result['faults'], [])
 
     def test_conversion_reader_nulls_and_cli(self):
         reader = object.__new__(compare_words.Pdf)
@@ -570,7 +1113,8 @@ class Identities(unittest.TestCase):
         self.assertEqual(result['faults'][0]['code'], 'PreparationRefused')
         self.assertIn('M077: PreparationRefused: -/-: -:-: bad inventory',
                       diagnostic.getvalue())
-        with mock.patch.object(compare_words, 'corroborate', side_effect=RuntimeError('bad correspondence')):
+        with mock.patch.object(compare_words, 'align_located',
+                               side_effect=RuntimeError('bad correspondence')):
             exit_code, result = self.conversion_run()
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
         self.assertEqual((result['faults'][0]['code'], result['faults'][0]['stage']),

@@ -43,4 +43,5 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |033|Inline styles in unit prose|accepted; decides the authoring syntax reserved by 021; retains 022's mathematics boundary|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|
-|038|Independent complete-document text comparison|accepted|
+|038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
+|043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|

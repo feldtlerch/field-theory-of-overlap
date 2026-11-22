@@ -282,6 +282,8 @@ fn w06_python_differential_compares_discovery_snapshots_and_all_occurrences() {
     fs::remove_dir_all(fixture).unwrap();
 }
 fn differential(root: &Path, python_script: &Path) {
+    // The Python walk shares the checkout fixture lock with the Rust walk.
+    let _guard = files::checkout_fixture_read_guard(root).unwrap();
     let sources = files::collect(root).unwrap();
     let checked = check_markdown_sources(sources.clone()).unwrap();
     let script = r"

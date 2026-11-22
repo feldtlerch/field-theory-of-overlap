@@ -41,8 +41,9 @@ def assertion(args):
     names = {row['fixture'] for row in record['fixtures']}
     expected = {'leak-control', 'shipped', 'copies', 'math', 'locator', 'layout-sites',
                 'concordance', 'concordance-differs', 'missing',
-                'conversion-parent', 'conversion-parent-hyphen', 'conversion-native', 'conversion-changed',
-                'conversion-reflow', 'conversion-reflow-hyphen'}
+                'conversion-companion', 'conversion-parent', 'conversion-parent-hyphen',
+                'conversion-native', 'conversion-changed',
+                'conversion-reflow', 'conversion-reflow-hyphen', 'line-end-marks'}
     passed = record['status'] == 0 and names == expected
     write(pathlib.Path(args.output), {'verdict': 'pass' if passed else 'refusal',
           'reason': '' if passed else 'T40 identity fixtures incomplete or failed'})

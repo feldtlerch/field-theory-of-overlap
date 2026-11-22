@@ -3,6 +3,8 @@ mod files;
 #[cfg(test)]
 mod tests;
 use crate::UnitLoadError;
+#[cfg(test)]
+pub(crate) use files::checkout_fixture_read_guard;
 use ftoo_manifest::{
     AddressBook, CheckedMarkdown, LabelErrors, LabelSourceError, MintKind, check_markdown_sources,
     integrate_labels,

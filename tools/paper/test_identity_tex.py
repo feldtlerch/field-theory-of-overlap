@@ -115,7 +115,8 @@ Appendix paragraph.\par\checkoriginal
 '''
 
 
-def private_conversion_commit(repo, private, parent_pdf, companion_pdf, paragraph):
+def private_conversion_commit(repo, private, parent_pdf, companion_pdf, paragraph,
+                              native=False, master=None):
     env = dict(os.environ, GIT_CONFIG_GLOBAL='/dev/null', GIT_CONFIG_NOSYSTEM='1')
     def git(*args, data=None):
         result = subprocess.run(['git', '-C', str(private), *args], input=data,
@@ -140,11 +141,51 @@ def private_conversion_commit(repo, private, parent_pdf, companion_pdf, paragrap
             rows.append(mode.encode() + b' ' + kind.encode() + b' ' +
                         object_id.encode() + b'\t' + name.encode() + b'\0')
         return git('mktree', '-z', data=b''.join(rows))
+    receipt = json.loads((private/'generated/paper/inputs.json').read_bytes())
+    if master is not None:
+        receipt['inputs']['documents/paper/main.tex'] = digest(master)
+    fragment_name = 'generated/documents/paper-pilot/sec-reading-shadow.tex'
+    if native:
+        receipt['inputs'][fragment_name] = digest(paragraph)
+    else:
+        source_name = 'documents/paper/parts/front.tex'
+        marker = b'% generated: sec:reading:shadow\n'
+        authored = (private/source_name).read_bytes()
+        require(authored.count(marker) == 1, 'Selected marker is not unique')
+        authored = authored.replace(marker, paragraph)
+        inclusion_name = 'generated/documents/inclusions.tsv'
+        inclusion = (private/inclusion_name).read_bytes()
+        selected = [row for row in inclusion.splitlines(keepends=True)
+                    if b'\tsec:reading:shadow\t' in row and b'\tparagraph\t' in row]
+        require(len(selected) == 1, 'Selected inclusion is not unique')
+        inclusion = inclusion.replace(selected[0], b'')
+        receipt['inputs'][source_name] = digest(authored)
+        receipt['inputs'][inclusion_name] = digest(inclusion)
+        receipt['inputs'].pop(fragment_name)
+    receipt_data = (json.dumps(receipt, sort_keys=True, indent=2) + '\n').encode()
     paper = tree('HEAD:generated/paper', {
-        'paper.pdf': blob(parent_pdf), 'explainer.pdf': blob(companion_pdf)})
-    generated = tree('HEAD:generated', {'paper': paper})
-    root = tree('HEAD', {'generated': generated,
-                         'paragraph.tex': ('100644', 'blob', blob(paragraph))})
+        'paper.pdf': blob(parent_pdf), 'explainer.pdf': blob(companion_pdf),
+        'inputs.json': blob(receipt_data)})
+    if native:
+        paper_fragments = tree('HEAD:generated/documents/paper-pilot', {
+            'sec-reading-shadow.tex': blob(paragraph)})
+        generated_documents = tree('HEAD:generated/documents', {
+            'paper-pilot': paper_fragments})
+    else:
+        generated_documents = tree('HEAD:generated/documents', {
+            'inclusions.tsv': blob(inclusion)})
+    generated = tree('HEAD:generated', {'paper': paper, 'documents': generated_documents})
+    if native:
+        replacements = {'generated': generated}
+        if master is not None:
+            replacements['documents'] = tree('HEAD:documents', {
+                'paper': tree('HEAD:documents/paper', {'main.tex': blob(master)})})
+        root = tree('HEAD', replacements)
+    else:
+        parts = tree('HEAD:documents/paper/parts', {'front.tex': blob(authored)})
+        document_paper = tree('HEAD:documents/paper', {'parts': parts})
+        documents = tree('HEAD:documents', {'paper': document_paper})
+        root = tree('HEAD', {'generated': generated, 'documents': documents})
     return git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                '-c', 'commit.gpgsign=false', 'commit-tree', root, '-p', 'HEAD',
                data=b'Paper paragraph comparison fixture\n')
@@ -162,6 +203,17 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
     fragment = (repo/'generated/documents/paper-pilot/sec-reading-shadow.tex').read_text()
     filler = ('The neutral record stays in its place, and its words are the same in every '
               'rendering of this comparison. ' * 12 + '\n\n') * 20
+    companion_area = work/'conversion-companion'
+    shutil.copytree(template, companion_area)
+    (companion_area/'conversion-companion.tex').write_text(
+        preamble + 'Companion text.\n\\end{document}\n')
+    companion_result = subprocess.run(
+        [str(engine), '--bundle', str(bundle), '--only-cached', '--untrusted',
+         '--keep-logs', '--reruns', '0', 'conversion-companion.tex'],
+        cwd=companion_area, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90)
+    (companion_area/'engine.txt').write_bytes(companion_result.stdout)
+    require(companion_result.returncode == 0 and b'Fontconfig' not in companion_result.stdout,
+            'Conversion companion did not typeset cleanly')
     for name in ('conversion-parent', 'conversion-parent-hyphen', 'conversion-native',
                  'conversion-changed', 'conversion-reflow', 'conversion-reflow-hyphen'):
         area = work/name
@@ -176,7 +228,8 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
         penalty = '' if name in ('conversion-parent-hyphen', 'conversion-reflow-hyphen') else '\\hyphenpenalty=10000\n'
         body = (penalty +
                 '\\ExplSyntaxOn\\prop_gput:Nnn \\g_ftoo_seen_prop {src:nd}{1}\\ExplSyntaxOff\n'
-                '\\handle*{src:nd}\n\n' + source + '\n\n' + filler + '\\end{document}\n')
+                '\\handle*{src:nd}\n\n' + source + '\n\n\\hyphenpenalty=10000\n' +
+                filler + '\\end{document}\n')
         (area/(name+'.tex')).write_text(top + body)
         result = subprocess.run(
             [str(engine), '--bundle', str(bundle), '--only-cached', '--untrusted',
@@ -200,15 +253,15 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
              '68643f6:generated/paper/' + document + '.pdf']))
         delivered[document] = path
     parent = work/'conversion-parent/conversion-parent.pdf'
-    companion = delivered['explainer']
-    original = b'\n' + paragraph.encode() + b'\n'
+    companion = companion_area/'conversion-companion.pdf'
+    original = paragraph.encode()
     commit = private_conversion_commit(repo, private, parent.read_bytes(),
                                        companion.read_bytes(), original)
-    source_selector = commit + ':paragraph.tex:2-6'
+    source_selector = commit + ':documents/paper/parts/front.tex:203-207'
     hyphen_parent = work/'conversion-parent-hyphen/conversion-parent-hyphen.pdf'
     hyphen_commit = private_conversion_commit(repo, private, hyphen_parent.read_bytes(),
                                               companion.read_bytes(), original)
-    hyphen_selector = hyphen_commit + ':paragraph.tex:2-6'
+    hyphen_selector = hyphen_commit + ':documents/paper/parts/front.tex:203-207'
     baseline_pages = Pdf(parent).raw_pages()
     reflow_pages = Pdf(work/'conversion-reflow/conversion-reflow.pdf').raw_pages()
     require(len(baseline_pages) != len(reflow_pages),
@@ -216,7 +269,7 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
     for name, expected in (('conversion-native', 'equal'),
                            ('conversion-changed', 'different'),
                            ('conversion-reflow', 'equal'),
-                           ('conversion-reflow-hyphen', 'refused')):
+                           ('conversion-reflow-hyphen', 'equal')):
         fragment_path = private/'generated/documents/paper-pilot/sec-reading-shadow.tex'
         if name == 'conversion-changed':
             fragment_path.write_text(fragment.replace('poorest', 'richest'))
@@ -251,14 +304,20 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
             require(hyphen_parent.read_bytes() != after.read_bytes() and
                     Pdf(hyphen_parent).raw_pages() != Pdf(after).raw_pages(),
                     'Hyphenated reflow fixture did not change raw pages')
-            require(record['faults'] and record['faults'][0]['code'] == 'HyphenUnconfirmed',
-                    'Hyphenated reflow did not refuse an unconfirmed break')
-    lexical = original.replace(b'dependence', b'de-pendence', 1)
-    require(lexical != original, 'Lexical source control did not change the paragraph')
+            require(all(any(row['decision'] == 'remove-discretionary' for row in
+                            record['correspondence'][side]['decisions'])
+                        for side in ('before', 'after')),
+                    'Hyphenated reflow lacks a confirmed break on one side')
+            require(record['documents']['paper']['before']['canonical_stream'] ==
+                    record['documents']['paper']['after']['canonical_stream'],
+                    'Hyphenated reflow changed canonical text')
+    lexical = fragment.encode().replace(b'dependence', b'de-pendence', 1)
+    require(lexical != fragment.encode(), 'Lexical source control did not change the paragraph')
     delivered_paper = delivered['paper']
     delivered_companion = delivered['explainer']
     lexical_commit = private_conversion_commit(repo, private, delivered_paper.read_bytes(),
-                                                delivered_companion.read_bytes(), lexical)
+                                                delivered_companion.read_bytes(), lexical,
+                                                native=True)
     (private/'generated/paper/paper.pdf').write_bytes(delivered_paper.read_bytes())
     (private/'generated/paper/explainer.pdf').write_bytes(delivered_companion.read_bytes())
     lexical_output = (work/'conversion-parent/lexical-source-comparison').resolve()
@@ -266,15 +325,93 @@ def conversion_fixtures(repo, support, work, engine, bundle, env):
         repository=private, before_paper=delivered_paper, before_explainer=delivered_companion,
         after_paper=delivered_paper,
         after_explainer=delivered_companion,
-        before_source=lexical_commit + ':paragraph.tex:2-6',
+        before_source=None, before_revision=lexical_commit,
         unit='sec:reading:shadow', output=lexical_output)
     lexical_verdict = compare(lexical_args)
     lexical_record = json.loads((lexical_output/'comparison.json').read_text())
     require(lexical_verdict == 1 and lexical_record['verdict'] == 'different' and
-            {row['part'] for row in lexical_record['differences']} == {'source/body'} and
-            lexical_record['correspondence']['before']['confirmed_joins'] == [] and
-            len(lexical_record['correspondence']['after']['confirmed_joins']) == 1,
+            {row['part'] for row in lexical_record['differences']} >=
+            {'source/body', 'stream'} and
+            lexical_record['correspondence']['before']['decisions'][0]['decision'] ==
+            'keep-lexical' and
+            any(row['decision'] == 'remove-discretionary' for row in
+                lexical_record['correspondence']['after']['decisions']),
             'Lexical source spelling did not differ from the native paragraph')
+    line_end_marks(repo, work, template, preamble, private, engine, bundle, env,
+                   companion.read_bytes())
+
+
+def line_end_marks(repo, work, template, preamble, private, engine, bundle, env,
+                   companion_pdf):
+    """Observe mark spellings and breaks in the paper preamble, then compare both widths."""
+    root = work/'line-end-marks'
+    root.mkdir()
+    original_receipt = (repo/'generated/paper/inputs.json').read_bytes()
+    original_master = (repo/'documents/paper/main.tex').read_bytes()
+    records = []
+    for index, mark in enumerate((' — ', ' – ', ' / ', '—', '–', '/')):
+        body = 'm'*44 + mark + 'strengths continue with plain words.'
+        fragment = ('\\PaperNativeParagraph{sec:reading:shadow}{' + body + '}\n').encode()
+        pages = []
+        for side, width in (('before', '6.0in'), ('after', '6.4in')):
+            area = root/(str(index) + '-' + side)
+            shutil.copytree(template, area)
+            top = preamble.replace('textwidth=6.0in', 'textwidth=' + width, 1)
+            require(top != preamble if side == 'after' else True,
+                    'Mark fixture width did not change')
+            (area/'mark.tex').write_text(top + fragment.decode() + '\n\\end{document}\n')
+            result = subprocess.run(
+                [str(engine), '--bundle', str(bundle), '--only-cached', '--untrusted',
+                 '--keep-logs', '--reruns', '0', 'mark.tex'], cwd=area, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90)
+            (area/'engine.txt').write_bytes(result.stdout)
+            require(result.returncode == 0 and b'Fontconfig' not in result.stdout,
+                    'Mark fixture did not typeset cleanly: ' + str(index) + side)
+            raw = Pdf(area/'mark.pdf').raw_pages()
+            require(len(raw) == 1, 'Mark fixture page count differs')
+            pages.append((area/'mark.pdf', raw[0]))
+        left_pdf, left_raw = pages[0]
+        right_pdf, right_raw = pages[1]
+        ending = mark.strip() + '\n'
+        if index < 4:
+            require(ending in left_raw and ending not in right_raw,
+                    'Mark fixture did not move the mark: ' + str(index))
+        else:
+            require(ending not in left_raw and ending not in right_raw,
+                    'Unspaced mark unexpectedly ended a line: ' + str(index))
+        (private/'generated/paper/inputs.json').write_bytes(original_receipt)
+        (private/'documents/paper/main.tex').write_bytes(original_master)
+        before_master = original_master
+        after_master = original_master.replace(b'textwidth=6.0in', b'textwidth=6.4in', 1)
+        require(after_master != before_master, 'Mark fixture master width did not change')
+        parent = private_conversion_commit(repo, private, left_pdf.read_bytes(),
+                                           companion_pdf, fragment, native=True,
+                                           master=before_master)
+        (private/'generated/documents/paper-pilot/sec-reading-shadow.tex').write_bytes(fragment)
+        (private/'documents/paper/main.tex').write_bytes(after_master)
+        (private/'generated/paper/paper.pdf').write_bytes(right_pdf.read_bytes())
+        (private/'generated/paper/explainer.pdf').write_bytes(companion_pdf)
+        receipt = json.loads(original_receipt)
+        receipt['inputs']['documents/paper/main.tex'] = digest(after_master)
+        receipt['inputs']['generated/documents/paper-pilot/sec-reading-shadow.tex'] = digest(fragment)
+        (private/'generated/paper/inputs.json').write_text(
+            json.dumps(receipt, sort_keys=True, indent=2) + '\n')
+        output = root/(str(index) + '-comparison')
+        args = argparse.Namespace(
+            repository=private, before_paper=left_pdf,
+            before_explainer=work/'conversion-companion/conversion-companion.pdf',
+            after_paper=right_pdf,
+            after_explainer=work/'conversion-companion/conversion-companion.pdf',
+            before_source=None, before_revision=parent,
+            unit='sec:reading:shadow', output=output)
+        verdict = compare(args)
+        record = json.loads((output/'comparison.json').read_text())
+        require(verdict == 0 and record['verdict'] == 'equal' and not record['faults'],
+                'Mark fixture comparison differs: ' + str(index) + ' ' +
+                str(record['faults']))
+        records.append(dict(mark=mark, before=left_raw, after=right_raw,
+                            verdict=record['verdict']))
+    (root/'engine.txt').write_text(json.dumps(records, ensure_ascii=False, indent=2) + '\n')
 
 
 def historical_pair(repo, work):
@@ -329,7 +466,8 @@ def historical_pair(repo, work):
         before_explainer=before['explainer'],
         after_paper=private/'generated/paper/paper.pdf',
         after_explainer=private/'generated/paper/explainer.pdf',
-        before_source='68643f63939af28693897b84478e1e4988c40e32:documents/paper/parts/front.tex:203-207',
+        before_source=None,
+        before_revision='90da6b7124cc2f9bf550ca9d1a1520b490315ed1',
         unit='sec:reading:shadow', output=work/'comparison')
     verdict = compare(args)
     record = json.loads((args.output/'comparison.json').read_text())

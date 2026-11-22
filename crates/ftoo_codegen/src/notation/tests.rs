@@ -2982,6 +2982,8 @@ fn support_required_external_markdown_and_links_do_not_change_either_source_inve
     use std::process::Command;
     let fixture = Fixture::new();
     let root = support::repository();
+    // The external Markdown walk shares the checkout fixture lock with native tests.
+    let _guard = crate::labels::checkout_fixture_read_guard(&root).unwrap();
     let python = || {
         let result = Command::new("python3").arg("-I").arg("-c").arg("import pathlib,json; print(json.dumps([(p.as_posix(),p.read_text(encoding='utf-8')) for p in sorted(pathlib.Path('.').rglob('*.md'))]))").current_dir(&root).output().unwrap();
         assert_eq!(result.status.code(), Some(0));
