@@ -46,3 +46,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
 |042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|
+|046|Registered HTML block gaps|accepted; the development product check inventories withheld HTML passages without changing release refusal|

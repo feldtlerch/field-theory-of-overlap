@@ -46,12 +46,20 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
             .unwrap();
     let displays = ftoo_manifest::check_displays(&display_drafts, &skeletons, &welded).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let bibliography = fs::read_to_string(root.join("documents/paper/references.bib"))?;
     let directory = Directory::new();
     let path = directory.0.join("historical.tex");
     crate::notation::with_preparation(None, &catalogue, |notation| -> Result<(), DocumentError> {
         plan::citation_tests::support_required_literal_build_controls(notation);
         super::pending::support_required_pending_paragraphs_are_complete_label_neutral_and_independently_consumed(&book, notation)?;
-        let plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
+        let plans = plan::build(
+            &skeletons,
+            &welded,
+            notation,
+            &metadata,
+            &displays,
+            &bibliography,
+        )?;
         let plan = plans
             .iter()
             .find(|plan| plan.document == "main" && plan.language == "en")

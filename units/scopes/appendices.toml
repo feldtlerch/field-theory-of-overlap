@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/appendices.tex"
+
+[[scope.occurrences]]
+unit = "sec:log:andreoni-joint"
+role = "paragraph"

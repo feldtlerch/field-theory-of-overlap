@@ -133,7 +133,10 @@ fn check_runs(
         match run {
             Inline::Text(text) if !text.is_empty() => adjacent = None,
             Inline::Text(_) => {}
-            Inline::Tag { .. } | Inline::PaperTag { .. } | Inline::Citation { .. } => {
+            Inline::Tag { .. }
+            | Inline::PaperTag { .. }
+            | Inline::Citation { .. }
+            | Inline::BibliographyCitation { .. } => {
                 adjacent = Some(MarkdownMathReason::DirectTagOrCitationAdjacency);
             }
             Inline::Mention { .. } => {
@@ -263,7 +266,10 @@ fn next_style_neighbor(runs: &[Inline]) -> Option<StyleNeighbor> {
             Inline::Text(text) if text.is_empty() => {}
             Inline::Math { .. } => return Some(StyleNeighbor::Mathematics),
             Inline::Styled { .. } => return Some(StyleNeighbor::Style),
-            Inline::Tag { .. } | Inline::PaperTag { .. } | Inline::Citation { .. } => {
+            Inline::Tag { .. }
+            | Inline::PaperTag { .. }
+            | Inline::Citation { .. }
+            | Inline::BibliographyCitation { .. } => {
                 return Some(StyleNeighbor::TagOrCitation);
             }
             _ => return None,
@@ -299,6 +305,8 @@ pub(super) fn check_math_admission(plan: &DocumentPlan) -> Result<(), DocumentEr
         let (context, admitted) = if plan.screen.is_some() {
             if index == 0 {
                 ("screen heading", false)
+            } else if block.paragraph {
+                ("ordinary prose", true)
             } else {
                 ("refrain HTML block", false)
             }
@@ -418,6 +426,20 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
             text(&screen.gaps.last().expect("gap").message)
         )
         .expect("string write");
+        let entries = super::bibliography::entries(plan);
+        if !entries.is_empty() {
+            output.push_str("## References\n\n");
+            for entry in entries {
+                writeln!(
+                    output,
+                    "<a id=\"{}\"></a>{}<!-- bibentry {} -->\n",
+                    entry.anchor,
+                    text(&super::bibliography::screen_text(&entry)),
+                    entry.key
+                )
+                .expect("string write");
+            }
+        }
         output.pop();
         return (output, paper_spans);
     }
@@ -502,6 +524,8 @@ pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
             "<!-- unit ",
             "<!-- label ",
             "<!-- cite ",
+            "<!-- bibcite ",
+            "<!-- bibentry ",
         ]
         .iter()
         .any(|prefix| comment.starts_with(prefix))
@@ -637,7 +661,9 @@ pub(super) fn check_reader(
         ));
     }
     if plan.screen.is_some() {
-        for (index, (at, prefix)) in reader.match_indices("id=\"").enumerate() {
+        let bibliography = super::bibliography::entries(plan);
+        let mut refrain_index = 0;
+        for (at, prefix) in reader.match_indices("id=\"") {
             let start = at + prefix.len();
             let tag_end = reader[start..].find('>').map(|offset| start + offset);
             let end = reader[start..].find('"').map(|offset| start + offset);
@@ -653,6 +679,19 @@ pub(super) fn check_reader(
                 ));
             };
             let fragment = &reader[start..end];
+            if bibliography.iter().any(|entry| entry.anchor == fragment) {
+                if reader.matches(&format!("id=\"{fragment}\"")).count() != 1 {
+                    return Err(role_failure(
+                        plan,
+                        false,
+                        start..end,
+                        AssemblyFault::InvalidPublicAnchor {
+                            fragment: fragment.into(),
+                        },
+                    ));
+                }
+                continue;
+            }
             let Some(handle) = super::plan::inverse_fragment(fragment) else {
                 return Err(role_failure(
                     plan,
@@ -672,7 +711,7 @@ pub(super) fn check_reader(
                     .refrains
                     .iter()
                     .filter(|refrain| refrain.quotation.is_none())
-                    .nth(index)
+                    .nth(refrain_index)
             }) && handle != refrain.handle
             {
                 return Err(role_failure(
@@ -686,6 +725,7 @@ pub(super) fn check_reader(
                     },
                 ));
             }
+            refrain_index += 1;
         }
     }
     if let Some((bytes, value)) = leak {
@@ -715,7 +755,9 @@ fn check_quotation_links(
         .flat_map(|screen| &screen.refrains)
         .filter_map(|refrain| refrain.quotation.as_ref().map(|quote| (refrain, quote)))
         .collect();
-    for (index, (at, prefix)) in reader.match_indices("href=\"").enumerate() {
+    let bibliography = super::bibliography::entries(plan);
+    let mut quotation_index = 0;
+    for (at, prefix) in reader.match_indices("href=\"") {
         let start = at + prefix.len();
         let tag_end = reader[start..].find('>').map(|offset| start + offset);
         let end = reader[start..].find('"').map(|offset| start + offset);
@@ -730,6 +772,11 @@ fn check_quotation_links(
             ));
         };
         let href = &reader[start..end];
+        if let Some(anchor) = href.strip_prefix('#')
+            && bibliography.iter().any(|entry| entry.anchor == anchor)
+        {
+            continue;
+        }
         let Some((_, _, fragment, decoded_handle)) = super::plan::parse_public_href(href) else {
             return Err(role_failure(
                 plan,
@@ -755,7 +802,7 @@ fn check_quotation_links(
                 },
             ));
         }
-        let Some((refrain, quotation)) = quotations.get(index) else {
+        let Some((refrain, quotation)) = quotations.get(quotation_index) else {
             return Err(role_failure(
                 plan,
                 false,
@@ -763,6 +810,7 @@ fn check_quotation_links(
                 AssemblyFault::InvalidQuotationHref { href: href.into() },
             ));
         };
+        quotation_index += 1;
         if !reader[..at].ends_with("<a ") || !reader[end..].starts_with("\">") {
             return Err(role_failure(
                 plan,
@@ -848,6 +896,36 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             } => {
                 write!(output, "{}<!-- cite {label} -->", text(&identity.handle))
                     .expect("string write");
+            }
+            Inline::BibliographyCitation { kind, entries, .. } => {
+                if *kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+                    output.push('(');
+                }
+                for (index, entry) in entries.iter().enumerate() {
+                    if index != 0 {
+                        output.push_str("; ");
+                    }
+                    let label = if *kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+                        entry.label.clone()
+                    } else {
+                        entry.label.replace(' ', " (") + ")"
+                    };
+                    write!(output, "<a href=\"#{}\">{}</a>", entry.anchor, text(&label))
+                        .expect("string write");
+                }
+                if *kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+                    output.push(')');
+                }
+                write!(
+                    output,
+                    "<!-- bibcite {} -->",
+                    entries
+                        .iter()
+                        .map(|entry| entry.key.as_str())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+                .expect("string write");
             }
             Inline::Mention { text, .. } => output.push_str(&code(text)),
             Inline::Styled { kind, children, .. } => {

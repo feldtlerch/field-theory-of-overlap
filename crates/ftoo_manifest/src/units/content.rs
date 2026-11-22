@@ -1,6 +1,6 @@
 use super::{
-    CheckedText, InsertionReason, LocatedString, MathOccurrence, TagOccurrence, UnitFault,
-    UnitSite, local_name,
+    BibliographyCitationKind, BibliographyCitationOccurrence, CheckedText, InsertionReason,
+    LocatedString, MathOccurrence, TagOccurrence, UnitFault, UnitSite, local_name,
 };
 use std::ops::Range;
 
@@ -46,14 +46,20 @@ pub(super) struct ScannedText {
     pub prose: bool,
     pub math: Vec<MathOccurrence>,
     pub tags: Vec<TagOccurrence>,
+    pub bibliography_citations: Vec<BibliographyCitationOccurrence>,
     pub styles: Vec<StyleOccurrence>,
 }
 fn insertion_index(scanned: &ScannedText, active_style: bool) -> usize {
-    scanned.math.len() + scanned.tags.len() + scanned.styles.len() + usize::from(active_style)
+    scanned.math.len()
+        + scanned.tags.len()
+        + scanned.bibliography_citations.len()
+        + scanned.styles.len()
+        + usize::from(active_style)
 }
 enum Insertion {
     Math(MathOccurrence),
     Tag(TagOccurrence),
+    BibliographyCitation(BibliographyCitationOccurrence),
 }
 pub(crate) enum AssemblyScanFault {
     Content(ScanFault),
@@ -82,6 +88,7 @@ pub(super) fn scan_limited(
         prose: false,
         math: Vec::new(),
         tags: Vec::new(),
+        bibliography_citations: Vec::new(),
         styles: Vec::new(),
     };
     let mut active_style: Option<(&'static str, usize, usize, usize)> = None;
@@ -93,6 +100,7 @@ pub(super) fn scan_limited(
                 span_index
                     + scanned.math.len()
                     + scanned.tags.len()
+                    + scanned.bibliography_citations.len()
                     + scanned.styles.len()
                     + usize::from(active_style.is_some())
                     == limit
@@ -246,7 +254,7 @@ pub(super) fn scan_limited(
         }
         let index = insertion_index(&scanned, active_style.is_some());
         let insertion = insertion(source, start, index, &mut chars)?;
-        if active_style.is_some() && matches!(&insertion, Insertion::Math(_)) {
+        if !styles && matches!(&insertion, Insertion::BibliographyCitation(_)) {
             return Err(malformed(
                 source,
                 start,
@@ -254,7 +262,28 @@ pub(super) fn scan_limited(
                     .find('}')
                     .map_or(source.value.len(), |end| start + end + 1),
                 index,
-                InsertionReason::StyledMath,
+                InsertionReason::UnknownForm,
+            )
+            .into());
+        }
+        if active_style.is_some()
+            && matches!(
+                &insertion,
+                Insertion::Math(_) | Insertion::BibliographyCitation(_)
+            )
+        {
+            return Err(malformed(
+                source,
+                start,
+                source.value[start..]
+                    .find('}')
+                    .map_or(source.value.len(), |end| start + end + 1),
+                index,
+                if matches!(&insertion, Insertion::Math(_)) {
+                    InsertionReason::StyledMath
+                } else {
+                    InsertionReason::StyledBibliographyCitation
+                },
             )
             .into());
         }
@@ -264,12 +293,14 @@ pub(super) fn scan_limited(
             let site = match &insertion {
                 Insertion::Math(value) => value.site.clone(),
                 Insertion::Tag(value) => value.site.clone(),
+                Insertion::BibliographyCitation(value) => value.site.clone(),
             };
             return Err(AssemblyScanFault::Limit(site));
         }
         match insertion {
             Insertion::Math(value) => scanned.math.push(value),
             Insertion::Tag(value) => scanned.tags.push(value),
+            Insertion::BibliographyCitation(value) => scanned.bibliography_citations.push(value),
         }
     }
     if let Some((_, opener, _, index)) = active_style {
@@ -284,12 +315,84 @@ pub(super) fn scan_limited(
     }
     Ok(scanned)
 }
+fn bibliography_insertion(
+    source: &LocatedString,
+    start: usize,
+    index: usize,
+    chars: &mut impl Iterator<Item = (usize, char)>,
+    kind: BibliographyCitationKind,
+    width: usize,
+) -> Result<Insertion, ScanFault> {
+    let key_start = start + width;
+    for (position, _) in chars.by_ref() {
+        if position + 1 == key_start {
+            break;
+        }
+    }
+    for (position, c) in chars.by_ref() {
+        if c == '{' {
+            return Err(malformed(
+                source,
+                start,
+                position + 1,
+                index,
+                InsertionReason::NestedBrace,
+            ));
+        }
+        if c == '}' {
+            let keys: Vec<_> = source.value[key_start..position].split(',').collect();
+            let valid = !keys.is_empty()
+                && keys.iter().all(|key| {
+                    key.starts_with("a:")
+                        && !key[2..].is_empty()
+                        && key[2..]
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+                });
+            let mut seen = std::collections::BTreeSet::new();
+            if !valid || keys.iter().any(|key| !seen.insert(*key)) {
+                return Err(malformed(
+                    source,
+                    start,
+                    position + 1,
+                    index,
+                    InsertionReason::BadBibliographyKey,
+                ));
+            }
+            return Ok(Insertion::BibliographyCitation(
+                BibliographyCitationOccurrence {
+                    kind,
+                    keys: keys.into_iter().map(str::to_owned).collect(),
+                    site: at(source, start, position + 1, Some(index)),
+                },
+            ));
+        }
+    }
+    Err(malformed(
+        source,
+        start,
+        source.value.len(),
+        index,
+        InsertionReason::Unclosed,
+    ))
+}
+
 fn insertion(
     source: &LocatedString,
     start: usize,
     index: usize,
     chars: &mut impl Iterator<Item = (usize, char)>,
 ) -> Result<Insertion, ScanFault> {
+    let bibliography = if source.value[start..].starts_with("@parencite{") {
+        Some((BibliographyCitationKind::Parenthetical, "@parencite{".len()))
+    } else if source.value[start..].starts_with("@textcite{") {
+        Some((BibliographyCitationKind::Textual, "@textcite{".len()))
+    } else {
+        None
+    };
+    if let Some((kind, width)) = bibliography {
+        return bibliography_insertion(source, start, index, chars, kind, width);
+    }
     let is_tag = prefix(source, start, index, chars)?;
     let name_start = start + if is_tag { 5 } else { 6 };
     for (position, c) in chars.by_ref() {

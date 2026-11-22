@@ -26,6 +26,8 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 \input{notation.tex}
 \input{addressing.tex}
 ";
+pub(super) const BIBLATEX_OPTIONS: &str = "backend=bibtex,style=authoryear,maxcitenames=2,mincitenames=1,uniquename=full,uniquelist=true,doi=true,isbn=false,url=false";
+pub(super) const BIBLATEX_EXECUTE_OPTIONS: &str = "ibidtracker=false,idemtracker=false";
 pub(super) fn text(source: &str) -> String {
     escaped(source, false)
 }
@@ -59,8 +61,35 @@ pub(super) fn start(document: &str, language: &str) -> String {
     append(&mut output, Piece::Insert(Insertion(&context)));
     output
 }
+pub(super) fn start_plan(plan: &DocumentPlan) -> String {
+    let bibliography = super::bibliography::entries(plan);
+    if bibliography.is_empty() {
+        return start(&plan.document, &plan.language);
+    }
+    let mut source = String::from("\\begin{filecontents*}{references.bib}\n");
+    for entry in &bibliography {
+        writeln!(source, "{}", entry.raw).expect("string write");
+    }
+    source.push_str("\\end{filecontents*}\n");
+    append(&mut source, Piece::Raw(RawTex(PREAMBLE)));
+    writeln!(source, "\\usepackage[{BIBLATEX_OPTIONS}]{{biblatex}}").expect("string write");
+    writeln!(
+        source,
+        "\\ExecuteBibliographyOptions{{{BIBLATEX_EXECUTE_OPTIONS}}}"
+    )
+    .expect("string write");
+    source.push_str("\\addbibresource{references.bib}\n");
+    writeln!(
+        source,
+        "\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}",
+        plan.document, plan.language
+    )
+    .expect("string write");
+    source
+}
 pub(super) fn render(plan: &DocumentPlan) -> String {
-    let mut output = start(&plan.document, &plan.language);
+    let bibliography = super::bibliography::entries(plan);
+    let mut output = start_plan(plan);
     writeln!(output, "{}\n", text(&plan.coverage.declaration)).expect("string write");
     inline(&mut output, &plan.coverage.runs);
     for runs in &plan.coverage.audit {
@@ -102,6 +131,9 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
             &plan.language,
             ftoo_manifest::DocumentTarget::Latex,
         ));
+    }
+    if !bibliography.is_empty() {
+        output.push_str("\\printbibliography\n");
     }
     output.push_str("\\end{document}\n");
     output
@@ -160,6 +192,22 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
                 )
                 .expect("string write");
                 commented = true;
+            }
+            Inline::BibliographyCitation { kind, entries, .. } => {
+                let command = match kind {
+                    ftoo_manifest::BibliographyCitationKind::Parenthetical => "parencite",
+                    ftoo_manifest::BibliographyCitationKind::Textual => "textcite",
+                };
+                write!(
+                    output,
+                    "\\{command}{{{}}}",
+                    entries
+                        .iter()
+                        .map(|entry| entry.key.as_str())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+                .expect("string write");
             }
             Inline::Mention { text: value, .. } => {
                 write!(output, "\\texttt{{{}}}", text(value)).expect("string write");

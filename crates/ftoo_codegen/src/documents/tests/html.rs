@@ -62,6 +62,10 @@ fn html_gap_planning_uses_nested_realizability() {
     let mut plan = prose_plan("Words.");
     plan.blocks[1].runs.push(math(site.clone()));
     assert!(plan::html_gaps(&plan).contains_key(&1));
+    assert_eq!(
+        super::super::html::unrealizable_kinds(&plan.blocks[1].runs, true),
+        std::collections::BTreeSet::from(["mathematics"])
+    );
     let mut admitted = math(site.clone());
     let plan::Inline::Math { markdown, .. } = &mut admitted else {
         unreachable!()
@@ -69,6 +73,7 @@ fn html_gap_planning_uses_nested_realizability() {
     *markdown = COEFFICIENT.into();
     plan.blocks[1].runs = vec![admitted.clone()];
     assert!(plan::html_gaps(&plan).is_empty());
+    assert!(super::super::html::unrealizable_kinds(&plan.blocks[1].runs, true).is_empty());
     plan.blocks[1].paragraph = false;
     assert!(plan::html_gaps(&plan).contains_key(&1));
     plan.blocks[1].paragraph = true;
@@ -79,6 +84,17 @@ fn html_gap_planning_uses_nested_realizability() {
         site: site.clone(),
     }];
     assert!(plan::html_gaps(&plan).contains_key(&1));
+    plan.blocks[1].runs = vec![plan::Inline::BibliographyCitation {
+        kind: ftoo_manifest::BibliographyCitationKind::Parenthetical,
+        entries: vec![],
+        label: "Andreoni 1990".into(),
+        site: site.clone(),
+    }];
+    assert!(plan::html_gaps(&plan).contains_key(&1));
+    assert_eq!(
+        super::super::html::unrealizable_kinds(&plan.blocks[1].runs, true),
+        std::collections::BTreeSet::from(["bibliography-citation"])
+    );
     plan.blocks[1].runs = vec![plan::Inline::Styled {
         kind: plan::StyleKind::Emphasis,
         children: vec![plan::Inline::Mention {
@@ -1004,7 +1020,14 @@ fn support_required_html_withheld_mathematics_round_trip_and_mutations() {
         emissions: vec![],
         html_gap_sites: vec![input::site("math-only.toml")],
     };
-    let release = crate::paper::release_html_gaps(&[artifact]).unwrap_err();
+    let release = crate::paper::html_gaps::refusal(&[HtmlGapRow {
+        document: "fixture".into(),
+        unit: "math-only".into(),
+        block: 1,
+        inline_kind: "mathematics".into(),
+        site: artifact.html_gap_sites[0].clone(),
+    }])
+    .unwrap_err();
     assert!(
         release
             .to_string()

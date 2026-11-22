@@ -402,6 +402,10 @@ fn preparation_joint_mints_then_registry_then_authored_tags_restore() {
         b"schema=1\n[documents.main]\nrequired-languages=['en']\n".to_vec(),
     );
     saved.insert(
+        "documents/paper/references.bib".into(),
+        fs::read(root.join("documents/paper/references.bib")).unwrap(),
+    );
+    saved.insert(
         "units/statements/fixture.toml".into(),
         unit.as_bytes().to_vec(),
     );

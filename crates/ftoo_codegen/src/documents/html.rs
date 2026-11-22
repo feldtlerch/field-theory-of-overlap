@@ -445,21 +445,39 @@ fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
                 .expect("prepared mathematics run")
                 .node
                 .clone(),
+            Inline::BibliographyCitation { .. } => {
+                unreachable!("unrealizable block withheld before emission")
+            }
         });
     }
     nodes
 }
 
 pub(super) fn realizable(runs: &[Inline], math_allowed: bool) -> bool {
-    runs.iter().all(|run| match run {
-        Inline::Text(_)
-        | Inline::Tag { .. }
-        | Inline::PaperTag { .. }
-        | Inline::Citation { .. }
-        | Inline::Mention { .. } => true,
-        Inline::Styled { children, .. } => realizable(children, false),
-        Inline::Math { markdown, .. } => math_allowed && admitted_source(markdown),
-    })
+    unrealizable_kinds(runs, math_allowed).is_empty()
+}
+
+pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSet<&'static str> {
+    let mut kinds = BTreeSet::new();
+    for run in runs {
+        match run {
+            Inline::Styled { children, .. } => kinds.extend(unrealizable_kinds(children, false)),
+            Inline::Math { markdown, .. } if !math_allowed || !admitted_source(markdown) => {
+                kinds.insert("mathematics");
+            }
+            Inline::BibliographyCitation { .. } => {
+                // HTML needs linked citations, a References section, and recovery for both.
+                kinds.insert("bibliography-citation");
+            }
+            Inline::Math { .. }
+            | Inline::Text(_)
+            | Inline::Tag { .. }
+            | Inline::PaperTag { .. }
+            | Inline::Citation { .. }
+            | Inline::Mention { .. } => {}
+        }
+    }
+    kinds
 }
 
 pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
@@ -473,7 +491,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
     fn first_unrealizable(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
             Inline::Styled { children, .. } => first_unrealizable(children),
-            Inline::Math { site, .. } => Some(site),
+            Inline::Math { site, .. } | Inline::BibliographyCitation { site, .. } => Some(site),
             _ => None,
         })
     }
@@ -482,6 +500,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             Inline::Tag { site, .. }
             | Inline::PaperTag { site, .. }
             | Inline::Citation { site, .. }
+            | Inline::BibliographyCitation { site, .. }
             | Inline::Math { site, .. } => Some(site),
             Inline::Styled { children, .. } => first_heading_fault(children),
             _ => None,
@@ -557,7 +576,9 @@ pub(super) fn plain(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&plain(children)),
-            Inline::Math { .. } => unreachable!("unrealizable heading refused before title"),
+            Inline::Math { .. } | Inline::BibliographyCitation { .. } => {
+                unreachable!("unrealizable heading refused before title")
+            }
         }
     }
     result

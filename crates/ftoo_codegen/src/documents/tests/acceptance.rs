@@ -40,6 +40,16 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
     assert!(source.contains("other way --- the fact"));
     assert!(source.contains("center's population"));
     assert!(source.contains("(\\ftag{src:nd}).}"));
+    let citation_fragment = "generated/documents/paper-pilot/sec-log-andreoni-joint.tex";
+    assert_eq!(
+        artifact(citation_fragment).bytes(),
+        std::fs::read(root.join(citation_fragment))?
+    );
+    let citation_source = std::str::from_utf8(artifact(citation_fragment).bytes())?;
+    assert!(
+        citation_source
+            .contains(r"\emph{occupied}. The nearest, warm-glow giving \parencite{a:andreoni}")
+    );
     let expected_gaps =
         1 + std::fs::read_to_string(root.join("generated/documents/inclusions.tsv"))?
             .lines()
@@ -62,6 +72,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         assert!(rendered.contains("other way — the fact"));
         assert!(rendered.contains("center’s population"));
         assert!(rendered.contains("&#40;src:nd"));
+        assert!(rendered.contains("bibliography-andreoni-1990"));
     }
     let site = input::site("units/statements/reading-shadow.toml");
     let broken = plan::Block {
@@ -885,7 +896,36 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
 -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
-    let (retained, prepared) = crate::retention::check_release_with_documents(&root, &support)?;
+    let retained = crate::retention::check_retention(&root)?;
+    assert_eq!(
+        retained.report().assessment().disposition(),
+        ftoo_manifest::Disposition::Pass
+    );
+    let prepared = crate::check_documents(&root, &support)?;
+    assert_eq!(
+        std::fs::read(root.join("generated/audit-report.json"))?,
+        retained.bytes()
+    );
+    let gaps = prepared.html_gap_rows();
+    crate::paper::html_gaps::check(&root, gaps)?;
+    let register: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
+    let registered = register["gaps"].as_array().unwrap();
+    assert_eq!(gaps.len(), registered.len());
+    for (gap, row) in gaps.iter().zip(registered) {
+        assert_eq!(gap.document, row["document"].as_str().unwrap());
+        assert_eq!(gap.unit, row["unit"].as_str().unwrap());
+        assert_eq!(gap.block, usize::try_from(row["block"].as_u64().unwrap())?);
+        assert_eq!(gap.inline_kind, row["inline-kind"].as_str().unwrap());
+    }
+    let refusal = crate::paper::html_gaps::refusal(gaps).unwrap_err();
+    let crate::paper::PaperFault::Release { part, reason } = refusal else {
+        panic!("release gap refusal")
+    };
+    assert_eq!(part, "HTML block gaps");
+    for gap in gaps {
+        assert!(reason.contains(&gap.site.to_string()));
+    }
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,

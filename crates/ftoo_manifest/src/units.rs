@@ -81,6 +81,32 @@ pub struct TagOccurrence {
     input: String,
     site: UnitSite,
 }
+/// A source-ordered bibliography citation with its exact insertion site.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BibliographyCitationKind {
+    Parenthetical,
+    Textual,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BibliographyCitationOccurrence {
+    kind: BibliographyCitationKind,
+    keys: Vec<String>,
+    site: UnitSite,
+}
+impl BibliographyCitationOccurrence {
+    #[must_use]
+    pub fn kind(&self) -> BibliographyCitationKind {
+        self.kind
+    }
+    #[must_use]
+    pub fn keys(&self) -> &[String] {
+        &self.keys
+    }
+    #[must_use]
+    pub fn site(&self) -> &UnitSite {
+        &self.site
+    }
+}
 impl TagOccurrence {
     #[must_use]
     pub fn input(&self) -> &str {
@@ -99,6 +125,7 @@ pub struct CheckedText {
     source: LocatedString,
     occurrences: Vec<MathOccurrence>,
     tags: Vec<TagOccurrence>,
+    bibliography_citations: Vec<BibliographyCitationOccurrence>,
     styles: Vec<content::StyleOccurrence>,
 }
 impl CheckedText {
@@ -117,6 +144,10 @@ impl CheckedText {
     #[must_use]
     pub fn tag_occurrences(&self) -> &[TagOccurrence] {
         &self.tags
+    }
+    #[must_use]
+    pub fn bibliography_citations(&self) -> &[BibliographyCitationOccurrence] {
+        &self.bibliography_citations
     }
 }
 /// Unique editorial metadata, complete language slots and used shared mathematics.
@@ -541,6 +572,7 @@ fn check_texts(
                 prose,
                 math: occurrences,
                 tags,
+                bibliography_citations,
                 styles,
             }) => {
                 if !prose {
@@ -576,6 +608,7 @@ fn check_texts(
                         source: entry.value.clone(),
                         occurrences,
                         tags,
+                        bibliography_citations,
                         styles,
                     },
                 );

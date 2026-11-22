@@ -1,0 +1,11 @@
+{
+  "gaps": [
+    {
+      "block": 7,
+      "document": "paper-pilot",
+      "inline-kind": "bibliography-citation",
+      "unit": "sec:log:andreoni-joint"
+    }
+  ],
+  "schema": 1
+}

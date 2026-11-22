@@ -65,6 +65,52 @@ fn documents_commands_refuse_work_and_missing_support() {
 }
 
 #[test]
+fn registered_gap_check_is_separate_from_release_command() {
+    let req = request(&[
+        "check-registered-html-gaps".into(),
+        "--built".into(),
+        "/unused-built-pair".into(),
+    ])
+    .unwrap();
+    assert!(req.release);
+    assert!(req.registered_html_gaps);
+    assert_eq!(
+        request(&[
+            "check-registered-html-gaps".into(),
+            "--release".into(),
+            "--built".into(),
+            "/unused-built-pair".into(),
+        ])
+        .err()
+        .unwrap()
+        .to_string(),
+        "Registered HTML gaps require the built product check without a release flag"
+    );
+    assert!(
+        !request(&["check".into(), "--release".into()])
+            .unwrap()
+            .registered_html_gaps
+    );
+}
+
+#[test]
+fn support_required_release_refuses_the_registered_html_gap() -> Result<()> {
+    let req = request(&[
+        "check".into(),
+        "--release".into(),
+        "--built".into(),
+        "/unused-built-pair".into(),
+    ])?;
+    assert!(!req.registered_html_gaps);
+    let PaperFault::Release { part, reason } = check_release_documents(&req).unwrap_err() else {
+        panic!("ordinary release must refuse the checked HTML block gap")
+    };
+    assert_eq!(part, "HTML block gaps");
+    assert!(reason.contains("units/statements/andreoni-joint.toml"));
+    Ok(())
+}
+
+#[test]
 fn reading_acceptance_locates_bytes_and_reports_complete_faults() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     check_reading_acceptance(&root).unwrap();
@@ -228,6 +274,14 @@ fn support_required_paper_gate() {
         scratch.0.join("build").into_os_string(),
     ])
     .unwrap();
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/check_citation_pdf.py"])
+            .arg(&root)
+            .arg(scratch.0.join("build/paper.pdf")),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -239,6 +293,17 @@ fn checking_capture_fixture_controls() {
             .args(["-B", "tools/paper/checking_capture.py", "selftest"])
             .arg(root.join("tools/paper/fixtures/checking-capture.json")),
     )
+    .unwrap();
+}
+
+#[test]
+fn bibliography_pdf_inventory_controls() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    command_output(Command::new("python3").current_dir(&root).args([
+        "-B",
+        "tools/paper/check_citation_pdf.py",
+        "selftest",
+    ]))
     .unwrap();
 }
 

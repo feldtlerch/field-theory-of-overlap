@@ -841,7 +841,15 @@ pub(super) fn classify(
         }
     }
     let lost = log.split(|b| *b == b'\n').any(lost_character);
-    if !output.status.success() || lost || overfull {
+    let undefined_citation = matches!(case, NativeCase::Document { .. })
+        && log.split(|b| *b == b'\n').any(|line| {
+            line.windows(8)
+                .any(|word| word.eq_ignore_ascii_case(b"citation"))
+                && line
+                    .windows(9)
+                    .any(|word| word.eq_ignore_ascii_case(b"undefined"))
+        });
+    if !output.status.success() || lost || overfull || undefined_citation {
         let context = case.clone();
         append(located_failure(
             RuleId::M056,

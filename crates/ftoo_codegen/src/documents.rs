@@ -1,6 +1,7 @@
 //! Complete statement-document preparation against one retained source snapshot.
 #![allow(clippy::result_large_err)]
 pub(crate) mod artifacts;
+mod bibliography;
 mod diagnostics;
 mod display;
 mod html;
@@ -62,6 +63,7 @@ impl DocumentArtifact {
 /// ```compile_fail,E0451
 /// let value = ftoo_codegen::PreparedDocuments {
 ///     artifacts: Vec::new(), inputs: Default::default(), observed_outputs: Default::default(),
+///     html_gap_rows: Vec::new(),
 ///     snapshot: None,
 /// };
 /// ```
@@ -109,10 +111,15 @@ impl DocumentArtifact {
 pub struct PreparedDocuments {
     snapshot: Option<crate::retention::DocumentSnapshot>,
     artifacts: Vec<DocumentArtifact>,
+    html_gap_rows: Vec<HtmlGapRow>,
     inputs: BTreeMap<String, Vec<u8>>,
     observed_outputs: BTreeMap<String, Vec<u8>>,
 }
 impl PreparedDocuments {
+    #[must_use]
+    pub(crate) fn html_gap_rows(&self) -> &[HtmlGapRow] {
+        &self.html_gap_rows
+    }
     #[must_use]
     pub fn artifacts(&self) -> &[DocumentArtifact] {
         &self.artifacts
@@ -129,6 +136,45 @@ impl PreparedDocuments {
     pub fn projection(&self) -> &[u8] {
         &self.inputs["generated/manifest.json"]
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct HtmlGapRow {
+    pub document: String,
+    pub unit: String,
+    pub block: usize,
+    pub inline_kind: String,
+    pub site: UnitSite,
+}
+
+fn html_gap_rows(
+    plans: &[plan::DocumentPlan],
+    selected: &BTreeMap<String, Vec<DocumentOutput>>,
+) -> Vec<HtmlGapRow> {
+    let mut rows = Vec::new();
+    for plan in plans {
+        if !selected
+            .get(&plan.document)
+            .is_some_and(|targets| targets.contains(&DocumentOutput::Html))
+        {
+            continue;
+        }
+        if let Some(screen) = &plan.screen {
+            for &block in screen.html_gaps.keys() {
+                let passage = &plan.blocks[block];
+                for inline_kind in html::unrealizable_kinds(&passage.runs, passage.paragraph) {
+                    rows.push(HtmlGapRow {
+                        document: plan.document.clone(),
+                        unit: passage.unit.clone(),
+                        block,
+                        inline_kind: inline_kind.into(),
+                        site: passage.site.clone(),
+                    });
+                }
+            }
+        }
+    }
+    rows
 }
 
 pub(crate) fn refuse_release_html_gaps(
@@ -266,6 +312,7 @@ pub(crate) fn prepare_context(
     let mut inputs = BTreeMap::from([("generated/manifest.json".into(), projection.clone())]);
     for file in [
         "documents/paper-build/fontconfig.conf",
+        "documents/paper/references.bib",
         "tools/assembly/native-lock.toml",
         "tools/assembly/prepare-native.py",
         "tools/notation/package-lock.json",
@@ -416,8 +463,30 @@ pub(crate) fn prepare_context(
         .map_err(|error| DocumentError::Retention(Box::new(error)))?;
     drop(admission);
     crate::notation::with_preparation(effective.as_ref(), &catalogue, |notation| {
-        let mut plans = plan::build(&skeletons, &welded, notation, &metadata, &displays)?;
+        let bibliography =
+            std::str::from_utf8(&inputs["documents/paper/references.bib"]).map_err(|_| {
+                failure(
+                    RuleId::M055,
+                    AssemblyStage::Source,
+                    AssemblySite::Inventory {
+                        path: "documents/paper/references.bib".into(),
+                    },
+                    AssemblyFault::UnknownToken {
+                        value: "references.bib".into(),
+                        expected: vec!["UTF-8 bibliography".into()],
+                    },
+                )
+            })?;
+        let mut plans = plan::build(
+            &skeletons,
+            &welded,
+            notation,
+            &metadata,
+            &displays,
+            bibliography,
+        )?;
         plan::plan_screens(&mut plans, &selected, &book, &skeletons, &document_sites)?;
+        let gap_rows = html_gap_rows(&plans, &selected);
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
         let mut artifacts = render_artifacts(
             root,
@@ -464,6 +533,7 @@ pub(crate) fn prepare_context(
             ],
             artifacts,
         )?;
+        prepared.html_gap_rows = gap_rows;
         if let Some(snapshot) = snapshot {
             snapshot
                 .recheck(root)
@@ -536,6 +606,7 @@ fn finish_snapshot(
     Ok(PreparedDocuments {
         snapshot: None,
         artifacts,
+        html_gap_rows: Vec::new(),
         inputs,
         observed_outputs,
     })
@@ -823,16 +894,8 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
     for run in &block.runs {
         match run {
             plan::Inline::Text(value) => {
-                let mut marks = 0;
-                for scalar in value.chars() {
-                    if matches!(scalar, '-' | '—') {
-                        marks += 1;
-                        if marks > 1 {
-                            return Err(refuse("adjacent hyphen or em-dash marks"));
-                        }
-                    } else {
-                        marks = 0;
-                    }
+                if adjacent_dash_marks(value) {
+                    return Err(refuse("adjacent hyphen or em-dash marks"));
                 }
                 let emitted = latex::prose_text(value).replace('—', "---");
                 if emitted
@@ -848,12 +911,63 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
             plan::Inline::PaperTag { value, .. } => {
                 write!(body, "\\ftag{{{}}}", value.key).expect("string write");
             }
+            plan::Inline::BibliographyCitation { kind, entries, .. } => {
+                let command = match kind {
+                    ftoo_manifest::BibliographyCitationKind::Parenthetical => "parencite",
+                    ftoo_manifest::BibliographyCitationKind::Textual => "textcite",
+                };
+                write!(
+                    body,
+                    "\\{command}{{{}}}",
+                    entries
+                        .iter()
+                        .map(|entry| entry.key.as_str())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+                .expect("string write");
+            }
+            plan::Inline::Styled {
+                kind: plan::StyleKind::Emphasis,
+                children,
+                ..
+            } if matches!(children.as_slice(), [plan::Inline::Text(_)]) => {
+                let plan::Inline::Text(value) = &children[0] else {
+                    unreachable!()
+                };
+                if adjacent_dash_marks(value) {
+                    return Err(refuse("adjacent hyphen or em-dash marks"));
+                }
+                let emitted = latex::prose_text(value).replace('—', "---");
+                if emitted
+                    .chars()
+                    .any(|c| matches!(c, '{' | '}' | '\\' | '\n' | '\r'))
+                {
+                    return Err(refuse("emphasis text needs multiline or escaped TeX"));
+                }
+                write!(body, "\\emph{{{emitted}}}").expect("string write");
+            }
             _ => return Err(refuse("paragraph contains a non-text run")),
         }
     }
     let mut output = String::new();
     writeln!(output, "\\PaperNativeParagraph{{{}}}{{{body}}}", block.unit).expect("string write");
     Ok(output)
+}
+
+fn adjacent_dash_marks(value: &str) -> bool {
+    let mut marks = 0;
+    for scalar in value.chars() {
+        if matches!(scalar, '-' | '—') {
+            marks += 1;
+            if marks > 1 {
+                return true;
+            }
+        } else {
+            marks = 0;
+        }
+    }
+    false
 }
 
 fn fragment_text(block: &plan::Block) -> Result<&str, DocumentError> {

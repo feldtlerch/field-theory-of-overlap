@@ -75,6 +75,12 @@ pub(super) enum Inline {
         text: String,
         site: UnitSite,
     },
+    BibliographyCitation {
+        kind: ftoo_manifest::BibliographyCitationKind,
+        entries: Vec<super::bibliography::Entry>,
+        label: String,
+        site: UnitSite,
+    },
     Mention {
         text: String,
         site: UnitSite,
@@ -100,6 +106,12 @@ enum Recovered {
         handle: String,
         label: String,
         token: Option<String>,
+    },
+    BibliographyCitation {
+        kind: ftoo_manifest::BibliographyCitationKind,
+        keys: Vec<String>,
+        label: String,
+        anchors: Vec<String>,
     },
     Mention(String),
     Styled {
@@ -139,6 +151,57 @@ fn flush_text(output: &mut Vec<Recovered>, text: &mut String) {
     if !text.is_empty() {
         output.push(Recovered::Text(std::mem::take(text)));
     }
+}
+fn recover_bibliography_markdown(source: &str) -> Option<(Recovered, usize)> {
+    let (kind, mut rest) = if let Some(rest) = source.strip_prefix("(<a href=\"#") {
+        (ftoo_manifest::BibliographyCitationKind::Parenthetical, rest)
+    } else {
+        (
+            ftoo_manifest::BibliographyCitationKind::Textual,
+            source.strip_prefix("<a href=\"#")?,
+        )
+    };
+    let mut anchors = Vec::new();
+    let mut labels = Vec::new();
+    loop {
+        let (anchor, tail) = rest.split_once("\">")?;
+        if !anchor.starts_with("bibliography-") {
+            return None;
+        }
+        let (label, tail) = tail.split_once("</a>")?;
+        anchors.push(anchor.to_owned());
+        labels.push(decode_code(label)?);
+        if let Some(next) = tail.strip_prefix("; <a href=\"#") {
+            rest = next;
+        } else {
+            rest = tail;
+            break;
+        }
+    }
+    if kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+        rest = rest.strip_prefix(')')?;
+    }
+    let after = rest.strip_prefix("<!-- bibcite ")?;
+    let (keys, rest) = after.split_once(" -->")?;
+    let keys = keys.split(',').map(str::to_owned).collect::<Vec<_>>();
+    if keys.len() != anchors.len() {
+        return None;
+    }
+    let label = if kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+        format!("({})", labels.join("; "))
+    } else {
+        labels.join("; ")
+    };
+    let consumed = source.len() - rest.len();
+    Some((
+        Recovered::BibliographyCitation {
+            kind,
+            keys,
+            label,
+            anchors,
+        },
+        consumed,
+    ))
 }
 fn inline_handle(run: &Inline) -> Option<&str> {
     match run {
@@ -200,6 +263,13 @@ fn recover_markdown<'a>(
                 }
             });
             at += comment_prefix + end + 4;
+        } else if tail.starts_with("(<a href=\"#bibliography-")
+            || tail.starts_with("<a href=\"#bibliography-")
+        {
+            flush_text(&mut output, &mut text);
+            let (citation, consumed) = recover_bibliography_markdown(tail)?;
+            output.push(citation);
+            at += consumed;
         } else if tail.starts_with('*') {
             flush_text(&mut output, &mut text);
             let (kind, delimiter) = if tail.starts_with("**") {
@@ -469,6 +539,30 @@ fn recover_tex(body: &str, prose: bool, initial_line: TexLine) -> Option<Vec<Rec
             output.push(Recovered::Styled { kind, children });
             at += prefix.len() + end + 1;
             line = TexLine::MidLine;
+        } else if tail.starts_with(r"\parencite{") || tail.starts_with(r"\textcite{") {
+            flush_text(&mut output, &mut text);
+            let (kind, prefix) = if tail.starts_with(r"\parencite{") {
+                (
+                    ftoo_manifest::BibliographyCitationKind::Parenthetical,
+                    r"\parencite{",
+                )
+            } else {
+                (
+                    ftoo_manifest::BibliographyCitationKind::Textual,
+                    r"\textcite{",
+                )
+            };
+            let body = &tail[prefix.len()..];
+            let end = body.find('}')?;
+            let keys = body[..end].split(',').map(str::to_owned).collect();
+            output.push(Recovered::BibliographyCitation {
+                kind,
+                keys,
+                label: String::new(),
+                anchors: Vec::new(),
+            });
+            at += prefix.len() + end + 1;
+            line = TexLine::MidLine;
         } else if let Some(tail) = tail.strip_prefix(r"\FtdocTag{") {
             flush_text(&mut output, &mut text);
             let (handle, end) = recover_handle(tail)?;
@@ -615,6 +709,20 @@ fn expected_run(run: &Inline, target: DocumentTarget, prose: bool) -> Option<Rec
             label: text.clone(),
             token: (target == DocumentTarget::Latex).then(|| identity.token.clone()),
         },
+        Inline::BibliographyCitation { kind, entries, .. } => Recovered::BibliographyCitation {
+            kind: *kind,
+            keys: entries.iter().map(|entry| entry.key.clone()).collect(),
+            label: if target == DocumentTarget::Markdown {
+                super::bibliography::citation_label(*kind, entries)
+            } else {
+                String::new()
+            },
+            anchors: if target == DocumentTarget::Markdown {
+                entries.iter().map(|entry| entry.anchor.clone()).collect()
+            } else {
+                Vec::new()
+            },
+        },
         Inline::Mention { text, .. } => Recovered::Mention(text.clone()),
         Inline::Styled { kind, children, .. } => Recovered::Styled {
             kind: *kind,
@@ -675,6 +783,9 @@ pub(super) fn check_emission(
         let mut body = &chunk[newline + 1..];
         if target == DocumentTarget::Latex && index + 1 == positions.len() {
             body = body.strip_suffix("\\end{document}\n").unwrap_or(body);
+            if !super::bibliography::entries(plan).is_empty() {
+                body = body.strip_suffix("\\printbibliography\n").unwrap_or(body);
+            }
         }
         let separator = if target == DocumentTarget::Markdown && index + 1 == positions.len() {
             "\n"
@@ -837,6 +948,51 @@ fn excerpt_refrain(source: &str) -> Option<(String, Vec<String>, String, String,
 }
 #[allow(clippy::too_many_lines)] // The excerpt's ordered blocks and their source ranges form one recovery pass.
 fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), DocumentError> {
+    let entries = super::bibliography::entries(plan);
+    let base_source;
+    let source = if entries.is_empty() {
+        if source.contains("\n\n## References\n\n") {
+            return Err(emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: vec![],
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            ));
+        }
+        source
+    } else {
+        let marker = "\n\n## References\n\n";
+        let Some((prefix, section)) = source.split_once(marker) else {
+            return Err(emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: plan.records(DocumentTarget::Markdown),
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            ));
+        };
+        if !super::bibliography::recover_screen(section, &entries) {
+            return Err(emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                prefix.len()..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: plan.records(DocumentTarget::Markdown),
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            ));
+        }
+        base_source = format!("{prefix}\n");
+        &base_source
+    };
     let screen = plan.screen.as_ref().expect("screen plan");
     let expected = plan.records(DocumentTarget::Markdown);
     if !envelope(plan, source, DocumentTarget::Markdown) {
@@ -912,7 +1068,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                                 if let (
                                     Inline::PaperTag { site, .. },
                                     Recovered::Tag { label, .. },
-                                ) = (run, recovered)
+                                ) = (run, &recovered)
                                 {
                                     actual.push(EmissionRecord {
                                         kind: EmissionKind::Tag,
@@ -920,7 +1076,31 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                                         language: language.into(),
                                         target: DocumentTarget::Markdown,
                                         occurrence: site.occurrence,
-                                        value: label,
+                                        value: label.clone(),
+                                        site: site.clone(),
+                                    });
+                                }
+                                if let (
+                                    Inline::BibliographyCitation { site, .. },
+                                    Recovered::BibliographyCitation {
+                                        kind,
+                                        keys,
+                                        label,
+                                        anchors,
+                                    },
+                                ) = (run, &recovered)
+                                {
+                                    actual.push(EmissionRecord {
+                                        kind: EmissionKind::BibliographyCitation {
+                                            kind: *kind,
+                                            keys: keys.clone(),
+                                            anchors: anchors.clone(),
+                                        },
+                                        unit: unit.into(),
+                                        language: language.into(),
+                                        target: DocumentTarget::Markdown,
+                                        occurrence: site.occurrence,
+                                        value: label.clone(),
                                         site: site.clone(),
                                     });
                                 }
@@ -1116,6 +1296,8 @@ fn envelope(plan: &DocumentPlan, source: &str, target: DocumentTarget) -> bool {
     source.starts_with(&coverage_prefix(plan, target))
         && if target == DocumentTarget::Markdown {
             source.ends_with('\n') && !source.ends_with("\n\n")
+        } else if !super::bibliography::entries(plan).is_empty() {
+            source.ends_with("\\printbibliography\n\\end{document}\n")
         } else {
             source.ends_with("\\end{document}\n")
         }
@@ -1432,12 +1614,7 @@ fn coverage_prefix(plan: &DocumentPlan, target: DocumentTarget) -> String {
             plan.document, plan.language
         )
     } else {
-        format!(
-            "{}\\FtdocContext{{{}}}{{{}}}\n\\begin{{document}}\n",
-            super::latex::PREAMBLE,
-            plan.document,
-            plan.language
-        )
+        super::latex::start_plan(plan)
     }
 }
 fn coverage_records(
@@ -1806,11 +1983,19 @@ pub(super) fn check_excerpt_shape(
                 && block.displays.is_empty()
                 && if block.paragraph {
                     !block.runs.is_empty()
-                        && block.runs.iter().all(|run| {
-                            matches!(
-                                run,
-                                Inline::Text(_) | Inline::PaperTag { .. } | Inline::Math { .. }
-                            )
+                        && block.runs.iter().all(|run| match run {
+                            Inline::Text(_)
+                            | Inline::PaperTag { .. }
+                            | Inline::Math { .. }
+                            | Inline::BibliographyCitation { .. } => true,
+                            Inline::Styled {
+                                kind: StyleKind::Emphasis,
+                                children,
+                                ..
+                            } => children
+                                .iter()
+                                .all(|child| matches!(child, Inline::Text(_))),
+                            _ => false,
                         })
                 } else {
                     matches!(block.runs.as_slice(), [Inline::Text(_)])
@@ -2175,6 +2360,33 @@ pub(super) fn plan_screens(
         });
         check_public_anchors(plan)?;
     }
+    for plan in plans.iter() {
+        require_bibliography_screen(plan)?;
+    }
+    Ok(())
+}
+
+fn require_bibliography_screen(plan: &DocumentPlan) -> Result<(), DocumentError> {
+    if plan.screen.is_some() {
+        return Ok(());
+    }
+    for block in &plan.blocks {
+        if let Some(Inline::BibliographyCitation { site, .. }) = block
+            .runs
+            .iter()
+            .find(|run| matches!(run, Inline::BibliographyCitation { .. }))
+        {
+            return Err(super::failure(
+                RuleId::M055,
+                AssemblyStage::Ownership,
+                AssemblySite::Source(site.clone()),
+                AssemblyFault::UnknownToken {
+                    value: "bibliography citation".into(),
+                    expected: vec!["screen bibliography consumer".into()],
+                },
+            ));
+        }
+    }
     Ok(())
 }
 impl DocumentPlan {
@@ -2224,6 +2436,24 @@ impl DocumentPlan {
                     } => (
                         EmissionKind::Citation(Box::new(identity.clone())),
                         text,
+                        site,
+                    ),
+                    Inline::BibliographyCitation {
+                        kind,
+                        entries,
+                        label,
+                        site,
+                    } => (
+                        EmissionKind::BibliographyCitation {
+                            kind: *kind,
+                            keys: entries.iter().map(|entry| entry.key.clone()).collect(),
+                            anchors: if target == DocumentTarget::Markdown {
+                                entries.iter().map(|entry| entry.anchor.clone()).collect()
+                            } else {
+                                Vec::new()
+                            },
+                        },
+                        label,
                         site,
                     ),
                     Inline::Mention { text, site } => (EmissionKind::Mention, text, site),
@@ -2419,6 +2649,7 @@ pub(super) fn build(
     notation: &RenderableNotation<'_, '_, '_>,
     metadata: &BTreeMap<String, UnitSite>,
     displays: &ftoo_manifest::CheckedDisplays<'_>,
+    bibliography: &str,
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
     let corpus = skeletons.corpus();
     let book = welded.integrated().resolved().book();
@@ -2460,7 +2691,7 @@ pub(super) fn build(
                     .find(|(_, u)| u.label().as_str() == position.unit())
                     .expect("checked skeleton unit");
                 check_reader_literals(unit, language, displays, &mut errors);
-                let runs = runs(index, unit, language, welded, &equations);
+                let runs = runs(index, unit, language, welded, &equations, bibliography)?;
                 let bodies = display_plans(index, unit, language, welded, &equations, displays);
                 let mut block = Block {
                     pending_names: BTreeMap::new(),
@@ -2633,7 +2864,8 @@ fn runs(
     language: &str,
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     equations: &Equations,
-) -> Vec<Inline> {
+    bibliography: &str,
+) -> Result<Vec<Inline>, DocumentError> {
     let text = &unit.texts()[language];
     let mut replacements = Vec::new();
     for occurrence in text.tag_occurrences() {
@@ -2691,6 +2923,27 @@ fn runs(
             },
         ));
     }
+    for occurrence in text.bibliography_citations() {
+        let entries = occurrence
+            .keys()
+            .iter()
+            .map(|key| super::bibliography::resolve(bibliography, key, occurrence.site()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let label = super::bibliography::citation_label(occurrence.kind(), &entries);
+        replacements.push((
+            occurrence
+                .site()
+                .decoded
+                .clone()
+                .expect("admitted occurrence"),
+            Inline::BibliographyCitation {
+                kind: occurrence.kind(),
+                entries,
+                label,
+                site: occurrence.site().clone(),
+            },
+        ));
+    }
     spans(
         index,
         unit.label().as_str(),
@@ -2706,7 +2959,7 @@ fn runs(
         .collect();
     let mut runs = scoped_runs(text.text(), 0..text.text().len(), &replacements, &styles);
     normalize(&mut runs);
-    runs
+    Ok(runs)
 }
 fn scoped_runs(
     source: &str,
@@ -2750,6 +3003,7 @@ fn scoped_runs_with_sites(
                 | Inline::PaperTag { site, .. }
                 | Inline::Math { site, .. }
                 | Inline::Citation { site, .. }
+                | Inline::BibliographyCitation { site, .. }
                 | Inline::Mention { site, .. }
                 | Inline::Styled { site, .. } => site.clone(),
                 Inline::Text(_) => unreachable!("replacement is not text"),
@@ -2897,6 +3151,20 @@ fn canonical_run(run: &Inline) -> String {
         Inline::PaperTag { value, .. } => format!("@tag{{{}}}", value.key),
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
+        Inline::BibliographyCitation { kind, entries, .. } => {
+            let form = match kind {
+                ftoo_manifest::BibliographyCitationKind::Parenthetical => "parencite",
+                ftoo_manifest::BibliographyCitationKind::Textual => "textcite",
+            };
+            format!(
+                "@{form}{{{}}}",
+                entries
+                    .iter()
+                    .map(|entry| entry.key.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
         Inline::Mention { text, .. } => format!("``{text}``"),
         Inline::Styled { kind, children, .. } => format!(
             "@{kind}{{{}}}",
@@ -3061,6 +3329,48 @@ fn recovered_records(
                 let identity = recovered_citation(block, index, handle, label, token.as_deref());
                 (EmissionKind::Citation(Box::new(identity)), label.clone())
             }
+            Recovered::BibliographyCitation {
+                kind,
+                keys,
+                label,
+                anchors,
+            } => {
+                let form = match kind {
+                    ftoo_manifest::BibliographyCitationKind::Parenthetical => "parencite",
+                    ftoo_manifest::BibliographyCitationKind::Textual => "textcite",
+                };
+                write!(body, "@{form}{{{}}}", keys.join(",")).expect("string write");
+                let value = if target == DocumentTarget::Markdown {
+                    label.clone()
+                } else {
+                    let mut flattened = Vec::new();
+                    flatten_runs(&block.runs, &mut flattened);
+                    flattened
+                        .into_iter()
+                        .find_map(|run| match run {
+                            Inline::BibliographyCitation {
+                                kind: expected_kind,
+                                entries,
+                                label,
+                                ..
+                            } if expected_kind == kind
+                                && entries.iter().map(|entry| &entry.key).eq(keys.iter()) =>
+                            {
+                                Some(label.clone())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_default()
+                };
+                (
+                    EmissionKind::BibliographyCitation {
+                        kind: *kind,
+                        keys: keys.clone(),
+                        anchors: anchors.clone(),
+                    },
+                    value,
+                )
+            }
             Recovered::Mention(text) => {
                 write!(body, "``{text}``").expect("string write");
                 (EmissionKind::Mention, text.clone())
@@ -3163,6 +3473,24 @@ fn region_records(
                 } => (
                     EmissionKind::Citation(Box::new(identity.clone())),
                     text,
+                    site,
+                ),
+                Inline::BibliographyCitation {
+                    kind,
+                    entries,
+                    label,
+                    site,
+                } => (
+                    EmissionKind::BibliographyCitation {
+                        kind: *kind,
+                        keys: entries.iter().map(|entry| entry.key.clone()).collect(),
+                        anchors: if target == DocumentTarget::Markdown {
+                            entries.iter().map(|entry| entry.anchor.clone()).collect()
+                        } else {
+                            Vec::new()
+                        },
+                    },
+                    label,
                     site,
                 ),
                 Inline::Mention { text, site } => (EmissionKind::Mention, text, site),
@@ -4038,7 +4366,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),
-        runs: runs(0, unit, "en", welded, &BTreeMap::new()),
+        runs: runs(0, unit, "en", welded, &BTreeMap::new(), "").unwrap(),
     };
     block.map_citations(book, "fixture", "en").unwrap();
     DocumentPlan {

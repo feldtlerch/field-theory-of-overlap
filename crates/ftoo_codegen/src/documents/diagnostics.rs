@@ -710,6 +710,11 @@ pub enum EmissionKind {
     Body,
     Tag,
     Citation(Box<CitationIdentity>),
+    BibliographyCitation {
+        kind: ftoo_manifest::BibliographyCitationKind,
+        keys: Vec<String>,
+        anchors: Vec<String>,
+    },
     Mention,
     Math,
 }

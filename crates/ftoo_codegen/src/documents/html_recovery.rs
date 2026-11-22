@@ -354,8 +354,8 @@ fn flat(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&flat(children)),
-            Inline::Math { .. } => {
-                unreachable!("mathematics in a heading is refused before recovery")
+            Inline::Math { .. } | Inline::BibliographyCitation { .. } => {
+                unreachable!("unrealizable heading refused before recovery")
             }
         }
     }
@@ -477,6 +477,9 @@ fn runs(
                     return Err(math_mismatch(site, "HTML mathematical presentation"));
                 }
                 at += 1;
+            }
+            Inline::BibliographyCitation { .. } => {
+                unreachable!("unrealizable block withheld before recovery")
             }
         }
     }

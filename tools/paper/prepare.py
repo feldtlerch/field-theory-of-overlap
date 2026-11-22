@@ -72,7 +72,10 @@ def declared_fragments(repository, rows):
                  else 'Fragment label/declaration differs: ')+fragment)
         body = data[len(prefix):-2]
         if role == 'paragraph':
-            require(body and re.fullmatch(rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\})+', body),
+            require(body and re.fullmatch(
+                rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|'
+                rb'\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\})+',
+                body),
                     'M055: Fragment body differs: '+fragment)
             from identities import bindings
             available = bindings(repository)

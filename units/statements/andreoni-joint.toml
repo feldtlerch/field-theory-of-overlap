@@ -1,0 +1,9 @@
+schema = 1
+
+[unit]
+id = "sec:log:andreoni-joint"
+document = "paper-pilot"
+math = {}
+
+[unit.texts]
+en = "The one joint no antecedent touches is @tag{J:occ}: economics has no result that the still center is @emphasis{occupied}. The nearest, warm-glow giving @parencite{a:andreoni}, is a consumed state, not a held rate — the empty preimage is itself the finding."

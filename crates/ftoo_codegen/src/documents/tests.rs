@@ -2770,6 +2770,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
     ];
     let prepared = PreparedDocuments {
         snapshot: None,
+        html_gap_rows: Vec::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -2941,6 +2942,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
     ];
     let prepared = PreparedDocuments {
         snapshot: None,
+        html_gap_rows: Vec::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -3961,7 +3963,7 @@ fn markdown_style_soft_hyphen_outer_neighbor_refuses() {
 }
 
 #[test]
-fn markdown_style_screen_paragraph_is_unobserved() {
+fn markdown_style_screen_paragraph_is_observed() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = reader_fixture_book(&graph);
     let mut plan = fixture_plan_from_text(&book, "See @emphasis{one}.");
@@ -3987,19 +3989,7 @@ fn markdown_style_screen_paragraph_is_unobserved() {
         refrains: vec![],
         html_gaps: std::collections::BTreeMap::new(),
     });
-    let error = markdown::check_math_admission(&plan).unwrap_err();
-    let DocumentError::Assembly(errors) = error else {
-        panic!("screen diagnostic")
-    };
-    assert_eq!(errors.diagnostics()[0].site, AssemblySite::Source(site));
-    assert!(matches!(
-        &errors.diagnostics()[0].fault,
-        AssemblyFault::UnsupportedMarkdownStyle {
-            context,
-            reason: diagnostics::MarkdownStyleReason::UnobservedContext,
-            ..
-        } if context == "refrain HTML block"
-    ));
+    assert_eq!(markdown::check_math_admission(&plan), Ok(()));
 }
 
 #[test]

@@ -3,6 +3,379 @@ use super::Coverage;
 use super::*;
 use crate::documents::{input, latex, markdown, registry};
 use ftoo_manifest::*;
+const ANDREONI: &str = "@article{a:andreoni, author={Andreoni, James}, title={Impure Altruism and Donations to Public Goods: A Theory of Warm-Glow Giving}, journal={The Economic Journal}, volume={100}, number={401}, pages={464--477}, year={1990}, doi={10.2307/2234133}}";
+
+#[test]
+fn bibliography_article_shape_and_derived_keys_refuse() {
+    let site = input::site("fixture.toml");
+    for altered in [
+        ANDREONI.replace("Andreoni, James", "Andreoni, James AND Payne, Abigail"),
+        ANDREONI.replace("Andreoni, James", "Andreoni, James and Payne, Abigail"),
+        ANDREONI.replace("Andreoni, James", "{Andreoni}, James"),
+        ANDREONI.replace("year={1990},", ""),
+        ANDREONI.replace("year={1990}", "year=someyear"),
+        ANDREONI.replace("year={1990}", "year=\"1990\""),
+        ANDREONI.replace("year={1990}", "year=1990"),
+        ANDREONI.replace("year={1990}", "year={1990}, crossref={other}"),
+        ANDREONI.replace("year={1990}", "year={1990}, shorthand={A90}"),
+        ANDREONI.replace("year={1990}", "year={1990}, shortauthor={J. Andreoni}"),
+        ANDREONI.replace("Warm-Glow", "Warm~Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm--Glow"),
+        ANDREONI.replace("Warm-Glow", "``Warm-Glow''"),
+        ANDREONI.replace("Warm-Glow", "Warm\\-Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm'Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm\"Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm<<Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm>>Glow"),
+        ANDREONI.replace("Warm-Glow", "Warm,,Glow"),
+        ANDREONI.replace("464--477", "464''477"),
+        ANDREONI.replace("464--477", "464---477"),
+        ANDREONI.replace("{Andreoni, James}", "Andreoni, James"),
+        format!("@book{{a:andreoni, author={{Other, A}}, year={{1990}}}}\n{ANDREONI}"),
+        format!("@book{{A:ANDREONI, author={{Other, A}}, year={{1990}}}}\n{ANDREONI}"),
+        format!("% {ANDREONI}\n{ANDREONI}"),
+        format!("@comment{{{ANDREONI}}}\n{ANDREONI}"),
+        format!("{ANDREONI}\n@book{{a:other, author=Other, year={{1991}}}}"),
+        format!("{ANDREONI}\n@book{{a:other, author={{{{Other}}}}, year={{1991}}}}"),
+    ] {
+        assert!(
+            super::super::bibliography::resolve(&altered, "a:andreoni", &site).is_err(),
+            "{altered}"
+        );
+    }
+    for key in super::super::bibliography::DERIVED_KEYS {
+        let error = super::super::bibliography::resolve(ANDREONI, key, &site).unwrap_err();
+        assert!(format!("{error:?}").contains("entry changed by bibliography derivation"));
+    }
+    let error = super::super::bibliography::resolve(ANDREONI, "a:VMF", &site).unwrap_err();
+    assert!(format!("{error:?}").contains("entry changed by bibliography derivation"));
+    let collision =
+        format!("{ANDREONI}\n@book{{a:other, author={{Andreoni, Another}}, year={{1990}}}}");
+    assert!(super::super::bibliography::resolve(&collision, "a:andreoni", &site).is_err());
+    let upper = ANDREONI.replace("a:andreoni", "A:ANDREONI");
+    assert!(super::super::bibliography::resolve(&upper, "a:andreoni", &site).is_ok());
+}
+
+#[test]
+fn bibliography_derived_key_refusals_follow_the_paper_derivation() {
+    let route = include_str!("../../../../../tools/paper/bibroute.py");
+    let bibliography = include_str!("../../../../../documents/paper/references.bib");
+    let names = route
+        .split_once("names = {")
+        .unwrap()
+        .1
+        .split_once("}\n    for key")
+        .unwrap()
+        .0;
+    let mut changed: BTreeSet<&str> = names
+        .split('\'')
+        .filter(|part| part.starts_with("a:"))
+        .collect();
+    for needle in [r"Fran{\c{c}}ois", "Multi-Dimensioned"] {
+        let before = &bibliography[..bibliography.find(needle).unwrap()];
+        let entry = before.rsplit_once('@').unwrap().1;
+        let key = entry.split_once('{').unwrap().1.split_once(',').unwrap().0;
+        changed.insert(key);
+    }
+    assert_eq!(route.matches("bib = bib.replace(").count(), 2);
+    assert_eq!(route.matches("re.subn(").count(), 1);
+    assert_eq!(
+        changed,
+        super::super::bibliography::DERIVED_KEYS
+            .into_iter()
+            .collect()
+    );
+}
+
+#[test]
+fn bibliography_main_document_requires_screen_at_citation_site() {
+    let site = input::site("fixture.toml");
+    let entry = super::super::bibliography::resolve(ANDREONI, "a:andreoni", &site).unwrap();
+    let mut plan = DocumentPlan {
+        document: "main".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage declaration", "Declared slice: (empty)"),
+        blocks: vec![Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:citation".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![Inline::BibliographyCitation {
+                kind: BibliographyCitationKind::Parenthetical,
+                entries: vec![entry],
+                label: "(Andreoni 1990)".into(),
+                site: site.clone(),
+            }],
+        }],
+        screen: None,
+    };
+    let error = require_bibliography_screen(&plan).unwrap_err();
+    assert!(format!("{error:?}").contains("screen bibliography consumer"));
+    assert!(format!("{error:?}").contains("fixture.toml"));
+    plan.screen = Some(ScreenPlan {
+        gaps: vec![],
+        refrains: vec![],
+        html_gaps: std::collections::BTreeMap::new(),
+    });
+    assert!(require_bibliography_screen(&plan).is_ok());
+}
+
+#[test]
+fn bibliography_native_options_match_paper_preamble() {
+    let source = include_str!("../../../../../documents/paper/main.tex");
+    let end = source.find("]{biblatex}").unwrap();
+    let start = source[..end].rfind("\\usepackage[").unwrap() + "\\usepackage[".len();
+    let options = &source[start..end];
+    let normalized = options.split_whitespace().collect::<String>();
+    assert_eq!(normalized, latex::BIBLATEX_OPTIONS);
+    let execute = source
+        .split_once("\\ExecuteBibliographyOptions{")
+        .unwrap()
+        .1
+        .split_once('}')
+        .unwrap()
+        .0;
+    assert_eq!(
+        execute.split_whitespace().collect::<String>(),
+        latex::BIBLATEX_EXECUTE_OPTIONS
+    );
+}
+
+#[test]
+fn bibliography_paragraph_emphasis_refuses_doubled_dash() {
+    let site = input::site("fixture.toml");
+    let block = Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: "sec:fixture:citation".into(),
+        depth: None,
+        quotation: false,
+        paragraph: true,
+        site: site.clone(),
+        runs: vec![Inline::Styled {
+            kind: StyleKind::Emphasis,
+            children: vec![Inline::Text("a--b".into())],
+            child_sites: vec![site.clone()],
+            site: site.clone(),
+        }],
+    };
+    let error = super::super::paragraph_fragment_line(&block).unwrap_err();
+    assert!(format!("{error:?}").contains("adjacent hyphen or em-dash marks"));
+}
+
+#[test]
+fn bibliography_source_and_screen_entry_refuse_missing_or_changed_work() {
+    let site = input::site("fixture.toml");
+    let entry = super::super::bibliography::resolve(ANDREONI, "a:andreoni", &site).unwrap();
+    assert_eq!(entry.label, "Andreoni 1990");
+    assert_eq!(entry.anchor, "bibliography-andreoni-1990");
+    assert!(super::super::bibliography::resolve(ANDREONI, "a:missing", &site).is_err());
+    let row = format!(
+        "<a id=\"{}\"></a>{}<!-- bibentry {} -->\n",
+        entry.anchor,
+        markdown::text(&super::super::bibliography::screen_text(&entry)),
+        entry.key
+    );
+    assert!(super::super::bibliography::recover_screen(
+        &row,
+        std::slice::from_ref(&entry)
+    ));
+    assert!(!super::super::bibliography::recover_screen(
+        "",
+        std::slice::from_ref(&entry)
+    ));
+    assert!(!super::super::bibliography::recover_screen(&row, &[]));
+    assert!(!super::super::bibliography::recover_screen(
+        &row.replace("Andreoni, James", "Andreoni, John"),
+        std::slice::from_ref(&entry)
+    ));
+    assert!(!super::super::bibliography::recover_screen(
+        &row.replace("bibliography-andreoni-1990", "bibliography-andreoni-2000"),
+        std::slice::from_ref(&entry)
+    ));
+    let changed = super::super::bibliography::resolve(
+        &ANDREONI.replace("year={1990}", "year={2000}"),
+        "a:andreoni",
+        &site,
+    )
+    .unwrap();
+    assert_ne!(changed.label, entry.label);
+    assert!(!super::super::bibliography::recover_screen(
+        &row,
+        &[changed]
+    ));
+}
+
+#[test]
+fn bibliography_citation_recovery_preserves_kind_order_and_visible_label() {
+    let clean = "(<a href=\"#bibliography-andreoni-1990\">Andreoni 1990</a>; <a href=\"#bibliography-andreoni-1990\">Andreoni 1990</a>)<!-- bibcite a:andreoni,a:other -->";
+    let expected = recover_bibliography_markdown(clean).unwrap().0;
+    assert!(
+        matches!(&expected, Recovered::BibliographyCitation { kind: BibliographyCitationKind::Parenthetical, keys, label, .. } if keys == &["a:andreoni", "a:other"] && label == "(Andreoni 1990; Andreoni 1990)")
+    );
+    for altered in [
+        clean.replace("a:andreoni,a:other", "a:other,a:andreoni"),
+        clean.replace("Andreoni 1990</a>", "Andreoni 2000</a>"),
+        clean.replace("bibliography-andreoni-1990", "bibliography-andreoni-2000"),
+        clean.replacen("(<a", "<a", 1).replacen("</a>)", "</a>", 1),
+    ] {
+        assert_ne!(recover_bibliography_markdown(&altered).unwrap().0, expected);
+    }
+    assert_eq!(
+        recover_latex(r"\parencite{a:andreoni,a:other}"),
+        Some(vec![Recovered::BibliographyCitation {
+            kind: BibliographyCitationKind::Parenthetical,
+            keys: vec!["a:andreoni".into(), "a:other".into()],
+            label: String::new(),
+            anchors: vec![]
+        }])
+    );
+    assert!(matches!(recover_latex(r"\textcite{a:andreoni}"),
+        Some(runs) if matches!(&runs[0], Recovered::BibliographyCitation { kind: BibliographyCitationKind::Textual, .. })));
+}
+
+#[test]
+fn bibliography_latex_document_recovers_the_source_command_and_entry() {
+    let site = input::site("fixture.toml");
+    let entry = super::super::bibliography::resolve(ANDREONI, "a:andreoni", &site).unwrap();
+    let plan = DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage declaration", "Declared slice: (empty)"),
+        blocks: vec![Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:citation".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![
+                Inline::Text("See ".into()),
+                Inline::BibliographyCitation {
+                    kind: BibliographyCitationKind::Parenthetical,
+                    entries: vec![entry.clone()],
+                    label: "(Andreoni 1990)".into(),
+                    site,
+                },
+                Inline::Text(".".into()),
+            ],
+        }],
+        screen: None,
+    };
+    let source = latex::render(&plan);
+    assert!(source.starts_with("\\begin{filecontents*}{references.bib}\n"));
+    assert!(source.contains(r"See \parencite{a:andreoni}."));
+    assert!(source.ends_with("\\printbibliography\n\\end{document}\n"));
+    check_emission(&plan, &source, DocumentTarget::Latex).unwrap();
+    assert!(
+        check_emission(
+            &plan,
+            &source.replace(r"\parencite{a:andreoni}", r"\textcite{a:andreoni}"),
+            DocumentTarget::Latex
+        )
+        .is_err()
+    );
+    assert!(
+        check_emission(
+            &plan,
+            &source.replace(r"\parencite{a:andreoni}", r"\parencite{a:unknown}"),
+            DocumentTarget::Latex
+        )
+        .is_err()
+    );
+    assert!(
+        check_emission(
+            &plan,
+            &source.replace("\\printbibliography\n", ""),
+            DocumentTarget::Latex
+        )
+        .is_err()
+    );
+    assert!(
+        check_emission(
+            &plan,
+            &source.replace("year={1990}", "year={2000}"),
+            DocumentTarget::Latex
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn support_required_bibliography_latex_context_typesets() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = super::super::NativeSupport::from_environment(&root)
+        .map_err(|error| format!("{error:?}"))?;
+    let lock = super::super::native_support::lock(&root).map_err(|error| format!("{error:?}"))?;
+    let site = input::site("fixture.toml");
+    let entry = super::super::bibliography::resolve(ANDREONI, "a:andreoni", &site)?;
+    let plan = DocumentPlan {
+        document: "fixture".into(),
+        language: "en".into(),
+        coverage: Coverage::fixture("Coverage declaration", "Declared slice: (empty)"),
+        blocks: vec![Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:citation".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![
+                Inline::Text("See ".into()),
+                Inline::BibliographyCitation {
+                    kind: BibliographyCitationKind::Parenthetical,
+                    entries: vec![entry],
+                    label: "(Andreoni 1990)".into(),
+                    site,
+                },
+                Inline::Text(".".into()),
+            ],
+        }],
+        screen: None,
+    };
+    let source = latex::render(&plan);
+    support.scope(&lock, || {
+        super::super::native::consume_plan(
+            &support,
+            &lock,
+            &source,
+            "",
+            "\\newcommand{\\FtdocContext}[2]{}\n",
+            &plan,
+        )
+    })?;
+    let undefined = source.replace(r"\parencite{a:andreoni}", r"\parencite{a:missing}");
+    let error = support
+        .scope(&lock, || {
+            super::super::native::consume_plan(
+                &support,
+                &lock,
+                &undefined,
+                "",
+                "\\newcommand{\\FtdocContext}[2]{}\n",
+                &plan,
+            )
+        })
+        .unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("undefined citation must be a native assembly refusal");
+    };
+    assert!(errors.diagnostics().iter().any(|diagnostic| {
+        let AssemblyFault::NativeRejected { status, log, .. } = &diagnostic.fault else {
+            return false;
+        };
+        *status == Some(0)
+            && String::from_utf8_lossy(log).contains("Citation 'a:missing'")
+            && String::from_utf8_lossy(log).contains("undefined")
+    }));
+    Ok(())
+}
 const LABEL: &str = "dec:fixture:source";
 const UNIT: &str = "sec:fixture:reader";
 fn context(
@@ -44,7 +417,7 @@ fn context_graph(
         quotation: false,
         paragraph: false,
         site: site.clone(),
-        runs: runs(0, unit, "en", &welded, &BTreeMap::new()),
+        runs: runs(0, unit, "en", &welded, &BTreeMap::new(), "").unwrap(),
     };
     check(&book, unit, &welded, block);
 }
@@ -378,14 +751,14 @@ pub(in crate::documents) fn support_required_literal_build_controls(
                 let expected = DocumentError::Assembly(
                     AssemblyErrors::from_diagnostics(vec![expected]).unwrap(),
                 );
-                let actual = build(&skeletons, welded, notation, &metadata, &displays)
+                let actual = build(&skeletons, welded, notation, &metadata, &displays, "")
                     .err()
                     .unwrap();
                 assert_eq!(actual, expected);
                 assert_eq!(actual.to_string(), expected.to_string());
             } else {
                 assert_eq!(errors, vec![]);
-                let plans = build(&skeletons, welded, notation, &metadata, &displays).unwrap();
+                let plans = build(&skeletons, welded, notation, &metadata, &displays, "").unwrap();
                 for plan in plans {
                     assert_eq!(
                         check_emission(&plan, &latex::render(&plan), DocumentTarget::Latex),

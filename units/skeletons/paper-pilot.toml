@@ -11,5 +11,6 @@ children = [
   { kind = "unit", unit = "sec:say:harm-enlargement" },
   { kind = "unit", unit = "sec:say:wonder-beauty" },
   { kind = "unit", unit = "sec:say:enemy-to-none" },
-  { kind = "unit", unit = "sec:coda:record-limit" }
+  { kind = "unit", unit = "sec:coda:record-limit" },
+  { kind = "paragraph", unit = "sec:log:andreoni-joint" }
 ]

@@ -1,4 +1,5 @@
 //! Whole-pair fixed point and exact delivered-byte gate for the paper and explainer.
+pub(crate) mod html_gaps;
 mod registry;
 mod release;
 use crate::hex;
@@ -638,6 +639,7 @@ struct Request {
     root: PathBuf,
     values: BTreeMap<String, OsString>,
     release: bool,
+    registered_html_gaps: bool,
 }
 fn request(args: &[OsString]) -> Result<Request> {
     let mut iter = args.iter();
@@ -650,6 +652,7 @@ fn request(args: &[OsString]) -> Result<Request> {
     if ![
         "generate",
         "check",
+        "check-registered-html-gaps",
         "produce",
         "publish",
         "documents-generate",
@@ -692,11 +695,22 @@ fn request(args: &[OsString]) -> Result<Request> {
         || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
         PathBuf::from,
     );
+    let registered_html_gaps = operation == "check-registered-html-gaps";
+    if registered_html_gaps {
+        if release || !values.contains_key("--built") {
+            return Err(
+                "Registered HTML gaps require the built product check without a release flag"
+                    .into(),
+            );
+        }
+        release = true;
+    }
     Ok(Request {
         operation,
         root: root.canonicalize().map_err(|e| e.to_string())?,
         values,
         release,
+        registered_html_gaps,
     })
 }
 fn require_notation_support(value: Option<&std::ffi::OsStr>) -> Result<()> {
@@ -739,15 +753,14 @@ fn check_release_documents(req: &Request) -> Result<PathBuf> {
     require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
     let documents = crate::check_documents(&req.root, &assembly)
         .map_err(|error| PaperFault::Input(error.to_string()))?;
-    release_html_gaps(documents.artifacts())?;
-    Ok(assembly.directory().to_path_buf())
-}
-pub(crate) fn release_html_gaps(artifacts: &[crate::DocumentArtifact]) -> Result<()> {
     release::part(
         "HTML block gaps",
-        crate::documents::refuse_release_html_gaps(artifacts)
-            .map_err(|error| PaperFault::Input(error.to_string())),
-    )
+        html_gaps::check(&req.root, documents.html_gap_rows()),
+    )?;
+    if !req.registered_html_gaps {
+        html_gaps::refusal(documents.html_gap_rows())?;
+    }
+    Ok(assembly.directory().to_path_buf())
 }
 fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathBuf> {
     release_support
@@ -800,7 +813,7 @@ pub fn run(args: &[OsString]) -> Result<()> {
         }
     }
     if let Some(built) = req.values.get("--built") {
-        if req.operation != "check" {
+        if req.operation != "check" && req.operation != "check-registered-html-gaps" {
             return Err("Built pair is only valid for check".into());
         }
         let built = PathBuf::from(built);

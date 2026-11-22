@@ -42,4 +42,13 @@ Not yet converted: intervening material is omitted from this excerpt.
 <p align="center"><a id="sec-crecord--limit"></a><em>The record can watch the hand’s tremor turning. It cannot see what the righting is paid in.</em></p>
 <p align="right">sec:record&#45;limit<!-- label sec:coda:record-limit --></p>
 
+Not yet converted: intervening material is omitted from this excerpt.
+
+<!-- unit sec:log:andreoni-joint document paper-pilot language en -->
+The one joint no antecedent touches is J:occ<!-- label sem:joint:occupancy -->: economics has no result that the still center is *occupied*. The nearest, warm&#45;glow giving (<a href="#bibliography-andreoni-1990">Andreoni 1990</a>)<!-- bibcite a:andreoni -->, is a consumed state, not a held rate — the empty preimage is itself the finding.
+
 Not yet converted: later material is omitted from this excerpt.
+
+## References
+
+<a id="bibliography-andreoni-1990"></a>Andreoni, James, 1990. Impure Altruism and Donations to Public Goods: A Theory of Warm&#45;Glow Giving. The Economic Journal 100&#40;401&#41;, 464–477. DOI: 10.2307&#47;2234133.<!-- bibentry a:andreoni -->

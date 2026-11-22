@@ -1058,6 +1058,9 @@ class Identities(unittest.TestCase):
         exit_code, result = self.conversion_run(options={'unit': 'sec:say:direction'})
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
         self.assertEqual(result['faults'][0]['code'], 'UnitInvalid')
+        exit_code, result = self.conversion_run(options={'unit': 'sec:log:andreoni-joint'})
+        self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
+        self.assertEqual(result['faults'][0]['code'], 'SyntaxUnsupported')
         with self.assertRaises(compare_words.Fault) as raised:
             self.conversion_run(options={'output': self.root})
         self.assertEqual(raised.exception.row['code'], 'OutputExists')

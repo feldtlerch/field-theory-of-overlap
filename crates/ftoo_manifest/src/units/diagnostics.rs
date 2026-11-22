@@ -101,11 +101,13 @@ pub enum InsertionReason {
     Unclosed,
     NestedBrace,
     BadMathName,
+    BadBibliographyKey,
     NestedStyle,
     EmptyStyle,
     BoundaryWhitespace,
     AdjacentStyle,
     StyledMath,
+    StyledBibliographyCitation,
     OwnCloser,
 }
 

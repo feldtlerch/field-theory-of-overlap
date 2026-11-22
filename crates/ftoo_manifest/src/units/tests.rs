@@ -953,7 +953,7 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M041,
-            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics.",
+            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics.",
             "Every authored statement text, shared math entry and local math insertion.",
         ),
     ];
