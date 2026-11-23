@@ -44,7 +44,12 @@ jobs:
       - name: support-independent tests
         env:
           CARGO_NET_OFFLINE: 'true'
-        run: time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net "$HOME/.cargo/bin/cargo" test --workspace --locked -- --skip support_required
+        # The full product battery runs this test: paper input declarations and the Python identity and composition controls.
+        run: >-
+          time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net
+          "$HOME/.cargo/bin/cargo" test --workspace --locked --
+          --skip support_required
+          --skip actual_input_declarations_run_without_support
       - name: labels
         env:
           CARGO_NET_OFFLINE: 'true'
