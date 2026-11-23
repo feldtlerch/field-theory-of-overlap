@@ -39,11 +39,12 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
 |026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
 |030|Native renderings, complete graph and native model|accepted; establishes the complete-document release gate, complete-graph boundary and native-model boundary; amends 014, 016 and 017; relationship disposition at the complete-graph boundary is governed by 036; native use of the existing paper-scoped store is governed by 037|
-|032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract|
+|032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract; native support is governed by 041|
 |033|Inline styles in unit prose|accepted; decides the authoring syntax reserved by 021; retains 022's mathematics boundary|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
+|041|Compared inherited support in native documents|accepted; qualifies 032's native sweep exception and embedding-removal condition, and amends M055, M056 and M057|
 |042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|
 |046|Registered HTML block gaps|accepted; the development product check inventories withheld HTML passages without changing release refusal|

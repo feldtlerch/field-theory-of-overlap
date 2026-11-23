@@ -89,6 +89,7 @@ def documents_record(args):
         'units/documents.toml', 'registry/documentary-tags.toml',
         'documents/paper-build/fontconfig.conf',
         'generated/manifest.json', 'generated/notation.tex',
+        'generated/notation-status.json', 'generated/native-paper-support.tex',
         'generated/addressing.tex', 'tools/assembly/native-lock.toml',
         'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
         'tools/notation/package.json', 'tools/notation/support-digests.json',

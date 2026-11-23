@@ -367,7 +367,10 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
         inline(&mut output, &heading.runs);
         output.push_str("\n\n");
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            writeln!(output, "{}\n", text(&screen.gaps[index - 1].message)).expect("string write");
+            if !screen.gaps[index - 1].message.is_empty() {
+                writeln!(output, "{}\n", text(&screen.gaps[index - 1].message))
+                    .expect("string write");
+            }
             writeln!(
                 output,
                 "<!-- unit {} document {} language {} -->",

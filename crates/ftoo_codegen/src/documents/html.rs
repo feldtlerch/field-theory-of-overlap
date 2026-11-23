@@ -703,11 +703,13 @@ pub(super) fn model(
     ));
     let mut main = vec![element("h1", &[("id", "content")], heading_nodes)];
     for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-        main.push(element(
-            "p",
-            &[("class", "gap")],
-            vec![Node::Text(screen.gaps[index - 1].message.clone())],
-        ));
+        if !screen.gaps[index - 1].message.is_empty() {
+            main.push(element(
+                "p",
+                &[("class", "gap")],
+                vec![Node::Text(screen.gaps[index - 1].message.clone())],
+            ));
+        }
         if let Some(gap) = screen.html_gaps.get(&index) {
             main.push(element(
                 "p",

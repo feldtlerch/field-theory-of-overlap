@@ -6,6 +6,7 @@ mod diagnostics;
 mod display;
 mod html;
 mod html_recovery;
+mod inherited_support;
 mod input;
 mod latex;
 mod lock_scan;
@@ -312,6 +313,11 @@ pub(crate) fn prepare_context(
     let mut inputs = BTreeMap::from([("generated/manifest.json".into(), projection.clone())]);
     for file in [
         "documents/paper-build/fontconfig.conf",
+        inherited_support::COMPARED_PATHS[0],
+        inherited_support::COMPARED_PATHS[1],
+        inherited_support::COMPARED_PATHS[2],
+        inherited_support::TYPED_PATH,
+        inherited_support::MACROS_PATH,
         "documents/paper/references.bib",
         "tools/assembly/native-lock.toml",
         "tools/assembly/prepare-native.py",
@@ -485,7 +491,15 @@ pub(crate) fn prepare_context(
             &displays,
             bibliography,
         )?;
-        plan::plan_screens(&mut plans, &selected, &book, &skeletons, &document_sites)?;
+        plan::plan_screens(
+            &mut plans,
+            &selected,
+            &book,
+            &skeletons,
+            &document_sites,
+            &inclusions,
+            &inputs,
+        )?;
         let gap_rows = html_gap_rows(&plans, &selected);
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
         let mut artifacts = render_artifacts(
@@ -495,6 +509,7 @@ pub(crate) fn prepare_context(
             &selected,
             &plans,
             notation,
+            &inputs,
             &known_labels,
         )?;
         let mut inclusion_text = String::new();
@@ -632,6 +647,7 @@ fn metadata(
 }
 
 #[allow(clippy::too_many_lines)] // Selected outputs and shared support remain in one preparation scope.
+#[allow(clippy::too_many_arguments)] // Source snapshots are separate from document selection and rendered support.
 fn render_artifacts(
     root: &Path,
     support: &NativeSupport,
@@ -639,6 +655,7 @@ fn render_artifacts(
     selected: &BTreeMap<String, Vec<DocumentOutput>>,
     plans: &[plan::DocumentPlan],
     notation: &crate::RenderableNotation<'_, '_, '_>,
+    inputs: &BTreeMap<String, Vec<u8>>,
     known_labels: &[&str],
 ) -> Result<Vec<DocumentArtifact>, DocumentError> {
     let addressing = runtime::render(book, plans)?;
@@ -650,6 +667,52 @@ fn render_artifacts(
     )?;
     let notation_status = notation.status_artifact();
     check_rendered_bytes("generated/notation-status.json", &notation_status, &[])?;
+    let source_text = |path: &str| std::str::from_utf8(&inputs[path]).unwrap_or("");
+    let inherited = inherited_support::generate(
+        notation.catalogue(),
+        inherited_support::Sources {
+            symbols: source_text(inherited_support::COMPARED_PATHS[0]),
+            historical: source_text(inherited_support::COMPARED_PATHS[1]),
+            registers: source_text(inherited_support::COMPARED_PATHS[2]),
+            typed_tools: source_text(inherited_support::TYPED_PATH),
+            macros_overlap: source_text(inherited_support::MACROS_PATH),
+        },
+    )
+    .map_err(|refusal| {
+        let (rule, path) = match &refusal {
+            inherited_support::Refusal::ChangedSource(short) => {
+                let path = inherited_support::COMPARED_PATHS
+                    .into_iter()
+                    .find(|path| path.ends_with(short))
+                    .unwrap_or_else(|| {
+                        if *short == "ftoo_typed_tools.tex" {
+                            inherited_support::TYPED_PATH
+                        } else {
+                            inherited_support::MACROS_PATH
+                        }
+                    });
+                let rule = if inherited_support::COMPARED_PATHS.contains(&path) {
+                    RuleId::M078
+                } else {
+                    RuleId::M056
+                };
+                (rule, path)
+            }
+            inherited_support::Refusal::MissingPrecondition(_) => {
+                (RuleId::M056, inherited_support::MACROS_PATH)
+            }
+        };
+        failure(
+            rule,
+            AssemblyStage::Source,
+            AssemblySite::Inventory { path: path.into() },
+            AssemblyFault::InheritedSupport {
+                reason: format!("{refusal:?}"),
+            },
+        )
+    })?;
+    check_rendered_bytes(inherited_support::PATH, inherited.as_bytes(), &[])?;
+    support.set_inherited(inherited.as_bytes(), &inputs[inherited_support::TYPED_PATH]);
     let lock = native_support::lock(root)?;
     support.scope(&lock, || {
         let mut artifacts = Vec::new();
@@ -769,6 +832,13 @@ fn render_artifacts(
         artifacts.push(DocumentArtifact {
             path: "generated/notation-status.json".into(),
             bytes: notation_status,
+            origins: Vec::new(),
+            emissions: Vec::new(),
+            html_gap_sites: Vec::new(),
+        });
+        artifacts.push(DocumentArtifact {
+            path: inherited_support::PATH.into(),
+            bytes: inherited.into_bytes(),
             origins: Vec::new(),
             emissions: Vec::new(),
             html_gap_sites: Vec::new(),
@@ -911,6 +981,19 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
             plan::Inline::PaperTag { value, .. } => {
                 write!(body, "\\ftag{{{}}}", value.key).expect("string write");
             }
+            plan::Inline::Math { latex, site, .. } => {
+                if !plan::native_paragraph_command(latex) {
+                    return Err(failure(
+                        RuleId::M055,
+                        AssemblyStage::Emission,
+                        AssemblySite::Source(site.clone()),
+                        AssemblyFault::UnsupportedParagraphBody {
+                            reason: "mathematics is not a compared inherited command".into(),
+                        },
+                    ));
+                }
+                write!(body, "\\({latex}\\)").expect("string write");
+            }
             plan::Inline::BibliographyCitation { kind, entries, .. } => {
                 let command = match kind {
                     ftoo_manifest::BibliographyCitationKind::Parenthetical => "parencite",
@@ -1028,8 +1111,8 @@ fn consume_sweep(
 ) -> Result<(), DocumentError> {
     let mut sweep = latex::start("assembly-sweep", "en");
     let mut rows = Vec::new();
-    // This native sweep typesets commands declared in generated notation support.
-    // Inherited paper commands use their compared source declarations (M078); their screen forms use the strict sweep.
+    // The native sweep typesets generated notation and the inherited commands
+    // supplied by compared native support; readout awaits its math alphabet.
     for row in notation
         .sweep_rows()
         .iter()

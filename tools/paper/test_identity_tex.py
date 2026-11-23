@@ -346,7 +346,8 @@ def line_end_marks(repo, work, template, preamble, private, engine, bundle, env,
     """Observe mark spellings and breaks in the paper preamble, then compare both widths."""
     root = work/'line-end-marks'
     root.mkdir()
-    original_receipt = (repo/'generated/paper/inputs.json').read_bytes()
+    original_receipt = subprocess.check_output(
+        ['git', '-C', str(private), 'show', 'HEAD:generated/paper/inputs.json'])
     original_master = (repo/'documents/paper/main.tex').read_bytes()
     records = []
     for index, mark in enumerate((' — ', ' – ', ' / ', '—', '–', '/')):

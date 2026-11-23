@@ -212,17 +212,16 @@ pub(super) fn support_required_native_sweep_row_has_complete_evidence_and_restor
     let (stdout, stderr, log): (String, String, String) = serde_json::from_str(include_str!(
         "../../../tests/fixtures/assembly/sweep-rejection.json"
     ))?;
-    assert_eq!(
-        &source[535..596],
-        "% sweep Definition(CoefficientOne) base\n\\(\\FtdocStored\\)\\par\n"
-    );
+    let expected_source = "% sweep Definition(CoefficientOne) base\n\\(\\FtdocStored\\)\\par\n";
+    let range = 568..629;
+    assert_eq!(&source[range.clone()], expected_source);
     let expected = failure(
         RuleId::M056,
         AssemblyStage::Native,
         AssemblySite::Generated {
             path: "assembly-sweep.tex".into(),
-            bytes: 535..596,
-            origins: vec![origin("coefficient-one", "base", 535..596)],
+            bytes: range.clone(),
+            origins: vec![origin("coefficient-one", "base", range)],
         },
         AssemblyFault::NativeRejected {
             case: NativeCase::Sweep {

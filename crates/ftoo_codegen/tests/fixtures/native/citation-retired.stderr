@@ -1,4 +1,4 @@
-error: document.tex:19: Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
+error: document.tex:20: Fatal Package ftdoc Error: Addressing runtime refusal. Document fixture,
 (ftdoc)                      unit sec:fixture:citation, language en, site
 (ftdoc)                      u0-c0.
 
@@ -14,8 +14,8 @@ Document Class: article 2021/10/04 v1.4n Standard LaTeX document class
 For additional information on amsmath, use the `?' option.
 (amstext.sty (amsgen.sty)) (amsbsy.sty) (amsopn.sty)) (amssymb.sty
 (amsfonts.sty)) (fontspec.sty (xparse.sty (expl3.sty (l3backend-xetex.def)))
-(fontspec-xetex.sty (fontenc.sty) (fontspec.cfg))) (notation.tex)
-(addressing.tex)
+(fontspec-xetex.sty (fontenc.sty) (fontspec.cfg))) (native-paper-support.tex
+(ftoo_typed_tools.tex)) (notation.tex) (addressing.tex)
 No file document.aux.
 (ts1cmr.fd)
 FTDOC-R:i:0:1:6465633a77656c64
@@ -38,7 +38,7 @@ FTDOC-END
 Type <return> to continue.
  ...                                              
                                                   
-l.19 See \FtdocTag{dec:weld}{u0-c0}
+l.20 See \FtdocTag{dec:weld}{u0-c0}
                                    % cite dec:weld:equal-address-sets
 No pages of output.
 Transcript written on document.log.

@@ -22,6 +22,7 @@ type Result<T> = std::result::Result<T, NativeAdapterFault>;
 pub struct NativeSupport {
     pub(super) root: PathBuf,
     active: RefCell<Option<Active>>,
+    inherited: RefCell<Option<(Vec<u8>, Vec<u8>)>>,
     #[cfg(test)]
     pub(super) cold_format: std::cell::Cell<bool>,
     #[cfg(test)]
@@ -54,6 +55,12 @@ impl Clone for NativeSupport {
     }
 }
 impl NativeSupport {
+    pub(super) fn set_inherited(&self, module: &[u8], typed_tools: &[u8]) {
+        *self.inherited.borrow_mut() = Some((module.to_vec(), typed_tools.to_vec()));
+    }
+    pub(super) fn inherited(&self) -> Option<(Vec<u8>, Vec<u8>)> {
+        self.inherited.borrow().clone()
+    }
     pub(super) fn invalidate_observation(&self) {
         self.active
             .borrow_mut()
@@ -143,6 +150,7 @@ impl NativeSupport {
         Self {
             root,
             active: RefCell::new(None),
+            inherited: RefCell::new(None),
             #[cfg(test)]
             cold_format: std::cell::Cell::new(false),
             #[cfg(test)]

@@ -12,6 +12,9 @@ use std::{fmt, io, ops::Range, path::PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)] // The public fault retains both complete address sides.
 pub enum AssemblyFault {
+    InheritedSupport {
+        reason: String,
+    },
     UnsupportedParagraphBody {
         reason: String,
     },
@@ -289,6 +292,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
+            Self::InheritedSupport { .. } => 50,
             Self::UnsupportedParagraphBody { .. } => 48,
             Self::UnsupportedMarkdownMath { .. } => 47,
             Self::UnsupportedMarkdownStyle { .. } => 49,

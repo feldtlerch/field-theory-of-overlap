@@ -385,6 +385,11 @@ fn preparation_joint_mints_then_registry_then_authored_tags_restore() {
     for name in [
         "generated/manifest.json",
         "documents/paper-build/fontconfig.conf",
+        super::super::inherited_support::COMPARED_PATHS[0],
+        super::super::inherited_support::COMPARED_PATHS[1],
+        super::super::inherited_support::COMPARED_PATHS[2],
+        super::super::inherited_support::TYPED_PATH,
+        super::super::inherited_support::MACROS_PATH,
         "tools/assembly/native-lock.toml",
         "tools/assembly/prepare-native.py",
         "tools/notation/package-lock.json",

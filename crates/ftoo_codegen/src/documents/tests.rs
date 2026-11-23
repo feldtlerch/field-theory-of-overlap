@@ -14,6 +14,13 @@ mod spacing;
 mod sweep;
 use brackets::CaseEvidence;
 
+pub(super) fn inherited_native_fixture(support: &NativeSupport, root: &Path) {
+    support.set_inherited(
+        &fs::read(root.join(inherited_support::PATH)).unwrap(),
+        &fs::read(root.join(inherited_support::TYPED_PATH)).unwrap(),
+    );
+}
+
 #[test]
 fn comment_spacing_writer_consumes_only_semantic_spaces() {
     use plan::Inline;
@@ -623,6 +630,12 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             ..
         }
     )));
+    for id in [D::Comovfield, D::Willvirtue, D::Gensym] {
+        rows.push(NativeCase::Sweep {
+            owner: RenderOwner::Definition(id),
+            case: "base".into(),
+        });
+    }
     let primitives = [
         (P::Alpha, 0),
         (P::Beta, 0),
@@ -672,7 +685,7 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             }
         }
     }
-    assert_eq!(rows.len(), 325);
+    assert_eq!(rows.len(), 328);
     assert_eq!(native::sweep_inventory(&catalogue, &rows), Ok(()));
     let missing = NativeCase::Sweep {
         owner: RenderOwner::Definition(D::Dimension),
@@ -1781,6 +1794,7 @@ fn support_required_mutation_during_successful_native_invocation_invalidates_suc
     crate::telemetry::counter("native.private_bundle_copies", 1);
     let support =
         NativeSupport::resolve(&root, Some(&directory.0)).map_err(|e| format!("{e:?}"))?;
+    inherited_native_fixture(&support, &root);
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let addressing = runtime::render(&book, &[])?;
@@ -2209,7 +2223,7 @@ fn support_required_native_lost_character_is_a_complete_hard_error(
     } else {
         ""
     };
-    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.6416015625 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
+    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.72265625 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
     let stderr = if support.cold_format.get() {
         include_bytes!("../../tests/fixtures/native/cold-lost-character-refusal.stderr").to_vec()
     } else {

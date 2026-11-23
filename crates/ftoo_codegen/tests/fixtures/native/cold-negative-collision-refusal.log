@@ -191,7 +191,10 @@ t10-bold,BoldItalicFont=lmmonolt10-boldoblique].
 (fontspec)             4\font \fontdimen 7\font =0\fontdimen 2\font
 (fontspec)             \tex_hyphenchar:D \font =-1\scan_stop: 
 
- (notation.tex
+ (native-paper-support.tex
+(ftoo_typed_tools.tex
+\g__ftoo_envdepth_int=\count285
+)) (notation.tex
 
 ! LaTeX Error: Command \FtooQCoefficientOne already defined.
                Or name \end... illegal, see p.192 of the manual.

@@ -742,25 +742,27 @@ fn check_main(
     )?;
     let mut at = 1;
     for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-        let gap = nodes
-            .get(at)
-            .ok_or_else(|| mismatch(plan, "HTML gap inventory"))?;
-        let gap = element(
-            plan,
-            known,
-            gap,
-            "p",
-            &[("class", "gap")],
-            "HTML gap boundary",
-        )?;
-        text(
-            plan,
-            known,
-            gap,
-            &screen.gaps[index - 1].message,
-            "HTML gap sentence",
-        )?;
-        at += 1;
+        if !screen.gaps[index - 1].message.is_empty() {
+            let gap = nodes
+                .get(at)
+                .ok_or_else(|| mismatch(plan, "HTML gap inventory"))?;
+            let gap = element(
+                plan,
+                known,
+                gap,
+                "p",
+                &[("class", "gap")],
+                "HTML gap boundary",
+            )?;
+            text(
+                plan,
+                known,
+                gap,
+                &screen.gaps[index - 1].message,
+                "HTML gap sentence",
+            )?;
+            at += 1;
+        }
         let body = nodes
             .get(at)
             .ok_or_else(|| mismatch(plan, "HTML block inventory"))?;

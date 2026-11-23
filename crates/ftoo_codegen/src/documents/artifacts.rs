@@ -81,6 +81,7 @@ fn inventory(root: &Path) -> Result<Vec<String>, DocumentError> {
     for name in [
         "generated/notation.tex",
         "generated/notation-status.json",
+        "generated/native-paper-support.tex",
         "generated/addressing.tex",
     ] {
         match fs::symlink_metadata(root.join(name)) {

@@ -2,6 +2,99 @@ use super::*;
 use ftoo_manifest::{NodeId, ReaderIdentityPosition};
 use std::{fs, path::Path};
 
+#[test]
+fn excerpt_gap_uses_checked_source_lines() {
+    let first = super::super::input::Inclusion {
+        source: "documents/paper/parts/fixture.tex".into(),
+        unit: "first".into(),
+        fragment: "first.tex".into(),
+        role: "paragraph".into(),
+        line: 1,
+    };
+    let second = super::super::input::Inclusion {
+        line: 3,
+        ..first.clone()
+    };
+    let path = first.source.clone();
+    let mut inputs = BTreeMap::from([(
+        path.clone(),
+        b"% generated: first\n \r\n% generated: second\n".to_vec(),
+    )]);
+    assert!(!source_material_between(&first, &second, &inputs));
+    inputs.insert(
+        path,
+        b"% generated: first\nAuthored text.\n% generated: second\n".to_vec(),
+    );
+    assert!(source_material_between(&first, &second, &inputs));
+    let second_source = super::super::input::Inclusion {
+        source: "documents/paper/parts/another.tex".into(),
+        ..second
+    };
+    assert!(source_material_between(&first, &second_source, &inputs));
+}
+
+fn inherited_inputs(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    super::super::inherited_support::COMPARED_PATHS
+        .into_iter()
+        .chain([
+            super::super::inherited_support::TYPED_PATH,
+            super::super::inherited_support::MACROS_PATH,
+        ])
+        .map(|path| (path.into(), fs::read(root.join(path)).unwrap()))
+        .collect()
+}
+
+#[test]
+fn support_required_changed_typed_source_has_located_document_error()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let support = super::super::NativeSupport::from_environment(&root)
+        .map_err(|error| format!("{error:?}"))?;
+    let graph = ftoo_manifest::seed()?;
+    let book = ftoo_manifest::addressing(&graph)?;
+    let catalogue = ftoo_manifest::notation(&book)?;
+    let mut inputs = inherited_inputs(&root);
+    let intact = crate::notation::with_preparation(None, &catalogue, |notation| {
+        super::super::render_artifacts(
+            &root,
+            &support,
+            &book,
+            &BTreeMap::new(),
+            &[],
+            notation,
+            &inputs,
+            &[],
+        )
+    });
+    assert!(intact.is_ok());
+    let path = super::super::inherited_support::TYPED_PATH;
+    inputs.get_mut(path).unwrap().push(b' ');
+    let actual = crate::notation::with_preparation(None, &catalogue, |notation| {
+        super::super::render_artifacts(
+            &root,
+            &support,
+            &book,
+            &BTreeMap::new(),
+            &[],
+            notation,
+            &inputs,
+            &[],
+        )
+    });
+    assert_eq!(
+        actual,
+        Err(super::super::failure(
+            RuleId::M056,
+            AssemblyStage::Source,
+            AssemblySite::Inventory { path: path.into() },
+            AssemblyFault::InheritedSupport {
+                reason: "ChangedSource(\"ftoo_typed_tools.tex\")".into(),
+            },
+        ))
+    );
+    Ok(())
+}
+
 fn math_run(body: &str, site: &UnitSite) -> Inline {
     Inline::Math {
         definition_site: super::super::input::site("units/definitions/fixture.toml"),
@@ -573,6 +666,7 @@ fn support_required_artifact_limit_measures_emitted_bytes() -> Result<(), Box<dy
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let catalogue = ftoo_manifest::notation(&book)?;
+    let inputs = inherited_inputs(&root);
     let mut selected_plan = plan(&book);
     selected_plan.coverage.declaration = "a".repeat(limit + 1);
     let selected = BTreeMap::from([(
@@ -587,6 +681,7 @@ fn support_required_artifact_limit_measures_emitted_bytes() -> Result<(), Box<dy
             &selected,
             std::slice::from_ref(&selected_plan),
             notation,
+            &inputs,
             &[],
         )
     })?;
@@ -615,6 +710,7 @@ fn support_required_artifact_limit_measures_emitted_bytes() -> Result<(), Box<dy
             &selected,
             std::slice::from_ref(&oversize_plan),
             notation,
+            &inputs,
             &[],
         )
     })
@@ -930,6 +1026,26 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
     )
     .unwrap();
     let (drafts, _) = super::super::input::assembly_sources(&sources, &[]).unwrap();
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: super::super::input::read(&root, "units/documents.toml").unwrap(),
+    };
+    let scopes = super::super::input::sources(
+        &root,
+        &super::super::input::discover(&root, "units/scopes", false).unwrap(),
+    )
+    .unwrap();
+    let inclusions =
+        super::super::input::composition(&root, &declaration, &scopes, &drafts).unwrap();
+    let inputs: BTreeMap<_, _> = inclusions
+        .iter()
+        .map(|inclusion| {
+            (
+                inclusion.source.clone(),
+                super::super::input::read(&root, &inclusion.source).unwrap(),
+            )
+        })
+        .collect();
     let (metadata, owners) = super::super::metadata(&statements);
     let document_sites = super::super::document_sites(&corpus);
     let skeletons =
@@ -950,6 +1066,8 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &book,
         &skeletons,
         &document_sites,
+        &inclusions,
+        &inputs,
     )
     .unwrap();
     assert_eq!(
@@ -976,6 +1094,8 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &book,
         &skeletons,
         &document_sites,
+        &inclusions,
+        &inputs,
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1003,6 +1123,8 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &book,
         &skeletons,
         &document_sites,
+        &inclusions,
+        &inputs,
     )
     .unwrap();
     assert!(french.screen.is_none());
@@ -1038,6 +1160,8 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &book,
         &skeletons,
         &document_sites,
+        &inclusions,
+        &inputs,
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1086,6 +1210,8 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &book,
         &skeletons,
         &document_sites,
+        &inclusions,
+        &inputs,
     )
     .unwrap();
     let screen = plans[1].screen.as_ref().unwrap();
@@ -1624,6 +1750,7 @@ fn support_required_markdown_emission_refuses_a_known_label_beside_a_colon()
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;
     let catalogue = ftoo_manifest::notation(&book)?;
+    let inputs = inherited_inputs(&root);
     let mut leaked = plan(&book);
     leaked.coverage.declaration = "Coverage. def:langevin:coefficient-one:".into();
     let selected = BTreeMap::from([(
@@ -1642,6 +1769,7 @@ fn support_required_markdown_emission_refuses_a_known_label_beside_a_colon()
             &selected,
             std::slice::from_ref(&leaked),
             notation,
+            &inputs,
             &known,
         )
     });
@@ -2029,6 +2157,7 @@ fn support_required_reader_coverage_runtime_has_empty_unit_and_exact_origin()
     use super::super::{NativeSupport, native, native_support, runtime};
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|error| format!("{error:?}"))?;
+    super::super::tests::inherited_native_fixture(&support, &root);
     let lock = native_support::lock(&root).map_err(|error| format!("{error:?}"))?;
     let graph = ftoo_manifest::seed()?;
     let book = ftoo_manifest::addressing(&graph)?;

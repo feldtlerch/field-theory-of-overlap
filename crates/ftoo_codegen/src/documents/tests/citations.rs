@@ -311,6 +311,10 @@ fn support_required_bibliography_latex_context_typesets() -> Result<(), Box<dyn 
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = super::super::NativeSupport::from_environment(&root)
         .map_err(|error| format!("{error:?}"))?;
+    support.set_inherited(
+        &std::fs::read(root.join(super::super::inherited_support::PATH))?,
+        &std::fs::read(root.join(super::super::inherited_support::TYPED_PATH))?,
+    );
     let lock = super::super::native_support::lock(&root).map_err(|error| format!("{error:?}"))?;
     let site = input::site("fixture.toml");
     let entry = super::super::bibliography::resolve(ANDREONI, "a:andreoni", &site)?;

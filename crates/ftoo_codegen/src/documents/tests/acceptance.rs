@@ -20,6 +20,7 @@ fn paper_lookup_snapshot_refuses_a_second_version() {
 
 #[test]
 fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::Error>> {
+    const PINNED_NOTICE_COUNT: usize = 8;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|error| format!("{error:?}"))?;
     let prepared = prepare_documents(&root, &support)?;
@@ -50,15 +51,6 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         citation_source
             .contains(r"\emph{occupied}. The nearest, warm-glow giving \parencite{a:andreoni}")
     );
-    let expected_gaps =
-        1 + std::fs::read_to_string(root.join("generated/documents/inclusions.tsv"))?
-            .lines()
-            .filter(|row| {
-                row.split('\t').nth(2).is_some_and(|fragment| {
-                    fragment.starts_with("generated/documents/paper-pilot/")
-                })
-            })
-            .count();
     for path in [
         "generated/documents/paper-pilot/en.md",
         "generated/documents/paper-pilot/en.labels.md",
@@ -67,7 +59,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         let rendered = std::str::from_utf8(bytes)?;
         assert_eq!(
             rendered.matches("Not yet converted:").count(),
-            expected_gaps
+            PINNED_NOTICE_COUNT
         );
         assert!(rendered.contains("other way — the fact"));
         assert!(rendered.contains("center’s population"));
@@ -97,6 +89,106 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         )),
     );
     Ok(())
+}
+
+#[test]
+fn paper_paragraph_refuses_object_bound_mathematics_at_its_use() {
+    let site = input::site("units/statements/fixture.toml");
+    let block = plan::Block {
+        pending_names: BTreeMap::new(),
+        displays: BTreeMap::new(),
+        unit: "sec:fixture:paragraph".into(),
+        depth: None,
+        quotation: false,
+        paragraph: true,
+        site: site.clone(),
+        runs: vec![plan::Inline::Math {
+            definition_site: site.clone(),
+            key: "value".into(),
+            markdown: "{c}_1".into(),
+            latex: "\\FtooQCoefficientOne{}".into(),
+            pending: vec![],
+            site: site.clone(),
+        }],
+    };
+    assert_eq!(
+        fragment_line(&block),
+        Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(site),
+            AssemblyFault::UnsupportedParagraphBody {
+                reason: "mathematics is not a compared inherited command".into(),
+            },
+        ))
+    );
+}
+
+#[test]
+fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
+    let site = input::site("units/statements/fixture.toml");
+    for (latex, admitted) in [
+        ("\\willvirtue{}", true),
+        ("\\gensym{}", true),
+        ("\\readout{}", false),
+    ] {
+        let block = plan::Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:paragraph".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![plan::Inline::Math {
+                definition_site: site.clone(),
+                key: "inherited".into(),
+                markdown: "x".into(),
+                latex: latex.into(),
+                pending: vec![],
+                site: site.clone(),
+            }],
+        };
+        let plan = plan::DocumentPlan {
+            document: "paper-pilot".into(),
+            language: "en".into(),
+            coverage: plan::Coverage::fixture("coverage", "slice"),
+            blocks: vec![
+                plan::Block {
+                    pending_names: BTreeMap::new(),
+                    displays: BTreeMap::new(),
+                    unit: "sec:fixture:heading".into(),
+                    depth: Some(1),
+                    quotation: false,
+                    paragraph: false,
+                    site: site.clone(),
+                    runs: vec![plan::Inline::Text("Heading".into())],
+                },
+                block,
+            ],
+            screen: None,
+        };
+        let shape = plan::check_excerpt_shape(&plan, &site);
+        let emitted = fragment_line(&plan.blocks[1]);
+        if admitted {
+            assert_eq!(shape, Ok(()), "{latex}");
+            assert!(emitted.unwrap().contains(latex), "{latex}");
+        } else {
+            let shape = format!("{:?}", shape.unwrap_err());
+            assert!(shape.contains("M055") && shape.contains("ExcerptShape"));
+            assert_eq!(
+                emitted,
+                Err(failure(
+                    RuleId::M055,
+                    AssemblyStage::Emission,
+                    AssemblySite::Source(site.clone()),
+                    AssemblyFault::UnsupportedParagraphBody {
+                        reason: "mathematics is not a compared inherited command".into(),
+                    },
+                )),
+            );
+        }
+    }
 }
 
 #[test]
@@ -985,6 +1077,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     expected.extend([
         "generated/notation.tex".into(),
         "generated/notation-status.json".into(),
+        "generated/native-paper-support.tex".into(),
         "generated/addressing.tex".into(),
         "generated/documents/inclusions.tsv".into(),
     ]);

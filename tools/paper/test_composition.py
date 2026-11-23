@@ -61,6 +61,7 @@ class Composition(unittest.TestCase):
             root = pathlib.Path(directory)
             fixed = ['units/documents.toml', 'registry/documentary-tags.toml',
                      'generated/manifest.json', 'generated/notation.tex',
+                     'generated/notation-status.json', 'generated/native-paper-support.tex',
                      'generated/addressing.tex', 'tools/assembly/native-lock.toml',
                      'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
                      'tools/notation/package.json', 'tools/notation/support-digests.json',
@@ -89,6 +90,17 @@ class Composition(unittest.TestCase):
                 source.write_text(source.read_text()+'\n')
                 meson_adapter.documents_record(args)
                 self.assertNotEqual(args.output.read_bytes(), before)
+                source.write_text(source.read_text()[:-1])
+                meson_adapter.documents_record(args)
+                self.assertEqual(args.output.read_bytes(), before)
+                for name in ('generated/notation-status.json',
+                             'generated/native-paper-support.tex'):
+                    artifact = root/name
+                    original = artifact.read_bytes()
+                    artifact.write_bytes(original+b'!')
+                    meson_adapter.documents_record(args)
+                    self.assertNotEqual(args.output.read_bytes(), before)
+                    artifact.write_bytes(original)
 
     def test_inclusion_rows_and_markers_refuse_changes(self):
         repository = pathlib.Path(__file__).resolve().parents[2]
@@ -126,6 +138,25 @@ class Composition(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'M055: Fragment marker/declaration differs'):
                 checked_fragments(root, rows)
             source.write_bytes(original)
+            math_fragment = root/'generated/documents/paper-pilot/sec-coda-whole-field.tex'
+            intact = math_fragment.read_bytes()
+            altered = intact.replace(b'\\comovfield{}', b'\\unknown{}', 1)
+            self.assertNotEqual(altered, intact)
+            math_fragment.write_bytes(altered)
+            with self.assertRaisesRegex(ValueError, 'M055: Fragment body differs'):
+                checked_fragments(root, rows)
+            math_fragment.write_bytes(intact)
+            for command in (b'willvirtue', b'gensym'):
+                admitted = intact.replace(b'\\comovfield{}', b'\\' + command + b'{}', 1)
+                self.assertNotEqual(admitted, intact)
+                math_fragment.write_bytes(admitted)
+                self.assertEqual(len(checked_fragments(root, rows)), expected)
+            refused = intact.replace(b'\\comovfield{}', b'\\readout{}', 1)
+            self.assertNotEqual(refused, intact)
+            math_fragment.write_bytes(refused)
+            with self.assertRaisesRegex(ValueError, 'M055: Fragment body differs'):
+                checked_fragments(root, rows)
+            math_fragment.write_bytes(intact)
             self.assertEqual(len(scope_fragments(root)), expected)
 
 

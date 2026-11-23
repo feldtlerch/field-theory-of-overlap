@@ -1,0 +1,28 @@
+\ExplSyntaxOn
+\NewDocumentCommand{\grade}{m}
+  { {\normalfont\footnotesize\textsc{#1}}\quad }
+\NewCommandCopy{\secgrade}{\grade}
+\NewDocumentCommand{\gradeword}{m}{ \textsc{#1} }
+\input{ftoo_typed_tools.tex}
+\NewDocumentCommand
+  { \comovfield }
+  {  }
+  {
+    \ensuremath{S}
+  }
+\NewDocumentCommand
+  { \readout }
+  {  }
+  {
+    \ensuremath{\symcal{M}}
+  }
+\NewDocumentCommand
+  { \willvirtue }
+  {  }
+  {
+    \ensuremath{\omega\sp{\mathrm{vir}}}
+  }
+\DeclareQuantity{\gensym}{0}{ dim={\Time[-1]}, variance=operator, spends={} }
+  { A\sb{\mathrm S} }
+\RegisterVariance{\comovfield}{operator}
+\ExplSyntaxOff

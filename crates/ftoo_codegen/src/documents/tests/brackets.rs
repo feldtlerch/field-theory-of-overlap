@@ -182,6 +182,7 @@ fn support_required_native_steady_cases_close_before_exact_assertions()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
+    super::inherited_native_fixture(&support, &root);
     let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
     *support.evidence.borrow_mut() = Some(Vec::new());
     let results = support.scope(&lock, || -> Result<_, DocumentError> {

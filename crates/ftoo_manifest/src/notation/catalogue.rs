@@ -12,6 +12,30 @@ const SYMBOLS: &str = include_str!("../../../../documents/paper/data/ftoo_symbol
 const HISTORICAL: &str =
     include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
 const REGISTERS: &str = include_str!("../../../../documents/paper/data/ftoo_registers.tex");
+pub const INHERITED_SOURCE_FILES: [(&str, &str); 3] = [
+    ("ftoo_symbols.tex", SYMBOLS),
+    ("ftoo_symbols_historical.tex", HISTORICAL),
+    ("ftoo_registers.tex", REGISTERS),
+];
+pub const INHERITED_SOURCE_DECLARATIONS: [(DefinitionId, &str); 4] = [
+    (
+        DefinitionId::Comovfield,
+        "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
+    ),
+    (
+        DefinitionId::Readout,
+        "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
+    ),
+    (
+        DefinitionId::Willvirtue,
+        "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
+    ),
+    (
+        DefinitionId::Gensym,
+        "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+    ),
+];
+pub const INHERITED_VARIANCE_DECLARATION: &str = "\\RegisterVariance{\\comovfield}{operator}\n";
 pub(super) struct InheritedSources<'a> {
     pub symbols: &'a str,
     pub historical: &'a str,
@@ -946,19 +970,19 @@ pub(super) fn inherited_source(
         (
             DefinitionId::Comovfield,
             sources.symbols,
-            "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
+            INHERITED_SOURCE_DECLARATIONS[0].1,
             literal("S"),
         ),
         (
             DefinitionId::Readout,
             sources.historical,
-            "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
+            INHERITED_SOURCE_DECLARATIONS[1].1,
             primitive(PrimitiveId::Calligraphic, vec![literal("M")]),
         ),
         (
             DefinitionId::Willvirtue,
             sources.historical,
-            "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
+            INHERITED_SOURCE_DECLARATIONS[2].1,
             primitive(
                 PrimitiveId::Superscript,
                 vec![
@@ -970,7 +994,7 @@ pub(super) fn inherited_source(
         (
             DefinitionId::Gensym,
             sources.registers,
-            "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+            INHERITED_SOURCE_DECLARATIONS[3].1,
             primitive(
                 PrimitiveId::Subscript,
                 vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
@@ -997,10 +1021,7 @@ pub(super) fn inherited_source(
             || variance_sites != usize::from(id == DefinitionId::Comovfield)
             || !source_matches(source, bytes)
             || (id == DefinitionId::Comovfield
-                && !source_matches(
-                    sources.registers,
-                    "\\RegisterVariance{\\comovfield}{operator}\n",
-                ))
+                && !source_matches(sources.registers, INHERITED_VARIANCE_DECLARATION))
             || actual.body() != Some(&body)
             || actual.signature.arity != 0
         {

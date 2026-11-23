@@ -13,7 +13,10 @@ pub use ast::{
     ExprDraft, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES, MathSort,
     Signature,
 };
-pub use catalogue::{DefinitionCategory, DefinitionId, DefinitionKind, DefinitionSpec};
+pub use catalogue::{
+    DefinitionCategory, DefinitionId, DefinitionKind, DefinitionSpec,
+    INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES, INHERITED_VARIANCE_DECLARATION,
+};
 pub use diagnostics::{
     AliasTargetReason, DefinitionShapeReason, LiteralReason, NotationDiagnostic, NotationErrors,
     NotationFault, NotationOrigin, NotationPathPart, NotationResource, NotationSite, NotationStage,

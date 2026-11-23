@@ -1,7 +1,13 @@
 {
   "gaps": [
     {
-      "block": 7,
+      "block": 6,
+      "document": "paper-pilot",
+      "inline-kind": "mathematics",
+      "unit": "sec:coda:whole-field"
+    },
+    {
+      "block": 8,
       "document": "paper-pilot",
       "inline-kind": "bibliography-citation",
       "unit": "sec:log:andreoni-joint"

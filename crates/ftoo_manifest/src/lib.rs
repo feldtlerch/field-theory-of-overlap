@@ -32,6 +32,9 @@ pub use notation::{
     PrimitiveSpec, ReasonPart, ReasonRole, RegistryEntry, Signature, SymbolLookupFault,
     SymbolStatus, SymbolTier, SymbolUse, check_expression, deferred_parts, notation, verdict_word,
 };
+pub use notation::{
+    INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES, INHERITED_VARIANCE_DECLARATION,
+};
 pub use notation::{RenderOwner, RenderTarget};
 mod labels;
 pub use labels::READ_KIND;

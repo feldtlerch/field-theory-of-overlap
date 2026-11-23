@@ -1065,45 +1065,50 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                             recover_markdown(body, block.runs.iter().flat_map(inline_handles))
                         {
                             for (run, recovered) in block.runs.iter().zip(found) {
-                                if let (
-                                    Inline::PaperTag { site, .. },
-                                    Recovered::Tag { label, .. },
-                                ) = (run, &recovered)
-                                {
-                                    actual.push(EmissionRecord {
-                                        kind: EmissionKind::Tag,
-                                        unit: unit.into(),
-                                        language: language.into(),
-                                        target: DocumentTarget::Markdown,
-                                        occurrence: site.occurrence,
-                                        value: label.clone(),
-                                        site: site.clone(),
-                                    });
-                                }
-                                if let (
-                                    Inline::BibliographyCitation { site, .. },
-                                    Recovered::BibliographyCitation {
-                                        kind,
-                                        keys,
-                                        label,
-                                        anchors,
-                                    },
-                                ) = (run, &recovered)
-                                {
-                                    actual.push(EmissionRecord {
-                                        kind: EmissionKind::BibliographyCitation {
-                                            kind: *kind,
-                                            keys: keys.clone(),
-                                            anchors: anchors.clone(),
+                                let (kind, value, site) = match (run, recovered) {
+                                    (
+                                        Inline::PaperTag { site, .. },
+                                        Recovered::Tag { label, .. },
+                                    ) => (EmissionKind::Tag, label, site),
+                                    (
+                                        Inline::Math {
+                                            key,
+                                            site,
+                                            markdown,
+                                            ..
                                         },
-                                        unit: unit.into(),
-                                        language: language.into(),
-                                        target: DocumentTarget::Markdown,
-                                        occurrence: site.occurrence,
-                                        value: label.clone(),
-                                        site: site.clone(),
-                                    });
-                                }
+                                        Recovered::Math(body),
+                                    ) if body == *markdown => {
+                                        (EmissionKind::Math, key.clone(), site)
+                                    }
+                                    (
+                                        Inline::BibliographyCitation { site, .. },
+                                        Recovered::BibliographyCitation {
+                                            kind,
+                                            keys,
+                                            label,
+                                            anchors,
+                                        },
+                                    ) => (
+                                        EmissionKind::BibliographyCitation {
+                                            kind,
+                                            keys,
+                                            anchors,
+                                        },
+                                        label,
+                                        site,
+                                    ),
+                                    _ => continue,
+                                };
+                                actual.push(EmissionRecord {
+                                    kind,
+                                    unit: unit.into(),
+                                    language: language.into(),
+                                    target: DocumentTarget::Markdown,
+                                    occurrence: site.occurrence,
+                                    value,
+                                    site: site.clone(),
+                                });
                             }
                         }
                     } else if let Some((_, destinations, handle, label, role)) =
@@ -1986,8 +1991,8 @@ pub(super) fn check_excerpt_shape(
                         && block.runs.iter().all(|run| match run {
                             Inline::Text(_)
                             | Inline::PaperTag { .. }
-                            | Inline::Math { .. }
                             | Inline::BibliographyCitation { .. } => true,
+                            Inline::Math { latex, .. } => native_paragraph_command(latex),
                             Inline::Styled {
                                 kind: StyleKind::Emphasis,
                                 children,
@@ -2013,6 +2018,25 @@ pub(super) fn check_excerpt_shape(
             },
         ))
     }
+}
+pub(super) fn native_paragraph_command(latex: &str) -> bool {
+    matches!(latex, "\\comovfield{}" | "\\willvirtue{}" | "\\gensym{}")
+}
+
+fn source_material_between(
+    first: &super::input::Inclusion,
+    second: &super::input::Inclusion,
+    inputs: &BTreeMap<String, Vec<u8>>,
+) -> bool {
+    if first.source != second.source {
+        return true;
+    }
+    let bytes = &inputs[&first.source];
+    bytes
+        .split(|byte| *byte == b'\n')
+        .skip(first.line)
+        .take(second.line.saturating_sub(first.line + 1))
+        .any(|line| line.iter().any(|byte| !byte.is_ascii_whitespace()))
 }
 pub(super) fn public_fragment(
     plan: &DocumentPlan,
@@ -2162,6 +2186,8 @@ pub(super) fn plan_screens(
     book: &ftoo_manifest::AddressBook<'_>,
     skeletons: &CheckedSkeletons<'_>,
     document_sites: &BTreeMap<String, UnitSite>,
+    inclusions: &[super::input::Inclusion],
+    inputs: &BTreeMap<String, Vec<u8>>,
 ) -> Result<(), DocumentError> {
     let mut owned = BTreeMap::<(String, String), OwnedDestination>::new();
     let mut anchors = BTreeSet::new();
@@ -2268,6 +2294,21 @@ pub(super) fn plan_screens(
                 GapPosition::Between
             };
             let mut gap = screen_gap(plan, positions[0].site(), position)?;
+            if position == GapPosition::Between {
+                let fragment =
+                    |block: &Block| super::input::fragment_path(&plan.document, &block.unit);
+                let first = inclusions
+                    .iter()
+                    .find(|inclusion| inclusion.fragment == fragment(&plan.blocks[index]))
+                    .expect("checked excerpt inclusion");
+                let second = inclusions
+                    .iter()
+                    .find(|inclusion| inclusion.fragment == fragment(&plan.blocks[index + 1]))
+                    .expect("checked excerpt inclusion");
+                if !source_material_between(first, second, inputs) {
+                    gap.message.clear();
+                }
+            }
             if index > 0 {
                 gap.boundaries.push(positions[index].site().clone());
             }
@@ -2542,18 +2583,20 @@ impl DocumentPlan {
                     });
                 }
                 let gap = &screen.gaps[index];
-                records.push(EmissionRecord {
-                    kind: EmissionKind::Gap {
-                        index,
-                        position: gap.position,
-                    },
-                    unit: String::new(),
-                    language: self.language.clone(),
-                    target,
-                    occurrence: Some(index),
-                    value: gap.message.clone(),
-                    site: gap.site.clone(),
-                });
+                if !gap.message.is_empty() {
+                    records.push(EmissionRecord {
+                        kind: EmissionKind::Gap {
+                            index,
+                            position: gap.position,
+                        },
+                        unit: String::new(),
+                        language: self.language.clone(),
+                        target,
+                        occurrence: Some(index),
+                        value: gap.message.clone(),
+                        site: gap.site.clone(),
+                    });
+                }
             }
         }
         records

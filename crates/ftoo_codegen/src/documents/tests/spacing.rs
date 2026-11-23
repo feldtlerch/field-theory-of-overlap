@@ -424,6 +424,7 @@ fn support_required_native_comment_glue_matches_authored_controls()
     use std::fmt::Write;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|e| format!("{e:?}"))?;
+    super::inherited_native_fixture(&support, &root);
     let lock = native_support::lock(&root).map_err(|e| format!("{e:?}"))?;
     let graph = ftoo_manifest::seed()?;
     let book = reader_fixture_book(&graph);

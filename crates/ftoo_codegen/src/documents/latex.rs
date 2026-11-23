@@ -23,6 +23,7 @@ pub(super) const PREAMBLE: &str = r"\documentclass{article}
 \vfuzz=0pt
 \setmainfont{lmroman10}[Extension=.otf,UprightFont=*-regular,BoldFont=*-bold,ItalicFont=*-italic,BoldItalicFont=*-bolditalic]
 \setmonofont{lmmono10}[Extension=.otf,UprightFont=*-regular,ItalicFont=*-italic,BoldFont=lmmonolt10-bold,BoldItalicFont=lmmonolt10-boldoblique]
+\input{native-paper-support.tex}
 \input{notation.tex}
 \input{addressing.tex}
 ";

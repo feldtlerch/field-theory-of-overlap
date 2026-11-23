@@ -5,5 +5,9 @@ document = "paper-pilot"
 source = "documents/paper/parts/coda.tex"
 
 [[scope.occurrences]]
+unit = "sec:coda:whole-field"
+role = "paragraph"
+
+[[scope.occurrences]]
 unit = "sec:coda:record-limit"
 role = "refrain"

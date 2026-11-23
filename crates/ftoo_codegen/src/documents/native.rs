@@ -346,18 +346,15 @@ pub(super) fn tag_range(source: &str, token: &str) -> Option<std::ops::Range<usi
     }
     None
 }
-/// The native sweep uses generated notation support, which does not declare inherited source commands.
+/// The native sweep includes every definition except readout, whose mathematics context is absent.
 pub(super) fn sweep_declared(
-    catalogue: &ftoo_manifest::CheckedNotation<'_, '_>,
+    _catalogue: &ftoo_manifest::CheckedNotation<'_, '_>,
     owner: ftoo_manifest::RenderOwner,
 ) -> bool {
-    match owner {
-        ftoo_manifest::RenderOwner::Definition(id) => !matches!(
-            catalogue.definition(id).spec().kind(),
-            ftoo_manifest::DefinitionKind::Inherited { .. }
-        ),
-        ftoo_manifest::RenderOwner::Primitive(_) | ftoo_manifest::RenderOwner::Expression => true,
-    }
+    !matches!(
+        owner,
+        ftoo_manifest::RenderOwner::Definition(ftoo_manifest::DefinitionId::Readout)
+    )
 }
 pub(super) fn sweep_inventory(
     catalogue: &ftoo_manifest::CheckedNotation<'_, '_>,
@@ -563,6 +560,16 @@ fn invoke(
         let path = scratch.join(name);
         fs::write(&path, bytes)
             .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
+    }
+    if let Some((module, typed_tools)) = support.inherited() {
+        for (name, bytes) in [
+            ("native-paper-support.tex", module),
+            ("ftoo_typed_tools.tex", typed_tools),
+        ] {
+            let path = scratch.join(name);
+            fs::write(&path, bytes)
+                .map_err(|e| native_support::io_error(NativeOperation::WriteInput, &path, &e))?;
+        }
     }
     let fontconfig = scratch.join("fontconfig.conf");
     fs::write(&fontconfig, FONTCONFIG)
@@ -1105,9 +1112,10 @@ pub(super) fn command(support: &NativeSupport, scratch: &Path) -> Command {
 mod inherited_sweep_tests {
     use super::*;
     use ftoo_manifest::{DefinitionId, RenderOwner};
+    use std::fs;
 
     #[test]
-    fn support_required_only_generated_declarations_enter_native_sweep() {
+    fn support_required_compared_declarations_enter_native_sweep() {
         let graph = ftoo_manifest::seed().unwrap();
         let book = ftoo_manifest::addressing(&graph).unwrap();
         let catalogue = ftoo_manifest::notation(&book).unwrap();
@@ -1140,14 +1148,17 @@ mod inherited_sweep_tests {
         );
         for id in [
             DefinitionId::Comovfield,
-            DefinitionId::Readout,
             DefinitionId::Willvirtue,
             DefinitionId::Gensym,
         ] {
-            assert!(!sweep_declared(&catalogue, RenderOwner::Definition(id)));
+            assert!(sweep_declared(&catalogue, RenderOwner::Definition(id)));
         }
+        assert!(!sweep_declared(
+            &catalogue,
+            RenderOwner::Definition(DefinitionId::Readout)
+        ));
         cases.push(NativeCase::Sweep {
-            owner: RenderOwner::Definition(DefinitionId::Comovfield),
+            owner: RenderOwner::Definition(DefinitionId::Readout),
             case: "base".into(),
         });
         assert!(sweep_inventory(&catalogue, &cases).is_err());
@@ -1156,5 +1167,103 @@ mod inherited_sweep_tests {
             !matches!(case, NativeCase::Sweep { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case } if case == "base")
         });
         assert!(sweep_inventory(&catalogue, &cases).is_err());
+    }
+
+    #[test]
+    fn support_required_missing_inherited_native_declaration_refuses_with_strict_screen_intact() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let support = NativeSupport::from_environment(&root).unwrap();
+        let lock = native_support::lock(&root).unwrap();
+        let graph = ftoo_manifest::seed().unwrap();
+        let book = ftoo_manifest::addressing(&graph).unwrap();
+        let catalogue = ftoo_manifest::notation(&book).unwrap();
+        let notation = crate::prepare_notation(&catalogue).unwrap();
+        let row = notation
+            .sweep_rows()
+            .iter()
+            .find(|row| row.owner() == RenderOwner::Definition(DefinitionId::Comovfield))
+            .unwrap();
+        assert_eq!(row.unicode_source(), "S");
+        let symbols =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[0]))
+                .unwrap();
+        let historical =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[1]))
+                .unwrap();
+        let registers =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[2]))
+                .unwrap();
+        let typed_tools =
+            fs::read_to_string(root.join(super::super::inherited_support::TYPED_PATH)).unwrap();
+        let macros_overlap =
+            fs::read_to_string(root.join(super::super::inherited_support::MACROS_PATH)).unwrap();
+        let module = super::super::inherited_support::generate(
+            &catalogue,
+            super::super::inherited_support::Sources {
+                symbols: &symbols,
+                historical: &historical,
+                registers: &registers,
+                typed_tools: &typed_tools,
+                macros_overlap: &macros_overlap,
+            },
+        )
+        .unwrap();
+        let addressing = fs::read_to_string(root.join("generated/addressing.tex")).unwrap();
+        let source = format!(
+            "{}\\({}\\)\\par\n\\end{{document}}\n",
+            super::super::latex::start("assembly-sweep", "en"),
+            row.macro_source()
+        );
+        support.set_inherited(module.as_bytes(), typed_tools.as_bytes());
+        assert_eq!(
+            consume(
+                &support,
+                &lock,
+                &source,
+                notation.declarations(),
+                &addressing,
+                NativeCase::Sweep {
+                    owner: row.owner(),
+                    case: "base".into(),
+                },
+                vec![],
+            ),
+            Ok(())
+        );
+        let missing = module.replace(ftoo_manifest::INHERITED_SOURCE_DECLARATIONS[0].1, "");
+        assert_ne!(missing, module);
+        support.set_inherited(missing.as_bytes(), typed_tools.as_bytes());
+        let rejected = consume(
+            &support,
+            &lock,
+            &source,
+            notation.declarations(),
+            &addressing,
+            NativeCase::Sweep {
+                owner: row.owner(),
+                case: "base".into(),
+            },
+            vec![],
+        )
+        .unwrap_err();
+        let DocumentError::Assembly(errors) = rejected else {
+            panic!("native refusal is located");
+        };
+        let diagnostic = &errors.diagnostics()[0];
+        assert_eq!(diagnostic.rule, RuleId::M056);
+        assert!(matches!(
+            &diagnostic.fault,
+            AssemblyFault::NativeRejected {
+                case: NativeCase::Sweep { owner: RenderOwner::Definition(DefinitionId::Comovfield), case },
+                ..
+            } if case == "base"
+        ));
+        let strict = crate::prepare_notation(&catalogue).unwrap();
+        let screen = strict
+            .sweep_rows()
+            .iter()
+            .find(|row| row.owner() == RenderOwner::Definition(DefinitionId::Comovfield))
+            .unwrap();
+        assert_eq!(screen.unicode_source(), "S");
     }
 }
