@@ -515,6 +515,7 @@ fn run(
     support: &Support,
     source: Option<&[u8]>,
     mathml: bool,
+    display: bool,
 ) -> Result<Output, NotationAdapterFault> {
     let _phase = crate::telemetry::Phase::new(if source.is_some() {
         "notation.expression_process"
@@ -527,8 +528,12 @@ fn run(
     let child = Command::new(&support.runtime)
         .arg(adapter)
         .arg(if source.is_some() {
-            if mathml {
+            if mathml && display {
+                "--mathml-display"
+            } else if mathml {
                 "--mathml-inline"
+            } else if display {
+                "--expression-display"
             } else {
                 "--expression"
             }
@@ -591,7 +596,7 @@ pub(super) fn invoke(
         crate::telemetry::counter("notation.logical_requests", 1);
     }
     invoke_with(support, source.is_none(), || {
-        run(support, source.map(str::as_bytes), false)
+        run(support, source.map(str::as_bytes), false, false)
     })
 }
 #[cfg(test)]
@@ -600,7 +605,7 @@ pub(super) fn invoke_bytes(
     source: &[u8],
 ) -> Result<Result<String, String>, NotationAdapterFault> {
     crate::telemetry::counter("notation.logical_requests", 1);
-    invoke_with(support, false, || run(support, Some(source), false))
+    invoke_with(support, false, || run(support, Some(source), false, false))
 }
 pub(super) fn invoke_mathml(
     support: &Support,
@@ -608,7 +613,16 @@ pub(super) fn invoke_mathml(
 ) -> Result<Result<String, String>, NotationAdapterFault> {
     crate::telemetry::counter("notation.logical_requests", 1);
     invoke_with(support, false, || {
-        run(support, Some(source.as_bytes()), true)
+        run(support, Some(source.as_bytes()), true, false)
+    })
+}
+pub(super) fn invoke_display(
+    support: &Support,
+    source: &str,
+) -> Result<Result<String, String>, NotationAdapterFault> {
+    crate::telemetry::counter("notation.logical_requests", 1);
+    invoke_with(support, false, || {
+        run(support, Some(source.as_bytes()), false, true)
     })
 }
 pub(super) fn invoke_with(

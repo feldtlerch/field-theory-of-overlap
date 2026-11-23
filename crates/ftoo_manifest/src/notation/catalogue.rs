@@ -17,7 +17,7 @@ pub const INHERITED_SOURCE_FILES: [(&str, &str); 3] = [
     ("ftoo_symbols_historical.tex", HISTORICAL),
     ("ftoo_registers.tex", REGISTERS),
 ];
-pub const INHERITED_SOURCE_DECLARATIONS: [(DefinitionId, &str); 4] = [
+pub const INHERITED_SOURCE_DECLARATIONS: [(DefinitionId, &str); 7] = [
     (
         DefinitionId::Comovfield,
         "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
@@ -33,6 +33,18 @@ pub const INHERITED_SOURCE_DECLARATIONS: [(DefinitionId, &str); 4] = [
     (
         DefinitionId::Gensym,
         "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+    ),
+    (
+        DefinitionId::Alignrate,
+        "\\NewDocumentCommand\n  { \\alignrate }\n  {  }\n  {\n    \\ensuremath{\\dot{\\sigma}}\n  }\n",
+    ),
+    (
+        DefinitionId::Willnet,
+        "\\NewDocumentCommand\n  { \\willnet }\n  {  }\n  {\n    \\ensuremath{\\omega\\sb{\\mathrm{net}}}\n  }\n",
+    ),
+    (
+        DefinitionId::Willdecay,
+        "\\NewDocumentCommand\n  { \\willdecay }\n  {  }\n  {\n    \\ensuremath{\\gamma\\sigma}\n  }\n",
     ),
 ];
 pub const INHERITED_VARIANCE_DECLARATION: &str = "\\RegisterVariance{\\comovfield}{operator}\n";
@@ -64,9 +76,12 @@ pub enum DefinitionId {
     Readout,
     Willvirtue,
     Gensym,
+    Alignrate,
+    Willnet,
+    Willdecay,
 }
 impl DefinitionId {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 14] = [
         Self::CoefficientOne,
         Self::CoefficientThree,
         Self::CoefficientOneValue,
@@ -78,6 +93,9 @@ impl DefinitionId {
         Self::Readout,
         Self::Willvirtue,
         Self::Gensym,
+        Self::Alignrate,
+        Self::Willnet,
+        Self::Willdecay,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -93,6 +111,9 @@ impl DefinitionId {
             Self::Readout => "readout",
             Self::Willvirtue => "willvirtue",
             Self::Gensym => "gensym",
+            Self::Alignrate => "alignrate",
+            Self::Willnet => "willnet",
+            Self::Willdecay => "willdecay",
         }
     }
 }
@@ -208,8 +229,9 @@ pub(super) fn call(id: DefinitionId, arguments: Vec<ExprDraft>) -> ExprDraft {
 #[allow(clippy::too_many_lines)] // The closed catalogue keeps source identities and bodies together.
 pub(super) fn catalogue() -> Vec<DefinitionSpec> {
     use DefinitionId::{
-        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Comovfield,
-        Dimension, FirstCoefficient, Gensym, Product, Readout, Willvirtue,
+        Alignrate, CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue,
+        Comovfield, Dimension, FirstCoefficient, Gensym, Product, Readout, Willdecay, Willnet,
+        Willvirtue,
     };
     use NodeId::{
         LangevinCoefficientOne, LangevinCoefficientOneValue, LangevinCoefficientThree,
@@ -341,6 +363,48 @@ pub(super) fn catalogue() -> Vec<DefinitionSpec> {
                 body: primitive(
                     PrimitiveId::Subscript,
                     vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
+                ),
+            },
+        },
+        DefinitionSpec {
+            id: Alignrate,
+            token: Alignrate.token(),
+            stem: "Alignrate",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Dot,
+                    vec![primitive(PrimitiveId::Sigma, vec![])],
+                ),
+            },
+        },
+        DefinitionSpec {
+            id: Willnet,
+            token: Willnet.token(),
+            stem: "Willnet",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Subscript,
+                    vec![
+                        primitive(PrimitiveId::Omega, vec![]),
+                        primitive(PrimitiveId::UprightNet, vec![]),
+                    ],
+                ),
+            },
+        },
+        DefinitionSpec {
+            id: Willdecay,
+            token: Willdecay.token(),
+            stem: "Willdecay",
+            signature: Signature { arity: 0 },
+            kind: DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::TightJoin,
+                    vec![
+                        primitive(PrimitiveId::Gamma, vec![]),
+                        primitive(PrimitiveId::Sigma, vec![]),
+                    ],
                 ),
             },
         },
@@ -783,7 +847,7 @@ fn fully_expanded(
     }
     *remaining -= 1;
     match expr {
-        ExprDraft::Literal { .. } => Some(expr.clone()),
+        ExprDraft::Literal { .. } | ExprDraft::Text { .. } => Some(expr.clone()),
         ExprDraft::Slot { index } => slots.get(usize::from(*index)).cloned(),
         ExprDraft::Call { callee, arguments } => {
             let arguments = arguments
@@ -962,6 +1026,7 @@ fn registered_variance_sites(source: &str, name: &str) -> usize {
         .filter(|(at, _)| declared_name(&source[*at + "\\RegisterVariance".len()..]) == Some(name))
         .count()
 }
+#[allow(clippy::too_many_lines)] // One comparison keeps all admitted source declarations and bodies together.
 pub(super) fn inherited_source(
     definitions: &[DefinitionSpec],
     sources: &InheritedSources<'_>,
@@ -998,6 +1063,39 @@ pub(super) fn inherited_source(
             primitive(
                 PrimitiveId::Subscript,
                 vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
+            ),
+        ),
+        (
+            DefinitionId::Alignrate,
+            sources.historical,
+            INHERITED_SOURCE_DECLARATIONS[4].1,
+            primitive(
+                PrimitiveId::Dot,
+                vec![primitive(PrimitiveId::Sigma, vec![])],
+            ),
+        ),
+        (
+            DefinitionId::Willnet,
+            sources.historical,
+            INHERITED_SOURCE_DECLARATIONS[5].1,
+            primitive(
+                PrimitiveId::Subscript,
+                vec![
+                    primitive(PrimitiveId::Omega, vec![]),
+                    primitive(PrimitiveId::UprightNet, vec![]),
+                ],
+            ),
+        ),
+        (
+            DefinitionId::Willdecay,
+            sources.historical,
+            INHERITED_SOURCE_DECLARATIONS[6].1,
+            primitive(
+                PrimitiveId::TightJoin,
+                vec![
+                    primitive(PrimitiveId::Gamma, vec![]),
+                    primitive(PrimitiveId::Sigma, vec![]),
+                ],
             ),
         ),
     ];
@@ -1072,6 +1170,7 @@ pub(super) fn admit(
                 &site(i, d.id).field("body"),
                 primitives,
                 definitions,
+                false,
             ));
         }
     }

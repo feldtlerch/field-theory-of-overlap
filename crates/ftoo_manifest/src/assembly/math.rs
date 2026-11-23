@@ -1,7 +1,9 @@
 use super::{
     AssemblyInputFault as Fault, AssemblyResource as Resource, MathSyntaxReason as Reason,
 };
-use crate::{Callee, CheckedNotation, DefinitionId, DefinitionKind, ExprDraft, PrimitiveId};
+use crate::{
+    Callee, CheckedNotation, DefinitionId, DefinitionKind, ExprDraft, PrimitiveId, TextRun,
+};
 use std::ops::Range;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,6 +51,7 @@ type Result<T> = std::result::Result<T, Failure>;
 struct Token {
     text: String,
     bytes: Range<usize>,
+    decoded_text: Option<(String, Range<usize>)>,
 }
 struct Node {
     draft: ExprDraft,
@@ -64,6 +67,7 @@ struct Parser<'a, 'b, 'g> {
     nodes: usize,
     commands: Vec<MathCommandUse>,
     arena: Vec<(Range<usize>, Vec<usize>)>,
+    display: bool,
 }
 fn limit(bytes: Range<usize>, resource: Resource, maximum: usize) -> Failure {
     Box::new((
@@ -75,6 +79,7 @@ fn limit(bytes: Range<usize>, resource: Resource, maximum: usize) -> Failure {
         },
     ))
 }
+#[allow(clippy::too_many_lines)] // Keep token and text-body ranges in one bounded scan.
 fn lex(source: &str) -> Result<Vec<Token>> {
     if source.len() > 262_144 {
         return Err(limit(262_144..262_145, Resource::MathBytes, 262_144));
@@ -110,12 +115,81 @@ fn lex(source: &str) -> Result<Vec<Token>> {
                 chars.next();
             }
         }
+        if &source[start..end] == "\\text" && chars.peek().is_some_and(|(_, c)| *c == '{') {
+            chars.next();
+            let body_start = end + 1;
+            let mut body_end = body_start;
+            let mut closed = false;
+            let mut previous = None;
+            for (at, value) in chars.by_ref() {
+                if value == '}' {
+                    end = at + 1;
+                    closed = true;
+                    break;
+                }
+                if !value.is_ascii_alphabetic() && !matches!(value, ' ' | ',' | '-') {
+                    return Err(Box::new((
+                        at..at + value.len_utf8(),
+                        Fault::MathSyntax {
+                            reason: Reason::InvalidTextCharacter,
+                            token: value.to_string(),
+                            expected: vec!["ASCII letter, space, comma or hyphen".into()],
+                        },
+                    )));
+                }
+                if previous == Some(value) && matches!(value, ' ' | ',' | '-') {
+                    return Err(Box::new((
+                        at..at + 1,
+                        Fault::MathSyntax {
+                            reason: Reason::InvalidTextCharacter,
+                            token: value.to_string(),
+                            expected: vec!["no adjacent spaces, commas or hyphens".into()],
+                        },
+                    )));
+                }
+                previous = Some(value);
+                body_end = at + value.len_utf8();
+                if body_end - body_start > 256 {
+                    return Err(limit(at..at + 1, Resource::MathTextBytes, 256));
+                }
+            }
+            if !closed {
+                return Err(Box::new((
+                    start..start + 5,
+                    Fault::MathSyntax {
+                        reason: Reason::UnclosedText,
+                        token: "\\text".into(),
+                        expected: vec!["}".into()],
+                    },
+                )));
+            }
+            if source[body_start..body_end].trim_matches(' ').is_empty() {
+                return Err(Box::new((
+                    body_start..body_end.max(body_start + 1),
+                    Fault::MathSyntax {
+                        reason: Reason::EmptyText,
+                        token: source[body_start..body_end].into(),
+                        expected: vec!["non-space text".into()],
+                    },
+                )));
+            }
+            if tokens.len() == 16_384 {
+                return Err(limit(start..end, Resource::MathTokens, 16_384));
+            }
+            tokens.push(Token {
+                text: "\\text".into(),
+                bytes: start..end,
+                decoded_text: Some((source[body_start..body_end].into(), body_start..body_end)),
+            });
+            continue;
+        }
         if tokens.len() == 16_384 {
             return Err(limit(start..end, Resource::MathTokens, 16_384));
         }
         tokens.push(Token {
             text: source[start..end].into(),
             bytes: start..end,
+            decoded_text: None,
         });
     }
     Ok(tokens)
@@ -125,6 +199,7 @@ impl Parser<'_, '_, '_> {
         self.tokens.get(self.at).cloned().unwrap_or(Token {
             text: String::new(),
             bytes: self.eof..self.eof,
+            decoded_text: None,
         })
     }
     fn is(&self, text: &str) -> bool {
@@ -172,10 +247,31 @@ impl Parser<'_, '_, '_> {
     }
     fn equality_inner(&mut self) -> Result<Node> {
         let left = self.sum()?;
+        if self.display
+            && self.is("\\;")
+            && self.tokens.get(self.at + 1).is_some_and(|t| t.text == "=")
+        {
+            self.take();
+        } else if self.display && self.is("=") {
+            return Err(self.syntax(Reason::UnexpectedToken, &["\\;"]));
+        }
         if !self.is("=") {
             return Ok(left);
         }
-        self.take();
+        let operator = self.take();
+        if self.display && !self.is("\\;") {
+            return Err(Box::new((
+                operator.bytes,
+                Fault::MathSyntax {
+                    reason: Reason::UnexpectedToken,
+                    token: operator.text,
+                    expected: vec!["\\;".into()],
+                },
+            )));
+        }
+        if self.display {
+            self.take();
+        }
         let right = self.sum()?;
         let bytes = left.bytes.start..right.bytes.end;
         let result = self.primitive(PrimitiveId::Equal, vec![left, right], bytes)?;
@@ -189,16 +285,51 @@ impl Parser<'_, '_, '_> {
     }
     fn sum(&mut self) -> Result<Node> {
         let mut left = self.product()?;
-        while self.is("+") || self.minus() {
+        while self.is("+")
+            || self.minus()
+            || (self.display
+                && self.is("\\;")
+                && self
+                    .tokens
+                    .get(self.at + 1)
+                    .is_some_and(|t| matches!(t.text.as_str(), "+" | "-")))
+        {
+            if self.display && !self.is("\\;") {
+                return Err(self.syntax(Reason::UnexpectedToken, &["\\;"]));
+            }
+            if self.display && self.is("\\;") {
+                self.take();
+            }
             let negate = self.minus();
             let sign = self.take();
+            if self.display && !self.is("\\;") {
+                return Err(Box::new((
+                    sign.bytes,
+                    Fault::MathSyntax {
+                        reason: Reason::UnexpectedToken,
+                        token: sign.text,
+                        expected: vec!["\\;".into()],
+                    },
+                )));
+            }
+            if self.display {
+                self.take();
+            }
             let mut right = self.product()?;
-            if negate {
+            if negate && !self.display {
                 let bytes = sign.bytes.start..right.bytes.end;
                 right = self.primitive(PrimitiveId::Negate, vec![right], bytes)?;
             }
             let bytes = left.bytes.start..right.bytes.end;
-            left = self.primitive(PrimitiveId::Add, vec![left, right], bytes)?;
+            left = self.primitive(
+                if negate && self.display {
+                    PrimitiveId::Subtract
+                } else {
+                    PrimitiveId::Add
+                },
+                vec![left, right],
+                bytes,
+            )?;
         }
         Ok(left)
     }
@@ -208,9 +339,11 @@ impl Parser<'_, '_, '_> {
             .primitives()
             .iter()
             .find(|p| {
-                matches!(p.id(), PrimitiveId::Multiply | PrimitiveId::Juxtapose)
-                    && (p.operation().host_tokens().contains(&text.as_str())
-                        || p.operation().unicode_scalar() == Some(text.as_str()))
+                matches!(
+                    p.id(),
+                    PrimitiveId::Multiply | PrimitiveId::Juxtapose | PrimitiveId::Times
+                ) && (p.operation().host_tokens().contains(&text.as_str())
+                    || p.operation().unicode_scalar() == Some(text.as_str()))
             })
             .map(crate::PrimitiveSpec::id)
     }
@@ -227,6 +360,9 @@ impl Parser<'_, '_, '_> {
     fn product(&mut self) -> Result<Node> {
         let mut left = self.unary()?;
         loop {
+            if self.display && self.is("\\;") {
+                break;
+            }
             let id = if let Some(id) = self.infix() {
                 self.take();
                 id
@@ -319,8 +455,32 @@ impl Parser<'_, '_, '_> {
         self.arena[node.index].0 = node.bytes.clone();
         Ok(node)
     }
+    #[allow(clippy::too_many_lines)] // Every display-only atom checks its original token site.
     fn atom(&mut self) -> Result<Node> {
         let token = self.token();
+        if let Some((value, source)) = token.decoded_text.clone() {
+            if !self.display {
+                return Err(self.syntax(Reason::UnexpectedToken, &["inline atom"]));
+            }
+            self.take();
+            if self.nodes == 4096 {
+                return Err(limit(token.bytes, Resource::MathNodes, 4096));
+            }
+            self.nodes += 1;
+            let index = self.arena.len();
+            self.arena.push((token.bytes.clone(), Vec::new()));
+            return Ok(Node {
+                draft: ExprDraft::Text {
+                    runs: vec![TextRun {
+                        decoded: 0..value.len(),
+                        text: value,
+                        source,
+                    }],
+                },
+                bytes: token.bytes,
+                index,
+            });
+        }
         match token.text.as_str() {
             "{" => return self.group("}"),
             "(" | "[" => {
@@ -335,10 +495,50 @@ impl Parser<'_, '_, '_> {
             }
             _ => {}
         }
+        if token.text == "\\underbrace" {
+            if !self.display {
+                return Err(self.syntax(Reason::UnexpectedToken, &["inline atom"]));
+            }
+            self.take();
+            if !self.is("{") {
+                return Err(self.syntax(Reason::UnexpectedToken, &["{"]));
+            }
+            let base = self.group("}")?;
+            if !self.is("_") {
+                return Err(self.syntax(Reason::UnexpectedToken, &["_"]));
+            }
+            self.take();
+            if !self.is("{") {
+                return Err(self.syntax(Reason::UnexpectedToken, &["{"]));
+            }
+            let annotation = self.group("}")?;
+            if let ExprDraft::Text { runs } = &annotation.draft
+                && runs
+                    .iter()
+                    .any(|run| run.text.trim_matches(' ') == "pending")
+            {
+                return Err(Box::new((
+                    runs[0].source.clone(),
+                    Fault::MathSyntax {
+                        reason: Reason::PendingAnnotation,
+                        token: "pending".into(),
+                        expected: vec!["authored annotation".into()],
+                    },
+                )));
+            }
+            let bytes = token.bytes.start..annotation.bytes.end;
+            return self.primitive(PrimitiveId::Underbrace, vec![base, annotation], bytes);
+        }
         let primitive = self.catalogue.primitives().iter().find(|p| {
             matches!(
                 p.id(),
-                PrimitiveId::Alpha | PrimitiveId::Beta | PrimitiveId::Fraction
+                PrimitiveId::Alpha
+                    | PrimitiveId::Beta
+                    | PrimitiveId::Fraction
+                    | PrimitiveId::Omega
+                    | PrimitiveId::Sigma
+                    | PrimitiveId::Gamma
+                    | PrimitiveId::Dot
             ) && (p.operation().host_tokens().contains(&token.text.as_str())
                 || p.operation().unicode_scalar() == Some(token.text.as_str()))
         });
@@ -472,12 +672,25 @@ pub fn parse_assembly_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
 ) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
-    parse_inner(catalogue, source).map_err(|failure| *failure)
+    parse_inner(catalogue, source, false).map_err(|failure| *failure)
+}
+/// Parse a mathematical display with its explicit thick-space boundaries.
+/// # Errors
+/// Returns the first decisive decoded range and complete parser fault.
+pub fn parse_assembly_display_math(
+    catalogue: &CheckedNotation<'_, '_>,
+    source: &str,
+) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
+    parse_inner(catalogue, source, true).map_err(|failure| *failure)
 }
 /// Parse the complete authored entry without evaluating any TeX.
 /// # Errors
 /// Returns the first decisive decoded range and complete parser fault.
-fn parse_inner(catalogue: &CheckedNotation<'_, '_>, source: &str) -> Result<ParsedAssemblyMath> {
+fn parse_inner(
+    catalogue: &CheckedNotation<'_, '_>,
+    source: &str,
+    display: bool,
+) -> Result<ParsedAssemblyMath> {
     let mut parser = Parser {
         catalogue,
         tokens: lex(source)?,
@@ -487,6 +700,7 @@ fn parse_inner(catalogue: &CheckedNotation<'_, '_>, source: &str) -> Result<Pars
         nodes: 0,
         commands: Vec::new(),
         arena: Vec::new(),
+        display,
     };
     let root = parser.equality()?;
     if parser.at != parser.tokens.len() {
@@ -541,5 +755,216 @@ mod inherited_tests {
         let (bytes, fault) = parse_assembly_math(&catalogue, r"\gensym{x}").unwrap_err();
         assert_eq!(bytes, 7..8);
         assert!(matches!(fault, Fault::MathArguments { expected: 0, .. }));
+    }
+}
+
+#[cfg(test)]
+mod text_tests {
+    use super::*;
+    use crate::{
+        NotationFault, NotationResource, addressing, check_document_expression, check_expression,
+        notation, seed,
+    };
+
+    #[test]
+    #[allow(clippy::too_many_lines)] // One fixture checks each text-grammar refusal at its range.
+    fn math_text_is_decoded_not_tex() {
+        let graph = seed().unwrap();
+        let book = addressing(&graph).unwrap();
+        let catalogue = notation(&book).unwrap();
+        let source = r"\underbrace{\dot{\sigma}}_{\text{change in overlap}}";
+        let parsed = parse_assembly_display_math(&catalogue, source).unwrap();
+        let ExprDraft::Call { arguments, .. } = parsed.draft() else {
+            panic!("underbrace root");
+        };
+        let ExprDraft::Text { runs } = &arguments[1] else {
+            panic!("text annotation");
+        };
+        assert_eq!(runs[0].text, "change in overlap");
+        assert_eq!(&source[runs[0].source.clone()], "change in overlap");
+        assert_eq!(runs[0].decoded, 0..17);
+        assert!(parsed.ranges().iter().any(|r| r.path == [1] && &source[r.bytes.clone()] == r"{\text{change in overlap}}"));
+        for (source, reason, fragment) in [
+            (r"\text{a@tag{x}}", Reason::InvalidTextCharacter, "@"),
+            (r"\text{a\alpha}", Reason::InvalidTextCharacter, "\\"),
+            ("\\text{a\nb}", Reason::InvalidTextCharacter, "\n"),
+            (r"\text{a{b}", Reason::InvalidTextCharacter, "{"),
+            (r"\text{a--b}", Reason::InvalidTextCharacter, "-"),
+            (r"\text{a,,b}", Reason::InvalidTextCharacter, ","),
+            (r"\text{a  b}", Reason::InvalidTextCharacter, " "),
+            (r"\text{}", Reason::EmptyText, "}"),
+            (r"\text{ }", Reason::EmptyText, " "),
+            (r"\text{abc", Reason::UnclosedText, r"\text"),
+        ] {
+            let (range, fault) = parse_assembly_display_math(&catalogue, source).unwrap_err();
+            assert!(source[range].contains(fragment), "{source:?}: {fault:?}");
+            assert!(matches!(fault, Fault::MathSyntax { reason: actual, .. } if actual == reason));
+        }
+        for (source, pair) in [
+            (r"\text{a--b}", "--"),
+            (r"\text{a,,b}", ",,"),
+            (r"\text{a  b}", "  "),
+        ] {
+            let (range, _) = parse_assembly_display_math(&catalogue, source).unwrap_err();
+            let second = source.find(pair).unwrap() + 1;
+            assert_eq!(range, second..second + 1);
+        }
+        for source in [r"\text{a}", r"\underbrace{x}_{\text{a}}"] {
+            let (range, fault) = parse_assembly_math(&catalogue, source).unwrap_err();
+            assert_eq!(
+                &source[range],
+                if source.starts_with(r"\text") {
+                    r"\text{a}"
+                } else {
+                    r"\underbrace"
+                }
+            );
+            assert!(matches!(
+                fault,
+                Fault::MathSyntax {
+                    reason: Reason::UnexpectedToken,
+                    ..
+                }
+            ));
+        }
+        let (range, fault) = parse_assembly_display_math(&catalogue, r"\text{a}}").unwrap_err();
+        assert_eq!(range, 8..9);
+        assert!(matches!(
+            fault,
+            Fault::MathSyntax {
+                reason: Reason::UnexpectedToken,
+                ..
+            }
+        ));
+        for forbidden in [
+            "$", "`", "<", ">", "&", "|", "_", "^", "~", "*", ":", "1", "'", ".", "\t",
+        ] {
+            let source = format!("\\text{{a{forbidden}b}}");
+            let (range, fault) = parse_assembly_display_math(&catalogue, &source).unwrap_err();
+            let start = source.find(forbidden).unwrap();
+            assert_eq!(range, start..start + forbidden.len(), "{source}");
+            assert!(matches!(
+                fault,
+                Fault::MathSyntax {
+                    reason: Reason::InvalidTextCharacter,
+                    ..
+                }
+            ));
+        }
+        let (range, fault) = parse_assembly_display_math(&catalogue, "x=y").unwrap_err();
+        assert_eq!(range, 1..2);
+        assert!(matches!(
+            fault,
+            Fault::MathSyntax {
+                reason: Reason::UnexpectedToken,
+                ..
+            }
+        ));
+        let (range, fault) = parse_assembly_display_math(&catalogue, r"x\;=\;y+z").unwrap_err();
+        assert_eq!(range, 7..8);
+        assert!(matches!(
+            fault,
+            Fault::MathSyntax {
+                reason: Reason::UnexpectedToken,
+                ..
+            }
+        ));
+        let (range, fault) =
+            parse_assembly_display_math(&catalogue, r"\underbrace{x}_{\text{pending}}")
+                .unwrap_err();
+        let start = r"\underbrace{x}_{\text{pending}}".find("pending").unwrap();
+        assert_eq!(range, start..start + 7);
+        assert!(matches!(
+            fault,
+            Fault::MathSyntax {
+                reason: Reason::PendingAnnotation,
+                ..
+            }
+        ));
+        let parsed = parse_assembly_display_math(&catalogue, source).unwrap();
+        let standalone = check_expression(&catalogue, parsed.draft().clone()).unwrap_err();
+        assert!(
+            standalone
+                .diagnostics()
+                .iter()
+                .any(|d| matches!(d.fault, NotationFault::TextOutsideDocument))
+        );
+        check_document_expression(&catalogue, parsed.into_draft()).unwrap();
+        let merged = check_document_expression(
+            &catalogue,
+            ExprDraft::Text {
+                runs: vec![
+                    TextRun {
+                        text: "change ".into(),
+                        source: 0..7,
+                        decoded: 0..7,
+                    },
+                    TextRun {
+                        text: "in overlap".into(),
+                        source: 7..17,
+                        decoded: 7..17,
+                    },
+                ],
+            },
+        )
+        .unwrap();
+        let ExprDraft::Text { runs } = merged.draft() else {
+            panic!("merged text");
+        };
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].text, "change in overlap");
+        assert_eq!(runs[0].source, 0..17);
+        let too_long = "a".repeat(257);
+        let at_limit = "a".repeat(256);
+        let accepted =
+            parse_assembly_display_math(&catalogue, &format!("\\text{{{at_limit}}}")).unwrap();
+        check_document_expression(&catalogue, accepted.into_draft()).unwrap();
+        let (range, fault) =
+            parse_assembly_display_math(&catalogue, &format!("\\text{{{too_long}}}")).unwrap_err();
+        assert_eq!(range, 262..263);
+        assert!(matches!(
+            fault,
+            Fault::Limit {
+                resource: Resource::MathTextBytes,
+                limit: 256,
+                ..
+            }
+        ));
+        let invalid = ExprDraft::Text {
+            runs: vec![TextRun {
+                text: too_long,
+                source: 0..257,
+                decoded: 0..257,
+            }],
+        };
+        let error = check_document_expression(&catalogue, invalid).unwrap_err();
+        assert!(error.diagnostics().iter().any(|d| matches!(
+            d.fault,
+            NotationFault::NotationLimit {
+                resource: NotationResource::TextBytes,
+                limit: 256,
+                ..
+            }
+        )));
+        let pending = ExprDraft::Call {
+            callee: Callee::Primitive(PrimitiveId::Underbrace),
+            arguments: vec![
+                ExprDraft::Literal { value: "x".into() },
+                ExprDraft::Text {
+                    runs: vec![TextRun {
+                        text: " pending ".into(),
+                        source: 0..9,
+                        decoded: 0..9,
+                    }],
+                },
+            ],
+        };
+        let error = check_document_expression(&catalogue, pending).unwrap_err();
+        assert!(
+            error
+                .diagnostics()
+                .iter()
+                .any(|d| matches!(d.fault, NotationFault::PendingAnnotation))
+        );
     }
 }

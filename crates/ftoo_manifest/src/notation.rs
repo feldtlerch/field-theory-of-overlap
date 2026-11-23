@@ -10,8 +10,8 @@ mod tiers;
 
 use crate::{AddressBook, NodeId, NodeKind};
 pub use ast::{
-    ExprDraft, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES, MathSort,
-    Signature,
+    ExprDraft, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_EXPRESSION_TEXT_BYTES,
+    MAX_LITERAL_BYTES, MAX_TEXT_BYTES, MAX_TEXT_RUNS, MathSort, Signature, TextRun,
 };
 pub use catalogue::{
     DefinitionCategory, DefinitionId, DefinitionKind, DefinitionSpec,
@@ -291,6 +291,25 @@ pub fn check_expression<'catalogue, 'book, 'graph>(
     catalogue: &'catalogue CheckedNotation<'book, 'graph>,
     draft: ExprDraft,
 ) -> Result<CheckedExpression<'catalogue, 'book, 'graph>, NotationErrors> {
+    check_expression_inner(catalogue, draft, false)
+}
+/// Check a document-owned expression whose decoded text runs are admitted.
+/// # Errors
+/// Returns AST or expansion diagnostics; never renderer readiness.
+pub fn check_document_expression<'catalogue, 'book, 'graph>(
+    catalogue: &'catalogue CheckedNotation<'book, 'graph>,
+    draft: ExprDraft,
+) -> Result<CheckedExpression<'catalogue, 'book, 'graph>, NotationErrors> {
+    check_expression_inner(catalogue, draft, true)
+}
+fn check_expression_inner<'catalogue, 'book, 'graph>(
+    catalogue: &'catalogue CheckedNotation<'book, 'graph>,
+    mut draft: ExprDraft,
+    allow_text: bool,
+) -> Result<CheckedExpression<'catalogue, 'book, 'graph>, NotationErrors> {
+    if allow_text {
+        ast::merge_plain_runs(&mut draft);
+    }
     let definitions: Vec<_> = catalogue
         .definitions
         .iter()
@@ -303,6 +322,7 @@ pub fn check_expression<'catalogue, 'book, 'graph>(
         &site,
         &catalogue.primitives,
         &definitions,
+        allow_text,
     ))?;
     let uses = ast::expand(&draft, site, &definitions, 0)
         .map_err(|e| NotationErrors::from_diagnostics(vec![*e]).expect("one diagnostic"))?;

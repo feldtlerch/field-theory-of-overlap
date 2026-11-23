@@ -630,7 +630,14 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             ..
         }
     )));
-    for id in [D::Comovfield, D::Willvirtue, D::Gensym] {
+    for id in [
+        D::Comovfield,
+        D::Willvirtue,
+        D::Gensym,
+        D::Alignrate,
+        D::Willnet,
+        D::Willdecay,
+    ] {
         rows.push(NativeCase::Sweep {
             owner: RenderOwner::Definition(id),
             case: "base".into(),
@@ -653,6 +660,14 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
         (P::Calligraphic, 1),
         (P::UprightVir, 0),
         (P::UprightS, 0),
+        (P::Dot, 1),
+        (P::Sigma, 0),
+        (P::Gamma, 0),
+        (P::Times, 2),
+        (P::Subtract, 2),
+        (P::TightJoin, 2),
+        (P::Underbrace, 2),
+        (P::UprightNet, 0),
     ];
     for (id, arity) in primitives {
         rows.push(NativeCase::Sweep {
@@ -677,6 +692,14 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
                 "calligraphic",
                 "upright-vir",
                 "upright-s",
+                "dot",
+                "sigma",
+                "gamma",
+                "times",
+                "subtract",
+                "tight-join",
+                "underbrace",
+                "upright-net",
             ] {
                 rows.push(NativeCase::Sweep {
                     owner: RenderOwner::Primitive(id),
@@ -685,7 +708,7 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             }
         }
     }
-    assert_eq!(rows.len(), 328);
+    assert_eq!(rows.len(), 699);
     assert_eq!(native::sweep_inventory(&catalogue, &rows), Ok(()));
     let missing = NativeCase::Sweep {
         owner: RenderOwner::Definition(D::Dimension),

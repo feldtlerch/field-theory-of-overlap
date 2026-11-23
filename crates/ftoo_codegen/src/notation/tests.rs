@@ -37,6 +37,105 @@ fn prepared() -> support::Support {
 }
 
 #[test]
+fn support_required_math_text_display_spelling_and_layout() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let source = r"\underbrace{\dot{\sigma}}_{\text{change in overlap}}";
+    let parsed = ftoo_manifest::parse_assembly_display_math(&catalogue, source).unwrap();
+    let renderable = prepare_notation(&catalogue).unwrap();
+    let inline_literal = renderable
+        .check_expression(ExprDraft::Literal { value: "x".into() })
+        .unwrap();
+    assert!(
+        !inline_literal
+            .render(RenderTarget::Unicode)
+            .unwrap()
+            .is_display()
+    );
+    let expression = renderable
+        .check_document_expression(parsed.into_draft())
+        .unwrap();
+    assert_eq!(
+        expression
+            .render_display(RenderTarget::Macro)
+            .unwrap()
+            .source(),
+        source
+    );
+    let screen = expression.render_display(RenderTarget::Unicode).unwrap();
+    assert!(screen.is_display());
+    assert_eq!(
+        screen.source(),
+        r"\underbrace{\dot{σ}}_{\text{change in overlap}}"
+    );
+    let inline = katex::invoke(&renderable.support, Some(screen.source()))
+        .unwrap()
+        .unwrap();
+    let display = katex::invoke_display(&renderable.support, screen.source())
+        .unwrap()
+        .unwrap();
+    assert_ne!(inline, display);
+    assert!(display.contains("katex-display"));
+    assert!(!inline.contains("katex-display"));
+    let literal = |value: &str| ExprDraft::Literal {
+        value: value.into(),
+    };
+    let bad = ExprDraft::Call {
+        callee: Callee::Primitive(PrimitiveId::Equal),
+        arguments: vec![
+            ExprDraft::Call {
+                callee: Callee::Primitive(PrimitiveId::Add),
+                arguments: vec![literal("x"), literal("y")],
+            },
+            literal("z"),
+        ],
+    };
+    let bad = renderable.check_document_expression(bad).unwrap();
+    let err = bad.render_display(RenderTarget::Unicode).unwrap_err();
+    assert!(
+        matches!(err, NotationRenderError::Admission(ref e) if e.diagnostics().iter().any(|d| d.rule == RuleId::M053 && d.fault == NotationFault::DisplayShape))
+    );
+    let flow_source = r"\underbrace{\alignrate}_{\text{change in overlap}}\;=\;\underbrace{\willnet}_{\text{will, signed}}\;-\;\underbrace{\willdecay}_{\text{decay}}\;+\;\underbrace{\text{reward-fed growth}}_{\text{surplus}\times\text{witness density}}";
+    let parsed = ftoo_manifest::parse_assembly_display_math(&catalogue, flow_source).unwrap();
+    let flow = renderable
+        .check_document_expression(parsed.into_draft())
+        .unwrap();
+    assert_eq!(
+        flow.render_display(RenderTarget::Macro).unwrap().source(),
+        flow_source.replace(r"\times", r"\times{}")
+    );
+    assert_eq!(
+        flow.render_display(RenderTarget::Unicode).unwrap().source(),
+        r"\underbrace{\dot{σ}}_{\text{change in overlap}}\;=\;\underbrace{{ω}_{\mathrm{net}}}_{\text{will, signed}}\;-\;\underbrace{γσ}_{\text{decay}}\;+\;\underbrace{\text{reward-fed growth}}_{\text{surplus}×\text{witness density}}"
+    );
+    let word = |value: &str| ExprDraft::Text {
+        runs: vec![ftoo_manifest::TextRun {
+            text: value.into(),
+            source: 0..value.len(),
+            decoded: 0..value.len(),
+        }],
+    };
+    let product = renderable
+        .check_document_expression(ExprDraft::Call {
+            callee: Callee::Primitive(PrimitiveId::Times),
+            arguments: vec![word("surplus"), literal("x")],
+        })
+        .unwrap();
+    let product_source = product.render_display(RenderTarget::Macro).unwrap();
+    assert_eq!(product_source.source(), r"\text{surplus}\times{}x");
+    assert!(!product_source.source().contains(r"\timesx"));
+    katex::invoke_display(&renderable.support, product_source.source())
+        .unwrap()
+        .unwrap();
+    assert!(
+        flow.render_display(RenderTarget::Macro)
+            .unwrap()
+            .is_display()
+    );
+}
+
+#[test]
 fn support_required_inherited_sweep_status_and_mark_policy() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
@@ -46,12 +145,15 @@ fn support_required_inherited_sweep_status_and_mark_policy() {
     assert!(!prepared.declarations().contains(r"\gensym"));
     let artifact: serde_json::Value = serde_json::from_slice(&prepared.status_artifact()).unwrap();
     let inherited = artifact["inherited"].as_array().unwrap();
-    assert_eq!(inherited.len(), 4);
+    assert_eq!(inherited.len(), 7);
     for id in [
         DefinitionId::Comovfield,
         DefinitionId::Readout,
         DefinitionId::Willvirtue,
         DefinitionId::Gensym,
+        DefinitionId::Alignrate,
+        DefinitionId::Willnet,
+        DefinitionId::Willdecay,
     ] {
         assert!(
             inherited
@@ -2208,6 +2310,10 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     let book = ftoo_manifest::addressing(&graph).unwrap();
     let n = ftoo_manifest::notation(&book).unwrap();
     let original = render::declarations(None, &n).unwrap();
+    let coefficient_position = original
+        .iter()
+        .position(|record| record.id == DefinitionId::CoefficientOne)
+        .unwrap();
     let catalogue = NotationSite::Catalogue {
         file: "crates/ftoo_manifest/src/notation/catalogue.rs".into(),
     };
@@ -2227,7 +2333,7 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     for count in [2, 3] {
         let mut records = original.clone();
         for _ in 1..count {
-            records.push(original[0].clone());
+            records.push(original[coefficient_position].clone());
         }
         exact_admission(
             sweep::inventory(&n, &records).unwrap_err(),
@@ -2243,7 +2349,7 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     }
     let mut records = original.clone();
     records.retain(|r| r.id != DefinitionId::CoefficientThree);
-    records.push(original[0].clone());
+    records.push(original[coefficient_position].clone());
     exact_admission(
         sweep::inventory(&n, &records).unwrap_err(),
         RuleId::M052,
@@ -2258,14 +2364,21 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     let site = NotationSite::Rendered {
         owner: RenderOwner::Definition(DefinitionId::CoefficientOne),
         case: "declaration".into(),
-        bytes: 0..declaration_goldens()[0].1.len(),
+        bytes: {
+            let start: usize = original
+                .iter()
+                .take(coefficient_position)
+                .map(|record| record.source.len())
+                .sum();
+            start..start + declaration_goldens()[0].1.len()
+        },
         origins: vec![NotationOrigin {
             definition: Some(DefinitionId::CoefficientOne),
             path: vec![],
         }],
     };
     let mut records = original.clone();
-    records[0].command = "\\Wrong".into();
+    records[coefficient_position].command = "\\Wrong".into();
     exact_admission(
         sweep::inventory(&n, &records).unwrap_err(),
         RuleId::M052,
@@ -2279,7 +2392,7 @@ fn sweep_inventory_mutations_are_exact_and_restore() {
     );
     sweep::inventory(&n, &original).unwrap();
     let mut records = original.clone();
-    records[0].arity = 1;
+    records[coefficient_position].arity = 1;
     exact_admission(
         sweep::inventory(&n, &records).unwrap_err(),
         RuleId::M052,
@@ -2398,7 +2511,7 @@ fn incomplete_and_output_boundaries_have_exact_sites() {
 
 // This oracle has no descriptor, declaration or writer reads. Its closed input
 // inventory and exact strings deliberately duplicate the reviewed specification.
-const PRIMITIVES: [(PrimitiveId, &str, usize); 16] = [
+const PRIMITIVES: [(PrimitiveId, &str, usize); 24] = [
     (PrimitiveId::Alpha, "alpha", 0),
     (PrimitiveId::Beta, "beta", 0),
     (PrimitiveId::Fraction, "fraction", 2),
@@ -2415,8 +2528,16 @@ const PRIMITIVES: [(PrimitiveId, &str, usize); 16] = [
     (PrimitiveId::Calligraphic, "calligraphic", 1),
     (PrimitiveId::UprightVir, "upright-vir", 0),
     (PrimitiveId::UprightS, "upright-s", 0),
+    (PrimitiveId::Dot, "dot", 1),
+    (PrimitiveId::Sigma, "sigma", 0),
+    (PrimitiveId::Gamma, "gamma", 0),
+    (PrimitiveId::Times, "times", 2),
+    (PrimitiveId::Subtract, "subtract", 2),
+    (PrimitiveId::TightJoin, "tight-join", 2),
+    (PrimitiveId::Underbrace, "underbrace", 2),
+    (PrimitiveId::UprightNet, "upright-net", 0),
 ];
-const DEFINITIONS: [(DefinitionId, &str, usize); 11] = [
+const DEFINITIONS: [(DefinitionId, &str, usize); 14] = [
     (DefinitionId::CoefficientOne, "coefficient-one", 0),
     (DefinitionId::CoefficientThree, "coefficient-three", 0),
     (
@@ -2436,6 +2557,9 @@ const DEFINITIONS: [(DefinitionId, &str, usize); 11] = [
     (DefinitionId::Readout, "readout", 0),
     (DefinitionId::Willvirtue, "willvirtue", 0),
     (DefinitionId::Gensym, "gensym", 0),
+    (DefinitionId::Alignrate, "alignrate", 0),
+    (DefinitionId::Willnet, "willnet", 0),
+    (DefinitionId::Willdecay, "willdecay", 0),
 ];
 fn oracle(expr: &ExprDraft, unicode: bool) -> String {
     let ExprDraft::Call { callee, arguments } = expr else {
@@ -2453,6 +2577,19 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             PrimitiveId::Calligraphic => format!("{}{{{}}}", r"\mathcal", a[0]),
             PrimitiveId::UprightVir => r"\mathrm{vir}".into(),
             PrimitiveId::UprightS => r"\mathrm{S}".into(),
+            PrimitiveId::UprightNet => r"\mathrm{net}".into(),
+            PrimitiveId::Sigma => if unicode { "σ" } else { r"\sigma{}" }.into(),
+            PrimitiveId::Gamma => if unicode { "γ" } else { r"\gamma{}" }.into(),
+            PrimitiveId::Dot => format!("\\dot{{{}}}", a[0]),
+            PrimitiveId::Underbrace => format!("\\underbrace{{{}}}_{{{}}}", a[0], a[1]),
+            PrimitiveId::Times => format!(
+                "{}{}{}",
+                a[0],
+                if unicode { "×" } else { r"\times{}" },
+                a[1]
+            ),
+            PrimitiveId::Subtract => format!("{}\\;-\\;{}", a[0], a[1]),
+            PrimitiveId::TightJoin => format!("{}{}", a[0], a[1]),
             PrimitiveId::Fraction => format!("\\frac{{{}}}{{{}}}", a[0], a[1]),
             PrimitiveId::Subscript => format!("{{{}}}_{{{}}}", a[0], a[1]),
             PrimitiveId::Superscript => format!("{{{}}}^{{{}}}", a[0], a[1]),
@@ -2482,6 +2619,9 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
                 DefinitionId::Readout => r"\readout",
                 DefinitionId::Willvirtue => r"\willvirtue",
                 DefinitionId::Gensym => r"\gensym",
+                DefinitionId::Alignrate => r"\alignrate",
+                DefinitionId::Willnet => r"\willnet",
+                DefinitionId::Willdecay => r"\willdecay",
             };
             format!(
                 "{command}{}",
@@ -2511,6 +2651,9 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             DefinitionId::Readout => r"\mathcal{M}".into(),
             DefinitionId::Willvirtue => r"{ω}^{\mathrm{vir}}".into(),
             DefinitionId::Gensym => r"{A}_{\mathrm{S}}".into(),
+            DefinitionId::Alignrate => r"\dot{σ}".into(),
+            DefinitionId::Willnet => r"{ω}_{\mathrm{net}}".into(),
+            DefinitionId::Willdecay => "γσ".into(),
         },
     }
 }
@@ -2600,7 +2743,7 @@ fn complete_row_key_invocation_and_both_form_inventory() {
         })
         .collect();
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 329);
+    assert_eq!(actual.len(), 700);
     for (owner, case, expr) in sweep::cases(&n) {
         let checked = ftoo_manifest::check_expression(&n, expr).unwrap();
         for target in [RenderTarget::Macro, RenderTarget::Unicode] {
@@ -3052,8 +3195,8 @@ fn committed_adapter_and_ci_pins_are_fixed() {
     let script = include_str!("../../../../tools/notation/check.cjs");
     assert!(script.contains("require(entry)"));
     assert!(script.contains("throwOnError: true, strict: 'error', trust: false"));
-    assert!(script.contains("function options(mathml = false)"));
-    assert!(script.contains("output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: false, maxExpand: 1000, macros: {}"));
+    assert!(script.contains("function options(mathml = false, display = false)"));
+    assert!(script.contains("output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: display, maxExpand: 1000, macros: {}"));
     assert!(script.contains("'--mathml-inline'"));
     assert!(!script.contains("--mathml-display"));
 }
@@ -3141,10 +3284,16 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
         checks.push(Box::new(move || { restored.unwrap(); }));
     }
     let context = r"\newcommand{\FtooQCoefficientOne}[0]{x}";
+    let declaration_start = context.len()
+        + records
+            .iter()
+            .take_while(|record| record.id != DefinitionId::CoefficientOne)
+            .map(|record| record.source.len())
+            .sum::<usize>();
     let collision = sweep::namespace(&support, &records, context);
     checks.push(Box::new(move || exact_admission(collision.unwrap_err(),
         RuleId::M050, NotationStage::Typesetting,
-        NotationSite::Rendered { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case: "declaration".into(), bytes: 39..115, origins: vec![NotationOrigin { definition: Some(DefinitionId::CoefficientOne), path: vec![] }] },
+        NotationSite::Rendered { owner: RenderOwner::Definition(DefinitionId::CoefficientOne), case: "declaration".into(), bytes: declaration_start..declaration_start + declaration_goldens()[0].1.len(), origins: vec![NotationOrigin { definition: Some(DefinitionId::CoefficientOne), path: vec![] }] },
         NotationFault::HostCollision { command: r"\FtooQCoefficientOne".into(), message: r"KaTeX parse error: \newcommand{\FtooQCoefficientOne} attempting to redefine \FtooQCoefficientOne; use \renewcommand".into() })));
     let restored_namespace = sweep::namespace(&support, &records, "");
     checks.push(Box::new(move || { restored_namespace.unwrap(); }));
@@ -3152,7 +3301,11 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
     let declared = katex::invoke(&support, Some(declaration));
     checks.push(Box::new(move || assert!(declared.unwrap().unwrap().contains("<math"))));
     let mut mutated = records.clone();
-    mutated[0].source = declaration.into();
+    let coefficient_position = mutated
+        .iter()
+        .position(|record| record.id == DefinitionId::CoefficientOne)
+        .unwrap();
+    mutated[coefficient_position].source = declaration.into();
     sweep::inventory(&n, &mutated).unwrap();
     let bundle = mutated
         .iter()
@@ -3203,7 +3356,7 @@ fn support_required_actual_grammar_refusals_and_host_collision_restore() {
         RuleId::M051, NotationStage::Typesetting, site,
         NotationFault::KaTeXRejected { target: RenderTarget::Macro, source: full,
             message: "KaTeX parse error: Undefined control sequence: \\NotDefined at position 38: …ficientOne}[0]{\\\u{332}N\u{332}o\u{332}t\u{332}D\u{332}e\u{332}f\u{332}i\u{332}n\u{332}e\u{332}d\u{332}}\n\\newcommand{\\…".into() })));
-    mutated[0] = records[0].clone();
+    mutated[coefficient_position] = records[coefficient_position].clone();
     sweep::inventory(&n, &mutated).unwrap();
     let bundle = mutated
         .iter()
@@ -3441,9 +3594,9 @@ fn retained_sweep_controls(support: &support::Support) {
                     .map(|row| row.source.as_str())
                     .collect::<String>()
             );
-            assert_eq!(pending.len(), 9);
+            assert_eq!(pending.len(), 12);
         } else {
-            assert_eq!(pending.len(), 4);
+            assert_eq!(pending.len(), 7);
             let expression = ftoo_manifest::check_expression(
                 &catalogue,
                 ftoo_manifest::ExprDraft::Call {

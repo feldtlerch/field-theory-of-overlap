@@ -34,6 +34,7 @@ pub enum AssemblyResource {
     SkeletonDepth,
     UnitPositions,
     MathBytes,
+    MathTextBytes,
     MathTokens,
     MathDepth,
     MathNodes,
@@ -53,6 +54,10 @@ pub enum MathSyntaxReason {
     RepeatedSubscript,
     RepeatedSuperscript,
     ChainedEquality,
+    UnclosedText,
+    EmptyText,
+    InvalidTextCharacter,
+    PendingAnnotation,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MathUseSite {

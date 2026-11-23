@@ -19,6 +19,14 @@ pub enum PrimitiveOperation {
     Calligraphic,
     UprightVir,
     UprightS,
+    Dot,
+    Sigma,
+    Gamma,
+    Times,
+    Subtract,
+    TightJoin,
+    Underbrace,
+    UprightNet,
 }
 impl PrimitiveOperation {
     /// Closed host control tokens used by the renderer and the future shared
@@ -30,11 +38,18 @@ impl PrimitiveOperation {
             Self::Beta => &["\\beta"],
             Self::Omega => &["\\omega"],
             Self::Calligraphic => &["\\symcal"],
-            Self::UprightVir | Self::UprightS => &["\\mathrm"],
+            Self::UprightVir | Self::UprightS | Self::UprightNet => &["\\mathrm"],
+            Self::Dot => &["\\dot"],
+            Self::Sigma => &["\\sigma"],
+            Self::Gamma => &["\\gamma"],
+            Self::Times => &["\\times"],
+            Self::Underbrace => &["\\underbrace"],
             Self::Fraction => &["\\frac"],
             Self::Multiply => &["\\cdot"],
             Self::Juxtapose => &["\\,"],
-            Self::Subscript
+            Self::Subtract
+            | Self::TightJoin
+            | Self::Subscript
             | Self::Superscript
             | Self::Add
             | Self::Equal
@@ -52,6 +67,9 @@ impl PrimitiveOperation {
             Self::Omega => Some("ω"),
             Self::Negate => Some("−"),
             Self::Multiply => Some("⋅"),
+            Self::Sigma => Some("σ"),
+            Self::Gamma => Some("γ"),
+            Self::Times => Some("×"),
             Self::Fraction
             | Self::Calligraphic
             | Self::UprightVir
@@ -62,21 +80,39 @@ impl PrimitiveOperation {
             | Self::Equal
             | Self::Juxtapose
             | Self::Parentheses
-            | Self::Dimension => None,
+            | Self::Dimension
+            | Self::Dot
+            | Self::Subtract
+            | Self::TightJoin
+            | Self::Underbrace
+            | Self::UprightNet => None,
         }
     }
     #[must_use]
     pub const fn arity(self) -> u8 {
         match self {
-            Self::Alpha | Self::Beta | Self::Omega | Self::UprightVir | Self::UprightS => 0,
-            Self::Calligraphic | Self::Negate | Self::Parentheses | Self::Dimension => 1,
+            Self::Alpha
+            | Self::Beta
+            | Self::Omega
+            | Self::UprightVir
+            | Self::UprightS
+            | Self::Sigma
+            | Self::Gamma
+            | Self::UprightNet => 0,
+            Self::Calligraphic | Self::Negate | Self::Parentheses | Self::Dimension | Self::Dot => {
+                1
+            }
             Self::Fraction
             | Self::Subscript
             | Self::Superscript
             | Self::Add
             | Self::Equal
             | Self::Multiply
-            | Self::Juxtapose => 2,
+            | Self::Juxtapose
+            | Self::Times
+            | Self::Subtract
+            | Self::TightJoin
+            | Self::Underbrace => 2,
         }
     }
 }
@@ -106,9 +142,17 @@ pub enum PrimitiveId {
     Calligraphic,
     UprightVir,
     UprightS,
+    Dot,
+    Sigma,
+    Gamma,
+    Times,
+    Subtract,
+    TightJoin,
+    Underbrace,
+    UprightNet,
 }
 impl PrimitiveId {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 24] = [
         Self::Alpha,
         Self::Beta,
         Self::Fraction,
@@ -125,6 +169,14 @@ impl PrimitiveId {
         Self::Calligraphic,
         Self::UprightVir,
         Self::UprightS,
+        Self::Dot,
+        Self::Sigma,
+        Self::Gamma,
+        Self::Times,
+        Self::Subtract,
+        Self::TightJoin,
+        Self::Underbrace,
+        Self::UprightNet,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -145,6 +197,14 @@ impl PrimitiveId {
             Self::Calligraphic => "calligraphic",
             Self::UprightVir => "upright-vir",
             Self::UprightS => "upright-s",
+            Self::Dot => "dot",
+            Self::Sigma => "sigma",
+            Self::Gamma => "gamma",
+            Self::Times => "times",
+            Self::Subtract => "subtract",
+            Self::TightJoin => "tight-join",
+            Self::Underbrace => "underbrace",
+            Self::UprightNet => "upright-net",
         }
     }
     #[must_use]
@@ -166,6 +226,14 @@ impl PrimitiveId {
             Self::Calligraphic => PrimitiveOperation::Calligraphic,
             Self::UprightVir => PrimitiveOperation::UprightVir,
             Self::UprightS => PrimitiveOperation::UprightS,
+            Self::Dot => PrimitiveOperation::Dot,
+            Self::Sigma => PrimitiveOperation::Sigma,
+            Self::Gamma => PrimitiveOperation::Gamma,
+            Self::Times => PrimitiveOperation::Times,
+            Self::Subtract => PrimitiveOperation::Subtract,
+            Self::TightJoin => PrimitiveOperation::TightJoin,
+            Self::Underbrace => PrimitiveOperation::Underbrace,
+            Self::UprightNet => PrimitiveOperation::UprightNet,
         }
     }
 }

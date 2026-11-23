@@ -24,5 +24,23 @@
   }
 \DeclareQuantity{\gensym}{0}{ dim={\Time[-1]}, variance=operator, spends={} }
   { A\sb{\mathrm S} }
+\NewDocumentCommand
+  { \alignrate }
+  {  }
+  {
+    \ensuremath{\dot{\sigma}}
+  }
+\NewDocumentCommand
+  { \willnet }
+  {  }
+  {
+    \ensuremath{\omega\sb{\mathrm{net}}}
+  }
+\NewDocumentCommand
+  { \willdecay }
+  {  }
+  {
+    \ensuremath{\gamma\sigma}
+  }
 \RegisterVariance{\comovfield}{operator}
 \ExplSyntaxOff

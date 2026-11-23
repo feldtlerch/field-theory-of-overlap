@@ -85,6 +85,9 @@ fn inherited_coda_definitions_are_checked_and_unbound() -> TestResult {
         DefinitionId::Readout,
         DefinitionId::Willvirtue,
         DefinitionId::Gensym,
+        DefinitionId::Alignrate,
+        DefinitionId::Willnet,
+        DefinitionId::Willdecay,
     ] {
         let definition = notation.definition(id);
         assert!(matches!(
@@ -100,6 +103,145 @@ fn inherited_coda_definitions_are_checked_and_unbound() -> TestResult {
         );
         check_expression(&notation, call(id, vec![]))?;
     }
+    Ok(())
+}
+
+#[test]
+fn document_text_bounds_and_catalogue_refusal() -> TestResult {
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let catalogue = notation(&book)?;
+    let runs = |count: usize, width: usize| {
+        (0..count)
+            .map(|index| {
+                let start = index * (width + 1);
+                TextRun {
+                    text: "a".repeat(width),
+                    source: start..start + width,
+                    decoded: start..start + width,
+                }
+            })
+            .collect()
+    };
+    for (count, width) in [(1, 256), (16, 256), (64, 1)] {
+        check_document_expression(
+            &catalogue,
+            ExprDraft::Text {
+                runs: runs(count, width),
+            },
+        )?;
+    }
+    let total_error = check_document_expression(
+        &catalogue,
+        ExprDraft::Text {
+            runs: runs(17, 256),
+        },
+    )
+    .unwrap_err();
+    assert!(total_error.diagnostics().iter().any(|d| matches!(
+        d.fault,
+        NotationFault::NotationLimit {
+            resource: NotationResource::ExpressionTextBytes,
+            limit: 4096,
+            actual: 4352,
+        }
+    )));
+    let run_error =
+        check_document_expression(&catalogue, ExprDraft::Text { runs: runs(65, 1) }).unwrap_err();
+    assert_eq!(run_error.diagnostics().len(), 1);
+    assert!(matches!(
+        run_error.diagnostics()[0].fault,
+        NotationFault::InvalidTextRuns { count: 65 }
+    ));
+    for value in ["a--b", "a,,b", "a  b"] {
+        let error = check_document_expression(
+            &catalogue,
+            ExprDraft::Text {
+                runs: vec![TextRun {
+                    text: value.into(),
+                    source: 0..value.len(),
+                    decoded: 0..value.len(),
+                }],
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .diagnostics()
+                .iter()
+                .any(|d| matches!(d.fault, NotationFault::InvalidText { .. }))
+        );
+    }
+    let mut definitions = catalogue::catalogue();
+    *body_mut(&mut definitions[0]) = ExprDraft::Text { runs: runs(1, 1) };
+    let error = catalogue::admit(&primitives::catalogue(), &definitions).unwrap_err();
+    assert!(
+        error
+            .diagnostics()
+            .iter()
+            .any(|d| matches!(d.fault, NotationFault::TextOutsideDocument))
+    );
+    Ok(())
+}
+
+#[test]
+fn document_text_cross_run_separators_and_pending_refuse() -> TestResult {
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let catalogue = notation(&book)?;
+    let split = |first: &str, second: &str| ExprDraft::Text {
+        runs: vec![
+            TextRun {
+                text: first.into(),
+                source: 0..first.len(),
+                decoded: 0..first.len(),
+            },
+            TextRun {
+                text: second.into(),
+                source: first.len() + 1..first.len() + 1 + second.len(),
+                decoded: first.len() + 1..first.len() + 1 + second.len(),
+            },
+        ],
+    };
+    for (first, second, pair) in [("a-", "-b", "--"), ("a,", ",b", ",,"), ("a ", " b", "  ")] {
+        let error = check_document_expression(&catalogue, split(first, second)).unwrap_err();
+        assert_eq!(error.diagnostics().len(), 1);
+        assert_eq!(
+            error.diagnostics()[0].fault,
+            NotationFault::InvalidText { value: pair.into() }
+        );
+        assert_eq!(
+            error.diagnostics()[0].site,
+            NotationSite::Expression {
+                path: vec![
+                    NotationPathPart::Field("runs".into()),
+                    NotationPathPart::Argument(1)
+                ]
+            }
+        );
+    }
+    let error = check_document_expression(
+        &catalogue,
+        primitive(
+            PrimitiveId::Underbrace,
+            vec![literal("a"), split("pend", "ing")],
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(error.diagnostics().len(), 1);
+    assert_eq!(
+        error.diagnostics()[0].fault,
+        NotationFault::PendingAnnotation
+    );
+    assert_eq!(
+        error.diagnostics()[0].site,
+        NotationSite::Expression {
+            path: vec![
+                NotationPathPart::Field("arguments".into()),
+                NotationPathPart::Argument(1),
+            ]
+        }
+    );
     Ok(())
 }
 
@@ -171,6 +313,24 @@ fn inherited_source_bytes_and_declaration_sites_refuse_changes() {
             "variance=operator",
             "variance=operatpr",
             DefinitionId::Gensym,
+        ),
+        (
+            historical,
+            "\\ensuremath{\\dot{\\sigma}}",
+            "\\ensuremath{\\dot{\\alpha}}",
+            DefinitionId::Alignrate,
+        ),
+        (
+            historical,
+            "\\ensuremath{\\omega\\sb{\\mathrm{net}}}",
+            "\\ensuremath{\\omega\\sb{\\mathrm{new}}}",
+            DefinitionId::Willnet,
+        ),
+        (
+            historical,
+            "\\ensuremath{\\gamma\\sigma}",
+            "\\ensuremath{\\gamma\\alpha}",
+            DefinitionId::Willdecay,
         ),
         (
             registers,
@@ -447,8 +607,9 @@ fn inherited_source_rule_is_pinned() {
 #[test]
 fn n01_primitive_inventory_and_signatures() -> TestResult {
     use PrimitiveId::{
-        Add, Alpha, Beta, Calligraphic, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate,
-        Omega, Parentheses, Subscript, Superscript, UprightS, UprightVir,
+        Add, Alpha, Beta, Calligraphic, Dimension, Dot, Equal, Fraction, Gamma, Juxtapose,
+        Multiply, Negate, Omega, Parentheses, Sigma, Subscript, Subtract, Superscript, TightJoin,
+        Times, Underbrace, UprightNet, UprightS, UprightVir,
     };
     let graph = seed()?;
     let book = addressing(&graph)?;
@@ -469,6 +630,14 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         (Calligraphic, "calligraphic", 1),
         (UprightVir, "upright-vir", 0),
         (UprightS, "upright-s", 0),
+        (Dot, "dot", 1),
+        (Sigma, "sigma", 0),
+        (Gamma, "gamma", 0),
+        (Times, "times", 2),
+        (Subtract, "subtract", 2),
+        (TightJoin, "tight-join", 2),
+        (Underbrace, "underbrace", 2),
+        (UprightNet, "upright-net", 0),
     ];
     let n = notation(&book)?;
     assert_eq!(
@@ -519,7 +688,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            primitive_site(Alpha, 15, &["id"]),
+            primitive_site(Alpha, 23, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
@@ -527,7 +696,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 15, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 23, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
     );
     let mut p = primitives::catalogue();
     let mut duplicate = p[0].clone();
@@ -543,10 +712,10 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 16],
+                positions: vec![0, 24],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 16] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 24] }\n",
     );
     let mut p = primitives::catalogue();
     p[1].token = "alpha";
@@ -832,7 +1001,7 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            registry_site(CoefficientOne, 10, &["id"]),
+            registry_site(CoefficientOne, 13, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
@@ -840,7 +1009,7 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 10, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 13, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
     );
     for (target, reason) in [
         (Dimension, AliasTargetReason::ConstructorTarget),
@@ -1485,6 +1654,62 @@ fn n02_depth_and_node_boundaries() -> TestResult {
     check_expression(&n, literal("x"))?;
     Ok(())
 }
+
+#[test]
+fn document_text_run_cannot_step_past_node_bound() -> TestResult {
+    fn balanced_literals(leaves: usize) -> ExprDraft {
+        if leaves == 1 {
+            literal("a")
+        } else {
+            primitive(
+                PrimitiveId::Add,
+                vec![
+                    balanced_literals(leaves / 2),
+                    balanced_literals(leaves - leaves / 2),
+                ],
+            )
+        }
+    }
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let catalogue = notation(&book)?;
+    let expression = primitive(
+        PrimitiveId::Add,
+        vec![
+            balanced_literals(2_047),
+            primitive(
+                PrimitiveId::Equal,
+                vec![
+                    ExprDraft::Text {
+                        runs: vec![TextRun {
+                            text: "a".into(),
+                            source: 0..1,
+                            decoded: 0..1,
+                        }],
+                    },
+                    primitive(PrimitiveId::Negate, vec![literal("a")]),
+                ],
+            ),
+        ],
+    );
+    let error = check_document_expression(&catalogue, expression).unwrap_err();
+    assert_eq!(error.diagnostics().len(), 1);
+    assert_eq!(
+        error.diagnostics()[0].fault,
+        NotationFault::NotationLimit {
+            resource: NotationResource::AstNodes,
+            limit: 4_096,
+            actual: 4_097,
+        }
+    );
+    assert_eq!(
+        error.diagnostics()[0].site,
+        NotationSite::Expression {
+            path: argument_path(&[1, 0]),
+        }
+    );
+    Ok(())
+}
 // Independent visit arithmetic: a duplicating invocation visits its call, the
 // binary primitive and two slots, plus two visits of its argument tree.
 fn expanded_size(size: usize) -> ExprDraft {
@@ -1555,7 +1780,7 @@ fn n16_exact_appended_register() {
         [
             (
                 RuleId::M047,
-                "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields.",
+                "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields. Mathematics-text nodes contain bounded decoded plain runs in submitted document expressions; text nodes in catalogue bodies and tag runs refuse. An authored underbrace annotation whose decoded text, after trimming ASCII spaces, is pending refuses to preserve the derived status marker's distinction.",
                 "Every primitive descriptor, definition body and submitted notation expression.",
                 RuleState::Enforced,
                 None
@@ -1716,10 +1941,10 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 11],
+                positions: vec![0, 14],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 11] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 14] }\n",
     );
     let mut d = catalogue::catalogue();
     d[1].token = "coefficient-one";
@@ -1759,7 +1984,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
             diag(
                 RuleId::M047,
                 NotationStage::Catalogue,
-                primitive_site(PrimitiveId::Beta, 16, &["operation"]),
+                primitive_site(PrimitiveId::Beta, 24, &["operation"]),
                 NotationFault::CatalogMultiplicity {
                     entry: RegistryEntry::Primitive(PrimitiveId::Beta),
                     expected: 1,
@@ -1768,7 +1993,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 },
             ),
         ],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 16, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 24, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
     );
     notation(&book)?;
     Ok(())
@@ -1848,8 +2073,9 @@ fn n03_all_argument_errors_and_alias_self_cycle() -> TestResult {
 #[test]
 fn n05_seed_exact_statuses_and_catalogue_bodies() -> TestResult {
     use DefinitionId::{
-        CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue, Comovfield,
-        Dimension, FirstCoefficient, Gensym, Product, Readout, Willvirtue,
+        Alignrate, CoefficientOne, CoefficientOneValue, CoefficientThree, CoefficientThreeValue,
+        Comovfield, Dimension, FirstCoefficient, Gensym, Product, Readout, Willdecay, Willnet,
+        Willvirtue,
     };
     use NodeId::{
         LangevinCoefficientOne as One, LangevinCoefficientOneValue as OneValue,
@@ -2004,6 +2230,51 @@ fn n05_seed_exact_statuses_and_catalogue_bodies() -> TestResult {
                 body: primitive(
                     PrimitiveId::Subscript,
                     vec![literal("A"), primitive(PrimitiveId::UprightS, vec![])],
+                ),
+            },
+        ),
+        (
+            Alignrate,
+            "alignrate",
+            "Alignrate",
+            "\\alignrate",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Dot,
+                    vec![primitive(PrimitiveId::Sigma, vec![])],
+                ),
+            },
+        ),
+        (
+            Willnet,
+            "willnet",
+            "Willnet",
+            "\\willnet",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::Subscript,
+                    vec![
+                        primitive(PrimitiveId::Omega, vec![]),
+                        primitive(PrimitiveId::UprightNet, vec![]),
+                    ],
+                ),
+            },
+        ),
+        (
+            Willdecay,
+            "willdecay",
+            "Willdecay",
+            "\\willdecay",
+            0,
+            DefinitionKind::Inherited {
+                body: primitive(
+                    PrimitiveId::TightJoin,
+                    vec![
+                        primitive(PrimitiveId::Gamma, vec![]),
+                        primitive(PrimitiveId::Sigma, vec![]),
+                    ],
                 ),
             },
         ),
@@ -2186,14 +2457,14 @@ fn complete_seed_consumer() {
     let graph = seed().unwrap();
     let book = addressing(&graph).unwrap();
     let n = notation(&book).unwrap();
-    assert_eq!(n.definitions().len(), 11);
-    assert_eq!(n.primitives().len(), 16);
+    assert_eq!(n.definitions().len(), 14);
+    assert_eq!(n.primitives().len(), 24);
     assert_eq!(
         n.definitions()
             .iter()
             .filter(|d| d.status().is_some())
             .count(),
-        9
+        12
     );
     for object in NodeId::ALL {
         assert_eq!(

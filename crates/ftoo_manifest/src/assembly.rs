@@ -11,7 +11,10 @@ mod skeleton;
 mod tests;
 pub use diagnostics::*;
 pub use display::*;
-pub use math::{MathCommandUse, MathSourceRange, ParsedAssemblyMath, parse_assembly_math};
+pub use math::{
+    MathCommandUse, MathSourceRange, ParsedAssemblyMath, parse_assembly_display_math,
+    parse_assembly_math,
+};
 pub use skeleton::{
     CheckedSkeletons, SkeletonChild, SkeletonDraft, SkeletonPosition, SkeletonSection,
     check_skeletons,

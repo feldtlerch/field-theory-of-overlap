@@ -346,7 +346,7 @@ fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
         [
             (
                 RuleId::M053,
-                "Every shared math source parses completely into the closed notation AST within the assembly math bounds, resolves every command with its declared syntax, and passes both rendering consumers with all authored use sites retained.",
+                "Every shared math source parses completely into the closed notation AST within the assembly math bounds, resolves every command with its declared syntax, and passes both rendering consumers with all authored use sites retained. Text bodies use only the bounded decoded plain-text grammar at their source ranges.",
                 "All math entries of every welded unit consumed by assembly.",
                 RuleState::Enforced,
                 None

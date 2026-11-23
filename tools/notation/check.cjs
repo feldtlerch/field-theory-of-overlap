@@ -43,9 +43,9 @@ function measured(phase, operation) {
   }
 }
 
-function options(mathml = false) {
+function options(mathml = false, display = false) {
   return { throwOnError: true, strict: 'error', trust: false,
-    output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: false, maxExpand: 1000, macros: {} };
+    output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: display, maxExpand: 1000, macros: {} };
 }
 
 function decode(input) {
@@ -125,7 +125,7 @@ function batch(entry, expected) {
 function main() {
 try {
   const [mode, entry] = process.argv.slice(2);
-  if (process.argv.length !== 4 || !['--version', '--expression', '--batch', '--mathml-inline'].includes(mode) || !path.isAbsolute(entry)) {
+  if (process.argv.length !== 4 || !['--version', '--expression', '--expression-display', '--batch', '--mathml-inline'].includes(mode) || !path.isAbsolute(entry)) {
     throw new Error('expected an explicit mode and absolute package entry');
   }
   const pin = fs.readFileSync(path.join(__dirname, '.node-version'), 'utf8');
@@ -151,7 +151,7 @@ try {
     }
     const source = decode(buffer.subarray(0, length));
     try {
-      process.stdout.write(measured('notation.expression_evaluation', () => katex.renderToString(source, options(mode === '--mathml-inline'))));
+      process.stdout.write(measured('notation.expression_evaluation', () => katex.renderToString(source, options(mode === '--mathml-inline', mode === '--expression-display'))));
     } catch (error) {
       if (!(error instanceof katex.ParseError)) throw error;
       process.stdout.write(error.message);

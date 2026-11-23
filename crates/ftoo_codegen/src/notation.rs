@@ -156,13 +156,28 @@ fn rendered_site(
         origins,
     }
 }
+#[cfg(test)]
 fn typeset(
     support: &support::Support,
     target: RenderTarget,
     source: &str,
     site: NotationSite,
 ) -> Result<()> {
-    if let Err(message) = katex::invoke(support, Some(source))? {
+    typeset_with_mode(support, target, source, site, false)
+}
+fn typeset_with_mode(
+    support: &support::Support,
+    target: RenderTarget,
+    source: &str,
+    site: NotationSite,
+    display: bool,
+) -> Result<()> {
+    let result = if display {
+        katex::invoke_display(support, source)?
+    } else {
+        katex::invoke(support, Some(source))?
+    };
+    if let Err(message) = result {
         return Err(admission(
             RuleId::M051,
             NotationStage::Typesetting,
@@ -316,6 +331,19 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
             expression,
         })
     }
+    /// Bind a checked document expression, including its bounded plain text runs.
+    /// # Errors
+    /// Returns semantic admission faults for an invalid draft.
+    pub fn check_document_expression<'a>(
+        &'a self,
+        draft: ftoo_manifest::ExprDraft,
+    ) -> Result<RenderableExpression<'a, 'catalogue, 'book, 'graph>> {
+        let expression = ftoo_manifest::check_document_expression(self.catalogue, draft)?;
+        Ok(RenderableExpression {
+            notation: self,
+            expression,
+        })
+    }
     fn render<'a>(
         &'a self,
         expression: &CheckedExpression<'catalogue, 'book, 'graph>,
@@ -323,15 +351,31 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
         self.support.scope(
             &support::repository().join("tools/notation/check.cjs"),
-            || self.render_inner(expression, target),
+            || self.render_inner(expression, target, false),
+        )
+    }
+    fn render_display<'a>(
+        &'a self,
+        expression: &CheckedExpression<'catalogue, 'book, 'graph>,
+        target: RenderTarget,
+    ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
+        self.support.scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || self.render_inner(expression, target, true),
         )
     }
     fn render_inner<'a>(
         &'a self,
         expression: &CheckedExpression<'catalogue, 'book, 'graph>,
         target: RenderTarget,
+        display: bool,
     ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
-        let expanded = render::expression(
+        let render_expression = if display {
+            render::display_expression
+        } else {
+            render::expression
+        };
+        let expanded = render_expression(
             self.effective.as_ref(),
             self.catalogue,
             expression.draft(),
@@ -339,16 +383,17 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
             RenderOwner::Expression,
             "expression",
         )?;
-        typeset(
+        typeset_with_mode(
             &self.support,
             RenderTarget::Unicode,
             &expanded.source,
             expanded.site(RenderOwner::Expression, "expression"),
+            display,
         )?;
         let source = match target {
             RenderTarget::Unicode => expanded.source,
             RenderTarget::Macro => {
-                let result = render::expression(
+                let result = render_expression(
                     self.effective.as_ref(),
                     self.catalogue,
                     expression.draft(),
@@ -371,7 +416,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
                     &result.source,
                     result.site(RenderOwner::Expression, "expression"),
                 )?;
-                typeset(
+                typeset_with_mode(
                     &self.support,
                     target,
                     &combined,
@@ -381,6 +426,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
                         &combined,
                         expanded.origins,
                     ),
+                    display,
                 )?;
                 result.source
             }
@@ -388,6 +434,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
         Ok(RenderedExpression {
             notation: self,
             source,
+            display,
             uses: expression.uses().to_vec(),
             pending: pending_uses(&self.pending, expression.uses()),
         })
@@ -413,6 +460,15 @@ impl<'a, 'catalogue, 'book, 'graph> RenderableExpression<'a, 'catalogue, 'book, 
     ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
         self.notation.render(&self.expression, target)
     }
+    /// Render a display spelling under the library's display layout.
+    /// # Errors
+    /// Refuses output limits, changed support, adapter failures and grammar rejection.
+    pub fn render_display(
+        &self,
+        target: RenderTarget,
+    ) -> Result<RenderedExpression<'a, 'catalogue, 'book, 'graph>> {
+        self.notation.render_display(&self.expression, target)
+    }
 }
 
 /// Returned bytes have passed the pinned grammar under retained integrity.
@@ -437,6 +493,7 @@ impl<'a, 'catalogue, 'book, 'graph> RenderableExpression<'a, 'catalogue, 'book, 
 pub struct RenderedExpression<'a, 'catalogue, 'book, 'graph> {
     notation: &'a RenderableNotation<'catalogue, 'book, 'graph>,
     source: String,
+    display: bool,
     uses: Vec<SymbolUse>,
     pending: Vec<PendingEntry>,
 }
@@ -444,6 +501,10 @@ impl<'a, 'catalogue, 'book, 'graph> RenderedExpression<'a, 'catalogue, 'book, 'g
     #[must_use]
     pub fn source(&self) -> &str {
         &self.source
+    }
+    #[must_use]
+    pub const fn is_display(&self) -> bool {
+        self.display
     }
     #[must_use]
     pub fn pending_entries(&self) -> &[PendingEntry] {

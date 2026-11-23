@@ -4,12 +4,50 @@ use super::{
     PrimitiveSpec,
 };
 use crate::RuleId;
+use std::ops::Range;
 use std::rc::Rc;
 
 pub const MAX_DEPTH: usize = 64;
 pub const MAX_AST_NODES: usize = 4_096;
 pub const MAX_LITERAL_BYTES: usize = 256;
 pub const MAX_EXPANSION_NODES: usize = 65_536;
+pub const MAX_TEXT_BYTES: usize = 256;
+pub const MAX_TEXT_RUNS: usize = 64;
+pub const MAX_EXPRESSION_TEXT_BYTES: usize = 4_096;
+
+/// Decoded mathematical words and their source and decoded byte ranges.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextRun {
+    pub text: String,
+    pub source: Range<usize>,
+    pub decoded: Range<usize>,
+}
+
+pub(super) fn merge_plain_runs(expr: &mut ExprDraft) {
+    let mut pending = vec![expr];
+    while let Some(expr) = pending.pop() {
+        match expr {
+            ExprDraft::Text { runs } if runs.len() <= MAX_TEXT_RUNS => {
+                let mut merged: Vec<TextRun> = Vec::new();
+                for run in std::mem::take(runs) {
+                    if let Some(last) = merged.last_mut()
+                        && last.source.end == run.source.start
+                        && last.decoded.end == run.decoded.start
+                    {
+                        last.text.push_str(&run.text);
+                        last.source.end = run.source.end;
+                        last.decoded.end = run.decoded.end;
+                        continue;
+                    }
+                    merged.push(run);
+                }
+                *runs = merged;
+            }
+            ExprDraft::Call { arguments, .. } => pending.extend(arguments.iter_mut()),
+            _ => {}
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MathSort {
@@ -38,6 +76,9 @@ impl Signature {
 pub enum ExprDraft {
     Literal {
         value: String,
+    },
+    Text {
+        runs: Vec<TextRun>,
     },
     Slot {
         index: u8,
@@ -141,19 +182,22 @@ fn declared_arity(
     }
 }
 
+#[allow(clippy::too_many_lines)] // One walk enforces shared depth, node and text bounds.
 pub(super) fn validate(
     expr: &ExprDraft,
     arity: u8,
     site: &NotationSite,
     primitives: &[PrimitiveSpec],
     definitions: &[DefinitionSpec],
+    allow_text: bool,
 ) -> Vec<NotationDiagnostic> {
     let mut errors = Vec::new();
     let mut stack = vec![(expr, site.clone(), 1)];
     let mut nodes = 0;
     let mut used = [false; 9];
+    let mut text_bytes = 0;
     while let Some((expr, site, depth)) = stack.pop() {
-        if nodes == MAX_AST_NODES {
+        if nodes >= MAX_AST_NODES {
             errors.push(limit(
                 site,
                 NotationStage::Ast,
@@ -193,6 +237,92 @@ pub(super) fn validate(
                     push(site.field("value"), fault);
                 }
             }
+            ExprDraft::Text { runs } => {
+                if !allow_text {
+                    push(site.clone(), NotationFault::TextOutsideDocument);
+                }
+                if runs.is_empty() || runs.len() > MAX_TEXT_RUNS {
+                    push(
+                        site.clone(),
+                        NotationFault::InvalidTextRuns { count: runs.len() },
+                    );
+                }
+                if nodes.saturating_add(runs.len()) > MAX_AST_NODES {
+                    push(
+                        site.clone(),
+                        NotationFault::NotationLimit {
+                            resource: NotationResource::AstNodes,
+                            limit: MAX_AST_NODES,
+                            actual: nodes.saturating_add(runs.len()),
+                        },
+                    );
+                    break;
+                }
+                nodes += runs.len();
+                for (index, run) in runs.iter().enumerate() {
+                    let run_site = site.field("runs").child(NotationPathPart::Argument(index));
+                    if run.text.len() > MAX_TEXT_BYTES {
+                        push(
+                            run_site,
+                            NotationFault::NotationLimit {
+                                resource: NotationResource::TextBytes,
+                                limit: MAX_TEXT_BYTES,
+                                actual: run.text.len(),
+                            },
+                        );
+                        continue;
+                    }
+                    text_bytes += run.text.len();
+                    if text_bytes > MAX_EXPRESSION_TEXT_BYTES {
+                        push(
+                            run_site,
+                            NotationFault::NotationLimit {
+                                resource: NotationResource::ExpressionTextBytes,
+                                limit: MAX_EXPRESSION_TEXT_BYTES,
+                                actual: text_bytes,
+                            },
+                        );
+                        continue;
+                    }
+                    if run.decoded.end.checked_sub(run.decoded.start) != Some(run.text.len())
+                        || run.source.end.checked_sub(run.source.start) != Some(run.text.len())
+                        || run.text.trim_matches(' ').is_empty()
+                        || run
+                            .text
+                            .bytes()
+                            .any(|b| !b.is_ascii_alphabetic() && !matches!(b, b' ' | b',' | b'-'))
+                        || run
+                            .text
+                            .as_bytes()
+                            .windows(2)
+                            .any(|pair| pair[0] == pair[1] && matches!(pair[0], b' ' | b',' | b'-'))
+                    {
+                        push(
+                            run_site,
+                            NotationFault::InvalidText {
+                                value: run.text.clone(),
+                            },
+                        );
+                    }
+                }
+                for (index, pair) in runs.windows(2).enumerate() {
+                    let (Some(&left), Some(&right)) = (
+                        pair[0].text.as_bytes().last(),
+                        pair[1].text.as_bytes().first(),
+                    ) else {
+                        continue;
+                    };
+                    if left == right && matches!(left, b' ' | b',' | b'-') {
+                        push(
+                            site.field("runs")
+                                .child(NotationPathPart::Argument(index + 1)),
+                            NotationFault::InvalidText {
+                                value: format!("{}{}", left as char, right as char),
+                            },
+                        );
+                    }
+                }
+            }
             ExprDraft::Slot { index } => {
                 if *index >= arity {
                     push(
@@ -207,6 +337,16 @@ pub(super) fn validate(
                 }
             }
             ExprDraft::Call { callee, arguments } => {
+                if matches!(callee, Callee::Primitive(super::PrimitiveId::Underbrace))
+                    && arguments.get(1).is_some_and(|annotation| {
+                        matches!(annotation, ExprDraft::Text { runs } if {
+                            let mut bytes = runs.iter().flat_map(|run| run.text.bytes()).skip_while(|byte| *byte == b' ');
+                            b"pending".iter().all(|byte| bytes.next() == Some(*byte)) && bytes.all(|byte| byte == b' ')
+                        })
+                    })
+                {
+                    push(site.field("arguments").child(NotationPathPart::Argument(1)), NotationFault::PendingAnnotation);
+                }
                 let expected = declared_arity(*callee, primitives, definitions);
                 if arguments.len() != usize::from(expected) {
                     push(
@@ -222,7 +362,7 @@ pub(super) fn validate(
                 // The extra scheduled node retains the exact first-excess site.
                 for (index, arg) in arguments
                     .iter()
-                    .take(MAX_AST_NODES + 1 - nodes)
+                    .take((MAX_AST_NODES + 1).saturating_sub(nodes))
                     .enumerate()
                     .rev()
                 {
@@ -317,7 +457,7 @@ pub(super) fn expand(
         }
         visited += 1;
         match bound.expr {
-            ExprDraft::Literal { .. } => {}
+            ExprDraft::Literal { .. } | ExprDraft::Text { .. } => {}
             ExprDraft::Slot { index } => {
                 let mut argument = bound.environment[usize::from(*index)].clone();
                 let mut origins = bound.origins;

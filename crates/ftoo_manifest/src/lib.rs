@@ -26,11 +26,12 @@ pub use notation::{
     AliasTargetReason, Callee, CheckedDefinition, CheckedExpression, CheckedNotation,
     DefinitionCategory, DefinitionId, DefinitionKind, DefinitionShapeReason, DefinitionSpec,
     EvidenceExhaustion, EvidenceResource, EvidenceStage, ExhaustionReason, ExprDraft,
-    LiteralReason, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_LITERAL_BYTES, MathSort,
-    NotationDiagnostic, NotationErrors, NotationFault, NotationOrigin, NotationPathPart,
-    NotationResource, NotationSite, NotationStage, PendingReason, PrimitiveId, PrimitiveOperation,
-    PrimitiveSpec, ReasonPart, ReasonRole, RegistryEntry, Signature, SymbolLookupFault,
-    SymbolStatus, SymbolTier, SymbolUse, check_expression, deferred_parts, notation, verdict_word,
+    LiteralReason, MAX_AST_NODES, MAX_DEPTH, MAX_EXPANSION_NODES, MAX_EXPRESSION_TEXT_BYTES,
+    MAX_LITERAL_BYTES, MAX_TEXT_BYTES, MAX_TEXT_RUNS, MathSort, NotationDiagnostic, NotationErrors,
+    NotationFault, NotationOrigin, NotationPathPart, NotationResource, NotationSite, NotationStage,
+    PendingReason, PrimitiveId, PrimitiveOperation, PrimitiveSpec, ReasonPart, ReasonRole,
+    RegistryEntry, Signature, SymbolLookupFault, SymbolStatus, SymbolTier, SymbolUse, TextRun,
+    check_document_expression, check_expression, deferred_parts, notation, verdict_word,
 };
 pub use notation::{
     INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES, INHERITED_VARIANCE_DECLARATION,

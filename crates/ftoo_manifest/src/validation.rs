@@ -435,7 +435,7 @@ pub const RULES: [RuleSpec; 78] = [
     },
     RuleSpec {
         number: RuleId::M047,
-        statement: "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields.",
+        statement: "Notation expressions use only the closed registry, exact signatures, bounded literal grammar and scoped constructor parameters, and every formal is used, within declared notation limits. Inherited signatures and decoded bodies obey the same grammar and limits, with no checking-effect fields. Mathematics-text nodes contain bounded decoded plain runs in submitted document expressions; text nodes in catalogue bodies and tag runs refuse. An authored underbrace annotation whose decoded text, after trimming ASCII spaces, is pending refuses to preserve the derived status marker's distinction.",
         scope: "Every primitive descriptor, definition body and submitted notation expression.",
         state: RuleState::Enforced,
         deferred_reason: None,
@@ -477,7 +477,7 @@ pub const RULES: [RuleSpec; 78] = [
     },
     RuleSpec {
         number: RuleId::M053,
-        statement: "Every shared math source parses completely into the closed notation AST within the assembly math bounds, resolves every command with its declared syntax, and passes both rendering consumers with all authored use sites retained.",
+        statement: "Every shared math source parses completely into the closed notation AST within the assembly math bounds, resolves every command with its declared syntax, and passes both rendering consumers with all authored use sites retained. Text bodies use only the bounded decoded plain-text grammar at their source ranges.",
         scope: "All math entries of every welded unit consumed by assembly.",
         state: RuleState::Enforced,
         deferred_reason: None,

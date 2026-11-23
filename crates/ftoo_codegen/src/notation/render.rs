@@ -63,11 +63,17 @@ enum Part {
     Fixed(&'static str),
     Argument(usize),
 }
-fn parts(operation: PrimitiveOperation, target: RenderTarget) -> Vec<Part> {
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) enum SpellingMode {
+    Inline,
+    Display,
+}
+fn parts(operation: PrimitiveOperation, target: RenderTarget, spelling: SpellingMode) -> Vec<Part> {
     use Part::{Argument as A, Fixed as F};
     use PrimitiveOperation::{
-        Add, Alpha, Beta, Calligraphic, Dimension, Equal, Fraction, Juxtapose, Multiply, Negate,
-        Omega, Parentheses, Subscript, Superscript, UprightS, UprightVir,
+        Add, Alpha, Beta, Calligraphic, Dimension, Dot, Equal, Fraction, Gamma, Juxtapose,
+        Multiply, Negate, Omega, Parentheses, Sigma, Subscript, Subtract, Superscript, TightJoin,
+        Times, Underbrace, UprightNet, UprightS, UprightVir,
     };
     match operation {
         Alpha | Beta | Omega => {
@@ -82,6 +88,31 @@ fn parts(operation: PrimitiveOperation, target: RenderTarget) -> Vec<Part> {
         Calligraphic => vec![F("\\mathcal{"), A(0), F("}")],
         UprightVir => vec![F("\\mathrm{vir}")],
         UprightS => vec![F("\\mathrm{S}")],
+        UprightNet => vec![F("\\mathrm{net}")],
+        Sigma | Gamma => {
+            if target == RenderTarget::Macro {
+                if spelling == SpellingMode::Display {
+                    vec![F(operation.host_tokens()[0])]
+                } else {
+                    vec![F(operation.host_tokens()[0]), F("{}")]
+                }
+            } else {
+                vec![F(operation.unicode_scalar().expect("closed scalar"))]
+            }
+        }
+        Dot => vec![F("\\dot{"), A(0), F("}")],
+        Underbrace => vec![F("\\underbrace{"), A(0), F("}_{"), A(1), F("}")],
+        Times => vec![
+            A(0),
+            F(if target == RenderTarget::Macro {
+                "\\times{}"
+            } else {
+                "×"
+            }),
+            A(1),
+        ],
+        TightJoin => vec![A(0), A(1)],
+        Subtract => vec![A(0), F("\\;-\\;"), A(1)],
         Fraction => vec![
             F(operation.host_tokens()[0]),
             F("{"),
@@ -92,6 +123,8 @@ fn parts(operation: PrimitiveOperation, target: RenderTarget) -> Vec<Part> {
         ],
         Subscript => vec![F("{"), A(0), F("}_{"), A(1), F("}")],
         Superscript => vec![F("{"), A(0), F("}^{"), A(1), F("}")],
+        Add if spelling == SpellingMode::Display => vec![A(0), F("\\;+\\;"), A(1)],
+        Equal if spelling == SpellingMode::Display => vec![A(0), F("\\;=\\;"), A(1)],
         Add => vec![F("({"), A(0), F("}+{"), A(1), F("})")],
         Equal => vec![F("({"), A(0), F("}={"), A(1), F("})")],
         Negate => vec![
@@ -234,6 +267,7 @@ fn definition<'a>(
         stack.push(Action::Text("\\underbrace{".into(), origins));
     }
 }
+#[allow(clippy::too_many_arguments)] // One renderer carries target, owner, case and spelling boundaries.
 fn emit<'a>(
     effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
     n: &'a CheckedNotation<'_, '_>,
@@ -242,6 +276,7 @@ fn emit<'a>(
     owner: RenderOwner,
     case: &str,
     mode: Mode,
+    spelling: SpellingMode,
 ) -> Result<Candidate> {
     let unmarked = matches!(mode, Mode::PendingBody);
     let mut output = Candidate {
@@ -257,6 +292,14 @@ fn emit<'a>(
                 match frame.expr {
                     ExprDraft::Literal { value } => {
                         append(&mut output, value, origins, owner, case)?;
+                    }
+                    ExprDraft::Text { runs } => {
+                        let mut source = String::from("\\text{");
+                        for run in runs {
+                            source.push_str(&run.text);
+                        }
+                        source.push('}');
+                        append(&mut output, &source, origins, owner, case)?;
                     }
                     ExprDraft::Slot { index } if matches!(mode, Mode::Declaration) => append(
                         &mut output,
@@ -280,7 +323,7 @@ fn emit<'a>(
                             .find(|p| p.id() == *id)
                             .expect("checked primitive")
                             .operation();
-                        for part in parts(operation, target).into_iter().rev() {
+                        for part in parts(operation, target, spelling).into_iter().rev() {
                             stack.push(match part {
                                 Part::Fixed(text) => Action::Text(text.into(), origins.clone()),
                                 Part::Argument(i) => Action::Visit(frame.child(&arguments[i], i)),
@@ -291,7 +334,7 @@ fn emit<'a>(
                         callee: Callee::Definition(id),
                         arguments,
                     } if target == RenderTarget::Macro && !unmarked => {
-                        if arguments.is_empty() {
+                        if arguments.is_empty() && spelling != SpellingMode::Display {
                             stack.push(Action::Text("{}".into(), origins.clone()));
                         }
                         for (i, arg) in arguments.iter().enumerate().rev() {
@@ -376,7 +419,101 @@ pub(super) fn expression(
         owner,
         case,
         Mode::Expression,
+        SpellingMode::Inline,
     )
+}
+pub(super) fn display_expression(
+    effective: Option<&ftoo_audit::retention::RetainedNotation<'_, '_, '_>>,
+    n: &CheckedNotation<'_, '_>,
+    expr: &ExprDraft,
+    target: RenderTarget,
+    owner: RenderOwner,
+    case: &str,
+) -> Result<Candidate> {
+    if has_display_chain(expr) && !first_display_chain(expr) {
+        return Err(admission(
+            RuleId::M053,
+            NotationStage::Ast,
+            NotationSite::Expression { path: vec![] },
+            NotationFault::DisplayShape,
+        ));
+    }
+    emit(
+        effective,
+        n,
+        vec![Action::Visit(Frame {
+            expr,
+            environment: Rc::new(vec![]),
+            definition: None,
+            path: vec![],
+            origins: vec![],
+        })],
+        target,
+        owner,
+        case,
+        Mode::Expression,
+        SpellingMode::Display,
+    )
+}
+fn primitive_call(expr: &ExprDraft, id: ftoo_manifest::PrimitiveId) -> Option<&[ExprDraft]> {
+    let ExprDraft::Call {
+        callee: Callee::Primitive(actual),
+        arguments,
+    } = expr
+    else {
+        return None;
+    };
+    (*actual == id).then_some(arguments)
+}
+fn has_display_chain(expr: &ExprDraft) -> bool {
+    let mut pending = vec![expr];
+    while let Some(node) = pending.pop() {
+        if let ExprDraft::Call {
+            callee: Callee::Primitive(id),
+            arguments,
+        } = node
+        {
+            if matches!(
+                id,
+                ftoo_manifest::PrimitiveId::Equal
+                    | ftoo_manifest::PrimitiveId::Add
+                    | ftoo_manifest::PrimitiveId::Subtract
+            ) {
+                return true;
+            }
+            pending.extend(arguments);
+        } else if let ExprDraft::Call { arguments, .. } = node {
+            pending.extend(arguments);
+        }
+    }
+    false
+}
+fn first_display_chain(expr: &ExprDraft) -> bool {
+    use ftoo_manifest::PrimitiveId::{Add, Equal, Subtract, Underbrace};
+    let Some(equal) = primitive_call(expr, Equal) else {
+        return false;
+    };
+    if equal.len() != 2 || primitive_call(&equal[0], Underbrace).is_none() {
+        return false;
+    }
+    let Some(add) = primitive_call(&equal[1], Add) else {
+        return false;
+    };
+    if add.len() != 2 || primitive_call(&add[1], Underbrace).is_none() {
+        return false;
+    }
+    let Some(subtract) = primitive_call(&add[0], Subtract) else {
+        return false;
+    };
+    subtract.len() == 2
+        && primitive_call(&subtract[0], Underbrace).is_some()
+        && primitive_call(&subtract[1], Underbrace).is_some()
+        && [&equal[0], &subtract[0], &subtract[1], &add[1]]
+            .iter()
+            .all(|operand| {
+                let arguments = primitive_call(operand, Underbrace).expect("underbrace profile");
+                arguments.len() == 2 && !arguments.iter().any(has_display_chain)
+            })
 }
 #[cfg(test)]
 pub(super) fn fixture_body(
@@ -415,6 +552,7 @@ pub(super) fn fixture_body(
         RenderOwner::Definition(DefinitionId::Product),
         "fixture",
         Mode::Expression,
+        SpellingMode::Inline,
     )
 }
 pub(super) fn combine(prefix: &str, source: &str, site: NotationSite) -> Result<String> {
@@ -506,6 +644,7 @@ pub(super) fn declarations(
             RenderOwner::Definition(id),
             "declaration",
             Mode::Declaration,
+            SpellingMode::Inline,
         )?;
         if marked(effective, n, id) && !inherited {
             body.source = combine(
@@ -598,5 +737,6 @@ pub(super) fn pending_body(
         RenderOwner::Definition(id),
         "pending-body",
         Mode::PendingBody,
+        SpellingMode::Inline,
     )
 }

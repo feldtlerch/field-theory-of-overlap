@@ -135,11 +135,22 @@ pub enum NotationResource {
     Depth,
     AstNodes,
     LiteralBytes,
+    TextBytes,
+    ExpressionTextBytes,
     ExpansionNodes,
     OutputBytes,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NotationFault {
+    TextOutsideDocument,
+    InvalidTextRuns {
+        count: usize,
+    },
+    InvalidText {
+        value: String,
+    },
+    DisplayShape,
+    PendingAnnotation,
     CatalogMultiplicity {
         entry: RegistryEntry,
         expected: usize,
@@ -262,6 +273,11 @@ impl NotationFault {
             Self::SweepCommand { .. } => 18,
             Self::SweepSignature { .. } => 19,
             Self::SourceMismatch { .. } => 20,
+            Self::TextOutsideDocument => 21,
+            Self::InvalidTextRuns { .. } => 22,
+            Self::InvalidText { .. } => 23,
+            Self::DisplayShape => 24,
+            Self::PendingAnnotation => 25,
         }
     }
 }

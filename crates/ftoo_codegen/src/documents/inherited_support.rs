@@ -99,6 +99,9 @@ mod tests {
                 "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
                 "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
                 "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+                "\\NewDocumentCommand\n  { \\alignrate }\n  {  }\n  {\n    \\ensuremath{\\dot{\\sigma}}\n  }\n",
+                "\\NewDocumentCommand\n  { \\willnet }\n  {  }\n  {\n    \\ensuremath{\\omega\\sb{\\mathrm{net}}}\n  }\n",
+                "\\NewDocumentCommand\n  { \\willdecay }\n  {  }\n  {\n    \\ensuremath{\\gamma\\sigma}\n  }\n",
                 "\\RegisterVariance{\\comovfield}{operator}\n",
                 "\\ExplSyntaxOff\n"
             )
