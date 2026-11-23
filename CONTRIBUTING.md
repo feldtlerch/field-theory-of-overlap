@@ -89,6 +89,7 @@ Eligible records are root Markdown, `LICENSE-CODE` and `LICENSE-DOCS`, Markdown 
 What a retained commit needs under [ADR 009](docs/adr/009-process.md) (`dec:process:signed-bites`):
 
 - Reviewable scope, a signature and green CI; [SIGNING.md](SIGNING.md) identifies the key and verification command.
+- Eligible native conversion under ADR 039 requires complete mechanical evidence instead of individual review; every other change retains reviewable scope, and signing and green CI remain required.
 - Each layer together with its checking validator or consumer, never ahead of it.
 - A message stating what holds and why, timelessly; checks report wall time.
 
@@ -127,6 +128,8 @@ A reader handle is called a **tag** in the decision records, glossary and regist
 Reader text refuses literal labels, except the exact planned spelling span of a checked paper tag whose printed spelling is its own source key (M055). Under ADR 017, `en.md` contains no internal labels, even in raw source; `en.labels.md` retains recovery evidence. The Python commands above, run at the repository root, check Markdown harvesting, mint uniqueness and citation resolution. [Manifest labels](crates/ftoo_manifest/src/labels.rs) and [codegen integration](crates/ftoo_codegen/src/labels.rs), exercised by workspace tests, check across Rust identities, Markdown and unit metadata; the Python check alone cannot prove that wider uniqueness.
 
 ## Review renderings and licences
+
+For eligible native conversion batches under ADR 039 only, final residual review replaces the individual page/screen review and individual independent-review requirements below. Every non-review requirement remains unchanged, including evidence, protected renewal, theory approval and M065’s limits.
 
 Changed pages and screens need recorded independent review against a prepared acceptance sheet under ADR 017. Follow [tools/paper/README.md](tools/paper/README.md) for baseline/candidate hashes, changed and adjoining page images, rendered screens, raw comparisons, destinations, links and the other evidence it lists. Record reviewed artifact coverage, findings and acceptance or revision. The author cannot accept the change; changed bound passages need renewal under ADR 024. A change to the theory requires approval by the project's owner; every other change, including a meaning-preserving passage renewal, is accepted through independent review by a reviewer other than the change's author, with its evidence recorded. When a claim of the theory is qualified or changed, the change is given to the project's owner for review before it lands. M065 conjoins the mechanical release checks its register entry lists; it neither supplies visual acceptance nor authorizes publication.
 

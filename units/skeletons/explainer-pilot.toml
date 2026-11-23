@@ -6,6 +6,7 @@ document = "explainer-pilot"
 [[skeleton.sections]]
 heading = "sec:pilot:explainer-excerpt"
 children = [
+  { kind = "paragraph", unit = "sec:reading:plain-intro" },
   { kind = "quotation", unit = "sec:say:direction" },
   { kind = "quotation", unit = "sec:say:enemy-to-none" },
   { kind = "quotation", unit = "sec:coda:record-limit" }

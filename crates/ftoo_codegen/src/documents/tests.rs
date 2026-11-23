@@ -1103,6 +1103,12 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         .unwrap()
         .bytes
         .extend_from_slice(b"fr = \"Extrait explicatif\"\n");
+    multilingual_statements
+        .iter_mut()
+        .find(|source| source.file.ends_with("plain-intro.toml"))
+        .unwrap()
+        .bytes
+        .extend_from_slice(b"fr = \"Ce paragraphe presente la theorie.\"\n");
     let multilingual = crate::load_unit_sources(
         crate::UnitSource {
             file: "units/documents.toml".into(),
@@ -1126,7 +1132,11 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         .iter_mut()
         .find(|draft| draft.document.value == "explainer-pilot")
         .unwrap();
-    let SkeletonChild::Quotation(quoted) = &mut explainer.sections[0].children[0] else {
+    let Some(SkeletonChild::Quotation(quoted)) = explainer.sections[0]
+        .children
+        .iter_mut()
+        .find(|child| matches!(child, SkeletonChild::Quotation(_)))
+    else {
         panic!("quotation fixture")
     };
     quoted.value = "sec:missing:quotation".into();
@@ -1146,7 +1156,11 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         .iter_mut()
         .find(|draft| draft.document.value == "explainer-pilot")
         .unwrap();
-    let SkeletonChild::Quotation(quoted) = &mut explainer.sections[0].children[0] else {
+    let Some(SkeletonChild::Quotation(quoted)) = explainer.sections[0]
+        .children
+        .iter_mut()
+        .find(|child| matches!(child, SkeletonChild::Quotation(_)))
+    else {
         panic!("quotation fixture")
     };
     quoted.value = "sec:pilot:explainer-excerpt".into();

@@ -154,6 +154,6 @@ fn retention_register_has_complete_independent_records() {
                 .filter(|rule| rule.deferred_reason.is_some())
                 .count()
         ),
-        (77, 66, 5, 6)
+        (78, 67, 5, 6)
     );
 }

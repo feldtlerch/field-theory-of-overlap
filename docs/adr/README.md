@@ -16,11 +16,11 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |002|Four-axis status and declared coverage|accepted; reading lifecycle and availability are governed by 025|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted; inherited definitions' referent prerequisite and pending presentation are governed by 032|
-|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025|
+|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025; eligible native conversion's cross-target judgment is governed by 039|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent docs-only changes are governed by 018 and ordinary paper-pair reuse by 019|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
-|009|Process: signed reviewed bites, each layer with its validator|accepted|
+|009|Process: signed reviewed bites, each layer with its validator|accepted; eligible native conversion's review timing is governed by 039|
 |010|Validation rules form a registered, stated-scope rule set|accepted|
 |011|Serialization is strict everywhere|accepted|
 |012|The weld: equal address sets across a unit's texts|accepted|
@@ -28,22 +28,23 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024; the complete-document release gate and complete-graph boundary are governed by 030; native use of the paper-scoped store is governed by 037|
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030; retirement of residual authored-source machinery is governed by 036; native use of the paper-scoped store is governed by 037|
-|017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030|
+|017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030; eligible native conversion's screen-review timing is governed by 039|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause; inline-style authoring syntax is governed by 033|
 |022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation; its reserved HTML-delivery question is governed by 042|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
-|024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others|
+|024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others; eligible native conversion's review timing is governed by 039|
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
-|026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning|
+|026|Warranted structural change|accepted; amends 001's identity-change mechanism while retaining historical meaning; eligible native conversion's depth-1 warrant and review timing are governed by 039|
 |030|Native renderings, complete graph and native model|accepted; establishes the complete-document release gate, complete-graph boundary and native-model boundary; amends 014, 016 and 017; relationship disposition at the complete-graph boundary is governed by 036; native use of the existing paper-scoped store is governed by 037|
 |032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract; native support is governed by 041|
 |033|Inline styles in unit prose|accepted; decides the authoring syntax reserved by 021; retains 022's mathematics boundary|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
 |037|Native paper-tagged paragraphs|accepted|
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
+|039|Mechanical conversion and final residual review|accepted; amends 005, 009, 017, 024 and 026 for eligible native conversion|
 |041|Compared inherited support in native documents|accepted; qualifies 032's native sweep exception and embedding-removal condition, and amends M055, M056 and M057|
 |042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|

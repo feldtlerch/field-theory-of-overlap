@@ -5,6 +5,10 @@ document = "explainer-pilot"
 source = "documents/paper/explainer/explainer.tex"
 
 [[scope.occurrences]]
+unit = "sec:reading:plain-intro"
+role = "paragraph"
+
+[[scope.occurrences]]
 unit = "sec:say:direction"
 role = "quotation"
 

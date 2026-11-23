@@ -1656,7 +1656,7 @@ fn n16_renderer_register_has_no_existing_transitions() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (77, 66, 5, 6)
+        (78, 67, 5, 6)
     );
 }
 

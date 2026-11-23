@@ -6,6 +6,7 @@ documents/paper/parts/partD.tex	sec:say:enemy-to-none	generated/documents/paper-
 documents/paper/parts/coda.tex	sec:coda:whole-field	generated/documents/paper-pilot/sec-coda-whole-field.tex	paragraph	102
 documents/paper/parts/coda.tex	sec:coda:record-limit	generated/documents/paper-pilot/sec-coda-record-limit.tex	refrain	104
 documents/paper/parts/appendices.tex	sec:log:andreoni-joint	generated/documents/paper-pilot/sec-log-andreoni-joint.tex	paragraph	424
-documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	319
-documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	687
-documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	972
+documents/paper/explainer/explainer.tex	sec:reading:plain-intro	generated/documents/explainer-pilot/sec-reading-plain-intro.tex	paragraph	47
+documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	316
+documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	684
+documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	969

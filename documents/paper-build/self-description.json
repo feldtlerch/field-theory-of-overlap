@@ -115,8 +115,8 @@
     {
       "id": 13,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 10283,
-      "end": 10609,
+      "start": 9988,
+      "end": 10314,
       "sha256": "284d376bca3767ddf1fc44fb4515b26d883f65f9bcc8e1604888cf0b6f9e5900",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "takes its own medicine here: every exchange rate it uses is declared on a public"
@@ -124,8 +124,8 @@
     {
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 53475,
-      "end": 56288,
+      "start": 53180,
+      "end": 55993,
       "sha256": "d7dc4a49e621fd741b74a948a9c9e138d277f8448193849c5fbaf35db8965ce2",
       "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
       "anchor": "\\section{The Paper and Its Checks}"

@@ -9,7 +9,7 @@
 - **Weld** — the gate holding a unit's texts to one addressable surface: the tag and label sets each text addresses must be equal (`rec:adr:012-the-weld`).
 - **Producer** — the audit function registered for one claim, constructing the claim's mathematical statement for the calculation engine (`rec:adr:007-audit-on-the-engine`).
 - **Referent** — a theory object admitted to the authority; the **referent expansion** is the ongoing admission of objects the prose already uses, in the order the claims under audit need them.
-- **Bite** — one reviewed, gated, signed change; the unit of this repository's history (`rec:adr:009-process`).
+- **Bite** — one reviewed, gated, signed change; the unit of this repository's history (`rec:adr:009-process`). Eligible native conversion batches under ADR 039 are gated and signed without required individual review; independent residual review covers the completed rendered result.
 - **Slice** — the audited part of the theory at a given moment, as the coverage declaration states it.
 - **Display** — a figure or table: a unit whose bodies are authored per rendering target rather than shared across them.
 - **Skeleton** — the ordered unit composition supplying ownership and order for a generator-example document or for a reading until its transfer to an identified reading tree.

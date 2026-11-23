@@ -1,4 +1,4 @@
-"""Compare complete captured paper text and corroborate one native paragraph."""
+"""Compare complete captured paper text and corroborate selected paragraphs."""
 import argparse
 import ast
 import ctypes
@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import tomllib
 import unicodedata
 
 from identities import (CHECK_INPUTS, INPUTS as BINDING_INPUTS,
@@ -21,7 +22,7 @@ from prepare import declared_fragments, scope_fragments
 INPUTS = ['tools/paper/compare_words.py', 'tools/paper/pdf_text.py',
           'tools/paper/common.py', 'tools/paper/identities.py',
           'tools/paper/prepare.py', 'tools/paper/meson_adapter.py',
-          'tools/paper/inputs.py']
+          'tools/paper/inputs.py', 'tools/paper/bibroute.py']
 LIGATURES = {'\ufb00': 'ff', '\ufb01': 'fi', '\ufb02': 'fl',
              '\ufb03': 'ffi', '\ufb04': 'ffl', '\ufb06': 'st'}
 SOURCE = re.compile(r'([^:]+):([^:]+):([1-9][0-9]*)-([1-9][0-9]*)\Z')
@@ -471,8 +472,14 @@ def align_located(decoded, extracted, document, side):
 
 def canonicalize(extracted, proof):
     """Apply only source-proved event edits to a complete normalized stream."""
-    edits = {begin: (end, replacement, source) for begin, end, replacement, source
-             in proof['edits']}
+    proofs = proof if isinstance(proof, list) else [proof]
+    edits = {}
+    for begin, end, replacement, source in (
+            edit for item in proofs for edit in item['edits']):
+        if begin in edits:
+            raise Fault('CorrespondenceInvalid', 'selected paragraph edits overlap',
+                        'correspondence')
+        edits[begin] = (end, replacement, source)
     text = extracted['stream']
     output = []
     offsets = []
@@ -528,12 +535,15 @@ def unchanged_paragraph_events(before_bytes, after_bytes, before, after):
 
 def residual_events(extracted, proof, document, side):
     """Name event locations by residual interval and mark-retaining token order."""
-    left, right = proof['range'] if proof else (0, 0)
+    proofs = proof if isinstance(proof, list) else ([proof] if proof else [])
+    proofs = sorted(proofs, key=lambda item: item['range'][0])
     rows = []
     for event in line_events(extracted, document, side):
         offset = event['normalized_offset']
-        if left <= offset < right and proof:
-            match = next((row for row in proof['decisions']
+        selected = next((item for item in proofs
+                         if item['range'][0] <= offset < item['range'][1]), None)
+        if selected:
+            match = next((row for row in selected['decisions']
                           if row['normalized_offset'] == offset), None)
             if match is None:
                 event['reason'] = 'selected event lacks source interpretation'
@@ -541,8 +551,8 @@ def residual_events(extracted, proof, document, side):
                 event = match
             rows.append(event)
             continue
-        ordinal = 0 if proof is None or offset < left else 1
-        origin = 0 if ordinal == 0 else right
+        ordinal = sum(item['range'][1] <= offset for item in proofs)
+        origin = 0 if ordinal == 0 else proofs[ordinal - 1]['range'][1]
         segment = extracted['stream'][origin:offset]
         token_ordinal = len(re.findall(r'[A-Za-z]+|[0-9]+|[^\sA-Za-z0-9]', segment))
         event['residual_key'] = [document, ordinal, token_ordinal]
@@ -556,8 +566,11 @@ def residual_proof(before, after, before_rows, after_rows, envelope,
     def intervals(extracted, match):
         if match is None:
             return [extracted['stream']]
-        left, right = match['range']
-        return [extracted['stream'][:left], extracted['stream'][right:]]
+        proofs = match if isinstance(match, list) else [match]
+        proofs = sorted(proofs, key=lambda item: item['range'][0])
+        bounds = [0, *(item['range'][1] for item in proofs)]
+        ends = [*(item['range'][0] for item in proofs), len(extracted['stream'])]
+        return [extracted['stream'][left:right] for left, right in zip(bounds, ends)]
 
     old = {tuple(row['residual_key']): row for row in before_rows
            if 'residual_key' in row}
@@ -772,7 +785,8 @@ def parent_fragments(snapshot):
     return rows
 
 
-def selected_sources(repo, args, parent, parent_dir, candidate_dir):
+def selected_sources(repo, args, parent, parent_dir, candidate_dir,
+                     defer_outside=False, line_shift=0):
     """Bind the requested occurrence to both checked inclusion places."""
     if bool(args.before_source) == bool(getattr(args, 'before_revision', None)):
         raise Fault('SourceInvalid', 'exactly one parent selector is required', 'snapshot')
@@ -805,14 +819,15 @@ def selected_sources(repo, args, parent, parent_dir, candidate_dir):
         authored = source_blob(repo, args.before_source)
         if authored['commit'] != parent['commit']:
             raise Fault('SourceInvalid', 'source selector and parent differ', 'snapshot')
-        if authored['path'] != source_name or authored['first'] != line:
+        if authored['path'] != source_name or authored['first'] + line_shift != line:
             raise Fault('SourceInvalid', 'source selector misses inclusion place', 'snapshot')
         listed = (parent_dir / 'documents/paper-build/sources.tsv').read_text().splitlines()
         if source_name not in parent['receipt']['inputs'] or source_name not in listed:
             raise Fault('SourceInvalid', 'source selector is outside declared inputs', 'snapshot')
         old = authored['blob_bytes']
         start, end = authored['bytes']
-        if old[:start] != candidate_source[:marker_start] or old[end:] != candidate_source[marker_start + len(marker):]:
+        if not defer_outside and (old[:start] != candidate_source[:marker_start] or
+                                  old[end:] != candidate_source[marker_start + len(marker):]):
             raise Fault('SourceInvalid', 'source differs outside selected paragraph', 'snapshot')
         before = dict(kind='authored', path=source_name, body=authored['body'].encode(),
                       blob_bytes=old, range=authored['bytes'],
@@ -840,17 +855,28 @@ def selected_sources(repo, args, parent, parent_dir, candidate_dir):
     return before, candidate
 
 
+def shifted_marker_line(selections, source, first):
+    """Locate a marker after earlier authored intervals in the same source."""
+    return first + sum(1 - len(old['body'].splitlines())
+                       for old, _, _ in selections
+                       if old['kind'] == 'authored' and old['source'] == source
+                       and old['line'] < first)
+
+
 def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before, after,
-                    unit):
-    """Prove unchanged residual inputs after one checked paragraph substitution."""
-    sentinel = ('<selected paragraph ' + unit + '>').encode()
+                    unit, additional=()):
+    """Prove unchanged residual inputs after checked paragraph substitutions."""
+    selections = ((before, after, unit), *additional)
+    selected_units = {key for _, _, key in selections}
+    if len(selected_units) != len(selections):
+        raise Fault('SourceInvalid', 'selected paragraph repeats', 'snapshot')
     parent_names = set(parent['receipt']['inputs'])
     candidate_receipt = json.loads((candidate_dir / 'generated/paper/inputs.json').read_bytes())
     candidate_names = set(candidate_receipt['inputs'])
     parent_captured = {row['path'] for row in parent['inputs']}
     candidate_captured = {row['path'] for row in candidate_inputs if not row['path'].startswith('/')}
-    selected_paths = {name for name in (before['path'], after['path'])
-                      if name != before['source']}
+    selected_paths = {name for old, new, _ in selections
+                      for name in (old['path'], new['path']) if name != old['source']}
     reasons = []
     old_rows = parent['fragments']
     new_rows = scope_fragments(candidate_dir)
@@ -882,20 +908,20 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
                                            parent_order[row[0]], row[4])):
             reasons.append('parent inclusion order differs from generator order')
     old_other = {(src, key, role): line for src, key, _, role, line in old_rows
-                 if not (key == unit and role == 'paragraph')}
+                 if not (key in selected_units and role == 'paragraph')}
     new_other = {(src, key, role): line for src, key, _, role, line in new_rows
-                 if not (key == unit and role == 'paragraph')}
+                 if not (key in selected_units and role == 'paragraph')}
     if set(old_other) != set(new_other):
         reasons.append('other inclusion identities differ')
-    shift = 0
-    # The authored interval's physical-line count, not its byte length, sets
-    # the line shift of later rows in the same source.
-    if before['kind'] == 'authored':
-        shift = 1 - len(before['body'].splitlines())
+    # Each authored interval's physical-line count sets the shift of later
+    # rows in that source. Native-to-native selections contribute zero.
+    shifts = [(old['source'], old['line'], new['line'],
+               1 - len(old['body'].splitlines()) if old['kind'] == 'authored' else 0)
+              for old, new, _ in selections]
     for key in set(old_other) & set(new_other):
         source, _, _ = key
-        expected = old_other[key] + (shift if source == before['source'] and
-                                     old_other[key] > before['line'] else 0)
+        expected = old_other[key] + sum(delta for path, line, _, delta in shifts
+                                        if path == source and old_other[key] > line)
         if new_other[key] != expected:
             reasons.append('inclusion line differs: ' + key[1])
     excluded = selected_paths | {'generated/documents/inclusions.tsv',
@@ -914,11 +940,14 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
             continue
         left, right = old.read_bytes(), new.read_bytes()
         original_left, original_right = digest(left), digest(right)
-        if name == before['source']:
-            a, b = before['range'] if before['kind'] == 'authored' else before['marker']
-            c, d = after['marker']
-            left = left[:a] + sentinel + left[b:]
-            right = right[:c] + sentinel + right[d:]
+        old_spans = [(old['range'] if old['kind'] == 'authored' else old['marker'], key)
+                     for old, _, key in selections if old['source'] == name]
+        new_spans = [(new['marker'], key) for _, new, key in selections
+                     if new['source'] == name]
+        for (a, b), key in sorted(old_spans, reverse=True):
+            left = left[:a] + ('<selected paragraph ' + key + '>').encode() + left[b:]
+        for (a, b), key in sorted(new_spans, reverse=True):
+            right = right[:a] + ('<selected paragraph ' + key + '>').encode() + right[b:]
         if left != right:
             reasons.append('paper input differs: ' + name)
         rows.append(dict(path=name, before_original=original_left,
@@ -935,19 +964,21 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
                 reasons.append('inclusion row grammar differs')
                 break
             source, key, fragment, role, line = fields
-            if key == unit.encode() and role == b'paragraph':
+            if key.decode() in selected_units and role == b'paragraph':
                 selected_count += 1
                 continue
-            if source.decode() == before['source'] and int(line) > after['line']:
-                fields[4] = str(int(line) - shift).encode()
+            adjusted = int(line) - sum(delta for path, _, new_line, delta in shifts
+                                       if path == source.decode() and int(line) > new_line)
+            fields[4] = str(adjusted).encode()
             rewritten.append(b'\t'.join(fields) + (b'\n' if row.endswith(b'\n') else b''))
-        if before['kind'] == 'native':
+        if any(old['kind'] == 'native' for old, _, _ in selections):
             old_comparable = [row for row in old_inclusion.read_bytes().splitlines(keepends=True)
-                              if b'\t' + unit.encode() + b'\t' not in row or
-                              b'\tparagraph\t' not in row]
+                              if not any(b'\t' + key.encode() + b'\t' in row and
+                                         b'\tparagraph\t' in row for old, _, key in selections
+                                         if old['kind'] == 'native')]
         else:
             old_comparable = old_inclusion.read_bytes().splitlines(keepends=True)
-        if selected_count != 1 or b''.join(rewritten) != b''.join(old_comparable):
+        if selected_count != len(selections) or b''.join(rewritten) != b''.join(old_comparable):
             reasons.append('inclusion bytes differ outside selected row')
         rows.append(dict(path='generated/documents/inclusions.tsv',
                          before_original=digest(old_inclusion.read_bytes()),
@@ -957,23 +988,239 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
     else:
         reasons.append('inclusion declaration format differs')
     for name in selected_paths:
-        if name != before['source'] and name != after['source']:
-            if name in parent_names or name in candidate_names:
-                rows.append(dict(path=name, selected=True,
-                                 before_original=(digest((parent_dir / name).read_bytes())
-                                                  if (parent_dir / name).is_file() else None),
-                                 after_original=(digest((candidate_dir / name).read_bytes())
-                                                 if (candidate_dir / name).is_file() else None)))
+        if name in parent_names or name in candidate_names:
+            rows.append(dict(path=name, selected=True,
+                             before_original=(digest((parent_dir / name).read_bytes())
+                                              if (parent_dir / name).is_file() else None),
+                             after_original=(digest((candidate_dir / name).read_bytes())
+                                             if (candidate_dir / name).is_file() else None)))
     parent_meta = {key: value for key, value in parent['receipt'].items() if key != 'inputs'}
     candidate_meta = {key: value for key, value in candidate_receipt.items()
                       if key != 'inputs'}
     if parent_meta != candidate_meta:
         reasons.append('paper receipt metadata differs')
+    substitutions = [dict(path=old['source'],
+                          before=old['marker'] if old['kind'] == 'native' else old['range'],
+                          after=new['marker']) for old, new, _ in selections]
     return dict(available=not reasons, reasons=sorted(set(reasons)), rows=rows,
-                inclusion_shift=shift, source_substitution=dict(
-                    path=before['source'],
-                    before=before['marker'] if before['kind'] == 'native' else before['range'],
-                    after=after['marker']))
+                inclusion_shift=shifts[0][3] if not additional else
+                {key: delta for (_, _, key), (_, _, _, delta) in zip(selections, shifts)},
+                source_substitution=substitutions[0] if not additional else substitutions)
+
+
+def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after, envelope,
+                         selections=None):
+    """Check every externally assigned plain occurrence after complete comparison."""
+    path = assignment_path.resolve()
+    if not assignment_path.is_absolute() or path == repo or repo in path.parents:
+        raise Fault('AssignmentInvalid', 'assignment must be outside the candidate', 'request')
+    try:
+        assignment = json.loads(path.read_bytes())
+    except (OSError, ValueError) as error:
+        raise Fault('AssignmentInvalid', error, 'request') from error
+    expected_fields = {'schema', 'author', 'parent', 'capability_revision',
+                       'capability_digest', 'source', 'source_blob', 'first',
+                       'last', 'unit', 'unit_path', 'expected_generated_classes'}
+    if not isinstance(assignment, dict) or set(assignment) not in (
+            expected_fields, expected_fields | {'occurrences'}):
+        raise Fault('AssignmentInvalid', 'assignment fields differ', 'request')
+    occurrences = assignment.get('occurrences', [assignment])
+    if (assignment['schema'] != (2 if 'occurrences' in assignment else 1) or
+            not isinstance(occurrences, list) or not occurrences or
+            not isinstance(assignment['author'], str) or
+            not assignment['author'] or
+            assignment['expected_generated_classes'] != ['documents', 'paper']):
+        raise Fault('AssignmentInvalid', 'assignment capability differs', 'request')
+    if selections is None:
+        selections = [(before, after, assignment['unit'])]
+    if len(occurrences) != len(selections):
+        raise Fault('AssignmentInvalid', 'assigned occurrence count differs', 'request')
+    if len({row.get('source') for row in occurrences if isinstance(row, dict)}) != 1:
+        raise Fault('AssignmentInvalid', 'assigned source file differs', 'request')
+    if 'occurrences' in assignment and occurrences[0] != {
+            key: assignment[key] for key in ('source', 'source_blob', 'first', 'last',
+                                               'unit', 'unit_path')} | {
+                                                   'previous_kind': before['kind']}:
+        raise Fault('AssignmentInvalid', 'first occurrence differs', 'request')
+    revision = assignment['capability_revision']
+    if not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40}', revision):
+        raise Fault('AssignmentInvalid', 'capability revision is not a full object id', 'request')
+    tree = git(repo, 'rev-parse', '--verify', revision + '^{tree}').strip()
+    if assignment['capability_digest'] != digest(tree):
+        raise Fault('AssignmentInvalid', 'capability digest differs', 'request')
+    runtime_root = pathlib.Path(__file__).resolve().parents[2]
+    for name in INPUTS:
+        try:
+            actual_runtime = (runtime_root / name).read_bytes()
+            reviewed_runtime = git(repo, 'show', revision + ':' + name)
+        except (OSError, RuntimeError) as error:
+            raise Fault('CapabilityChanged', 'comparison capability is unavailable: ' + name,
+                        'request') from error
+        if actual_runtime != reviewed_runtime:
+            raise Fault('CapabilityChanged', 'comparison capability differs: ' + name,
+                        'request')
+    if assignment['parent'] != parent['commit']:
+        raise Fault('AssignmentInvalid', 'assignment parent differs', 'snapshot')
+    head = git(repo, 'rev-parse', 'HEAD').decode().strip()
+    if head != parent['commit'] and git(repo, 'rev-parse', 'HEAD^').decode().strip() != parent['commit']:
+        raise Fault('AssignmentInvalid', 'comparison parent is not immediate', 'snapshot')
+    listed = git(repo, 'show', revision + ':documents/paper-build/sources.tsv').decode().splitlines()
+    protected = json.loads(git(repo, 'show', parent['commit'] +
+                               ':documents/paper-build/self-description.json'))
+    if not envelope['available']:
+        raise Fault('SourceEnvelopeChanged', '; '.join(envelope['reasons']), 'snapshot')
+    allowed = set()
+    intervals = {}
+    for row, (old_source, new_source, key) in zip(occurrences, selections):
+        if not isinstance(row, dict) or (row is not assignment and set(row) not in (
+                {'source', 'source_blob', 'first', 'last', 'unit', 'unit_path'},
+                {'source', 'source_blob', 'first', 'last', 'unit', 'unit_path',
+                 'previous_kind'})):
+            raise Fault('AssignmentInvalid', 'occurrence fields differ', 'request')
+        source = row['source']
+        if not isinstance(source, str) or source not in listed or not (
+                source.startswith('documents/paper/parts/') or
+                source == 'documents/paper/explainer/explainer.tex'):
+            raise Fault('AssignmentInvalid', 'assigned source path class differs', 'snapshot')
+        if row.get('previous_kind', old_source['kind']) != old_source['kind']:
+            raise Fault('AssignmentInvalid', 'assigned previous kind differs', 'snapshot')
+        if (row['source_blob'] != git(repo, 'rev-parse', '--verify',
+                                     parent['commit'] + ':' + source).decode().strip() or
+                old_source['source'] != source or new_source['source'] != source or
+                row['unit'] != key):
+            raise Fault('AssignmentInvalid', 'assigned source or unit differs', 'snapshot')
+        first, last = row['first'], row['last']
+        old = git(repo, 'show', parent['commit'] + ':' + source)
+        lines = old.splitlines(keepends=True)
+        if (not isinstance(first, int) or isinstance(first, bool) or
+                not isinstance(last, int) or isinstance(last, bool) or
+                not 1 <= first <= last <= len(lines) or old_source['line'] != first or
+                new_source['line'] != shifted_marker_line(selections, source, first)):
+            raise Fault('AssignmentInvalid', 'assigned source interval differs', 'snapshot')
+        start = sum(len(line) for line in lines[:first - 1])
+        end = start + sum(len(line) for line in lines[first - 1:last])
+        if old_source['kind'] == 'authored' and old_source['range'] != [start, end]:
+            raise Fault('AssignmentInvalid', 'assigned source interval differs', 'snapshot')
+        if old_source['kind'] == 'native' and (
+                first != last or old_source['marker'] != [start, end]):
+            raise Fault('AssignmentInvalid', 'assigned marker interval differs', 'snapshot')
+        for earlier_start, earlier_end in intervals.setdefault(source, []):
+            if start < earlier_end and earlier_start < end:
+                raise Fault('AssignmentInvalid', 'assigned source intervals overlap',
+                            'snapshot')
+        intervals[source].append((start, end))
+        for passage in protected['passages']:
+            if passage['file'] != source:
+                continue
+            anchor = passage['anchor'].encode()
+            locations = [match.start() for match in re.finditer(re.escape(anchor), old)]
+            if len(locations) != 1:
+                raise Fault('ProtectedSpan', 'bound passage anchor is ambiguous', 'snapshot')
+            place = locations[0]
+            length = passage['end'] - passage['start']
+            if digest(old[place:place + length]) != passage['sha256']:
+                raise Fault('ProtectedSpan', 'bound passage bytes differ', 'snapshot')
+            if start < place + length and place < end:
+                raise Fault('ProtectedSpan', 'assigned interval overlaps bound passage ' +
+                            str(passage['id']), 'snapshot')
+        unit_path = row['unit_path']
+        if (not isinstance(unit_path, str) or not re.fullmatch(
+                r'units/statements/[a-z0-9-]+\.toml', unit_path)):
+            raise Fault('AssignmentInvalid', 'assigned unit path class differs', 'snapshot')
+        try:
+            unit = tomllib.loads((repo / unit_path).read_text(encoding='utf-8'))['unit']
+        except (OSError, ValueError, KeyError) as error:
+            raise Fault('AssignmentInvalid', 'assigned unit is unavailable: ' + str(error),
+                        'snapshot') from error
+        expected_document = ('explainer-pilot' if source.endswith('/explainer.tex')
+                             else 'paper-pilot')
+        if unit.get('id') != row['unit'] or unit.get('document') != expected_document:
+            raise Fault('AssignmentInvalid', 'assigned unit identity differs', 'snapshot')
+        allowed.update({source, unit_path, 'units/scopes/' +
+                        ('explainer' if source.endswith('/explainer.tex') else
+                         pathlib.PurePosixPath(source).stem.lower()) + '.toml',
+                        'units/skeletons/' +
+                        ('explainer-pilot' if source.endswith('/explainer.tex') else
+                         'paper-pilot') + '.toml'})
+    acceptance_path = 'documents/paper-build/self-description.json'
+    if (repo / acceptance_path).read_bytes() != git(
+            repo, 'show', parent['commit'] + ':' + acceptance_path):
+        try:
+            current = json.loads((repo / acceptance_path).read_bytes())
+        except (OSError, ValueError) as error:
+            raise Fault('ProtectedSpan', 'accepted passage record is unreadable',
+                        'snapshot') from error
+        if not isinstance(current, dict):
+            raise Fault('ProtectedSpan', 'accepted passage inventory differs', 'snapshot')
+        old_passages = protected['passages']
+        new_passages = current.get('passages')
+        if ({key: value for key, value in current.items() if key != 'passages'} !=
+                {key: value for key, value in protected.items() if key != 'passages'} or
+                not isinstance(new_passages, list) or
+                len(new_passages) != len(old_passages)):
+            raise Fault('ProtectedSpan', 'accepted passage inventory differs', 'snapshot')
+        for previous, present in zip(old_passages, new_passages):
+            if ({key: value for key, value in previous.items()
+                 if key not in ('start', 'end')} !=
+                    {key: value for key, value in present.items()
+                     if key not in ('start', 'end')}):
+                raise Fault('ProtectedSpan', 'accepted passage identity differs', 'snapshot')
+            source_bytes = (repo / present['file']).read_bytes()
+            start_offset, end_offset = present['start'], present['end']
+            if (not isinstance(start_offset, int) or not isinstance(end_offset, int) or
+                    digest(source_bytes[start_offset:end_offset]) != present['sha256'] or
+                    source_bytes.count(present['anchor'].encode()) != 1):
+                raise Fault('ProtectedSpan', 'accepted passage offset or bytes differ',
+                            'snapshot')
+        allowed.add(acceptance_path)
+    def content_path(name):
+        return (name.startswith('documents/paper/parts/') and name.endswith('.tex') or
+                   name == 'documents/paper/explainer/explainer.tex' or
+                   name.startswith('units/statements/') and name.endswith('.toml') or
+                   name.startswith('units/scopes/') and name.endswith('.toml') or
+                   name.startswith('units/skeletons/') and name.endswith('.toml') or
+                   name.startswith('units/displays/') and name.endswith('.toml') or
+                   name == acceptance_path or
+                   name.startswith('generated/documents/') or
+                   name in ('generated/paper/paper.pdf',
+                            'generated/paper/explainer.pdf',
+                            'generated/paper/inputs.json'))
+
+    since_capability = set(git(repo, 'diff', '--no-renames', '--name-only', '-z', revision, '--')
+                           .decode().strip('\x00').split('\x00'))
+    for name in sorted(since_capability - {''}):
+        if not content_path(name):
+            raise Fault('CapabilityChanged', 'reviewed capability path changed: ' + name,
+                        'snapshot')
+    changed = set(git(repo, 'diff', '--no-renames', '--name-only', '-z', parent['commit'], '--')
+                  .decode().strip('\x00').split('\x00'))
+    changed.update(git(repo, 'ls-files', '--others', '--exclude-standard', '-z')
+                   .decode().strip('\x00').split('\x00'))
+    changed.discard('')
+    for name in sorted(changed):
+        generated = (name.startswith('generated/documents/') or
+                     name in ('generated/paper/paper.pdf',
+                              'generated/paper/explainer.pdf',
+                              'generated/paper/inputs.json'))
+        if name not in allowed and not generated:
+            raise Fault('PathIneligible',
+                        'unassigned or capability path changed: ' + name,
+                        'snapshot')
+        target = repo / name
+        if target.is_symlink() or not target.is_file() or target.stat().st_mode & 0o111:
+            raise Fault('PathIneligible', 'changed path is not an ordinary file: ' + name,
+                        'snapshot')
+    if evidence['verdict'] != 'equal' or evidence['faults'] or evidence['differences']:
+        raise Fault('ComparisonIncomplete', 'complete comparison is not equal', 'final')
+    result = dict(author=assignment['author'], parent=parent['commit'],
+                  capability_revision=revision, source=assignment['source'],
+                  unit=assignment['unit'], interval=[assignment['first'], assignment['last']],
+                  verdict='scope-admissible')
+    if 'occurrences' in assignment:
+        result['occurrences'] = [dict(source=row['source'], unit=row['unit'],
+                                      interval=[row['first'], row['last']])
+                                 for row in occurrences]
+    return result
 
 
 def compare(args):
@@ -996,6 +1243,7 @@ def compare(args):
     originals = {}
     copies = {}
     stage = 'snapshot'
+    active_index = 0
     try:
         selector = getattr(args, 'before_source', None)
         revision = getattr(args, 'before_revision', None)
@@ -1048,51 +1296,82 @@ def compare(args):
         parent = parent_snapshot(repo, parent_commit, parent_dir)
         evidence['parent'] = {key: value for key, value in parent.items()
                               if key != 'receipt'}
+        assigned = None
+        if getattr(args, 'assignment', None) is not None:
+            try:
+                assigned = json.loads(args.assignment.read_bytes())
+            except (OSError, ValueError) as error:
+                raise Fault('AssignmentInvalid', error, 'request') from error
+        multiple = (isinstance(assigned, dict) and
+                    isinstance(assigned.get('occurrences'), list) and
+                    len(assigned['occurrences']) > 1)
         before_source, after_source = selected_sources(repo, args, parent, parent_dir,
-                                                       snapshot)
+                                                       snapshot, defer_outside=multiple)
+        selections = [(before_source, after_source, args.unit)]
+        if assigned is not None:
+            if isinstance(assigned, dict) and isinstance(assigned.get('occurrences'), list):
+                for row in assigned['occurrences'][1:]:
+                    if not isinstance(row, dict) or not all(
+                            key in row for key in ('unit', 'source', 'first', 'last')):
+                        raise Fault('AssignmentInvalid', 'occurrence fields differ', 'request')
+                    unit_args = argparse.Namespace(
+                        unit=row['unit'], before_source=(
+                            f"{parent_commit}:{row['source']}:{row['first']}-{row['last']}"
+                            if row.get('previous_kind') == 'authored' else None),
+                        before_revision=(None if row.get('previous_kind') == 'authored'
+                                         else parent_commit))
+                    shift = shifted_marker_line(selections, row['source'], row['first']) - row['first']
+                    old, new = selected_sources(repo, unit_args, parent, parent_dir,
+                                                snapshot, defer_outside=multiple,
+                                                line_shift=shift)
+                    selections.append((old, new, row['unit']))
         evidence['source'] = {key: value for key, value in before_source.items()
                               if key not in ('body', 'blob_bytes')}
         try:
-            (output / 'source.blob').write_bytes(before_source['blob_bytes'])
+            for ordinal, (old, _, _) in enumerate(selections):
+                name = 'source.blob' if ordinal == 0 else f'source-{ordinal}.blob'
+                (output / name).write_bytes(old['blob_bytes'])
         except OSError as error:
             raise Fault('EvidenceUnavailable', error, 'snapshot') from error
         envelope = source_envelope(parent, parent_dir, snapshot, evidence['inputs'],
-                                   before_source, after_source, args.unit)
+                                   before_source, after_source, args.unit,
+                                   selections[1:])
         evidence['residuals'].append(envelope)
         rows = (snapshot / 'documents/paper-build/sources.tsv').read_text().splitlines()
         declared_fragments(snapshot, rows)
         # Each side resolves tags against the binding bytes captured for that side.
         before_lookup = bindings(parent_dir)
         after_lookup = bindings(snapshot)
-        before_decoded = decode_located(before_source['body'].decode('utf-8'),
-                                        before_lookup, before_source['path'],
-                                        before_source['range'][0])
-        after_decoded = decode_located(after_source['body'].decode('utf-8'),
-                                       after_lookup, after_source['path'],
-                                       after_source['range'][0])
-        before, after = before_decoded['extracted'], after_decoded['extracted']
-        before_semantic, after_semantic = before_decoded['semantic'], after_decoded['semantic']
-        before_tags, after_tags = before_decoded['tags'], after_decoded['tags']
-        tags = {(row['key'], row['spelling'], row['target']) for row in before_tags + after_tags}
+        decoded = []
+        all_tags = []
+        for old, new, key in selections:
+            old_decoded = decode_located(old['body'].decode('utf-8'), before_lookup,
+                                         old['path'], old['range'][0])
+            new_decoded = decode_located(new['body'].decode('utf-8'), after_lookup,
+                                         new['path'], new['range'][0])
+            decoded.append((old_decoded, new_decoded))
+            all_tags.extend(old_decoded['tags'] + new_decoded['tags'])
+            old['sha256'] = digest(old['blob_bytes'])
+            new['sha256'] = digest(new['blob_bytes'])
+            old['blob'] = next(row['blob'] for row in parent['inputs']
+                               if row['path'] == old['path'])
+            old['receipt_digest'] = parent['receipt']['inputs'].get(old['path'])
+            new['receipt_digest'] = json.loads(
+                (snapshot / 'generated/paper/inputs.json').read_bytes())['inputs'].get(new['path'])
+            old['binding_inputs'] = [row for row in parent['inputs']
+                                     if row['path'] in BINDING_INPUTS + CHECK_INPUTS]
+            new['binding_inputs'] = [row for row in evidence['inputs']
+                                     if row['path'] in BINDING_INPUTS + CHECK_INPUTS]
+            evidence['units'].append(dict(unit=key, occurrences=[dict(
+                sources=dict(before={field: value for field, value in old.items()
+                                     if field not in ('body', 'blob_bytes')},
+                             after={field: value for field, value in new.items()
+                                    if field not in ('body', 'blob_bytes')}),
+                tokens=dict(before=old_decoded['tokens'],
+                            after=new_decoded['tokens']))]))
+        tags = {(row['key'], row['spelling'], row['target']) for row in all_tags}
         evidence['tags'] = [dict(key=key, spelling=spelling, target=target)
                             for key, spelling, target in sorted(tags)]
-        before_source['sha256'] = digest(before_source['blob_bytes'])
-        after_source['sha256'] = digest(after_source['blob_bytes'])
-        before_source['blob'] = next(row['blob'] for row in parent['inputs']
-                                     if row['path'] == before_source['path'])
-        before_source['receipt_digest'] = parent['receipt']['inputs'].get(before_source['path'])
-        after_source['receipt_digest'] = json.loads(
-            (snapshot / 'generated/paper/inputs.json').read_bytes())['inputs'].get(after_source['path'])
-        before_source['binding_inputs'] = [row for row in parent['inputs']
-                                           if row['path'] in BINDING_INPUTS + CHECK_INPUTS]
-        after_source['binding_inputs'] = [row for row in evidence['inputs']
-                                          if row['path'] in BINDING_INPUTS + CHECK_INPUTS]
-        evidence['units'] = [dict(unit=args.unit, occurrences=[dict(
-            sources=dict(before={key: value for key, value in before_source.items()
-                                 if key not in ('body', 'blob_bytes')},
-                         after={key: value for key, value in after_source.items()
-                                if key not in ('body', 'blob_bytes')}),
-            tokens=dict(before=before_decoded['tokens'], after=after_decoded['tokens']))])]
         stage = 'extraction'
         evidence['extractor'] = extractor_identity()
         extraction_faults = []
@@ -1111,32 +1390,62 @@ def compare(args):
                                       if STAGES[row['stage']] == first_stage)
             raise StageHalt
         stage = 'correspondence'
-        paper = evidence['documents']['paper']
-        before_proof = align_located(before_decoded, paper['before'], 'paper', 'before')
-        evidence['units'][0]['occurrences'][0]['search'] = {
-            'before': before_proof['search']}
-        after_proof = align_located(after_decoded, paper['after'], 'paper', 'after')
-        proof = dict(before=before_proof, after=after_proof)
-        unchanged_paragraph_events(before_source['blob_bytes'], after_source['blob_bytes'],
-                                   proof['before'], proof['after'])
-        evidence['correspondence'] = proof
-        evidence['units'][0]['occurrences'][0]['search']['after'] = after_proof['search']
-        if before_semantic != after_semantic:
-            evidence['differences'].append(dict(code='TextDifference', part='source/body',
-                                                before=before_semantic, after=after_semantic,
-                                                proof='direct'))
-        if before_tags != after_tags:
-            evidence['differences'].append(dict(code='TextDifference', part='source/tags',
-                                                before=before_tags, after=after_tags,
-                                                proof='direct'))
+        proofs = {}
+        matches = {'paper': {'before': [], 'after': []},
+                   'explainer': {'before': [], 'after': []}}
+        active_index = 0
+        for index, ((old, new, key), (old_decoded, new_decoded)) in enumerate(
+                zip(selections, decoded)):
+            active_index = index
+            document = ('explainer' if old['source'].endswith('/explainer.tex')
+                        else 'paper')
+            pages = evidence['documents'][document]
+            old_proof = align_located(old_decoded, pages['before'], document, 'before')
+            evidence['units'][index]['occurrences'][0]['search'] = dict(
+                before=old_proof['search'])
+            new_proof = align_located(new_decoded, pages['after'], document, 'after')
+            proof = dict(before=old_proof, after=new_proof)
+            unchanged_paragraph_events(old['blob_bytes'], new['blob_bytes'],
+                                       old_proof, new_proof)
+            proofs[key] = proof
+            matches[document]['before'].append(old_proof)
+            matches[document]['after'].append(new_proof)
+            evidence['units'][index]['occurrences'][0]['search']['after'] = new_proof['search']
+            if old_decoded['semantic'] != new_decoded['semantic']:
+                difference = dict(
+                    code='TextDifference', part='source/body',
+                    before=old_decoded['semantic'], after=new_decoded['semantic'],
+                    proof='direct')
+                if len(selections) > 1:
+                    difference['unit'] = key
+                evidence['differences'].append(difference)
+            if old_decoded['tags'] != new_decoded['tags']:
+                difference = dict(
+                    code='TextDifference', part='source/tags',
+                    before=old_decoded['tags'], after=new_decoded['tags'],
+                    proof='direct')
+                if len(selections) > 1:
+                    difference['unit'] = key
+                evidence['differences'].append(difference)
+        evidence['correspondence'] = proofs[args.unit] if len(selections) == 1 else proofs
+        for document in ('paper', 'explainer'):
+            for side in ('before', 'after'):
+                spans = sorted(item['range'] for item in matches[document][side])
+                if any(left[1] > right[0] for left, right in zip(spans, spans[1:])):
+                    raise Fault('CorrespondenceInvalid',
+                                'selected paragraph ranges overlap', 'correspondence',
+                                document, side)
         stage = 'comparison'
         unresolved = []
         for document in ('paper', 'explainer'):
             before_pdf = evidence['documents'][document]['before']
             after_pdf = evidence['documents'][document]['after']
-            mapped = document == 'paper'
-            before_proof = proof['before'] if mapped else None
-            after_proof = proof['after'] if mapped else None
+            document_proofs = matches[document]
+            before_proof = document_proofs['before'] or None
+            after_proof = document_proofs['after'] or None
+            if before_proof and len(before_proof) == 1:
+                before_proof = before_proof[0]
+                after_proof = after_proof[0]
             for side, pdf, match in (('before', before_pdf, before_proof),
                                      ('after', after_pdf, after_proof)):
                 if match:
@@ -1158,13 +1467,15 @@ def compare(args):
                 for row in before_pdf['line_events'] + after_pdf['line_events']:
                     if 'residual_key' in row:
                         row['reason'] = residual_failure[0]
-            interval_count = 2 if mapped else 1
+            before_ranges = sorted((row['range'] for row in document_proofs['before']))
+            after_ranges = sorted((row['range'] for row in document_proofs['after']))
+            interval_count = len(before_ranges) + 1
             for ordinal in range(interval_count):
                 bounds = {}
-                for side, pdf, match in (('before', before_pdf, before_proof),
-                                         ('after', after_pdf, after_proof)):
-                    left = 0 if ordinal == 0 else match['range'][1]
-                    right = match['range'][0] if ordinal == 0 and match else len(pdf['stream'])
+                for side, pdf, ranges in (('before', before_pdf, before_ranges),
+                                          ('after', after_pdf, after_ranges)):
+                    left = 0 if ordinal == 0 else ranges[ordinal - 1][1]
+                    right = ranges[ordinal][0] if ordinal < len(ranges) else len(pdf['stream'])
                     segment = pdf['stream'][left:right]
                     bounds[side] = dict(range=[left, right],
                                         compared_tokens_sha256=digest(segment.encode()),
@@ -1204,7 +1515,7 @@ def compare(args):
                             code='TextDifference', document=document, part='stream',
                             proof='witness', witness_offset=witness_offset,
                             before=left_q, after=right_q))
-        evidence['coverage'] = dict(decoded_units=[args.unit],
+        evidence['coverage'] = dict(decoded_units=[key for _, _, key in selections],
                                     interpreted=sum(row['decision'] not in
                                                     ('unresolved', 'unchanged-residual',
                                                      'unchanged-paragraph')
@@ -1270,12 +1581,25 @@ def compare(args):
                     row['document'], row['side'], location[0], location[1]).row)
         else:
             evidence['verdict'] = 'equal'
+        if getattr(args, 'assignment', None) is not None:
+            try:
+                evidence['scope_admissibility'] = assigned_plain_scope(
+                    repo, args.assignment, evidence, parent, before_source,
+                    after_source, envelope, selections)
+            except Fault as error:
+                error.row['rule'] = 'M082'
+                if evidence['verdict'] == 'different':
+                    evidence['scope_admissibility'] = dict(
+                        verdict='refused', faults=[error.row])
+                else:
+                    evidence['verdict'] = 'refused'
+                    raise
     except StageHalt:
         pass
     except Fault as error:
         search = error.row.pop('search', None)
         if search is not None and evidence['units']:
-            occurrence = evidence['units'][0]['occurrences'][0]
+            occurrence = evidence['units'][active_index]['occurrences'][0]
             occurrence.setdefault('search', {})[error.row['side']] = search
         evidence['faults'].append(error.row)
     except Exception as error:
@@ -1294,7 +1618,8 @@ def compare(args):
     for row in evidence['faults']:
         display = dict(row, page=row['page'] if row['page'] is not None else '-',
                        offset=row['offset'] if row['offset'] is not None else '-')
-        print('M077: {code}: {document}/{side}: {page}:{offset}: {detail}'.format(**display),
+        display.setdefault('rule', 'M077')
+        print('{rule}: {code}: {document}/{side}: {page}:{offset}: {detail}'.format(**display),
               file=sys.stderr)
     return {'equal': 0, 'different': 1, 'refused': 2}[evidence['verdict']]
 
@@ -1313,6 +1638,7 @@ def main():
     comparison.add_argument('--before-source')
     comparison.add_argument('--before-revision')
     comparison.add_argument('--unit', required=True)
+    comparison.add_argument('--assignment', type=pathlib.Path)
     comparison.add_argument('--output', required=True, type=pathlib.Path)
     args = parser.parse_args()
     try:

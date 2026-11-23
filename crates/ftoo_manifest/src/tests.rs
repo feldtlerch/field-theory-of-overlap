@@ -548,7 +548,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
         M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M077,
-        M078, M079,
+        M078, M079, M082,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -558,7 +558,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
             M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
-            M071, M072, M073, M074, M077, M078, M079
+            M071, M072, M073, M074, M077, M078, M079, M082
         ]
     );
     for rule in RULES {
@@ -569,7 +569,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
             | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
-            | M071 | M073 | M074 | M077 | M078 | M079 => RuleState::Enforced,
+            | M071 | M073 | M074 | M077 | M078 | M079 | M082 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
             M072 => RuleState::DeferredPaperUnits,
@@ -633,7 +633,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 77);
+    assert_eq!(RULES.len(), 78);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -713,7 +713,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        66
+        67
     );
     assert_eq!(
         RULES
@@ -1147,12 +1147,38 @@ fn conversion_text_rule_literal() {
         .unwrap();
     assert_eq!(
         rule.statement,
-        "Requested paper-pair comparisons read captured PDFs in full through the recorded extractor, retain every raw page and classify every character under the stated profile and normalization rules. They compare complete canonical document streams and ordered bookmark titles and corroborate the declared paragraph with each side's captured source of that occurrence at its checked inclusion place. Only verified folios, whitespace, the listed presentation ligatures and source-decided line-end interpretation change extracted text. Line-end hyphens, en dashes, em dashes and slashes are retained as events before interpretation. An unchanged event may bypass interpretation only with an identical raw line, the same aligned token position and identical enclosing source bytes; an unidentified legacy interval may use the stricter unchanged-residual proof stated in ADR 043, never an offset-only match. Every other event requires unique source correspondence on each side independently; only a source-confirmed discretionary hyphen is removed, and authored marks and separators are retained. Complete comparison includes all text outside the corroborated paragraph. Checked bare paper tags retain the measured extracted small-cap spelling without general case folding, and correspondence refuses a mismatch; decoded paragraph text also compares their semantic spellings and targets. Outside decoded paragraph text, case inside small capitals is compared as extracted, so a source case change there can compare equal. Invalid or changed inputs, unavailable or ambiguous extraction, unsupported profiles or syntax, invalid furniture, absent or ambiguous selected-paragraph correspondence and exceeded correspondence bounds refuse. Unequal canonical content or bookmark titles reports differences. A difference that holds without the unresolved events (bookmark titles, source/body or source/tags, or a document stream with no unresolved events) reports different. The witness decides only otherwise. If only unresolved line-end coverage prevents complete interpretation, deleting the four event marks and whitespace everywhere from both streams may prove different when the resulting witnesses are unequal; otherwise the verdict is refused. Unresolved events are retained as coverage and never authorize equal. Changed locators, reflow at other break points and moved floats remain stated coverage limits, not permission to erase content, and can report differences without changed words. Equality attests only these comparisons, not paragraph boundaries, mathematical structure, checking effects, appearance or acceptance."
+        "Requested paper-pair comparisons read captured PDFs in full through the recorded extractor, retain every raw page and classify every character under the stated profile and normalization rules. They compare complete canonical document streams and ordered bookmark titles and corroborate every declared paragraph with each side's captured source of that occurrence at its checked inclusion place. Only verified folios, whitespace, the listed presentation ligatures and source-decided line-end interpretation change extracted text. Line-end hyphens, en dashes, em dashes and slashes are retained as events before interpretation. An unchanged event may bypass interpretation only with an identical raw line, the same aligned token position and identical enclosing source bytes; an unidentified legacy interval may use the stricter unchanged-residual proof stated in ADR 043, never an offset-only match. Every other event requires unique source correspondence on each side independently; only a source-confirmed discretionary hyphen is removed, and authored marks and separators are retained. Complete comparison includes all text outside the corroborated paragraphs. Checked bare paper tags retain the measured extracted small-cap spelling without general case folding, and correspondence refuses a mismatch; decoded paragraph text also compares their semantic spellings and targets. Outside decoded paragraph text, case inside small capitals is compared as extracted, so a source case change there can compare equal. Invalid or changed inputs, unavailable or ambiguous extraction, unsupported profiles or syntax, invalid furniture, absent or ambiguous selected-paragraph correspondence and exceeded correspondence bounds refuse. Unequal canonical content or bookmark titles reports differences. A difference that holds without the unresolved events (bookmark titles, source/body or source/tags, or a document stream with no unresolved events) reports different. The witness decides only otherwise. If only unresolved line-end coverage prevents complete interpretation, deleting the four event marks and whitespace everywhere from both streams may prove different when the resulting witnesses are unequal; otherwise the verdict is refused. Unresolved events are retained as coverage and never authorize equal. Changed locators, reflow at other break points and moved floats remain stated coverage limits, not permission to erase content, and can report differences without changed words. Equality attests only these comparisons, not paragraph boundaries, mathematical structure, checking effects, appearance or acceptance."
     );
     assert_eq!(
         rule.scope,
-        "Explicit complete-paper-and-explainer comparison requests using the A4 plain-folio profile, a declared plain paragraph with checked bare paper tags and the bounded source-decided line-end grammar; complete raw and canonical streams, ordered bookmark titles, per-side captured source and unchanged-event/residual evidence. No automatic release or conversion acceptance, no derived-locator exclusion and no general legacy TeX decoder."
+        "Explicit complete-paper-and-explainer comparison requests using the A4 plain-folio profile, one or more declared plain paragraphs with checked bare paper tags and the bounded source-decided line-end grammar; complete raw and canonical streams, ordered bookmark titles, per-side captured source and unchanged-event/residual evidence. No automatic release or conversion acceptance, no derived-locator exclusion and no general legacy TeX decoder."
     );
     assert_eq!(rule.state, RuleState::Enforced);
     assert_eq!(rule.deferred_reason, None);
+    let guide = include_str!("../../../tools/paper/README.md");
+    let section = guide
+        .split_once("`rule:paper:conversion-word-comparison`")
+        .unwrap()
+        .1
+        .trim_start();
+    let (statement, scoped) = section.split_once("\n\nScope: ").unwrap();
+    assert_eq!(statement, rule.statement);
+    assert_eq!(scoped.split_once("\n\n").unwrap().0, rule.scope);
+}
+
+#[test]
+fn assigned_plain_scope_rule_literal() {
+    let rule = RULES
+        .iter()
+        .find(|rule| rule.number == RuleId::M082)
+        .unwrap();
+    assert_eq!(
+        rule.statement,
+        "An externally assigned set of plain paragraphs is scope-admissible only when its assignment lies outside the candidate, binds the immediate parent and a full capability revision with matching tree digest, runs the comparison from that revision's recorded code bytes, names every selected source blob, unit and interval in one source file, and permits only fixed generated classes; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a generated class and is an ordinary file, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
+    );
+    assert_eq!(
+        rule.scope,
+        "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with an external assignment; no batch-retention claim."
+    );
+    assert_eq!(rule.state, RuleState::Enforced);
 }
