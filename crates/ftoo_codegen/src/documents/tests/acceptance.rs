@@ -1003,21 +1003,27 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let register: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
     let registered = register["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), registered.len());
-    for (gap, row) in gaps.iter().zip(registered) {
-        assert_eq!(gap.document, row["document"].as_str().unwrap());
-        assert_eq!(gap.unit, row["unit"].as_str().unwrap());
-        assert_eq!(gap.block, usize::try_from(row["block"].as_u64().unwrap())?);
-        assert_eq!(gap.inline_kind, row["inline-kind"].as_str().unwrap());
-    }
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(gaps[0].document, "paper-pilot");
+    assert_eq!(gaps[0].unit, "sec:coda:whole-field");
+    assert_eq!(gaps[0].block, 6);
+    assert_eq!(gaps[0].inline_kind, "mathematics");
+    assert_eq!(
+        registered.as_slice(),
+        &[serde_json::json!({
+            "block": 6,
+            "document": "paper-pilot",
+            "inline-kind": "mathematics",
+            "unit": "sec:coda:whole-field"
+        })]
+    );
     let refusal = crate::paper::html_gaps::refusal(gaps).unwrap_err();
-    let crate::paper::PaperFault::Release { part, reason } = refusal else {
-        panic!("release gap refusal")
-    };
-    assert_eq!(part, "HTML block gaps");
-    for gap in gaps {
-        assert!(reason.contains(&gap.site.to_string()));
-    }
+    assert!(
+        refusal
+            .to_string()
+            .contains("HTML block gaps: paper-pilot / sec:coda:whole-field block 6 mathematics")
+    );
+    assert!(refusal.to_string().contains(&gaps[0].site.to_string()));
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,

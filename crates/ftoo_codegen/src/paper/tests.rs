@@ -94,7 +94,7 @@ fn registered_gap_check_is_separate_from_release_command() {
 }
 
 #[test]
-fn support_required_release_refuses_the_registered_html_gap() -> Result<()> {
+fn support_required_release_names_coda_html_block_gap() -> Result<()> {
     let req = request(&[
         "check".into(),
         "--release".into(),
@@ -103,10 +103,12 @@ fn support_required_release_refuses_the_registered_html_gap() -> Result<()> {
     ])?;
     assert!(!req.registered_html_gaps);
     let PaperFault::Release { part, reason } = check_release_documents(&req).unwrap_err() else {
-        panic!("ordinary release must refuse the checked HTML block gap")
+        panic!("the remaining HTML block gap must refuse release")
     };
     assert_eq!(part, "HTML block gaps");
-    assert!(reason.contains("units/statements/andreoni-joint.toml"));
+    assert!(reason.starts_with("paper-pilot / sec:coda:whole-field block 6 mathematics at "));
+    assert!(reason.contains("units/statements/coda-whole-field.toml"));
+    assert!(!reason.contains("bibliography-citation"));
     Ok(())
 }
 

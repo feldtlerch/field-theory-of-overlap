@@ -284,10 +284,10 @@ fn public_run_text(
                 .chars()
                 .next_back()
                 .is_some_and(label_character)
-                || value[range.end..]
-                    .chars()
-                    .next()
-                    .is_some_and(label_character)
+                || {
+                    let after = &value[range.end..];
+                    after.chars().next().is_some_and(label_character) && !after.starts_with(": ")
+                }
         })
     {
         return Err(mismatch(plan, "HTML reader label literal"));
@@ -360,6 +360,109 @@ fn flat(runs: &[Inline]) -> String {
         }
     }
     result
+}
+
+fn bibliography_citation(
+    plan: &DocumentPlan,
+    known: &[&str],
+    node: &Node,
+    kind: ftoo_manifest::BibliographyCitationKind,
+    entries: &[super::bibliography::Entry],
+    label: &str,
+) -> Result<(), DocumentError> {
+    let parenthetical = kind == ftoo_manifest::BibliographyCitationKind::Parenthetical;
+    let children = element(
+        plan,
+        known,
+        node,
+        "span",
+        &[(
+            "data-kind",
+            if parenthetical {
+                "parenthetical"
+            } else {
+                "textual"
+            },
+        )],
+        "HTML bibliography citation kind",
+    )?;
+    let expected_nodes = if entries.is_empty() {
+        usize::from(parenthetical)
+    } else {
+        2 * entries.len() - 1 + 2 * usize::from(parenthetical)
+    };
+    if children.len() != expected_nodes {
+        return Err(mismatch(plan, "HTML bibliography citation link inventory"));
+    }
+    if label != super::bibliography::citation_label(kind, entries) {
+        return Err(mismatch(plan, "HTML bibliography citation planned label"));
+    }
+    let mut at = 0;
+    if parenthetical {
+        let node = children
+            .get(at)
+            .ok_or_else(|| mismatch(plan, "HTML bibliography citation link inventory"))?;
+        text(
+            plan,
+            known,
+            std::slice::from_ref(node),
+            "(",
+            "HTML bibliography citation punctuation",
+        )?;
+        at += 1;
+    }
+    for (index, entry) in entries.iter().enumerate() {
+        if index != 0 {
+            let node = children
+                .get(at)
+                .ok_or_else(|| mismatch(plan, "HTML bibliography citation link inventory"))?;
+            text(
+                plan,
+                known,
+                std::slice::from_ref(node),
+                "; ",
+                "HTML bibliography citation punctuation",
+            )?;
+            at += 1;
+        }
+        let node = children
+            .get(at)
+            .ok_or_else(|| mismatch(plan, "HTML bibliography citation link inventory"))?;
+        let href = format!("#{}", entry.anchor);
+        let link = element(
+            plan,
+            known,
+            node,
+            "a",
+            &[("href", &href)],
+            "HTML bibliography citation destination",
+        )?;
+        text(
+            plan,
+            known,
+            link,
+            &super::bibliography::screen_citation_piece(kind, entry),
+            "HTML bibliography citation label",
+        )?;
+        at += 1;
+    }
+    if parenthetical {
+        let node = children
+            .get(at)
+            .ok_or_else(|| mismatch(plan, "HTML bibliography citation link inventory"))?;
+        text(
+            plan,
+            known,
+            std::slice::from_ref(node),
+            ")",
+            "HTML bibliography citation punctuation",
+        )?;
+        at += 1;
+    }
+    if at != children.len() {
+        return Err(mismatch(plan, "HTML bibliography citation link inventory"));
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_lines)] // Each inline kind has its own recovery comparison.
@@ -478,8 +581,18 @@ fn runs(
                 }
                 at += 1;
             }
-            Inline::BibliographyCitation { .. } => {
-                unreachable!("unrealizable block withheld before recovery")
+            Inline::BibliographyCitation {
+                kind,
+                entries,
+                label,
+                ..
+            } => {
+                flush(&mut pending, &mut paper, &mut at)?;
+                let node = actual
+                    .get(at)
+                    .ok_or_else(|| mismatch(plan, "HTML bibliography citation position"))?;
+                bibliography_citation(plan, known, node, *kind, entries, label)?;
+                at += 1;
             }
         }
     }
@@ -863,8 +976,70 @@ fn check_main(
             .message,
         "HTML final gap sentence",
     )?;
-    if nodes.len() != at + 1 {
-        return Err(mismatch(plan, "HTML block inventory"));
+    at += 1;
+    for section in &screen.end_matter {
+        match section {
+            super::plan::ScreenEndMatter::References(entries) => {
+                let heading = nodes
+                    .get(at)
+                    .ok_or_else(|| mismatch(plan, "HTML bibliography heading position"))?;
+                let heading = element(
+                    plan,
+                    known,
+                    heading,
+                    "h2",
+                    &[("id", "references")],
+                    "HTML bibliography heading anchor",
+                )?;
+                text(
+                    plan,
+                    known,
+                    heading,
+                    "References",
+                    "HTML bibliography heading text",
+                )?;
+                at += 1;
+                for entry in entries {
+                    let row = nodes
+                        .get(at)
+                        .ok_or_else(|| mismatch(plan, "HTML bibliography entry inventory"))?;
+                    let row = element(
+                        plan,
+                        known,
+                        row,
+                        "p",
+                        &[],
+                        "HTML bibliography entry position",
+                    )?;
+                    let [anchor, content] = row else {
+                        return Err(mismatch(plan, "HTML bibliography entry inventory"));
+                    };
+                    if !element(
+                        plan,
+                        known,
+                        anchor,
+                        "a",
+                        &[("id", &entry.anchor)],
+                        "HTML bibliography entry anchor",
+                    )?
+                    .is_empty()
+                    {
+                        return Err(mismatch(plan, "HTML bibliography entry anchor"));
+                    }
+                    text(
+                        plan,
+                        known,
+                        std::slice::from_ref(content),
+                        &super::bibliography::screen_text(entry),
+                        "HTML bibliography entry text",
+                    )?;
+                    at += 1;
+                }
+            }
+        }
+    }
+    if nodes.len() != at {
+        return Err(mismatch(plan, "HTML end-matter inventory"));
     }
     Ok(())
 }

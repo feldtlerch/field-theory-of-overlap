@@ -41,6 +41,7 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
         ],
         refrains: vec![],
         html_gaps: std::collections::BTreeMap::new(),
+        end_matter: vec![],
     });
     plan
 }
@@ -90,11 +91,8 @@ fn html_gap_planning_uses_nested_realizability() {
         label: "Andreoni 1990".into(),
         site: site.clone(),
     }];
-    assert!(plan::html_gaps(&plan).contains_key(&1));
-    assert_eq!(
-        super::super::html::unrealizable_kinds(&plan.blocks[1].runs, true),
-        std::collections::BTreeSet::from(["bibliography-citation"])
-    );
+    assert!(plan::html_gaps(&plan).is_empty());
+    assert!(super::super::html::unrealizable_kinds(&plan.blocks[1].runs, true).is_empty());
     plan.blocks[1].runs = vec![plan::Inline::Styled {
         kind: plan::StyleKind::Emphasis,
         children: vec![plan::Inline::Mention {
@@ -105,6 +103,233 @@ fn html_gap_planning_uses_nested_realizability() {
         site,
     }];
     assert!(plan::html_gaps(&plan).is_empty());
+}
+
+#[test]
+fn support_required_html_bibliography_links_and_entries_recover_by_position() {
+    let support = support();
+    let site = input::site("bibliography-html.toml");
+    let source = include_str!("../../../../../documents/paper/references.bib");
+    let first = super::super::bibliography::resolve(source, "a:andreoni", &site).unwrap();
+    let mut second = first.clone();
+    second.key = "a:second".into();
+    second.author = "Bell, Example".into();
+    second.year = "1991".into();
+    second.label = "Bell 1991".into();
+    second.anchor = "bibliography-bell-1991".into();
+    let entries = vec![first.clone(), second.clone()];
+    let mut plan = prose_plan("Words.");
+    plan.screen.as_mut().unwrap().end_matter =
+        vec![plan::ScreenEndMatter::References(entries.clone())];
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    for kind in [
+        ftoo_manifest::BibliographyCitationKind::Parenthetical,
+        ftoo_manifest::BibliographyCitationKind::Textual,
+    ] {
+        plan.blocks[1].runs = vec![
+            plan::Inline::Text("See ".into()),
+            plan::Inline::BibliographyCitation {
+                kind,
+                entries: entries.clone(),
+                label: super::super::bibliography::citation_label(kind, &entries),
+                site: site.clone(),
+            },
+            plan::Inline::Text(".".into()),
+        ];
+        let rendered = super::super::html::render(&plan, &support, &[], None).unwrap();
+        html_recovery::check(&plan, &fonts, &[], &[], &rendered).unwrap();
+        let first_piece = super::super::bibliography::screen_citation_piece(kind, &first);
+        let second_piece = super::super::bibliography::screen_citation_piece(kind, &second);
+        let first_link = format!("<a href=\"#{}\">{}</a>", first.anchor, first_piece);
+        let second_link = format!("<a href=\"#{}\">{}</a>", second.anchor, second_piece);
+        let first_row = format!(
+            "<p><a id=\"{}\"></a>{}</p>",
+            first.anchor,
+            super::super::bibliography::screen_text(&first)
+        );
+        let second_row = format!(
+            "<p><a id=\"{}\"></a>{}</p>",
+            second.anchor,
+            super::super::bibliography::screen_text(&second)
+        );
+        let check = |changed: &str, aspect: &str| {
+            assert_ne!(changed, rendered);
+            let error = html_recovery::check(&plan, &fonts, &[], &[], changed).unwrap_err();
+            assert!(format!("{error:?}").contains(aspect), "{error:?}");
+        };
+        check(
+            &rendered.replacen(&first_link, "", 1),
+            "HTML bibliography citation link inventory",
+        );
+        check(
+            &rendered.replacen(
+                &first_link,
+                &first_link.replace(&first.anchor, "missing"),
+                1,
+            ),
+            "HTML bibliography citation destination",
+        );
+        check(
+            &rendered.replacen(
+                &first_link,
+                &first_link.replace(&first_piece, "Changed 1990"),
+                1,
+            ),
+            "HTML bibliography citation label",
+        );
+        let pair = format!("{first_link}; {second_link}");
+        check(
+            &rendered.replacen(&pair, &format!("{second_link}; {first_link}"), 1),
+            "HTML bibliography citation destination",
+        );
+        let end = if kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+            ")</span>"
+        } else {
+            "</span>"
+        };
+        let invented = format!("{}{first_link}</span>", end.trim_end_matches("</span>"));
+        check(
+            &rendered.replacen(end, &invented, 1),
+            "HTML bibliography citation link inventory",
+        );
+        let actual_kind = if kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
+            "parenthetical"
+        } else {
+            "textual"
+        };
+        check(
+            &rendered.replacen(
+                &format!("data-kind=\"{actual_kind}\""),
+                "data-kind=\"changed\"",
+                1,
+            ),
+            "HTML bibliography citation kind",
+        );
+        check(
+            &rendered.replacen(&first_row, "", 1),
+            "HTML bibliography entry anchor",
+        );
+        check(
+            &rendered.replacen(
+                &format!("{first_row}{second_row}"),
+                &format!("{second_row}{first_row}"),
+                1,
+            ),
+            "HTML bibliography entry anchor",
+        );
+        check(
+            &rendered.replacen(
+                &first_row,
+                &first_row.replace(&first.title, "Changed title"),
+                1,
+            ),
+            "HTML bibliography entry text",
+        );
+        check(
+            &rendered.replacen(&second_row, &format!("{second_row}{first_row}"), 1),
+            "HTML end-matter inventory",
+        );
+        check(
+            &rendered.replacen(
+                "<h2 id=\"references\">References</h2>",
+                "<h2 id=\"wrong\">References</h2>",
+                1,
+            ),
+            "HTML bibliography heading anchor",
+        );
+        check(
+            &rendered.replacen(
+                "<h2 id=\"references\">References</h2>",
+                "<h2 id=\"references\">Other works</h2>",
+                1,
+            ),
+            "HTML bibliography heading text",
+        );
+        let section = format!("<h2 id=\"references\">References</h2>{first_row}{second_row}");
+        check(
+            &rendered.replacen(&section, "", 1),
+            "HTML bibliography heading position",
+        );
+        let final_gap = "<p class=\"gap\">Later content is unavailable.</p>";
+        check(
+            &rendered.replacen(
+                &format!("{final_gap}{section}"),
+                &format!("{section}{final_gap}"),
+                1,
+            ),
+            "HTML final gap",
+        );
+        check(
+            &rendered.replacen(&second_row, "", 1),
+            "HTML bibliography entry inventory",
+        );
+    }
+    let plan::ScreenEndMatter::References(planned) =
+        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    planned[0].title = "A changed work".into();
+    let error = super::super::html::prose_only(&plan).unwrap_err();
+    assert!(
+        format!("{error:?}")
+            .contains("HTML bibliography end-matter entries derived from citations"),
+        "{error:?}"
+    );
+    let plan::ScreenEndMatter::References(planned) =
+        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    planned[0].title = first.title.clone();
+    let end_matter = std::mem::take(&mut plan.screen.as_mut().unwrap().end_matter);
+    let error = super::super::html::prose_only(&plan).unwrap_err();
+    assert!(
+        format!("{error:?}").contains("HTML References section for bibliography citations"),
+        "{error:?}"
+    );
+    plan.screen.as_mut().unwrap().end_matter = end_matter;
+    let plan::ScreenEndMatter::References(planned) =
+        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    let anchor = planned[0].anchor.clone();
+    planned[1].anchor = anchor;
+    let error = plan::check_public_anchors(&plan).unwrap_err();
+    assert!(
+        format!("{error:?}").contains("DuplicatePublicAnchor"),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn support_required_html_paper_tag_span_allows_following_punctuation_only_when_planned() {
+    let support = support();
+    let site = input::site("paper-tag-html.toml");
+    let evidence = ftoo_manifest::PaperEvidenceSite {
+        file: "documents/paper-build/paper-tags.tsv".into(),
+        line: 6,
+    };
+    let mut plan = prose_plan("Words.");
+    plan.blocks[1].runs = vec![
+        plan::Inline::Text("is ".into()),
+        plan::Inline::PaperTag {
+            value: ftoo_manifest::PaperTagValue {
+                key: "J:occ".into(),
+                spelling: "J:occ".into(),
+                target: "sem:joint:occupancy".into(),
+                target_kind: "node".into(),
+                lookup_site: evidence.clone(),
+                alias_site: None,
+                declaration_sites: vec![evidence],
+            },
+            site,
+        },
+        plan::Inline::Text(": yes.".into()),
+    ];
+    let rendered = super::super::html::render(&plan, &support, &["J:occ"], None).unwrap();
+    assert!(rendered.contains("is J:occ: yes."));
+    plan.blocks[1].runs[2] = plan::Inline::Text(":x yes.".into());
+    let error = super::super::html::render(&plan, &support, &["J:occ"], None).unwrap_err();
+    assert!(
+        format!("{error:?}").contains("HTML reader label literal"),
+        "{error:?}"
+    );
+    plan.blocks[1].runs = vec![plan::Inline::Text("is J:occ: yes.".into())];
+    let error = super::super::html::render(&plan, &support, &["J:occ"], None).unwrap_err();
+    assert!(format!("{error:?}").contains("HTML reader label literal"));
 }
 
 #[test]

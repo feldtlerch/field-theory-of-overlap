@@ -786,6 +786,7 @@ fn excerpt_plan() -> DocumentPlan {
         gaps,
         refrains,
         html_gaps: std::collections::BTreeMap::new(),
+        end_matter: vec![],
     });
     plan
 }

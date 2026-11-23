@@ -119,6 +119,7 @@ fn bibliography_main_document_requires_screen_at_citation_site() {
         gaps: vec![],
         refrains: vec![],
         html_gaps: std::collections::BTreeMap::new(),
+        end_matter: vec![],
     });
     assert!(require_bibliography_screen(&plan).is_ok());
 }

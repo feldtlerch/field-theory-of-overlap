@@ -445,8 +445,40 @@ fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
                 .expect("prepared mathematics run")
                 .node
                 .clone(),
-            Inline::BibliographyCitation { .. } => {
-                unreachable!("unrealizable block withheld before emission")
+            Inline::BibliographyCitation { kind, entries, .. } => {
+                let parenthetical = *kind == ftoo_manifest::BibliographyCitationKind::Parenthetical;
+                let mut children = Vec::new();
+                if parenthetical {
+                    children.push(Node::Text("(".into()));
+                }
+                for (index, entry) in entries.iter().enumerate() {
+                    if index != 0 {
+                        children.push(Node::Text("; ".into()));
+                    }
+                    let href = format!("#{}", entry.anchor);
+                    children.push(element(
+                        "a",
+                        &[("href", &href)],
+                        vec![Node::Text(super::bibliography::screen_citation_piece(
+                            *kind, entry,
+                        ))],
+                    ));
+                }
+                if parenthetical {
+                    children.push(Node::Text(")".into()));
+                }
+                element(
+                    "span",
+                    &[(
+                        "data-kind",
+                        if parenthetical {
+                            "parenthetical"
+                        } else {
+                            "textual"
+                        },
+                    )],
+                    children,
+                )
             }
         });
     }
@@ -465,11 +497,8 @@ pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSe
             Inline::Math { markdown, .. } if !math_allowed || !admitted_source(markdown) => {
                 kinds.insert("mathematics");
             }
-            Inline::BibliographyCitation { .. } => {
-                // HTML needs linked citations, a References section, and recovery for both.
-                kinds.insert("bibliography-citation");
-            }
-            Inline::Math { .. }
+            Inline::BibliographyCitation { .. }
+            | Inline::Math { .. }
             | Inline::Text(_)
             | Inline::Tag { .. }
             | Inline::PaperTag { .. }
@@ -478,6 +507,54 @@ pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSe
         }
     }
     kinds
+}
+
+fn bibliography_end_matter(plan: &DocumentPlan) -> Result<(), DocumentError> {
+    fn first_bibliography_citation(runs: &[Inline]) -> Option<&UnitSite> {
+        runs.iter().find_map(|run| match run {
+            Inline::BibliographyCitation { site, .. } => Some(site),
+            Inline::Styled { children, .. } => first_bibliography_citation(children),
+            _ => None,
+        })
+    }
+    let screen = plan.screen.as_ref().expect("screen checked above");
+    let cited = plan
+        .blocks
+        .iter()
+        .find_map(|block| first_bibliography_citation(&block.runs));
+    if screen.end_matter.is_empty()
+        && let Some(site) = cited
+    {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(site.clone()),
+            AssemblyFault::UnknownToken {
+                value: plan.document.clone(),
+                expected: vec!["HTML References section for bibliography citations".into()],
+            },
+        ));
+    }
+    let derived = super::bibliography::entries(plan);
+    let entries_match = match screen.end_matter.as_slice() {
+        [] => derived.is_empty(),
+        [super::plan::ScreenEndMatter::References(entries)] => *entries == derived,
+        _ => false,
+    };
+    if !entries_match {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(cited.unwrap_or(&plan.coverage.site).clone()),
+            AssemblyFault::UnknownToken {
+                value: plan.document.clone(),
+                expected: vec![
+                    "HTML bibliography end-matter entries derived from citations".into(),
+                ],
+            },
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
@@ -564,7 +641,7 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             },
         ));
     }
-    Ok(())
+    bibliography_end_matter(plan)
 }
 
 pub(super) fn plain(runs: &[Inline]) -> String {
@@ -744,6 +821,27 @@ pub(super) fn model(
         &[("class", "gap")],
         vec![Node::Text(screen.gaps.last().expect("gap").message.clone())],
     ));
+    for section in &screen.end_matter {
+        match section {
+            super::plan::ScreenEndMatter::References(entries) => {
+                main.push(element(
+                    "h2",
+                    &[("id", "references")],
+                    vec![Node::Text("References".into())],
+                ));
+                for entry in entries {
+                    main.push(element(
+                        "p",
+                        &[],
+                        vec![
+                            element("a", &[("id", &entry.anchor)], vec![]),
+                            Node::Text(super::bibliography::screen_text(entry)),
+                        ],
+                    ));
+                }
+            }
+        }
+    }
     body.push(element("main", &[], main));
     let mut licences = vec![element(
         "summary",

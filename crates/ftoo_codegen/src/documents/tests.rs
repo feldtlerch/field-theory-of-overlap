@@ -1330,6 +1330,7 @@ fn fragment_macro_follows_planned_quotation() {
         gaps: vec![],
         refrains: vec![],
         html_gaps: std::collections::BTreeMap::new(),
+        end_matter: vec![],
     });
     assert_eq!(
         refuse_quoted_screen_targets(&plan, &[DocumentOutput::Markdown]),
@@ -4002,6 +4003,7 @@ fn markdown_style_screen_paragraph_is_observed() {
         gaps: vec![],
         refrains: vec![],
         html_gaps: std::collections::BTreeMap::new(),
+        end_matter: vec![],
     });
     assert_eq!(markdown::check_math_admission(&plan), Ok(()));
 }

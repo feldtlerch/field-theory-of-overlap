@@ -303,22 +303,28 @@ pub(super) fn screen_text(entry: &Entry) -> String {
     )
 }
 
+pub(super) fn screen_citation_piece(
+    kind: ftoo_manifest::BibliographyCitationKind,
+    entry: &Entry,
+) -> String {
+    match kind {
+        ftoo_manifest::BibliographyCitationKind::Parenthetical => entry.label.clone(),
+        ftoo_manifest::BibliographyCitationKind::Textual => entry.label.replace(' ', " (") + ")",
+    }
+}
+
 pub(super) fn citation_label(
     kind: ftoo_manifest::BibliographyCitationKind,
     entries: &[Entry],
 ) -> String {
     let joined = entries
         .iter()
-        .map(|entry| entry.label.as_str())
+        .map(|entry| screen_citation_piece(kind, entry))
         .collect::<Vec<_>>()
         .join("; ");
     match kind {
         ftoo_manifest::BibliographyCitationKind::Parenthetical => format!("({joined})"),
-        ftoo_manifest::BibliographyCitationKind::Textual => entries
-            .iter()
-            .map(|entry| entry.label.replace(' ', " (") + ")")
-            .collect::<Vec<_>>()
-            .join("; "),
+        ftoo_manifest::BibliographyCitationKind::Textual => joined,
     }
 }
 

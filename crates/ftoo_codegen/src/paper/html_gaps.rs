@@ -66,12 +66,12 @@ mod tests {
     #[test]
     fn registered_gaps_refuse_missing_extra_and_changed_rows() {
         let row = HtmlGapRow {
-            document: "paper-pilot".into(),
-            unit: "sec:log:andreoni-joint".into(),
+            document: "example".into(),
+            unit: "example-unit".into(),
             block: 7,
-            inline_kind: "bibliography-citation".into(),
+            inline_kind: "mathematics".into(),
             site: UnitSite {
-                file: "units/statements/andreoni-joint.toml".into(),
+                file: "fixture.toml".into(),
                 path: vec![],
                 anchor: SourceAnchor::WholeFile,
                 decoded: None,
@@ -84,8 +84,8 @@ mod tests {
         for changed in [
             json!({"schema": 1, "gaps": []}),
             json!({"schema": 1, "gaps": [row_value.clone(), row_value.clone()]}),
-            json!({"schema": 1, "gaps": [{"document": "paper-pilot", "unit": "sec:log:andreoni-joint", "block": 8, "inline-kind": "bibliography-citation"}]}),
-            json!({"schema": 1, "gaps": [{"document": "paper-pilot", "unit": "sec:log:andreoni-joint", "block": 7, "inline-kind": "mathematics"}]}),
+            json!({"schema": 1, "gaps": [{"document": "example", "unit": "example-unit", "block": 8, "inline-kind": "mathematics"}]}),
+            json!({"schema": 1, "gaps": [{"document": "example", "unit": "example-unit", "block": 7, "inline-kind": "unsupported-style"}]}),
         ] {
             let mut bytes = serde_json::to_vec_pretty(&changed).unwrap();
             bytes.push(b'\n');
@@ -106,6 +106,6 @@ mod tests {
             )
             .is_err()
         );
-        assert!(refusal(&[row]).unwrap_err().to_string().contains("Paper release M065 refused at HTML block gaps: paper-pilot / sec:log:andreoni-joint block 7 bibliography-citation"));
+        assert!(refusal(&[row]).unwrap_err().to_string().contains("Paper release M065 refused at HTML block gaps: example / example-unit block 7 mathematics"));
     }
 }

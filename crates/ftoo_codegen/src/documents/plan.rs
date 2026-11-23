@@ -1877,6 +1877,11 @@ pub(super) struct ScreenPlan {
     pub gaps: Vec<ScreenGap>,
     pub refrains: Vec<ScreenRefrain>,
     pub html_gaps: BTreeMap<usize, ScreenGap>,
+    pub end_matter: Vec<ScreenEndMatter>,
+}
+#[derive(Clone, Debug)]
+pub(super) enum ScreenEndMatter {
+    References(Vec<super::bibliography::Entry>),
 }
 pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
     (index > 0 && !blocks[index].paragraph).then(|| {
@@ -1920,7 +1925,7 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
         if refrain.quotation.is_some() {
             continue;
         }
-        if !seen.insert(&refrain.fragment) {
+        if !seen.insert(refrain.fragment.as_str()) {
             return Err(screen_failure(
                 plan,
                 &refrain.site,
@@ -1928,6 +1933,25 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
                     fragment: refrain.fragment.clone(),
                 },
             ));
+        }
+    }
+    for section in &screen.end_matter {
+        match section {
+            ScreenEndMatter::References(entries) => {
+                for anchor in std::iter::once("references")
+                    .chain(entries.iter().map(|entry| entry.anchor.as_str()))
+                {
+                    if !seen.insert(anchor) {
+                        return Err(screen_failure(
+                            plan,
+                            &plan.coverage.site,
+                            AssemblyFault::DuplicatePublicAnchor {
+                                fragment: anchor.into(),
+                            },
+                        ));
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -2394,10 +2418,16 @@ pub(super) fn plan_screens(
             refrains.push(refrain);
         }
         let html_gaps = html_gaps(plan);
+        let entries = super::bibliography::entries(plan);
         plan.screen = Some(ScreenPlan {
             gaps,
             refrains,
             html_gaps,
+            end_matter: if entries.is_empty() {
+                vec![]
+            } else {
+                vec![ScreenEndMatter::References(entries)]
+            },
         });
         check_public_anchors(plan)?;
     }

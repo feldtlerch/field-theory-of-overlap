@@ -429,18 +429,21 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
             text(&screen.gaps.last().expect("gap").message)
         )
         .expect("string write");
-        let entries = super::bibliography::entries(plan);
-        if !entries.is_empty() {
-            output.push_str("## References\n\n");
-            for entry in entries {
-                writeln!(
-                    output,
-                    "<a id=\"{}\"></a>{}<!-- bibentry {} -->\n",
-                    entry.anchor,
-                    text(&super::bibliography::screen_text(&entry)),
-                    entry.key
-                )
-                .expect("string write");
+        for section in &screen.end_matter {
+            match section {
+                super::plan::ScreenEndMatter::References(entries) => {
+                    output.push_str("## References\n\n");
+                    for entry in entries {
+                        writeln!(
+                            output,
+                            "<a id=\"{}\"></a>{}<!-- bibentry {} -->\n",
+                            entry.anchor,
+                            text(&super::bibliography::screen_text(entry)),
+                            entry.key
+                        )
+                        .expect("string write");
+                    }
+                }
             }
         }
         output.pop();
@@ -908,11 +911,7 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                     if index != 0 {
                         output.push_str("; ");
                     }
-                    let label = if *kind == ftoo_manifest::BibliographyCitationKind::Parenthetical {
-                        entry.label.clone()
-                    } else {
-                        entry.label.replace(' ', " (") + ")"
-                    };
+                    let label = super::bibliography::screen_citation_piece(*kind, entry);
                     write!(output, "<a href=\"#{}\">{}</a>", entry.anchor, text(&label))
                         .expect("string write");
                 }
