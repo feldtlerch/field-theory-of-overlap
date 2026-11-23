@@ -14,13 +14,23 @@ checker's l3msg warning and error forms are observed,
 including shorter forms routed through their six-argument form; a checker error
 yields a refused run, while package warnings, infos and notes are outside this
 capture. Clean scopes cannot prove that spends, grants or the audit's judgement
-remain live: rerun the spend, grant, diagnostic, open-spend
-and refusal variants against each converted body. The source and output hashes
-describe the prepared and instrumented run, not tracked TeX or published PDFs;
-paper edits can stale every variant's provenance, while comparison ignores it
-and the full check rederives only the base fixture. A rewritten box opening may
+remain live: rerun spend, grant, diagnostic, open-spend and refusal variants against
+each converted body. A separate envelope binds the repository revision, all
+prepared paper input bytes, the locked engine and used bundle members, the
+capture tap and instrumented input bytes, the captured record, and the
+successful event, log, stream and PDF bytes. Each side is checked against its
+own retained run before a pair reports outcome and provenance differences;
+outcome comparison still ignores provenance. The closing paragraph and refrain
+are checked as consumed prepared bodies, and the economics row is a nonempty
+control. The envelope attests an instrumented typeset, not the driver's PDF
+pair or rendered concordance cells. A rewritten box opening may
 need a new anchor; an absent anchor refuses. The run uses the paper engine's
 fixed rerun count, not the paper-and-explainer auxiliary fixed point.
+Paper edits can stale every variant's provenance; the full check rederives only
+the base fixture. The source-note control inserts a comment after preparation
+at a fixed revision; it uses the same base checker instrumentation on both sides.
+The envelope cannot independently prove a command-only rerun-count variant.
+Pair comparison refuses changes to the checker source as capability changes.
 """
 import argparse
 import copy
@@ -29,6 +39,7 @@ import json
 import pathlib
 import re
 import resource
+import shutil
 import subprocess
 import sys
 import time
@@ -120,6 +131,11 @@ TAP = r'''
     \iow_term:x {FT-DIAG|\tl_use:N \g_ftoo_capture_scope_tl|error|#1|#2}
     \ftoo_capture_original_error:nnnnnn {#1}{#2}{#3}{#4}{#5}{#6}
   }
+\cs_new_protected:Npn \CaptureSpendControl
+  { \ftoo_spend:nn {c:lam}{capture} }
+\cs_new_protected:Npn \CaptureGrantControl
+  { \clist_put_right:Ne \l__ftoo_grant_mask_clist {\tl_to_str:n {c:lam}}
+    \ftoo_spend:nn {c:lam}{capture} }
 \AddToHook{enddocument/end}
   {\iow_now:Nn \g_ftoo_capture_iow {FT-COMPLETE}}
 '''
@@ -240,6 +256,7 @@ def instrument_part_b(source, variant):
 
 
 def instrument_coda(source, variant):
+    variant = variant.removesuffix('-inert')
     body_effect = variant.endswith('-body')
     variant = variant.removesuffix('-body')
     if variant in ('coda-feas', 'coda-spend', 'coda-open-spend'):
@@ -277,6 +294,22 @@ def instrument_coda(source, variant):
                  r'\end{definition}' + '\n' +
                  r'\ExplSyntaxOn\ftoo_capture_scope:n {subsec:coda:wall}\ExplSyntaxOff')
         source = unique_replace(source, r'\end{econ}', r'\end{econ}' + '\n' + added)
+    if variant.startswith('close-') and variant != 'close-provenance':
+        _, body, effect_kind = variant.split('-')
+        if body not in ('paragraph', 'refrain') or effect_kind not in (
+                'spend', 'grant', 'refusal'):
+            raise ValueError(f'Unknown closing control: {variant}')
+        if effect_kind == 'refusal':
+            source = unique_replace(source, r'\label{subsec:coda:close}',
+                                    r'\label{subsec:coda:close}' + '\n' +
+                                    r'\secgrade{nec}%')
+        if effect_kind == 'grant':
+            effect = r'\CaptureGrantControl'
+        else:
+            effect = r'\CaptureSpendControl'
+        ending = ('by other hands.}' if body == 'paragraph' else 'paid in.}')
+        source = unique_replace(source, ending,
+                                ending[:-1] + effect + '}')
     source = mark_after(source, r'\section{Truth and flourishing}', 'sec:coda')
     for name, _, anchor, _ in SCOPES[6:]:
         source = mark_after(source, anchor, name)
@@ -449,6 +482,263 @@ def resources(start, cgroup_line, before, after):
             'cgroup_before': before, 'cgroup_after': after}
 
 
+def sha256(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def canonical_sha256(value):
+    return sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode('utf-8'))
+
+
+def digest_map(value):
+    return (isinstance(value, dict) and bool(value) and
+            all(isinstance(name, str) and bool(name) and
+                not pathlib.PurePosixPath(name).is_absolute() and
+                '..' not in pathlib.PurePosixPath(name).parts and
+                isinstance(digest, str) and re.fullmatch(r'[0-9a-f]{64}', digest)
+                for name, digest in value.items()))
+
+
+def input_digests(directory):
+    return {str(path.relative_to(directory)): sha256(path.read_bytes())
+            for path in sorted(directory.rglob('*')) if path.is_file()}
+
+
+def revision(repository):
+    return subprocess.check_output(
+        ['git', '-C', str(repository), 'rev-parse', '--verify', 'HEAD'],
+        text=True, encoding='utf-8').strip()
+
+
+PREPARATION_INPUTS = ('documents', 'generated', 'registry', 'units',
+                      'tools/paper/prepare.py', 'tools/paper/bibroute.py',
+                      'tools/paper/identities.py', 'tools/paper/common.py')
+
+
+def preparation_changes(repository):
+    changed = subprocess.check_output(
+        ['git', '-C', str(repository), 'diff', '--name-only', 'HEAD', '--',
+         *PREPARATION_INPUTS], text=True, encoding='utf-8').strip()
+    return changed.splitlines()
+
+
+def required_packages(repository):
+    source_list = (repository / 'documents/paper-build/sources.tsv').read_text(
+        encoding='utf-8').splitlines()
+    source = b'\n'.join((repository / name).read_bytes() for name in source_list)
+    return sorted({name.decode('utf-8').strip() + '.sty' for group in re.findall(
+        rb'\\(?:usepackage|RequirePackage)(?:\[[^]]*\])?\{([^}]+)\}', source)
+                   for name in group.split(b',')})
+
+
+def support_identity(repository, support, packages):
+    settings, _, engine, bundle = runtime(repository, support)
+    names = sorted(set(packages) | set(settings['fonts']) | {'biblatex.bst'})
+    return {'engine_sha256': sha256(engine.read_bytes()),
+            'lock_sha256': sha256((repository / settings['support-lock']).read_bytes()),
+            'runtime_sha256': sha256((repository / 'documents/paper-build/runtime.toml')
+                                     .read_bytes()),
+            'bundle_files': {name: sha256((bundle / name).read_bytes()) for name in names}}
+
+
+INSTRUMENTED = ('ftoo_typed_tools.tex', 'parts/partB.tex', 'parts/coda.tex',
+                'parts/appendices.tex')
+
+
+def tap_for_variant(variant):
+    tap = TAP
+    if variant.endswith('-inert'):
+        tap += '\n' + r'\cs_set_protected:Npn \ftoo_capture_original_audit:n #1 {}' + '\n'
+        tap += (r'\cs_set_protected:Npn \ftoo_capture_original_section: '
+                r'{ \seq_gclear:N \g__ftoo_spendlog_seq '
+                r'\seq_gclear:N \g__ftoo_grantlog_seq '
+                r'\tl_gset_eq:NN \g__ftoo_secclaim_tl \c__ftoo_nograde_tl }' + '\n')
+    if variant == 'refusal-observed':
+        tap = tap.replace(
+            r'\ftoo_capture_original_error:nnnnnn {#1}{#2}{#3}{#4}{#5}{#6}',
+            r'\ftoo_capture_original_warning:nnnnnn {#1}{#2}{#3}{#4}{#5}{#6}')
+    return tap
+
+
+def instrumentation_variant(variant):
+    return 'base' if variant in ('close-provenance', 'checker-provenance') else variant
+
+
+def instrumented_bytes(prepared, variant):
+    """Build the exact four files the engine reads from retained prepared bytes."""
+    sources = {path: (prepared / path.relative_to('documents/paper'))
+               .read_text(encoding='utf-8') for path in (PART_B, CODA)}
+    typed = (prepared / 'ftoo_typed_tools.tex').read_text(encoding='utf-8')
+    appendices = (prepared / 'parts/appendices.tex').read_text(encoding='utf-8')
+    return {
+        'ftoo_typed_tools.tex': (typed + tap_for_variant(variant)).encode('utf-8'),
+        'parts/partB.tex': instrument_part_b(sources[PART_B], variant).encode('utf-8'),
+        'parts/coda.tex': instrument_coda(sources[CODA], variant).encode('utf-8'),
+        'parts/appendices.tex': unique_replace(
+            appendices, r'\section{Recovery}',
+            r'\section{Recovery}' + '\n' +
+            r'\ExplSyntaxOn\ftoo_capture_scope:n {outside}\ExplSyntaxOff'
+        ).encode('utf-8'),
+    }
+
+
+def make_envelope(repository, support, work, prepared, instrumented, packages,
+                  captured, variant, source_revision):
+    paper = work / 'paper'
+    return {'schema': 1, 'revision': source_revision,
+            'prepared_inputs': prepared,
+            'support': support_identity(repository, support, packages),
+            'instrumentation': {'tool_sha256': sha256(pathlib.Path(__file__).read_bytes()),
+                                'variant': variant,
+                                'tap_sha256': sha256(tap_for_variant(variant).encode('utf-8')),
+                                'inputs': instrumented},
+            'successful_output': {
+                'pdf_sha256': sha256((paper / 'main.pdf').read_bytes()),
+                'events_sha256': sha256((paper / 'checking-capture.events').read_bytes()),
+                'log_sha256': sha256((paper / 'main.log').read_bytes()),
+                'engine_stream_sha256': sha256((work / 'engine.txt').read_bytes())},
+            'capture_sha256': canonical_sha256(captured)}
+
+
+def validate_envelope_record(envelope, captured):
+    """Refuse a malformed, incomplete or unbound stored provenance claim."""
+    validate(captured)
+    if not isinstance(envelope, dict) or envelope.get('schema') != 1:
+        raise ValueError('Unsupported provenance envelope schema')
+    if set(envelope) != {'schema', 'revision', 'prepared_inputs', 'support',
+                         'instrumentation', 'successful_output', 'capture_sha256'}:
+        raise ValueError('Malformed provenance envelope')
+    if envelope.get('capture_sha256') != canonical_sha256(captured):
+        raise ValueError('Stale or swapped capture envelope')
+    if not isinstance(envelope.get('revision'), str) or not re.fullmatch(
+            r'[0-9a-f]{40}', envelope['revision']):
+        raise ValueError('Malformed source revision')
+    prepared = envelope.get('prepared_inputs')
+    if not digest_map(prepared) or not set(INSTRUMENTED) <= set(prepared):
+        raise ValueError('Malformed prepared input inventory')
+    support = envelope.get('support')
+    if (not isinstance(support, dict) or
+            set(support) != {'engine_sha256', 'lock_sha256',
+                             'runtime_sha256', 'bundle_files'} or
+            not digest_map(support['bundle_files']) or
+            any(not isinstance(support[name], str) or
+                not re.fullmatch(r'[0-9a-f]{64}', support[name])
+                for name in ('engine_sha256', 'lock_sha256', 'runtime_sha256'))):
+        raise ValueError('Malformed support identity')
+    instrumentation = envelope.get('instrumentation')
+    if (not isinstance(instrumentation, dict) or
+            set(instrumentation) != {'tool_sha256', 'variant',
+                                     'tap_sha256', 'inputs'} or
+            not isinstance(instrumentation['variant'], str) or
+            not digest_map(instrumentation['inputs']) or
+            set(instrumentation['inputs']) != set(prepared) or
+            any(not isinstance(instrumentation[name], str) or
+                not re.fullmatch(r'[0-9a-f]{64}', instrumentation[name])
+                for name in ('tool_sha256', 'tap_sha256'))):
+        raise ValueError('Malformed instrumentation inventory')
+    output = envelope.get('successful_output')
+    if (not isinstance(output, dict) or
+            set(output) != {'pdf_sha256', 'events_sha256', 'log_sha256',
+                            'engine_stream_sha256'} or
+            any(not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest)
+                for digest in output.values())):
+        raise ValueError('Missing successful output inventory')
+    if output['pdf_sha256'] != captured['run']['output_sha256']:
+        raise ValueError('Successful output differs from capture')
+
+
+def validate_envelope(envelope, captured, repository, support, work):
+    """Bind a complete capture to the files and support used by its typeset run."""
+    validate_envelope_record(envelope, captured)
+    if envelope.get('revision') != revision(repository):
+        raise ValueError('Source revision differs from envelope')
+    prepared = envelope['prepared_inputs']
+    paper = work / 'paper'
+    saved = work / 'prepared-inputs'
+    retained = input_digests(saved)
+    if set(retained) != set(prepared):
+        raise ValueError('Prepared input inventory differs from retained copy')
+    instrumentation = envelope.get('instrumentation')
+    if (not isinstance(instrumentation, dict) or
+            set(instrumentation) != {'tool_sha256', 'variant', 'tap_sha256', 'inputs'} or
+            not isinstance(instrumentation['inputs'], dict) or
+            set(instrumentation['inputs']) != set(prepared)):
+        raise ValueError('Instrumented input inventory differs')
+    for name, digest in prepared.items():
+        if retained[name] != digest:
+            raise ValueError(f'Changed consumed input: {name}')
+        if name not in INSTRUMENTED:
+            path = paper / name
+            if not path.is_file() or sha256(path.read_bytes()) != digest:
+                raise ValueError(f'Changed consumed input: {name}')
+    recorded_support = envelope.get('support')
+    if (not isinstance(recorded_support, dict) or
+            set(recorded_support) != {'engine_sha256', 'lock_sha256',
+                                      'runtime_sha256', 'bundle_files'} or
+            not isinstance(recorded_support['bundle_files'], dict)):
+        raise ValueError('Malformed support identity')
+    if recorded_support != support_identity(repository, support,
+                                            required_packages(repository)):
+        raise ValueError('Support identity differs from envelope')
+    if instrumentation['tool_sha256'] != sha256(pathlib.Path(__file__).read_bytes()):
+        raise ValueError('Capture instrument differs from envelope')
+    if instrumentation['tap_sha256'] != sha256(
+            tap_for_variant(instrumentation['variant']).encode('utf-8')):
+        raise ValueError('Checking tap differs from envelope')
+    expected_inputs = instrumented_bytes(saved, instrumentation['variant'])
+    for name, digest in instrumentation['inputs'].items():
+        path = paper / name
+        if not path.is_file() or sha256(path.read_bytes()) != digest:
+            raise ValueError(f'Instrumented input differs: {name}')
+    for name, expected in expected_inputs.items():
+        if (paper / name).read_bytes() != expected:
+            raise ValueError(f'Instrumented input differs from variant: {name}')
+    output = envelope['successful_output']
+    for name, path in (('pdf_sha256', paper / 'main.pdf'),
+                       ('events_sha256', paper / 'checking-capture.events'),
+                       ('log_sha256', paper / 'main.log'),
+                       ('engine_stream_sha256', work / 'engine.txt')):
+        if not path.is_file() or sha256(path.read_bytes()) != output.get(name):
+            raise ValueError(f'Missing or changed successful output: {name}')
+    locations = {row['scope']: row['location'] for row in captured['records']}
+    events = (paper / 'checking-capture.events').read_text(encoding='utf-8')
+    log = (paper / 'main.log').read_text(encoding='utf-8', errors='replace')
+    if parse_events(events, log, locations) != captured['records']:
+        raise ValueError('Checking events differ from capture')
+    if not re.search(r'Output written on main\.xdv \(\d+ pages, \d+ bytes\)\.\s*\Z', log):
+        raise ValueError('Successful typeset log incomplete')
+
+
+def compare_provenance(left, right):
+    """Report identity differences without treating them as outcome differences."""
+    def leaves(before, after, prefix):
+        if isinstance(before, dict) and isinstance(after, dict):
+            for name in sorted(before.keys() | after.keys()):
+                yield from leaves(before.get(name), after.get(name),
+                                  f'{prefix}.{name}' if prefix else name)
+        elif before != after:
+            yield prefix
+
+    return list(leaves(left, right, ''))
+
+
+def bound_pair(left, left_envelope, left_context, right, right_envelope,
+               right_context):
+    """Validate each live side, then report outcomes and provenance separately."""
+    validate_envelope(left_envelope, left, *left_context)
+    validate_envelope(right_envelope, right, *right_context)
+    provenance = compare_provenance(left_envelope, right_envelope)
+    forbidden = [path for path in provenance if path in (
+        'instrumentation.tool_sha256', 'instrumentation.tap_sha256',
+        'instrumentation.variant', 'support.engine_sha256',
+        'prepared_inputs.ftoo_typed_tools.tex',
+        'instrumentation.inputs.ftoo_typed_tools.tex') or
+        path.startswith('support.')]
+    if forbidden:
+        raise ValueError(f'Capability provenance differs: {forbidden}')
+    return compare(left, right), provenance
+
+
 def capture(repository, support, work, variant):
     work = work.resolve()
     start = time.monotonic()
@@ -458,29 +748,31 @@ def capture(repository, support, work, variant):
                    .strip().split(':')[-1])
     cgroup = pathlib.Path('/sys/fs/cgroup') / cgroup_line.lstrip('/')
     before = cgroup_snapshot(cgroup)
+    source_revision = revision(repository)
+    dirty_before = preparation_changes(repository)
     paper = work / 'paper'
-    prepare(repository, support, paper)
+    packages = prepare(repository, support, paper)
+    if variant == 'close-provenance':
+        coda = paper / 'parts/coda.tex'
+        coda.write_text(unique_replace(
+            coda.read_text(encoding='utf-8'),
+            r'\refrain{sec:coda:record-limit}',
+            '% capture provenance copy\n' + r'\refrain{sec:coda:record-limit}'),
+            encoding='utf-8')
+    if variant == 'checker-provenance':
+        typed = paper / 'ftoo_typed_tools.tex'
+        typed.write_text(typed.read_text(encoding='utf-8') + '% checker provenance copy\n',
+                         encoding='utf-8')
+    prepared = input_digests(paper)
+    saved = work / 'prepared-inputs'
+    shutil.copytree(paper, saved)
     sources = {path: (paper / path.relative_to('documents/paper')).read_text(encoding='utf-8')
                for path in (PART_B, CODA)}
     locations = source_locations(sources)
-    typed = paper / 'ftoo_typed_tools.tex'
-    tap = TAP
-    if variant.endswith('-inert'):
-        tap += '\n' + r'\cs_set_protected:Npn \ftoo_capture_original_audit:n #1 {}' + '\n'
-    if variant == 'refusal-observed':
-        tap = tap.replace(
-            r'\ftoo_capture_original_error:nnnnnn {#1}{#2}{#3}{#4}{#5}{#6}',
-            r'\ftoo_capture_original_warning:nnnnnn {#1}{#2}{#3}{#4}{#5}{#6}')
-    typed.write_text(typed.read_text(encoding='utf-8') + tap, encoding='utf-8')
-    (paper / 'parts/partB.tex').write_text(
-        instrument_part_b(sources[PART_B], variant), encoding='utf-8')
-    (paper / 'parts/coda.tex').write_text(instrument_coda(sources[CODA], variant),
-                                          encoding='utf-8')
-    appendices = paper / 'parts/appendices.tex'
-    appendices.write_text(unique_replace(appendices.read_text(encoding='utf-8'),
-        r'\section{Recovery}',
-        r'\section{Recovery}' + '\n' +
-        r'\ExplSyntaxOn\ftoo_capture_scope:n {outside}\ExplSyntaxOff'), encoding='utf-8')
+    effective_variant = instrumentation_variant(variant)
+    for name, data in instrumented_bytes(saved, effective_variant).items():
+        (paper / name).write_bytes(data)
+    instrumented = {name: sha256((paper / name).read_bytes()) for name in prepared}
     settings, _, engine, bundle = runtime(repository, support)
     environment = dict(settings['environment'])
     environment.update(SOURCE_DATE_EPOCH=str(settings['source-date-epoch']),
@@ -506,7 +798,10 @@ def capture(repository, support, work, variant):
     log_complete = bool(re.search(
         r'Output written on main\.xdv \(\d+ pages, \d+ bytes\)\.\s*\Z', log))
     if result.returncode:
-        refusal_scope = ('subsec:coda:wall' if variant == 'coda-refusal' else 'dyn:flow')
+        refusal_scope = ('subsec:coda:close' if variant in (
+                            'close-paragraph-refusal', 'close-refrain-refusal')
+                         else 'subsec:coda:wall' if variant == 'coda-refusal'
+                         else 'dyn:flow')
         refusal = classify_refusal(log, engine_stream, refusal_scope)
         records = []
         run = {'status': 'refused', 'engine_exit': result.returncode,
@@ -523,14 +818,24 @@ def capture(repository, support, work, variant):
         run = {'status': 'complete', 'engine_exit': result.returncode,
                'output_sha256': hashlib.sha256(output_path.read_bytes()).hexdigest(),
                'log_complete': log_complete}
-    after = cgroup_snapshot(cgroup)
-    return {'schema': 3, 'prepared_sha256': {
+    captured = {'schema': 3, 'prepared_sha256': {
                 str(path): hashlib.sha256(source.encode()).hexdigest()
                 for path, source in sources.items()},
             'run': run,
             'records': records,
-            'resources': resources(start, cgroup_line, before, after),
             }
+    if run['status'] == 'complete':
+        dirty_after = preparation_changes(repository)
+        if dirty_before or dirty_after or revision(repository) != source_revision:
+            print('Provenance envelope omitted: tracked preparation inputs differ '
+                  'from HEAD or the revision changed during capture', file=sys.stderr)
+        else:
+            stored = {key: value for key, value in captured.items() if key != 'resources'}
+            captured['envelope'] = make_envelope(repository, support, work, prepared,
+                                                 instrumented, packages, stored,
+                                                 effective_variant, source_revision)
+    captured['resources'] = resources(start, cgroup_line, before, cgroup_snapshot(cgroup))
+    return captured
 
 
 OUTCOME_FIELDS = ('claimed_grade', 'spend_set', 'grant_set', 'diagnostics', 'derived_rows')
@@ -782,16 +1087,47 @@ def selftest(fixture):
     print('Checking capture fixture controls passed')
 
 
-def write_capture(work, result):
-    stored = {key: value for key, value in result.items() if key != 'resources'}
+def write_capture(work, result, repository, support):
+    stored = {key: value for key, value in result.items()
+              if key not in ('resources', 'envelope')}
     (work / 'capture.json').write_text(
         json.dumps(stored, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     (work / 'resources.json').write_text(
         json.dumps(result['resources'], indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    if 'envelope' in result:
+        (work / 'envelope.json').write_text(
+            json.dumps(result['envelope'], indent=2, sort_keys=True) + '\n',
+            encoding='utf-8')
+        validate_envelope(result['envelope'], stored, repository, support, work)
     return stored
 
 
 def main():
+    if len(sys.argv) == 8 and sys.argv[1] == 'pair':
+        start = time.monotonic()
+        try:
+            left_repository, left_support, left_work, right_repository, right_support, right_work = (
+                map(pathlib.Path, sys.argv[2:]))
+
+            def side(repository, support, work):
+                captured = json.loads((work / 'capture.json').read_text(encoding='utf-8'))
+                envelope_path = work / 'envelope.json'
+                if not envelope_path.is_file():
+                    raise ValueError(f'Missing provenance envelope: {work}')
+                envelope = json.loads(envelope_path.read_text(encoding='utf-8'))
+                return captured, envelope, (repository, support, work)
+
+            outcomes, provenance = bound_pair(
+                *side(left_repository, left_support, left_work),
+                *side(right_repository, right_support, right_work))
+            print(json.dumps({'outcome_differences': outcomes,
+                              'provenance_differences': provenance}, sort_keys=True))
+            if outcomes:
+                raise ValueError(f'Checking outcomes differ: {outcomes}')
+        finally:
+            print(json.dumps({'pair_wall_seconds': round(time.monotonic() - start, 3)}),
+                  file=sys.stderr)
+        return
     if len(sys.argv) == 3 and sys.argv[1] == 'selftest':
         selftest(pathlib.Path(sys.argv[2]))
         return
@@ -816,16 +1152,14 @@ def main():
                        .strip().split(':')[-1])
         cgroup = pathlib.Path('/sys/fs/cgroup') / cgroup_line.lstrip('/')
         before = cgroup_snapshot(cgroup)
-        result = None
         try:
-            result = capture(repository, support, work, 'base')
-            stored = write_capture(work, result)
+            stored = write_capture(work, capture(repository, support, work, 'base'),
+                                   repository, support)
             expected = json.loads((repository / 'tools/paper/fixtures/checking-capture.json')
                                   .read_text(encoding='utf-8'))
             equal(expected, stored)
         finally:
-            measurement = (result['resources'] if result is not None else
-                           resources(start, cgroup_line, before, cgroup_snapshot(cgroup)))
+            measurement = resources(start, cgroup_line, before, cgroup_snapshot(cgroup))
             print(json.dumps(measurement, sort_keys=True), file=sys.stderr)
         return
     parser = argparse.ArgumentParser(description=__doc__)
@@ -841,10 +1175,16 @@ def main():
                                  'coda-feas', 'coda-spend', 'coda-grant',
                                  'coda-open-spend', 'coda-refusal', 'coda-row',
                                  'coda-spend-body', 'coda-grant-body',
-                                 'coda-open-spend-body'))
+                                 'coda-open-spend-body', 'close-provenance',
+                                 'checker-provenance',
+                                 'close-paragraph-spend', 'close-paragraph-spend-inert',
+                                 'close-paragraph-grant',
+                                 'close-paragraph-refusal', 'close-refrain-spend',
+                                 'close-refrain-grant',
+                                 'close-refrain-refusal'))
     args = parser.parse_args()
     stored = write_capture(args.work, capture(args.repository, args.support, args.work,
-                                              args.variant))
+                                              args.variant), args.repository, args.support)
     print(json.dumps(stored, indent=2, sort_keys=True))
     validate(stored)
 
