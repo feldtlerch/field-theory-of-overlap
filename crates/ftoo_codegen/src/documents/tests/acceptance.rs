@@ -1003,27 +1003,9 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let register: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
     let registered = register["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), 1);
-    assert_eq!(gaps[0].document, "paper-pilot");
-    assert_eq!(gaps[0].unit, "sec:coda:whole-field");
-    assert_eq!(gaps[0].block, 6);
-    assert_eq!(gaps[0].inline_kind, "mathematics");
-    assert_eq!(
-        registered.as_slice(),
-        &[serde_json::json!({
-            "block": 6,
-            "document": "paper-pilot",
-            "inline-kind": "mathematics",
-            "unit": "sec:coda:whole-field"
-        })]
-    );
-    let refusal = crate::paper::html_gaps::refusal(gaps).unwrap_err();
-    assert!(
-        refusal
-            .to_string()
-            .contains("HTML block gaps: paper-pilot / sec:coda:whole-field block 6 mathematics")
-    );
-    assert!(refusal.to_string().contains(&gaps[0].site.to_string()));
+    assert_eq!(gaps.len(), 0);
+    assert_eq!(registered.len(), 0);
+    assert!(crate::paper::html_gaps::refusal(gaps).is_ok());
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,

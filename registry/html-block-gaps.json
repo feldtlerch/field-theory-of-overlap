@@ -1,11 +1,4 @@
 {
-  "gaps": [
-    {
-      "block": 6,
-      "document": "paper-pilot",
-      "inline-kind": "mathematics",
-      "unit": "sec:coda:whole-field"
-    }
-  ],
+  "gaps": [],
   "schema": 1
 }

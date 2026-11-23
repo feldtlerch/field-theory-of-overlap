@@ -559,8 +559,9 @@ fn support_required_html_published_excerpt_content_and_faces() {
     let paper = std::str::from_utf8(artifact("generated/documents/paper-pilot/en.html")).unwrap();
     let explainer =
         std::str::from_utf8(artifact("generated/documents/explainer-pilot/en.html")).unwrap();
-    assert_eq!(paper.matches("@font-face").count(), 3);
+    assert_eq!(paper.matches("@font-face").count(), 4);
     assert_eq!(explainer.matches("@font-face").count(), 3);
+    assert!(paper.contains("by raising <math xmlns=\"http://www.w3.org/1998/Math/MathML\""));
     assert!(paper.contains("the fact is the shadow the principle casts"));
     assert!(paper.contains("id=\"sec-crecord--limit\""));
     assert!(explainer.contains("The record can watch the hand’s tremor turning."));
@@ -712,6 +713,72 @@ fn html_math_adapter_absence_refuses_before_fonts() {
 const COEFFICIENT: &str = r"({\underbrace{{c}_{1}}_{\text{pending}}}={\frac{1}{3}})";
 const SUBSCRIPT: &str = "{c}_{1}";
 
+fn comoving_plan() -> plan::DocumentPlan {
+    let mut plan = prose_plan("By raising a field toward all.");
+    let site = input::site("comoving.toml");
+    plan.blocks[1].runs = vec![
+        plan::Inline::Text("By raising ".into()),
+        plan::Inline::Math {
+            definition_site: site.clone(),
+            key: "field".into(),
+            markdown: "S".into(),
+            latex: "\\comovfield{}".into(),
+            pending: vec![],
+            site,
+        },
+        plan::Inline::Text(" toward all.".into()),
+    ];
+    plan
+}
+
+#[test]
+fn support_required_html_comoving_symbol_recovers_exact_presentation() {
+    let support = support();
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let notation = crate::notation::prepare_notation(&catalogue).unwrap();
+    let plan = comoving_plan();
+    assert!(plan::html_gaps(&plan).is_empty());
+    let prepared = super::super::html::prepare_math(&plan, Some(&notation)).unwrap();
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[], Some(&notation)).unwrap();
+    html_recovery::check(&plan, &fonts, &prepared, &[], &rendered).unwrap();
+    let start = rendered.find("<math xmlns=").unwrap();
+    let end = start + rendered[start..].find("</math>").unwrap() + "</math>".len();
+    let symbol = &rendered[start..end];
+    let probe = include_str!("../../../../../registry/html-mathematics/h6.html");
+    assert_eq!(probe.matches(symbol).count(), 2);
+    for (changed, aspect) in [
+        (
+            rendered.replacen("<mi>S</mi>", "<mi>T</mi>", 1),
+            "HTML mathematical presentation",
+        ),
+        (
+            rendered.replacen("<mi>S</mi>", "<mi mathvariant=\"normal\">S</mi>", 1),
+            "HTML mathematical presentation",
+        ),
+        (
+            rendered.replacen(symbol, "", 1),
+            "HTML inline text or identity",
+        ),
+        (
+            rendered.replacen(symbol, &format!("{symbol}{symbol}"), 1),
+            "HTML inline text or identity",
+        ),
+    ] {
+        assert_ne!(changed, rendered);
+        let error = html_recovery::check(&plan, &fonts, &prepared, &[], &changed).unwrap_err();
+        assert!(format!("{error:?}").contains(aspect), "{aspect}: {error:?}");
+    }
+    let mut wrong_source = comoving_plan();
+    let plan::Inline::Math { latex, .. } = &mut wrong_source.blocks[1].runs[1] else {
+        unreachable!()
+    };
+    *latex = "S".into();
+    assert!(plan::html_gaps(&wrong_source).contains_key(&1));
+}
+
 fn coefficient_plan() -> plan::DocumentPlan {
     let mut plan = prose_plan("A coefficient.");
     let site = input::site("coefficient.toml");
@@ -778,7 +845,7 @@ fn html_math_library_envelope() {
         let changed = html_recovery::library_fragment(&changed).unwrap();
         let error =
             super::super::html::checked_math_fragment(&changed, COEFFICIENT, site).unwrap_err();
-        assert!(format!("{error:?}").contains("bounded MathML coefficient profile"));
+        assert!(format!("{error:?}").contains("bounded exact-source MathML profile"));
         let DocumentError::Assembly(errors) = error else {
             panic!("profile fault must be located")
         };

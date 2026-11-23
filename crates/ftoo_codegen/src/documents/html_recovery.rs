@@ -149,7 +149,7 @@ pub(super) fn library_fragment(source: &str) -> Option<Node> {
     (parser.at == source.len()).then_some(root)
 }
 
-// The admitted coefficient profile is recorded at reg:documents:html-mathematics-observations.
+// Exact mathematical source profiles are recorded at reg:documents:html-mathematics-observations.
 pub(super) fn math_profile(fragment: &Node, expanded: &str) -> Option<Node> {
     fn node<'a>(value: &'a Node, name: &str, attrs: &[(&str, &str)]) -> Option<&'a [Node]> {
         let Node::Element {
@@ -215,6 +215,7 @@ pub(super) fn math_profile(fragment: &Node, expanded: &str) -> Option<Node> {
             ],
         ),
         "{c}_{1}" => e("mrow", &[], vec![sub()]),
+        "S" => e("mrow", &[], vec![leaf("mi", &[], "S")]),
         _ => return None,
     };
     let span = node(fragment, "span", &[("class", "katex")])?;

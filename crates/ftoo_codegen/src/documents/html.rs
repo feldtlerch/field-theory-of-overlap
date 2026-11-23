@@ -133,11 +133,11 @@ fn math_failure(site: &UnitSite, value: &str, expected: &str) -> DocumentError {
     )
 }
 
-fn admitted_source(source: &str) -> bool {
+fn admitted_math(source: &str, latex: &str) -> bool {
     matches!(
         source,
         "({\\underbrace{{c}_{1}}_{\\text{pending}}}={\\frac{1}{3}})" | "{c}_{1}"
-    )
+    ) || (source == "S" && latex == "\\comovfield{}")
 }
 
 pub(super) fn checked_math_fragment(
@@ -146,7 +146,7 @@ pub(super) fn checked_math_fragment(
     site: &UnitSite,
 ) -> Result<Node, DocumentError> {
     html_recovery::math_profile(fragment, source)
-        .ok_or_else(|| math_failure(site, source, "bounded MathML coefficient profile"))
+        .ok_or_else(|| math_failure(site, source, "bounded exact-source MathML profile"))
 }
 
 pub(super) fn prepare_math(
@@ -166,13 +166,14 @@ pub(super) fn prepare_math(
         for (run, item) in section.runs.iter().enumerate() {
             let Inline::Math {
                 markdown: source,
+                latex,
                 site,
                 ..
             } = item
             else {
                 continue;
             };
-            if !admitted_source(source) {
+            if !admitted_math(source, latex) {
                 return Err(math_failure(site, source, "realizable mathematical source"));
             }
             let adapter =
@@ -494,7 +495,9 @@ pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSe
     for run in runs {
         match run {
             Inline::Styled { children, .. } => kinds.extend(unrealizable_kinds(children, false)),
-            Inline::Math { markdown, .. } if !math_allowed || !admitted_source(markdown) => {
+            Inline::Math {
+                markdown, latex, ..
+            } if !math_allowed || !admitted_math(markdown, latex) => {
                 kinds.insert("mathematics");
             }
             Inline::BibliographyCitation { .. }
