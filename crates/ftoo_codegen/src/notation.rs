@@ -276,7 +276,6 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
     /// Render a checked expanded display source as `MathML` through the pinned strict adapter.
     /// # Errors
     /// Refuses unavailable or changed notation support and returns parser refusals unchanged.
-    #[cfg(test)]
     pub(crate) fn mathml_display(
         &self,
         source: &str,

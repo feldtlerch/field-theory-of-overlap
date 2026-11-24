@@ -52,6 +52,129 @@ fn support_required_complete_flow_display_probe() {
     );
 }
 
+#[test]
+fn support_required_observed_flow_display_emits_and_recovers() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let notation = crate::notation::prepare_notation(&catalogue).unwrap();
+    let unit: toml_edit::DocumentMut =
+        include_str!("../../../../../units/statements/explainer-overlap-flow.toml")
+            .parse()
+            .unwrap();
+    let authored = unit["unit"]["math"]["flow"].as_str().unwrap();
+    let parsed = ftoo_manifest::parse_assembly_display_math(&catalogue, authored).unwrap();
+    let checked = notation
+        .check_document_expression(parsed.into_draft())
+        .unwrap();
+    let expanded = checked
+        .render_display(ftoo_manifest::RenderTarget::Unicode)
+        .unwrap();
+    let site = input::site("units/statements/explainer-overlap-flow.toml");
+    let mut plan = prose_plan("Words.");
+    plan.blocks[1].unit = "eq:explainer:overlap-flow".into();
+    plan.blocks[1].paragraph = false;
+    plan.blocks[1].equation = true;
+    plan.blocks[1].site = site.clone();
+    plan.blocks[1].runs = vec![
+        plan::Inline::Math {
+            definition_site: site.clone(),
+            key: "flow".into(),
+            markdown: expanded.source().into(),
+            latex: authored.into(),
+            pending: vec![],
+            site: site.clone(),
+        },
+        plan::Inline::Text(".".into()),
+    ];
+    assert!(super::super::html::realizable_equation(&plan.blocks[1]));
+    let support = support();
+    let prepared = super::super::html::prepare_math(&plan, Some(&notation)).unwrap();
+    assert_eq!(prepared.len(), 1);
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[], Some(&notation)).unwrap();
+    assert!(rendered.contains("<div class=\"equation\" tabindex=\"0\"><math "));
+    assert!(!rendered.contains("This passage is not yet available in this rendering."));
+    html_recovery::check(&plan, &fonts, &prepared, &[], &rendered).unwrap();
+    for (mutated, aspect) in [
+        (
+            rendered.replacen("tabindex=\"0\"", "tabindex=\"-1\"", 1),
+            "HTML equation boundary",
+        ),
+        (
+            rendered.replacen("<mo>×</mo>", "<mo>÷</mo>", 1),
+            "HTML mathematical presentation",
+        ),
+        (
+            rendered.replacen("<mi mathvariant=\"normal\">.</mi>", "", 1),
+            "HTML mathematical presentation",
+        ),
+        (
+            rendered.replacen(
+                &format!("{}.</annotation>", expanded.source()),
+                &format!("{}x.</annotation>", expanded.source()),
+                1,
+            ),
+            "HTML mathematical annotation",
+        ),
+        (
+            rendered.replacen(
+                &format!("{}.</annotation>", expanded.source()),
+                &format!("{}</annotation>", expanded.source()),
+                1,
+            ),
+            "HTML mathematical annotation",
+        ),
+        (
+            rendered.replacen(
+                ".equation:focus-visible{outline:3px",
+                ".equation:focus-visible{outline:1px",
+                1,
+            ),
+            "HTML equation layout and focus",
+        ),
+    ] {
+        assert_ne!(
+            mutated, rendered,
+            "{aspect} mutation must change emitted HTML"
+        );
+        let error = html_recovery::check(&plan, &fonts, &prepared, &[], &mutated).unwrap_err();
+        assert!(format!("{error:?}").contains(aspect), "{error:?}");
+    }
+    let error = super::super::html::render(&plan, &support, &[], None).unwrap_err();
+    assert!(format!("{error:?}").contains("prepared notation adapter"));
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let prepared_documents = super::super::prepare_documents(&root, &support).unwrap();
+    let html = prepared_documents
+        .artifacts()
+        .iter()
+        .find(|artifact| artifact.path() == "generated/documents/explainer-pilot/en.html")
+        .unwrap();
+    assert!(
+        std::str::from_utf8(html.bytes())
+            .unwrap()
+            .contains("<div class=\"equation\" tabindex=\"0\"><math ")
+    );
+    assert_eq!(prepared_documents.html_gap_rows().len(), 1);
+    assert_eq!(
+        prepared_documents.html_gap_rows()[0].unit,
+        "sec:coda:audit-bottoms"
+    );
+    plan.blocks[1].unit = "eq:fixture:unadmitted-flow".into();
+    assert!(!super::super::html::realizable_equation(&plan.blocks[1]));
+    let gaps = plan::html_gaps(&plan);
+    assert_eq!(gaps.len(), 1);
+    assert!(gaps.contains_key(&1));
+    plan.screen.as_mut().unwrap().html_gaps = gaps;
+    let selected =
+        std::collections::BTreeMap::from([(plan.document.clone(), vec![DocumentOutput::Html])]);
+    let rows = super::super::html_gap_rows(&[plan], &selected);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].unit, "eq:fixture:unadmitted-flow");
+    assert_eq!(rows[0].block, 1);
+    assert_eq!(rows[0].inline_kind, "mathematics");
+}
+
 fn support() -> NativeSupport {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     NativeSupport::from_environment(&root).unwrap()
@@ -625,7 +748,8 @@ fn support_required_html_published_excerpt_content_and_faces() {
     let explainer =
         std::str::from_utf8(artifact("generated/documents/explainer-pilot/en.html")).unwrap();
     assert_eq!(paper.matches("@font-face").count(), 4);
-    assert_eq!(explainer.matches("@font-face").count(), 3);
+    assert_eq!(explainer.matches("@font-face").count(), 4);
+    assert!(explainer.contains("<div class=\"equation\" tabindex=\"0\"><math "));
     assert!(paper.contains("by raising <math xmlns=\"http://www.w3.org/1998/Math/MathML\""));
     assert!(paper.contains("the fact is the shadow the principle casts"));
     assert!(paper.contains("id=\"sec-crecord--limit\""));

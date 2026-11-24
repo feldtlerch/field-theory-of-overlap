@@ -2406,7 +2406,13 @@ pub(super) fn html_gaps(plan: &DocumentPlan) -> BTreeMap<usize, ScreenGap> {
         .iter()
         .enumerate()
         .skip(1)
-        .filter(|(_, block)| !super::html::realizable(&block.runs, block.paragraph))
+        .filter(|(_, block)| {
+            !if block.equation {
+                super::html::realizable_equation(block)
+            } else {
+                super::html::realizable(&block.runs, block.paragraph)
+            }
+        })
         .map(|(index, block)| {
             (
                 index,

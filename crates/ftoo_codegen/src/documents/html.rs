@@ -2,7 +2,7 @@ use super::{
     NativeSupport,
     diagnostics::{AssemblyFault, DocumentError},
     failure, html_recovery,
-    plan::{DocumentPlan, Inline, StyleKind},
+    plan::{Block, DocumentPlan, Inline, StyleKind},
 };
 use crate::RenderableNotation;
 use ftoo_manifest::{AssemblySite, AssemblyStage, DocumentOutput, RuleId, UnitSite};
@@ -155,12 +155,46 @@ pub(super) fn prepare_math(
 ) -> Result<Vec<MathRun>, DocumentError> {
     let mut prepared = Vec::new();
     for (block, section) in plan.blocks.iter().enumerate() {
-        if !section.paragraph
+        if !(section.paragraph || section.equation)
             || plan
                 .screen
                 .as_ref()
                 .is_some_and(|screen| screen.html_gaps.contains_key(&block))
         {
+            continue;
+        }
+        if section.equation {
+            let (source, _) = section
+                .equation_pair()
+                .expect("checked equation shape before HTML emission");
+            let Inline::Math { site, .. } = &section.runs[0] else {
+                unreachable!("checked equation pair begins with mathematics")
+            };
+            if !realizable_equation(section) {
+                return Err(math_failure(
+                    site,
+                    source,
+                    "observed complete display profile",
+                ));
+            }
+            let adapter =
+                notation.ok_or_else(|| math_failure(site, source, "prepared notation adapter"))?;
+            let returned = adapter
+                .mathml_display(&format!("{source}."))
+                .map_err(|error| {
+                    math_failure(site, &format!("{error:?}"), "pinned strict MathML adapter")
+                })?
+                .map_err(|error| math_failure(site, &error, "strict MathML display expression"))?;
+            let fragment = html_recovery::library_fragment(&returned)
+                .ok_or_else(|| math_failure(site, source, "bounded MathML display fragment"))?;
+            let node = html_recovery::display_math_profile(&fragment, source)
+                .ok_or_else(|| math_failure(site, source, "observed complete display profile"))?;
+            prepared.push(MathRun {
+                block,
+                run: 0,
+                source: source.into(),
+                node,
+            });
             continue;
         }
         for (run, item) in section.runs.iter().enumerate() {
@@ -230,7 +264,10 @@ fn need_faces(plan: &DocumentPlan) -> Vec<Face> {
     let mut selected = BTreeSet::from([REGULAR.file, BOLD.file]);
     if plan.screen.as_ref().is_some_and(|screen| {
         plan.blocks.iter().enumerate().any(|(index, block)| {
-            !block.paragraph && block.depth.is_none() && !screen.html_gaps.contains_key(&index)
+            !block.paragraph
+                && !block.equation
+                && block.depth.is_none()
+                && !screen.html_gaps.contains_key(&index)
         })
     }) {
         selected.insert(ITALIC.file);
@@ -324,7 +361,7 @@ fn base64(bytes: &[u8]) -> String {
     result
 }
 
-fn css(fonts: &Fonts) -> String {
+fn css(plan: &DocumentPlan, fonts: &Fonts) -> String {
     let mut result = String::new();
     for (face, bytes) in &fonts.0 {
         writeln!(
@@ -345,6 +382,9 @@ fn css(fonts: &Fonts) -> String {
     }
     if fonts.0.iter().any(|(face, _)| face.is_math()) {
         result.push_str("math{font-family:'Pagella Math';font-weight:400;font-style:normal}math mtext{font-family:'Pagella',serif}\n");
+    }
+    if plan.blocks.iter().any(realizable_equation) {
+        result.push_str(".equation{max-width:100%;min-width:0;overflow-x:auto}.equation:focus-visible{outline:3px solid #a34500;outline-offset:3px}\n");
     }
     result
 }
@@ -489,6 +529,13 @@ fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
 
 pub(super) fn realizable(runs: &[Inline], math_allowed: bool) -> bool {
     unrealizable_kinds(runs, math_allowed).is_empty()
+}
+
+pub(super) fn realizable_equation(block: &Block) -> bool {
+    block.unit == "eq:explainer:overlap-flow"
+        && block
+            .equation_pair()
+            .is_some_and(|(source, _)| html_recovery::admitted_flow_source(source))
 }
 
 pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSet<&'static str> {
@@ -655,7 +702,11 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
                         .screen
                         .as_ref()
                         .is_some_and(|screen| screen.html_gaps.contains_key(&index))
-                        == realizable(&block.runs, block.paragraph))
+                        == if block.equation {
+                            realizable_equation(block)
+                        } else {
+                            realizable(&block.runs, block.paragraph)
+                        })
                     .then_some(&block.site)
                 })
         });
@@ -774,7 +825,7 @@ pub(super) fn model(
             },
         )
     })?;
-    let stylesheet = css(fonts);
+    let stylesheet = css(plan, fonts);
     if stylesheet.contains('<') || stylesheet.contains('&') {
         return Err(failure(
             RuleId::M055,
@@ -826,6 +877,18 @@ pub(super) fn model(
         }
         if block.paragraph {
             main.push(element("p", &[], inline(&block.runs, prepared, index)));
+            continue;
+        }
+        if block.equation {
+            let math = prepared
+                .iter()
+                .find(|item| item.block == index && item.run == 0)
+                .expect("prepared admitted equation");
+            main.push(element(
+                "div",
+                &[("class", "equation"), ("tabindex", "0")],
+                vec![math.node.clone()],
+            ));
             continue;
         }
         let refrain =

@@ -616,7 +616,6 @@ pub(super) fn invoke_mathml(
         run(support, Some(source.as_bytes()), true, false)
     })
 }
-#[cfg(test)]
 pub(super) fn invoke_mathml_display(
     support: &Support,
     source: &str,

@@ -5,7 +5,9 @@ use super::{
     plan::{DocumentPlan, Inline, StyleKind},
 };
 use ftoo_manifest::{AssemblySite, AssemblyStage, RuleId};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::ops::Range;
 
 const MAX_BYTES: usize = 16_777_216;
@@ -242,6 +244,50 @@ pub(super) fn math_profile(fragment: &Node, expanded: &str) -> Option<Node> {
         return None;
     }
     Some(math.clone())
+}
+
+fn observed_flow_math() -> Option<Node> {
+    let page = include_str!("../../../../registry/html-mathematics/explainer-flow.html");
+    let mut digest = String::new();
+    for byte in Sha256::digest(page.as_bytes()) {
+        write!(digest, "{byte:02x}").ok()?;
+    }
+    if digest != "1fb8faf3e405fef308d51357b905d967efa014e715d5201123755988d75869b3" {
+        return None;
+    }
+    let start = page.find("<math ")?;
+    let end = start + page[start..].find("</math>")? + "</math>".len();
+    library_fragment(&page[start..end])
+}
+
+pub(super) fn admitted_flow_source(source: &str) -> bool {
+    observed_flow_math()
+        .and_then(|math| {
+            math_annotation(&math).map(|annotation| annotation == format!("{source}."))
+        })
+        .unwrap_or(false)
+}
+
+pub(super) fn display_math_profile(fragment: &Node, source: &str) -> Option<Node> {
+    let expected = observed_flow_math()?;
+    if math_annotation(&expected)? != format!("{source}.") {
+        return None;
+    }
+    let Node::Element {
+        name,
+        attributes,
+        children,
+    } = fragment
+    else {
+        return None;
+    };
+    if name != "span" || attributes != &[("class".into(), "katex".into())] {
+        return None;
+    }
+    let [math] = children.as_slice() else {
+        return None;
+    };
+    (math == &expected).then_some(math.clone())
 }
 
 fn mismatch(plan: &DocumentPlan, aspect: &str) -> DocumentError {
@@ -763,6 +809,14 @@ fn stylesheet(plan: &DocumentPlan, fonts: &Fonts, nodes: &[Node]) -> Result<(), 
     {
         return Err(mismatch(plan, "HTML mathematical face"));
     }
+    if plan.blocks.iter().any(super::html::realizable_equation)
+        && lines.next()
+            != Some(
+                ".equation{max-width:100%;min-width:0;overflow-x:auto}.equation:focus-visible{outline:3px solid #a34500;outline-offset:3px}",
+            )
+    {
+        return Err(mismatch(plan, "HTML equation layout and focus"));
+    }
     if lines.next().is_some() {
         return Err(mismatch(plan, "HTML stylesheet inventory"));
     }
@@ -801,7 +855,10 @@ fn check_faces(plan: &DocumentPlan, fonts: &Fonts) -> Result<(), DocumentError> 
     let mut used = BTreeSet::from(["texgyrepagella-regular.otf", "texgyrepagella-bold.otf"]);
     if plan.screen.as_ref().is_some_and(|screen| {
         plan.blocks.iter().enumerate().any(|(index, block)| {
-            !block.paragraph && block.depth.is_none() && !screen.html_gaps.contains_key(&index)
+            !block.paragraph
+                && !block.equation
+                && block.depth.is_none()
+                && !screen.html_gaps.contains_key(&index)
         })
     }) {
         used.insert("texgyrepagella-italic.otf");
@@ -911,6 +968,41 @@ fn check_main(
         if block.paragraph {
             let body = element(plan, known, body, "p", &[], "HTML paragraph boundary")?;
             runs(plan, known, &block.runs, body, false, index, prepared)?;
+            at += 1;
+            continue;
+        }
+        if block.equation {
+            let Some(Inline::Math { site, .. }) = block.runs.first() else {
+                return Err(mismatch(plan, "HTML equation plan"));
+            };
+            let Some((source, _)) = block.equation_pair() else {
+                return Err(mismatch(plan, "HTML equation plan"));
+            };
+            let expected = prepared
+                .iter()
+                .find(|item| item.block == index && item.run == 0)
+                .ok_or_else(|| math_mismatch(site, "HTML mathematical occurrence"))?;
+            let contents = element(
+                plan,
+                known,
+                body,
+                "div",
+                &[("class", "equation"), ("tabindex", "0")],
+                "HTML equation boundary",
+            )?;
+            let [actual] = contents else {
+                return Err(math_mismatch(site, "HTML mathematical inventory"));
+            };
+            math_text(plan, known, site, actual)?;
+            if expected.source != source {
+                return Err(math_mismatch(site, "HTML mathematical source occurrence"));
+            }
+            if math_annotation(actual) != Some(format!("{}.", expected.source).as_str()) {
+                return Err(math_mismatch(site, "HTML mathematical annotation"));
+            }
+            if actual != &expected.node {
+                return Err(math_mismatch(site, "HTML mathematical presentation"));
+            }
             at += 1;
             continue;
         }

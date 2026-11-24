@@ -1126,14 +1126,14 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let register: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
     let registered = register["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), 2);
-    assert_eq!(registered.len(), 2);
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(registered.len(), 1);
     let refusal = crate::paper::html_gaps::refusal(gaps)
         .unwrap_err()
         .to_string();
     assert!(refusal.contains("HTML block gaps"));
     assert!(refusal.contains("units/statements/coda-audit-bottoms.toml"));
-    assert!(refusal.contains("units/statements/explainer-overlap-flow.toml"));
+    assert!(!refusal.contains("units/statements/explainer-overlap-flow.toml"));
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,
