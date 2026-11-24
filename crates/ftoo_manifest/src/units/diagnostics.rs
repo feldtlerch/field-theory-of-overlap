@@ -107,6 +107,7 @@ pub enum InsertionReason {
     BoundaryWhitespace,
     AdjacentStyle,
     StyledMath,
+    StyledReference,
     StyledBibliographyCitation,
     OwnCloser,
 }

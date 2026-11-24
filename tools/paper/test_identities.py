@@ -15,7 +15,7 @@ import argparse
 from common import read, write, timed
 import compare_words
 from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds
-from ledger import leaks, occurrence_differences, ledger_binding, check_destination
+from ledger import leaks, occurrence_differences, ledger_binding, check_destination, screen_references, check_screen_references
 from prepare import declared_fragments, versioned, paper_master, scope_fragments
 
 FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
@@ -2045,6 +2045,33 @@ sites = ["fixture"]
         self.assertEqual(leaks('d:annex E:STOCK d:annex E:OSC'),[])
         self.assertEqual(leaks('a:bc:d'),['a:bc:d'])
         self.assertEqual(leaks('TBL:GEN:GRADES'),['tbl:gen:grades'])
+
+
+class ScreenReferenceChecks(unittest.TestCase):
+    def test_both_reader_documents_bind_to_the_paper_counter(self):
+        class PaperPdf:
+            def destination(self, anchor):
+                return {'paper.12': 12}[anchor]
+
+        target = {'default': 'G', 'page': '12', 'anchor': 'paper.12'}
+        paper = '<a href="../paper-pilot/en.md#method-self-limit">→ appendix G</a><!-- see app:self-limit -->'
+        explainer = '<a href="../paper-pilot/en.md#method-self-limit">→ appendix G</a><!-- see app:self-limit -->'
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            for owner, screen in [('paper-pilot', paper), ('explainer-pilot', explainer)]:
+                file = repo/'generated/documents'/owner/'en.labels.md'
+                file.parent.mkdir(parents=True)
+                write(file, screen)
+            check_screen_references(repo, {'app:self-limit': target}, PaperPdf())
+            for owner in ('paper-pilot', 'explainer-pilot'):
+                file = repo/'generated/documents'/owner/'en.labels.md'
+                write(file, file.read_text().replace('appendix G', 'appendix H'))
+                with self.subTest(owner=owner):
+                    with self.assertRaisesRegex(ValueError, 'screen/PDF reference number differs'):
+                        check_screen_references(repo, {'app:self-limit': target}, PaperPdf())
+                write(file, file.read_text().replace('appendix H', 'appendix G'))
+            self.assertEqual(screen_references(paper, {'app:self-limit': target}),
+                             [('app:self-limit', target)])
 
 
 if __name__=='__main__':

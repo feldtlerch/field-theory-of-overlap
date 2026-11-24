@@ -24,7 +24,7 @@
     "documents/paper/main_explainer.tex.in": "66ce30759e2b22873ae7d2dca68d2b04e4bc20083977b2feb99b385cca089daa",
     "documents/paper/paper_xref.tex.in": "d7d2d60b6aa72b86982a6ddec6ad27373fb69bc016ab42f62aba282bd781a84d",
     "documents/paper/parts/appendices.tex": "88efaf10e58a9dee87bace65e6cb4ec25387feeefd04aaf8c2a3b59b9969d807",
-    "documents/paper/parts/coda.tex": "0a375f05c4729034c90ec6e3b519b5407c7e23a7891d07527fec27f15e33f724",
+    "documents/paper/parts/coda.tex": "08c85465ab277e2aba28cd53428d4af7f3990c5fb89c44b5cfc97b32564fb3ea",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
     "documents/paper/parts/partA.tex": "1d7d04332608aa4a129d23df889ac769dd7cdfe599c6a4dcab500dc7c88d0ebf",
@@ -39,7 +39,8 @@
     "generated/documents/explainer-pilot/sec-reading-plain-intro.tex": "bff5ce6a32209e04390233e3e51ffe40038e9e3a9ce32b4c5a846111ec19c690",
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
-    "generated/documents/inclusions.tsv": "8fffde38da7243826b745331732bfa7c43d2af0e86ef847fcd51134b326822a2",
+    "generated/documents/inclusions.tsv": "7c79df2d4c52afcd596fea09e5d4c0829e9726772549ead3a5c4e2406ebbe233",
+    "generated/documents/paper-pilot/sec-coda-audit-bottoms.tex": "33de11f3485b7ad8798e7024f1e35aaa79939728cd7d9dba4b7ac8d825a5c227",
     "generated/documents/paper-pilot/sec-coda-record-limit.tex": "5ef0afd8c91d085aaa545b7790d6ddbf4b1776e52f72d189566bc75cdbc1dc22",
     "generated/documents/paper-pilot/sec-coda-whole-field.tex": "1903ea4bc8e2a7a131fecf5d370fcc515fd483fc077e0d1ff858e62113ac221c",
     "generated/documents/paper-pilot/sec-log-andreoni-joint.tex": "2624ce840185938b678b7a4c08dd046b0b9612744636f38e74c5c33e7a5c3a7e",
@@ -53,6 +54,6 @@
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "e72ece11a381dfa0ef2d62b4acb6181b304925908cda34027d2df7450e68931c"
+    "tools/paper/prepare.py": "aa4dd0afff25ea43813c06ab19cd178f9121067a941712811eb18576b5d29dd0"
   }
 }

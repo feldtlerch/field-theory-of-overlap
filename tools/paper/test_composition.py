@@ -107,7 +107,9 @@ class Composition(unittest.TestCase):
         expected = len(scope_fragments(repository))
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
-            files = {'generated/documents/inclusions.tsv'}
+            files = {'generated/documents/inclusions.tsv',
+                     'documents/paper-build/label-mints.tsv',
+                     'documents/paper-build/sources.tsv'}
             rows = (repository/'documents/paper-build/sources.tsv').read_text().splitlines()
             files.update(rows)
             files.update(source for source, _, _, _ in FRAGMENTS)

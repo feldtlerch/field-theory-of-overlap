@@ -31,6 +31,10 @@ Not yet converted: intervening material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+The audit bottoms out here, for the framework’s own reasons &#40;<a href="../paper-pilot/en.md#method-self-limit">→ appendix G</a>&#41;: no formalism contains the reading, no instrument reads the future at the instant — so the document, read, concludes its own audit has no formal close. This is not a weakness but the shape of the thing: it stands on exactly two feet, the unreadable&#45;now and the settled&#45;later, on a ground neither reaches.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 To love is to hold another&#39;s fate as partly your own; to be wise is to widen that holding without erasing the holder. The judge everyone can trust, the reporter who favours no one, and the self for whom every good act returns are not three but one, reached the one way the whole field points: by raising $`S`$ toward all until your field is the whole field and you are enemy to none — folding every other&#39;s goods by every other&#39;s own measure — at the price, in the plural dimension of outcomes, of bearing all of it. And it can be counterfeited by anyone with funding enough to look beloved, so the last thing the field can do is the first thing it most needs: to tell the woven from the one only paid to seem so — which settles, if ever, in arrears, the only way unposted prices are ever read: spent, at a crossing, by other hands.
 
 <p align="center"><a id="sec-crecord--limit"></a><em>The record can watch the hand’s tremor turning. It cannot see what the righting is paid in.</em></p>
@@ -41,6 +45,10 @@ Not yet converted: intervening material is omitted from this excerpt.
 The one joint no antecedent touches is J:occ: economics has no result that the still center is *occupied*. The nearest, warm&#45;glow giving (<a href="#bibliography-andreoni-1990">Andreoni 1990</a>), is a consumed state, not a held rate — the empty preimage is itself the finding.
 
 Not yet converted: later material is omitted from this excerpt.
+
+## References to unavailable content
+
+<a id="method-self-limit"></a>appendix G — The method’s self&#45;limit. Not yet available in this rendering.
 
 ## References
 

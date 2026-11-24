@@ -84,7 +84,7 @@ fn registered_gap_check_is_separate_from_release_command() {
         .err()
         .unwrap()
         .to_string(),
-        "Registered HTML gaps require the built product check without a release flag"
+        "Registered development gaps require the built product check without a release flag"
     );
     assert!(
         !request(&["check".into(), "--release".into()])
@@ -94,7 +94,7 @@ fn registered_gap_check_is_separate_from_release_command() {
 }
 
 #[test]
-fn support_required_release_has_no_html_block_gap() -> Result<()> {
+fn support_required_release_refuses_each_registered_gap_part() -> Result<()> {
     let req = request(&[
         "check".into(),
         "--release".into(),
@@ -102,7 +102,46 @@ fn support_required_release_has_no_html_block_gap() -> Result<()> {
         "/unused-built-pair".into(),
     ])?;
     assert!(!req.registered_html_gaps);
-    check_release_documents(&req)?;
+    let PaperFault::Release { part, reason } = check_release_documents(&req).unwrap_err() else {
+        panic!("ordinary release must refuse the checked screen destination gap")
+    };
+    assert_eq!(part, "screen destinations");
+    assert!(reason.contains("entries: 1"));
+    let assembly = assembly_support(&req)?;
+    let mut prepared = crate::check_documents(&req.root, &assembly)
+        .map_err(|error| PaperFault::Input(error.to_string()))?;
+    let scratch = Scratch::new();
+    fs::create_dir_all(scratch.0.join("registry")).unwrap();
+    fs::copy(
+        req.root.join("registry/html-block-gaps.json"),
+        scratch.0.join("registry/html-block-gaps.json"),
+    )
+    .unwrap();
+    fs::copy(
+        req.root.join("registry/screen-destination-gaps.json"),
+        scratch.0.join("registry/screen-destination-gaps.json"),
+    )
+    .unwrap();
+    prepared.clear_screen_gaps_for_test();
+    let PaperFault::Release { part, reason } =
+        release::screen_parts(&scratch.0, &prepared, false).unwrap_err()
+    else {
+        panic!("stale screen register must refuse ordinary release")
+    };
+    assert_eq!(part, "screen destinations");
+    assert!(reason.contains("registry/screen-destination-gaps.json"));
+    fs::write(
+        scratch.0.join("registry/screen-destination-gaps.json"),
+        release::canonical_destinations(&prepared.screen_gap_inventory())?,
+    )
+    .unwrap();
+    let PaperFault::Release { part, reason } =
+        release::screen_parts(&scratch.0, &prepared, false).unwrap_err()
+    else {
+        panic!("ordinary release must refuse the checked HTML block gap")
+    };
+    assert_eq!(part, "HTML block gaps");
+    assert!(reason.contains("units/statements/coda-audit-bottoms.toml"));
     Ok(())
 }
 
@@ -496,6 +535,7 @@ fn actual_input_declarations_run_without_support() {
         "crates/ftoo_codegen/src/paper/tests.rs",
         "tools/paper/test_identities.py",
         "tools/paper/test_composition.py",
+        "tools/paper/test_reference.py",
         "tools/paper/ledger.py",
         "tools/paper/pdf_text.py",
         "documents/paper-build/label-mints.tsv",
@@ -519,6 +559,14 @@ fn actual_input_declarations_run_without_support() {
     assert!(
         Command::new("python3")
             .args(["-B", "tools/paper/test_composition.py"])
+            .current_dir(&root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("python3")
+            .args(["-B", "tools/paper/test_reference.py"])
             .current_dir(&root)
             .status()
             .unwrap()

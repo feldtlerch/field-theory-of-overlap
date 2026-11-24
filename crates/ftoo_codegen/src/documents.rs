@@ -2,6 +2,7 @@
 #![allow(clippy::result_large_err)]
 pub(crate) mod artifacts;
 mod bibliography;
+mod destinations;
 mod diagnostics;
 mod display;
 mod html;
@@ -64,7 +65,9 @@ impl DocumentArtifact {
 /// ```compile_fail,E0451
 /// let value = ftoo_codegen::PreparedDocuments {
 ///     artifacts: Vec::new(), inputs: Default::default(), observed_outputs: Default::default(),
+///     unavailable: Vec::new(),
 ///     html_gap_rows: Vec::new(),
+///     screen_gap_rows: Vec::new(),
 ///     snapshot: None,
 /// };
 /// ```
@@ -115,6 +118,8 @@ pub struct PreparedDocuments {
     html_gap_rows: Vec<HtmlGapRow>,
     inputs: BTreeMap<String, Vec<u8>>,
     observed_outputs: BTreeMap<String, Vec<u8>>,
+    unavailable: Vec<destinations::IndexEntry>,
+    screen_gap_rows: Vec<ScreenGapRow>,
 }
 impl PreparedDocuments {
     #[must_use]
@@ -137,6 +142,90 @@ impl PreparedDocuments {
     pub fn projection(&self) -> &[u8] {
         &self.inputs["generated/manifest.json"]
     }
+    pub(crate) fn check_release_destinations(&self) -> Result<(), String> {
+        destinations::release(&self.unavailable, !self.screen_gap_rows.is_empty()).map_err(
+            |error| {
+                let entries = self
+                    .unavailable
+                    .iter()
+                    .map(|entry| {
+                        format!(
+                            "{:?} / {} #{}",
+                            entry.document, entry.language, entry.fragment
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                let gaps = self
+                    .screen_gap_rows
+                    .iter()
+                    .map(|row| {
+                        format!(
+                            "{} / {} position {} between {:?} and {:?}",
+                            row.document,
+                            row.language,
+                            row.position,
+                            row.before_unit,
+                            row.after_unit
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                format!("{error:?}; unavailable: {entries}; content gaps: {gaps}")
+            },
+        )
+    }
+    pub(crate) fn screen_gap_inventory(&self) -> serde_json::Value {
+        use serde_json::json;
+        let entries = self
+            .unavailable
+            .iter()
+            .map(|entry| {
+                let document = match entry.document {
+                    destinations::Reading::Paper => "paper-pilot",
+                    destinations::Reading::Explainer => "explainer-pilot",
+                };
+                json!({
+                    "document": document,
+                    "language": entry.language,
+                    "fragment": entry.fragment,
+                    "locator": entry.locator,
+                    "message": entry.message,
+                    "title": entry.title,
+                })
+            })
+            .collect::<Vec<_>>();
+        let gaps = self
+            .screen_gap_rows
+            .iter()
+            .map(|row| {
+                json!({
+                    "document": row.document,
+                    "language": row.language,
+                    "position": row.position,
+                    "before-unit": row.before_unit,
+                    "after-unit": row.after_unit,
+                    "message": row.message,
+                })
+            })
+            .collect::<Vec<_>>();
+        json!({"schema": 1, "entries": entries, "content-gaps": gaps})
+    }
+    #[cfg(test)]
+    pub(crate) fn clear_screen_gaps_for_test(&mut self) {
+        self.unavailable.clear();
+        self.screen_gap_rows.clear();
+    }
+}
+
+#[derive(Debug)]
+struct ScreenGapRow {
+    document: String,
+    language: String,
+    position: usize,
+    before_unit: Option<String>,
+    after_unit: Option<String>,
+    message: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -376,6 +465,19 @@ pub(crate) fn prepare_context(
             .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
         merge_checked_input(&mut inputs, registry::PAPER_MINTS.into(), data)?;
     }
+    for unit in corpus.units() {
+        for text in unit.texts().values() {
+            for reference in text.reference_occurrences() {
+                if let Some(ftoo_manifest::MintOrigin {
+                    kind: ftoo_manifest::MintKind::PaperTex,
+                    site: ftoo_manifest::LabelSite::PaperMintFile { file },
+                }) = registry_joint.mints().get(reference.label())
+                {
+                    merge_checked_input(&mut inputs, file.clone(), input::read(root, file)?)?;
+                }
+            }
+        }
+    }
     let source = registry::read(root)?;
     let events = registry::load(&source)?;
     merge_checked_input(&mut inputs, source.file, source.bytes)?;
@@ -499,6 +601,7 @@ pub(crate) fn prepare_context(
             &document_sites,
             &inclusions,
             &inputs,
+            registry_joint.mints(),
         )?;
         let gap_rows = html_gap_rows(&plans, &selected);
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
@@ -548,6 +651,37 @@ pub(crate) fn prepare_context(
             ],
             artifacts,
         )?;
+        prepared.unavailable = plans
+            .iter()
+            .flat_map(|plan| {
+                plan.screen
+                    .iter()
+                    .flat_map(|screen| screen.index.iter().cloned())
+            })
+            .collect();
+        prepared.screen_gap_rows = plans
+            .iter()
+            .flat_map(|plan| {
+                plan.screen.iter().flat_map(|screen| {
+                    screen
+                        .gaps
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, gap)| !gap.message.is_empty())
+                        .map(|(position, gap)| ScreenGapRow {
+                            document: plan.document.clone(),
+                            language: plan.language.clone(),
+                            position,
+                            before_unit: (position > 0).then(|| plan.blocks[position].unit.clone()),
+                            after_unit: plan
+                                .blocks
+                                .get(position + 1)
+                                .map(|block| block.unit.clone()),
+                            message: gap.message.clone(),
+                        })
+                })
+            })
+            .collect();
         prepared.html_gap_rows = gap_rows;
         if let Some(snapshot) = snapshot {
             snapshot
@@ -624,6 +758,8 @@ fn finish_snapshot(
         html_gap_rows: Vec::new(),
         inputs,
         observed_outputs,
+        unavailable: Vec::new(),
+        screen_gap_rows: Vec::new(),
     })
 }
 
@@ -980,6 +1116,9 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
             }
             plan::Inline::PaperTag { value, .. } => {
                 write!(body, "\\ftag{{{}}}", value.key).expect("string write");
+            }
+            plan::Inline::See { label, .. } => {
+                write!(body, "\\see{{{label}}}").expect("string write");
             }
             plan::Inline::Math { latex, site, .. } => {
                 if !plan::native_paragraph_command(latex) {

@@ -44,6 +44,10 @@ pub enum AssemblyFault {
     DuplicatePublicAnchor {
         fragment: String,
     },
+    ReferenceDestination {
+        label: String,
+        reason: String,
+    },
     InvalidPublicAnchor {
         fragment: String,
     },
@@ -292,7 +296,7 @@ impl fmt::Display for AssemblyFault {
 impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
-            Self::InheritedSupport { .. } => 50,
+            Self::InheritedSupport { .. } | Self::ReferenceDestination { .. } => 50,
             Self::UnsupportedParagraphBody { .. } => 48,
             Self::UnsupportedMarkdownMath { .. } => 47,
             Self::UnsupportedMarkdownStyle { .. } => 49,
@@ -681,6 +685,13 @@ impl fmt::Display for AssemblyErrors {
 impl std::error::Error for AssemblyErrors {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmissionKind {
+    See {
+        target: String,
+    },
+    IndexHeading,
+    IndexEntry {
+        fragment: String,
+    },
     RefrainHandle {
         role: RefrainRole,
         handle: String,

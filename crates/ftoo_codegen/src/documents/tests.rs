@@ -1366,6 +1366,7 @@ fn fragment_macro_follows_planned_quotation() {
     plan.screen = Some(plan::ScreenPlan {
         gaps: vec![],
         refrains: vec![],
+        index: vec![],
         html_gaps: std::collections::BTreeMap::new(),
         end_matter: vec![],
     });
@@ -2823,6 +2824,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
     let prepared = PreparedDocuments {
         snapshot: None,
         html_gap_rows: Vec::new(),
+        screen_gap_rows: Vec::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -2835,6 +2837,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
             .collect(),
         inputs: BTreeMap::new(),
         observed_outputs: BTreeMap::new(),
+        unavailable: Vec::new(),
     };
     fs::create_dir_all(directory.0.join("generated/documents/main")).unwrap();
     let reset = || {
@@ -2995,6 +2998,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
     let prepared = PreparedDocuments {
         snapshot: None,
         html_gap_rows: Vec::new(),
+        screen_gap_rows: Vec::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -3007,6 +3011,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
             .collect(),
         inputs: BTreeMap::new(),
         observed_outputs: BTreeMap::new(),
+        unavailable: Vec::new(),
     };
     fs::create_dir_all(directory.0.join("generated/documents/main")).unwrap();
     for path in paths {
@@ -4039,6 +4044,7 @@ fn markdown_style_screen_paragraph_is_observed() {
     plan.screen = Some(plan::ScreenPlan {
         gaps: vec![],
         refrains: vec![],
+        index: vec![],
         html_gaps: std::collections::BTreeMap::new(),
         end_matter: vec![],
     });
@@ -4092,4 +4098,47 @@ fn citation_fixture_plans_retain_real_checked_mint_origins() {
         plan::check_emission(&plan, &markdown::render(&plan), DocumentTarget::Markdown),
         Ok(())
     );
+}
+#[test]
+fn release_destination_bridge_refuses_entries_and_gaps_independently() {
+    let mut prepared = PreparedDocuments {
+        snapshot: None,
+        artifacts: Vec::new(),
+        html_gap_rows: Vec::new(),
+        screen_gap_rows: Vec::new(),
+        inputs: BTreeMap::new(),
+        observed_outputs: BTreeMap::new(),
+        unavailable: Vec::new(),
+    };
+    prepared.unavailable.push(destinations::IndexEntry {
+        document: destinations::Reading::Paper,
+        language: "en".into(),
+        fragment: "method-self-limit".into(),
+        title: "The method’s self-limit".into(),
+        locator: "appendix G".into(),
+        message: "Not yet available in this rendering.",
+    });
+    assert!(
+        prepared
+            .check_release_destinations()
+            .unwrap_err()
+            .contains("entries: 1, gaps: false")
+    );
+    prepared.unavailable.clear();
+    prepared.screen_gap_rows.push(ScreenGapRow {
+        document: "paper-pilot".into(),
+        language: "en".into(),
+        position: 1,
+        before_unit: Some("sec:first".into()),
+        after_unit: Some("sec:second".into()),
+        message: "Intervening content is unavailable.".into(),
+    });
+    assert!(
+        prepared
+            .check_release_destinations()
+            .unwrap_err()
+            .contains("entries: 0, gaps: true")
+    );
+    prepared.screen_gap_rows.clear();
+    assert_eq!(prepared.check_release_destinations(), Ok(()));
 }

@@ -1084,7 +1084,7 @@ fn m015_awaiting_claim_prevents_complete_even_outside_slice() -> TestResult {
 fn paper_rule_consumers_are_explicit() {
     assert_eq!(
         RULES[64].statement,
-        "Paper release requires no provisional printed identity, acceptance matching all nineteen final self-description passages, and an equal PDF pair and input receipt."
+        "Paper release requires no provisional printed identity, no unavailable screen destination or content gap, no HTML block gap, acceptance matching all nineteen final self-description passages, and an equal PDF pair and input receipt."
     );
     assert_eq!(
         RULES[62].statement,

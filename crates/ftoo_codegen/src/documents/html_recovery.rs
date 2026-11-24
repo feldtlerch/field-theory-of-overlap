@@ -355,7 +355,7 @@ fn flat(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&flat(children)),
-            Inline::Math { .. } | Inline::BibliographyCitation { .. } => {
+            Inline::Math { .. } | Inline::BibliographyCitation { .. } | Inline::See { .. } => {
                 unreachable!("unrealizable heading refused before recovery")
             }
         }
@@ -595,6 +595,7 @@ fn runs(
                 bibliography_citation(plan, known, node, *kind, entries, label)?;
                 at += 1;
             }
+            Inline::See { .. } => unreachable!("unrealizable block withheld before recovery"),
         }
     }
     flush(&mut pending, &mut paper, &mut at)?;
@@ -980,6 +981,53 @@ fn check_main(
     at += 1;
     for section in &screen.end_matter {
         match section {
+            super::plan::ScreenEndMatter::Unavailable(entries) => {
+                let heading = nodes
+                    .get(at)
+                    .ok_or_else(|| mismatch(plan, "HTML unavailable-content heading position"))?;
+                let heading = element(
+                    plan,
+                    known,
+                    heading,
+                    "h2",
+                    &[("id", "references-to-unavailable-content")],
+                    "HTML unavailable-content heading anchor",
+                )?;
+                text(
+                    plan,
+                    known,
+                    heading,
+                    "References to unavailable content",
+                    "HTML unavailable-content heading text",
+                )?;
+                at += 1;
+                for entry in entries {
+                    let row = nodes.get(at).ok_or_else(|| {
+                        mismatch(plan, "HTML unavailable-content entry inventory")
+                    })?;
+                    let row =
+                        element(plan, known, row, "p", &[], "HTML unavailable-content entry")?;
+                    let [anchor, copy] = row else {
+                        return Err(mismatch(plan, "HTML unavailable-content entry shape"));
+                    };
+                    element(
+                        plan,
+                        known,
+                        anchor,
+                        "a",
+                        &[("id", &entry.fragment)],
+                        "HTML unavailable-content entry anchor",
+                    )?;
+                    text(
+                        plan,
+                        known,
+                        std::slice::from_ref(copy),
+                        &format!("{} — {}. {}", entry.locator, entry.title, entry.message),
+                        "HTML unavailable-content entry text",
+                    )?;
+                    at += 1;
+                }
+            }
             super::plan::ScreenEndMatter::References(entries) => {
                 let heading = nodes
                     .get(at)

@@ -1,0 +1,127 @@
+{
+  "content-gaps": [
+    {
+      "after-unit": "sec:reading:plain-intro",
+      "before-unit": null,
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: earlier material is omitted from this excerpt.",
+      "position": 0
+    },
+    {
+      "after-unit": "sec:say:direction",
+      "before-unit": "sec:reading:plain-intro",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 1
+    },
+    {
+      "after-unit": "sec:say:enemy-to-none",
+      "before-unit": "sec:say:direction",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 2
+    },
+    {
+      "after-unit": "sec:coda:record-limit",
+      "before-unit": "sec:say:enemy-to-none",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 3
+    },
+    {
+      "after-unit": null,
+      "before-unit": "sec:coda:record-limit",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: later material is omitted from this excerpt.",
+      "position": 4
+    },
+    {
+      "after-unit": "sec:reading:shadow",
+      "before-unit": null,
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: earlier material is omitted from this excerpt.",
+      "position": 0
+    },
+    {
+      "after-unit": "sec:say:direction",
+      "before-unit": "sec:reading:shadow",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 1
+    },
+    {
+      "after-unit": "sec:say:harm-enlargement",
+      "before-unit": "sec:say:direction",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 2
+    },
+    {
+      "after-unit": "sec:say:wonder-beauty",
+      "before-unit": "sec:say:harm-enlargement",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 3
+    },
+    {
+      "after-unit": "sec:say:enemy-to-none",
+      "before-unit": "sec:say:wonder-beauty",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 4
+    },
+    {
+      "after-unit": "sec:coda:audit-bottoms",
+      "before-unit": "sec:say:enemy-to-none",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 5
+    },
+    {
+      "after-unit": "sec:coda:whole-field",
+      "before-unit": "sec:coda:audit-bottoms",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 6
+    },
+    {
+      "after-unit": "sec:log:andreoni-joint",
+      "before-unit": "sec:coda:record-limit",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 8
+    },
+    {
+      "after-unit": null,
+      "before-unit": "sec:log:andreoni-joint",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: later material is omitted from this excerpt.",
+      "position": 9
+    }
+  ],
+  "entries": [
+    {
+      "document": "paper-pilot",
+      "fragment": "method-self-limit",
+      "language": "en",
+      "locator": "appendix G",
+      "message": "Not yet available in this rendering.",
+      "title": "The method’s self-limit"
+    }
+  ],
+  "schema": 1
+}

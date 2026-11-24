@@ -93,18 +93,70 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
         );
 
         let modern = latex::render(plan);
+        let emitted_prefix = |unit: &str, handle: &str, suffix: &str| {
+            let unit_marker = format!("% unit {unit} document main language en\n");
+            let tag_marker = format!(r"\FtdocTag{{{handle}}}{{");
+            let section = modern.split_once(&unit_marker).unwrap().1;
+            let section = section
+                .split_once("\n% unit ")
+                .map_or(section, |(body, _)| body);
+            let token = section
+                .split_once(&tag_marker)
+                .unwrap()
+                .1
+                .split_once('}')
+                .unwrap()
+                .0;
+            token.strip_suffix(suffix).unwrap()
+        };
+        let citation_token = records
+            .iter()
+            .find_map(|record| match &record.kind {
+                EmissionKind::Citation(identity)
+                    if record.unit == "sec:coefficients:value-context" =>
+                {
+                    Some(identity.token.as_str())
+                }
+                _ => None,
+            })
+            .unwrap();
+        let pending_token = records
+            .iter()
+            .find_map(|record| match &record.kind {
+                EmissionKind::PendingExplanation(entry)
+                    if record.unit == "sec:coefficients:first-value" =>
+                {
+                    entry.names.iter().find(|name| name.handle == "c:1")
+                }
+                _ => None,
+            })
+            .unwrap()
+            .token
+            .as_str();
         // Retain historical body bytes, including the two endangered spaces.
-        // Current unit indices and the later envelope, live-citation and
+        // Current emitted tokens and the later envelope, live-citation and
         // pending-paragraph contracts are supplied without masking the spacing.
         let body = &old[old.find("% unit ").unwrap()..];
-        let body = body.replace("u2-t", "u4-t");
-        let body = body.replace("u0-t", "u2-t");
-        let body = body.replace("u3-dlatex", "u5-dlatex");
+        let body = body.replace(
+            "u2-t",
+            emitted_prefix("sec:coefficients:value-context", "v:1", "0"),
+        );
+        let body = body.replace(
+            "u0-t",
+            emitted_prefix("sec:coefficients:first-value", "c:1", "0"),
+        );
+        let body = body.replace(
+            "u3-dlatex",
+            emitted_prefix("sec:coefficients:value-table", "c:1", "-en-o0"),
+        );
         let body = body.replace(
             r"\texttt{dec:weld:equal-address-sets}",
-            r"\FtdocTag{dec:weld}{u4-c0}",
+            &format!(r"\FtdocTag{{dec:weld}}{{{citation_token}}}"),
         );
-        let body = body.replace("\n\n% unit sec:coefficients:value-table", "\n\nPending notation: \\({c}_{1}\\): retained formulation \\FtdocTag{c:1}{u2-p0-r0}% label def:langevin:coefficient-one\n.\n\n% unit sec:coefficients:value-table");
+        let pending = format!(
+            "\n\nPending notation: \\({{c}}_{{1}}\\): retained formulation \\FtdocTag{{c:1}}{{{pending_token}}}% label def:langevin:coefficient-one\n.\n\n% unit sec:coefficients:value-table"
+        );
+        let body = body.replace("\n\n% unit sec:coefficients:value-table", &pending);
         let candidate = format!("{}{body}", &modern[..modern.find("% unit ").unwrap()]);
         let changed = [
             (

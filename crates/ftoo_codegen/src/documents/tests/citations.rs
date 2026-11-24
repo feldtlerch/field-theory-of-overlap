@@ -118,10 +118,41 @@ fn bibliography_main_document_requires_screen_at_citation_site() {
     plan.screen = Some(ScreenPlan {
         gaps: vec![],
         refrains: vec![],
+        index: vec![],
         html_gaps: std::collections::BTreeMap::new(),
         end_matter: vec![],
     });
     assert!(require_bibliography_screen(&plan).is_ok());
+    plan.screen
+        .as_mut()
+        .unwrap()
+        .index
+        .push(super::super::destinations::IndexEntry {
+            document: super::super::destinations::Reading::Paper,
+            language: "en".into(),
+            fragment: "method-self-limit".into(),
+            title: "The method’s self-limit".into(),
+            locator: "appendix G".into(),
+            message: "Not yet available in this rendering.",
+        });
+    let index = plan.screen.as_ref().unwrap().index.clone();
+    let references = super::super::bibliography::entries(&plan);
+    plan.screen.as_mut().unwrap().end_matter = vec![
+        ScreenEndMatter::Unavailable(index),
+        ScreenEndMatter::References(references),
+    ];
+    assert!(matches!(
+        end_matter(&plan).as_slice(),
+        [EndMatter::Unavailable(_), EndMatter::References(_)]
+    ));
+    plan.screen.as_mut().unwrap().index[0].fragment = "bibliography-other".into();
+    let ScreenEndMatter::Unavailable(entries) = &mut plan.screen.as_mut().unwrap().end_matter[0]
+    else {
+        panic!("planned unavailable-content index")
+    };
+    entries[0].fragment = "bibliography-other".into();
+    let error = check_public_anchors(&plan).unwrap_err();
+    assert!(format!("{error:?}").contains("DuplicatePublicAnchor"));
 }
 
 #[test]

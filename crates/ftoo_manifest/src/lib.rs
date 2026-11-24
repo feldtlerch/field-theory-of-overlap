@@ -72,9 +72,9 @@ pub use units::{
     BibliographyCitationKind, BibliographyCitationOccurrence, CheckedText, CheckedUnit,
     DocumentDraft, DocumentEntryDraft, InsertionReason, LanguageCheckedUnits, LocatedEntryDraft,
     LocatedString, MathOccurrence, NameDomain, PaperEvidenceSite, PaperResolution, PaperTagValue,
-    PathPart, ResolvedTagTarget, ResolvedUnitTag, ResolvedUnits, ShapeKind, SourceAnchor,
-    TagOccurrence, UnitDiagnostic, UnitDraft, UnitErrors, UnitFault, UnitLabel, UnitSite,
-    UnitStage, admit_unit_drafts, resolve_unit_tags, resolve_unit_tags_with,
+    PathPart, ReferenceOccurrence, ResolvedTagTarget, ResolvedUnitTag, ResolvedUnits, ShapeKind,
+    SourceAnchor, TagOccurrence, UnitDiagnostic, UnitDraft, UnitErrors, UnitFault, UnitLabel,
+    UnitSite, UnitStage, admit_unit_drafts, resolve_unit_tags, resolve_unit_tags_with,
 };
 
 /// Check the closed three-component semantic-label spelling.

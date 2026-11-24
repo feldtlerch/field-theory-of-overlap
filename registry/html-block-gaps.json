@@ -1,4 +1,11 @@
 {
-  "gaps": [],
+  "gaps": [
+    {
+      "block": 6,
+      "document": "paper-pilot",
+      "inline-kind": "see-reference",
+      "unit": "sec:coda:audit-bottoms"
+    }
+  ],
   "schema": 1
 }

@@ -81,6 +81,22 @@ pub struct TagOccurrence {
     input: String,
     site: UnitSite,
 }
+/// One located authored see reference.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReferenceOccurrence {
+    label: String,
+    site: UnitSite,
+}
+impl ReferenceOccurrence {
+    #[must_use]
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+    #[must_use]
+    pub fn site(&self) -> &UnitSite {
+        &self.site
+    }
+}
 /// A source-ordered bibliography citation with its exact insertion site.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BibliographyCitationKind {
@@ -125,6 +141,7 @@ pub struct CheckedText {
     source: LocatedString,
     occurrences: Vec<MathOccurrence>,
     tags: Vec<TagOccurrence>,
+    references: Vec<ReferenceOccurrence>,
     bibliography_citations: Vec<BibliographyCitationOccurrence>,
     styles: Vec<content::StyleOccurrence>,
 }
@@ -144,6 +161,10 @@ impl CheckedText {
     #[must_use]
     pub fn tag_occurrences(&self) -> &[TagOccurrence] {
         &self.tags
+    }
+    #[must_use]
+    pub fn reference_occurrences(&self) -> &[ReferenceOccurrence] {
+        &self.references
     }
     #[must_use]
     pub fn bibliography_citations(&self) -> &[BibliographyCitationOccurrence] {
@@ -572,6 +593,7 @@ fn check_texts(
                 prose,
                 math: occurrences,
                 tags,
+                references,
                 bibliography_citations,
                 styles,
             }) => {
@@ -608,6 +630,7 @@ fn check_texts(
                         source: entry.value.clone(),
                         occurrences,
                         tags,
+                        references,
                         bibliography_citations,
                         styles,
                     },

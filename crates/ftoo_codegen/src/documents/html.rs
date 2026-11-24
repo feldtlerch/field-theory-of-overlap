@@ -481,6 +481,7 @@ fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
                     children,
                 )
             }
+            Inline::See { .. } => unreachable!("unrealizable block withheld before emission"),
         });
     }
     nodes
@@ -499,6 +500,10 @@ pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSe
                 markdown, latex, ..
             } if !math_allowed || !admitted_math(markdown, latex) => {
                 kinds.insert("mathematics");
+            }
+            Inline::See { .. } => {
+                // HTML needs a checked reference link emitter and recovery for its destination.
+                kinds.insert("see-reference");
             }
             Inline::BibliographyCitation { .. }
             | Inline::Math { .. }
@@ -525,7 +530,10 @@ fn bibliography_end_matter(plan: &DocumentPlan) -> Result<(), DocumentError> {
         .blocks
         .iter()
         .find_map(|block| first_bibliography_citation(&block.runs));
-    if screen.end_matter.is_empty()
+    if !screen
+        .end_matter
+        .iter()
+        .any(|section| matches!(section, super::plan::ScreenEndMatter::References(_)))
         && let Some(site) = cited
     {
         return Err(failure(
@@ -539,11 +547,26 @@ fn bibliography_end_matter(plan: &DocumentPlan) -> Result<(), DocumentError> {
         ));
     }
     let derived = super::bibliography::entries(plan);
-    let entries_match = match screen.end_matter.as_slice() {
-        [] => derived.is_empty(),
-        [super::plan::ScreenEndMatter::References(entries)] => *entries == derived,
-        _ => false,
+    let references = screen
+        .end_matter
+        .iter()
+        .filter_map(|section| match section {
+            super::plan::ScreenEndMatter::Unavailable(_) => None,
+            super::plan::ScreenEndMatter::References(entries) => Some(entries),
+        })
+        .collect::<Vec<_>>();
+    let index_match = match screen.end_matter.first() {
+        Some(super::plan::ScreenEndMatter::Unavailable(entries)) => {
+            !screen.index.is_empty() && *entries == screen.index
+        }
+        _ => screen.index.is_empty(),
     };
+    let entries_match = (match references.as_slice() {
+        [] => derived.is_empty(),
+        [entries] => **entries == derived,
+        _ => false,
+    }) && index_match
+        && screen.end_matter.len() == references.len() + usize::from(!screen.index.is_empty());
     if !entries_match {
         return Err(failure(
             RuleId::M055,
@@ -571,7 +594,9 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
     fn first_unrealizable(runs: &[Inline]) -> Option<&UnitSite> {
         runs.iter().find_map(|run| match run {
             Inline::Styled { children, .. } => first_unrealizable(children),
-            Inline::Math { site, .. } | Inline::BibliographyCitation { site, .. } => Some(site),
+            Inline::Math { site, .. }
+            | Inline::BibliographyCitation { site, .. }
+            | Inline::See { site, .. } => Some(site),
             _ => None,
         })
     }
@@ -581,7 +606,8 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             | Inline::PaperTag { site, .. }
             | Inline::Citation { site, .. }
             | Inline::BibliographyCitation { site, .. }
-            | Inline::Math { site, .. } => Some(site),
+            | Inline::Math { site, .. }
+            | Inline::See { site, .. } => Some(site),
             Inline::Styled { children, .. } => first_heading_fault(children),
             _ => None,
         })
@@ -656,7 +682,7 @@ pub(super) fn plain(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&plain(children)),
-            Inline::Math { .. } | Inline::BibliographyCitation { .. } => {
+            Inline::Math { .. } | Inline::BibliographyCitation { .. } | Inline::See { .. } => {
                 unreachable!("unrealizable heading refused before title")
             }
         }
@@ -826,6 +852,26 @@ pub(super) fn model(
     ));
     for section in &screen.end_matter {
         match section {
+            super::plan::ScreenEndMatter::Unavailable(entries) => {
+                main.push(element(
+                    "h2",
+                    &[("id", "references-to-unavailable-content")],
+                    vec![Node::Text("References to unavailable content".into())],
+                ));
+                for entry in entries {
+                    main.push(element(
+                        "p",
+                        &[],
+                        vec![
+                            element("a", &[("id", &entry.fragment)], vec![]),
+                            Node::Text(format!(
+                                "{} — {}. {}",
+                                entry.locator, entry.title, entry.message
+                            )),
+                        ],
+                    ));
+                }
+            }
             super::plan::ScreenEndMatter::References(entries) => {
                 main.push(element(
                     "h2",

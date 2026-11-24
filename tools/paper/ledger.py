@@ -10,7 +10,9 @@ from pdf_text import Pdf
 
 INPUTS = ['tools/paper/ledger.py', 'tools/paper/identities.py', 'tools/paper/pdf_text.py',
           'generated/manifest.json', 'registry/documentary-tags.toml',
-          'documents/paper-build/label-mints.tsv', 'documents/paper/data/ftoo_manifest.tex']
+          'documents/paper-build/label-mints.tsv', 'documents/paper/data/ftoo_manifest.tex',
+          'generated/documents/paper-pilot/en.labels.md',
+          'generated/documents/explainer-pilot/en.labels.md']
 LEAK = re.compile(r'\b[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)+', re.I)
 
 
@@ -70,11 +72,34 @@ def check_destination(document, key, anchor, auxiliary_page, destination_page):
                 auxiliary_page=auxiliary_page, destination_page=destination_page)))
 
 
+def screen_references(screen, paper_auxiliary):
+    see = list(re.finditer(r'<a href="[^"]+">→ (appendix [A-Z])</a><!-- see ([A-Za-z][A-Za-z0-9_:-]*) -->', screen))
+    require(len(see)==screen.count('<!-- see '), 'M055: malformed generated see reference')
+    checked=[]
+    for match in see:
+        locator,label = match.groups()
+        target = paper_auxiliary.get(label)
+        require(target is not None and target['default'] and target['page'] and target['anchor'],
+                'M055: paper reference target absent: '+label)
+        require(locator == 'appendix '+target['default'],
+                'M055: screen/PDF reference number differs: '+label)
+        checked.append((label,target))
+    return checked
+
+
+def check_screen_references(repo, paper_auxiliary, paper_pdf):
+    for owner in ('paper-pilot', 'explainer-pilot'):
+        screen = read(repo/'generated/documents'/owner/'en.labels.md')
+        for label,target in screen_references(screen,paper_auxiliary):
+            check_destination('main',label,target['anchor'],int(target['page']),paper_pdf.destination(target['anchor']))
+
+
 def check(repo, work):
     lookup = bindings(repo)
     paper = work/'paper'
     docs = {job:Pdf(paper/(job+'.pdf')) for job in ('main','main_explainer')}
     aux = {job:auxiliary(paper,job) for job in docs}
+    check_screen_references(repo,aux['main'],docs['main'])
     rows=[]; issues=[]; observed=collections.Counter()
     known={v['spelling'].casefold() for v in lookup.values()}
     for job,pdf in docs.items():

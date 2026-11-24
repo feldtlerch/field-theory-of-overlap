@@ -545,6 +545,7 @@ fn after_replacement(error: RetentionCheckError) -> RetentionCheckError {
     }
 }
 /// Check faithful retention, passing release assessment and existing base documents.
+/// This check refuses HTML block gaps; complete paper release also checks unavailable screen destinations and content gaps.
 /// # Errors
 /// Returns technical refusals; this does not certify the separate publication-policy audit.
 pub fn check_release_retention(

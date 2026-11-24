@@ -20,10 +20,18 @@ fn paper_lookup_snapshot_refuses_a_second_version() {
 
 #[test]
 fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::Error>> {
-    const PINNED_NOTICE_COUNT: usize = 8;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let support = NativeSupport::from_environment(&root).map_err(|error| format!("{error:?}"))?;
     let prepared = prepare_documents(&root, &support)?;
+    let registered: serde_json::Value = serde_json::from_slice(&std::fs::read(
+        root.join("registry/screen-destination-gaps.json"),
+    )?)?;
+    let expected_notices = registered["content-gaps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["document"] == "paper-pilot")
+        .count();
     let artifact = |path: &str| {
         prepared
             .artifacts()
@@ -59,7 +67,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         let rendered = std::str::from_utf8(bytes)?;
         assert_eq!(
             rendered.matches("Not yet converted:").count(),
-            PINNED_NOTICE_COUNT
+            expected_notices
         );
         assert!(rendered.contains("other way — the fact"));
         assert!(rendered.contains("center’s population"));
@@ -1003,9 +1011,13 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let register: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
     let registered = register["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), 0);
-    assert_eq!(registered.len(), 0);
-    assert!(crate::paper::html_gaps::refusal(gaps).is_ok());
+    assert_eq!(gaps.len(), 1);
+    assert_eq!(registered.len(), 1);
+    let refusal = crate::paper::html_gaps::refusal(gaps)
+        .unwrap_err()
+        .to_string();
+    assert!(refusal.contains("HTML block gaps"));
+    assert!(refusal.contains("units/statements/coda-audit-bottoms.toml"));
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,

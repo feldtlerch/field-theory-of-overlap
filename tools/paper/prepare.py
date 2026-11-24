@@ -6,7 +6,7 @@ import re
 import shutil
 import tomllib
 from bibroute import derive
-from identities import emit
+from identities import emit, label_mints
 from common import require, read, write, timed, runtime
 
 INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/fontconfig.conf", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
@@ -74,7 +74,7 @@ def declared_fragments(repository, rows):
         if role == 'paragraph':
             checked_math = rb'\\\(\\(?:comovfield|willvirtue|gensym)\{\}\\\)'
             allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|'
-                       rb'\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
+                       rb'\\see\{[A-Za-z][A-Za-z0-9_:-]*\}|\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
                        + checked_math + rb')+')
             require(body and re.fullmatch(allowed, body),
                     'M055: Fragment body differs: '+fragment)
@@ -84,6 +84,9 @@ def declared_fragments(repository, rows):
                 row = available.get(key.decode('ascii'))
                 require(row is not None and row['source_status'] in ('paper', 'alias'),
                         'M055: Fragment tag binding differs: '+fragment)
+            for key in re.findall(rb'\\see\{([^{}]+)\}', body):
+                require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
+                        'M055: Fragment reference binding differs: '+fragment)
             paragraph_bodies.append(b' '.join(body.split()))
         else:
             require(body and b'{' not in body and b'}' not in body,

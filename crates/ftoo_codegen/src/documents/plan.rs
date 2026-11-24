@@ -62,6 +62,14 @@ pub(super) enum Inline {
         value: ftoo_manifest::PaperTagValue,
         site: UnitSite,
     },
+    See {
+        label: String,
+        locator: String,
+        owner: String,
+        language: String,
+        fragment: String,
+        site: UnitSite,
+    },
     Math {
         definition_site: UnitSite,
         key: String,
@@ -114,6 +122,11 @@ enum Recovered {
         anchors: Vec<String>,
     },
     Mention(String),
+    See {
+        label: Option<String>,
+        locator: Option<String>,
+        href: Option<String>,
+    },
     Styled {
         kind: StyleKind,
         children: Vec<Recovered>,
@@ -225,6 +238,7 @@ fn inline_handles(run: &Inline) -> Vec<&str> {
         _ => inline_handle(run).into_iter().collect(),
     }
 }
+#[allow(clippy::too_many_lines)] // One pass preserves the order of all admitted inline forms.
 fn recover_markdown<'a>(
     body: &str,
     handles: impl Iterator<Item = &'a str>,
@@ -263,13 +277,40 @@ fn recover_markdown<'a>(
                 }
             });
             at += comment_prefix + end + 4;
-        } else if tail.starts_with("(<a href=\"#bibliography-")
-            || tail.starts_with("<a href=\"#bibliography-")
+        } else if tail.starts_with("(<a href=\"")
+            || tail
+                .strip_prefix("<a href=\"")
+                .and_then(|_| tail.split_once("</a>"))
+                .is_some_and(|(_, after)| {
+                    after.starts_with("<!-- bibcite ")
+                        || after.starts_with(")<!-- bibcite ")
+                        || after.starts_with("; <a href=\"")
+                })
         {
             flush_text(&mut output, &mut text);
             let (citation, consumed) = recover_bibliography_markdown(tail)?;
             output.push(citation);
             at += consumed;
+        } else if let Some(after) = tail.strip_prefix("<a href=\"") {
+            let (inside, after) = after.split_once("</a>")?;
+            let (href, locator) = inside.split_once("\">→ ")?;
+            if locator.contains('<') || locator.contains('>') {
+                return None;
+            }
+            let label = after.strip_prefix("<!-- see ")?.split_once(" -->")?.0;
+            flush_text(&mut output, &mut text);
+            output.push(Recovered::See {
+                label: Some(label.into()),
+                locator: Some(locator.into()),
+                href: Some(href.into()),
+            });
+            at += 9
+                + href.len()
+                + "\">→ ".len()
+                + locator.len()
+                + "</a><!-- see ".len()
+                + label.len()
+                + 4;
         } else if tail.starts_with('*') {
             flush_text(&mut output, &mut text);
             let (kind, delimiter) = if tail.starts_with("**") {
@@ -598,6 +639,19 @@ fn recover_tex(body: &str, prose: bool, initial_line: TexLine) -> Option<Vec<Rec
             output.push(Recovered::Math(tail[..end].into()));
             at += 2 + end + 2;
             line = TexLine::MidLine;
+        } else if let Some(rest) = tail.strip_prefix(r"\see{") {
+            let end = rest.find('}')?;
+            if rest[..end].contains('{') {
+                return None;
+            }
+            flush_text(&mut output, &mut text);
+            output.push(Recovered::See {
+                label: Some(rest[..end].into()),
+                locator: None,
+                href: None,
+            });
+            at += 5 + end + 1;
+            line = TexLine::MidLine;
         } else if let Some(tail) = tail.strip_prefix(r"\texttt{") {
             flush_text(&mut output, &mut text);
             let mut value = String::new();
@@ -693,6 +747,19 @@ fn expected_run(run: &Inline, target: DocumentTarget, prose: bool) -> Option<Rec
             handle: value.spelling.clone(),
             label: value.target.clone(),
             token: None,
+        },
+        Inline::See {
+            label,
+            locator,
+            owner,
+            language,
+            fragment,
+            ..
+        } => Recovered::See {
+            label: Some(label.clone()),
+            locator: (target == DocumentTarget::Markdown).then(|| locator.clone()),
+            href: (target == DocumentTarget::Markdown)
+                .then(|| markdown_document_href(owner, language, fragment)),
         },
         Inline::Math {
             markdown, latex, ..
@@ -948,7 +1015,14 @@ fn excerpt_refrain(source: &str) -> Option<(String, Vec<String>, String, String,
 }
 #[allow(clippy::too_many_lines)] // The excerpt's ordered blocks and their source ranges form one recovery pass.
 fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), DocumentError> {
-    let entries = super::bibliography::entries(plan);
+    let sections = end_matter(plan);
+    let entries = sections
+        .iter()
+        .find_map(|section| match section {
+            EndMatter::References(entries) => Some(*entries),
+            EndMatter::Unavailable(_) => None,
+        })
+        .unwrap_or(&[]);
     let base_source;
     let source = if entries.is_empty() {
         if source.contains("\n\n## References\n\n") {
@@ -978,7 +1052,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 },
             ));
         };
-        if !super::bibliography::recover_screen(section, &entries) {
+        if !super::bibliography::recover_screen(section, entries) {
             return Err(emission_failure(
                 plan,
                 DocumentTarget::Markdown,
@@ -1082,6 +1156,20 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                                         (EmissionKind::Math, key.clone(), site)
                                     }
                                     (
+                                        Inline::See { label, site, .. },
+                                        Recovered::See {
+                                            locator: Some(locator),
+                                            href: Some(href),
+                                            ..
+                                        },
+                                    ) => (
+                                        EmissionKind::See {
+                                            target: label.clone(),
+                                        },
+                                        format!("{locator}\t{href}"),
+                                        site,
+                                    ),
+                                    (
                                         Inline::BibliographyCitation { site, .. },
                                         Recovered::BibliographyCitation {
                                             kind,
@@ -1172,6 +1260,30 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     range.clone(),
                 ));
             }
+        } else if chunk == "## References to unavailable content" {
+            actual.push(EmissionRecord {
+                kind: EmissionKind::IndexHeading,
+                unit: String::new(),
+                language: plan.language.clone(),
+                target: DocumentTarget::Markdown,
+                occurrence: None,
+                value: chunk.into(),
+                site: plan.blocks[0].site.clone(),
+            });
+        } else if let Some(rest) = chunk.strip_prefix("<a id=\"") {
+            let entry = rest.split_once("\"></a>");
+            let (fragment, value) = entry.unwrap_or(("", chunk));
+            actual.push(EmissionRecord {
+                kind: EmissionKind::IndexEntry {
+                    fragment: fragment.into(),
+                },
+                unit: String::new(),
+                language: plan.language.clone(),
+                target: DocumentTarget::Markdown,
+                occurrence: None,
+                value: excerpt_text(value).unwrap_or_else(|| value.into()),
+                site: plan.blocks[0].site.clone(),
+            });
         } else {
             let gap_index = body_index;
             let position = if gap_index == 0 {
@@ -1463,7 +1575,7 @@ impl Block {
         flattened.into_iter()
     }
 }
-fn flatten_runs<'a>(runs: &'a [Inline], output: &mut Vec<&'a Inline>) {
+pub(super) fn flatten_runs<'a>(runs: &'a [Inline], output: &mut Vec<&'a Inline>) {
     for run in runs {
         output.push(run);
         if let Inline::Styled {
@@ -1876,12 +1988,31 @@ pub(super) struct DocumentPlan {
 pub(super) struct ScreenPlan {
     pub gaps: Vec<ScreenGap>,
     pub refrains: Vec<ScreenRefrain>,
+    pub index: Vec<super::destinations::IndexEntry>,
     pub html_gaps: BTreeMap<usize, ScreenGap>,
     pub end_matter: Vec<ScreenEndMatter>,
 }
 #[derive(Clone, Debug)]
 pub(super) enum ScreenEndMatter {
+    Unavailable(Vec<super::destinations::IndexEntry>),
     References(Vec<super::bibliography::Entry>),
+}
+
+pub(super) enum EndMatter<'a> {
+    Unavailable(&'a [super::destinations::IndexEntry]),
+    References(&'a [super::bibliography::Entry]),
+}
+
+pub(super) fn end_matter(plan: &DocumentPlan) -> Vec<EndMatter<'_>> {
+    plan.screen
+        .as_ref()
+        .into_iter()
+        .flat_map(|screen| &screen.end_matter)
+        .map(|section| match section {
+            ScreenEndMatter::Unavailable(entries) => EndMatter::Unavailable(entries),
+            ScreenEndMatter::References(entries) => EndMatter::References(entries),
+        })
+        .collect()
 }
 pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
     (index > 0 && !blocks[index].paragraph).then(|| {
@@ -1920,12 +2051,15 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
     let Some(screen) = &plan.screen else {
         return Ok(());
     };
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeSet::from([
+        "references".to_owned(),
+        "references-to-unavailable-content".to_owned(),
+    ]);
     for refrain in &screen.refrains {
         if refrain.quotation.is_some() {
             continue;
         }
-        if !seen.insert(refrain.fragment.as_str()) {
+        if refrain.fragment.starts_with("bibliography-") || !seen.insert(refrain.fragment.clone()) {
             return Err(screen_failure(
                 plan,
                 &refrain.site,
@@ -1937,16 +2071,29 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
     }
     for section in &screen.end_matter {
         match section {
+            ScreenEndMatter::Unavailable(entries) => {
+                for entry in entries {
+                    if entry.fragment.starts_with("bibliography-")
+                        || !seen.insert(entry.fragment.clone())
+                    {
+                        return Err(screen_failure(
+                            plan,
+                            &plan.blocks[0].site,
+                            AssemblyFault::DuplicatePublicAnchor {
+                                fragment: entry.fragment.clone(),
+                            },
+                        ));
+                    }
+                }
+            }
             ScreenEndMatter::References(entries) => {
-                for anchor in std::iter::once("references")
-                    .chain(entries.iter().map(|entry| entry.anchor.as_str()))
-                {
-                    if !seen.insert(anchor) {
+                for entry in entries {
+                    if !seen.insert(entry.anchor.clone()) {
                         return Err(screen_failure(
                             plan,
                             &plan.coverage.site,
                             AssemblyFault::DuplicatePublicAnchor {
-                                fragment: anchor.into(),
+                                fragment: entry.anchor.clone(),
                             },
                         ));
                     }
@@ -2015,7 +2162,8 @@ pub(super) fn check_excerpt_shape(
                         && block.runs.iter().all(|run| match run {
                             Inline::Text(_)
                             | Inline::PaperTag { .. }
-                            | Inline::BibliographyCitation { .. } => true,
+                            | Inline::BibliographyCitation { .. }
+                            | Inline::See { .. } => true,
                             Inline::Math { latex, .. } => native_paragraph_command(latex),
                             Inline::Styled {
                                 kind: StyleKind::Emphasis,
@@ -2144,6 +2292,10 @@ pub(super) fn parse_public_href(href: &str) -> Option<(&str, &str, &str, String)
     (component(owner) && component(language))
         .then(|| inverse_fragment(fragment).map(|handle| (owner, language, fragment, handle)))?
 }
+pub(super) fn markdown_document_href(owner: &str, language: &str, fragment: &str) -> String {
+    format!("../{owner}/{language}.md#{fragment}")
+}
+
 fn public_href(
     plan: &DocumentPlan,
     site: &UnitSite,
@@ -2151,7 +2303,7 @@ fn public_href(
     language: &str,
     fragment: &str,
 ) -> Result<String, DocumentError> {
-    let href = format!("../{owner}/{language}.md#{fragment}");
+    let href = markdown_document_href(owner, language, fragment);
     if parse_public_href(&href).is_none() {
         return Err(screen_failure(
             plan,
@@ -2160,6 +2312,10 @@ fn public_href(
         ));
     }
     Ok(href)
+}
+fn valid_see_href(owner: &str, language: &str, fragment: &str) -> bool {
+    parse_public_href(&markdown_document_href(owner, language, "a")).is_some()
+        && super::destinations::valid_fragment(fragment)
 }
 #[derive(Clone)]
 struct OwnedDestination {
@@ -2203,7 +2359,216 @@ fn missing_markdown_owner(
         },
     )
 }
-#[allow(clippy::too_many_lines)] // Both passes share checked ownership and destination identities.
+fn reading(document: &str) -> Option<super::destinations::Reading> {
+    match document {
+        "paper-pilot" => Some(super::destinations::Reading::Paper),
+        "explainer-pilot" => Some(super::destinations::Reading::Explainer),
+        _ => None,
+    }
+}
+fn bind_see(
+    runs: &mut [Inline],
+    links: &BTreeMap<String, (String, String, String, String)>,
+) -> Result<(), (String, UnitSite)> {
+    for run in runs {
+        match run {
+            Inline::See {
+                label,
+                locator,
+                owner,
+                language,
+                fragment,
+                site,
+            } => {
+                let Some((number, document, lang, anchor)) = links.get(label) else {
+                    return Err((label.clone(), site.clone()));
+                };
+                if number.is_empty() || document.is_empty() || lang.is_empty() || anchor.is_empty()
+                {
+                    return Err((label.clone(), site.clone()));
+                }
+                locator.clone_from(number);
+                owner.clone_from(document);
+                language.clone_from(lang);
+                fragment.clone_from(anchor);
+            }
+            Inline::Styled { children, .. } => bind_see(children, links)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+type SeeLinks = BTreeMap<String, BTreeMap<String, (String, String, String, String)>>;
+type SeeIndexes = BTreeMap<String, Vec<super::destinations::IndexEntry>>;
+#[allow(clippy::too_many_lines)] // Resolution retains each reference's source plan and site through one checked destination pass.
+fn resolve_see(
+    plans: &[DocumentPlan],
+    selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
+    inputs: &BTreeMap<String, Vec<u8>>,
+    mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
+    anchors: &BTreeSet<(String, String, String)>,
+) -> Result<(SeeLinks, SeeIndexes), DocumentError> {
+    use super::destinations::{self, Reference, Target};
+    let mut by_language: BTreeMap<String, Vec<(Reference, UnitSite, usize)>> = BTreeMap::new();
+    for (plan_index, plan) in plans.iter().enumerate() {
+        if !selected[&plan.document].contains(&ftoo_manifest::DocumentOutput::Markdown) {
+            continue;
+        }
+        for block in &plan.blocks {
+            let mut runs = Vec::new();
+            flatten_runs(&block.runs, &mut runs);
+            for run in runs {
+                if let Inline::See { label, site, .. } = run {
+                    let Some(document) = reading(&plan.document) else {
+                        return Err(screen_failure(
+                            plan,
+                            site,
+                            AssemblyFault::ReferenceDestination {
+                                label: label.clone(),
+                                reason: "unsupported reading".into(),
+                            },
+                        ));
+                    };
+                    let references = by_language.entry(plan.language.clone()).or_default();
+                    references.push((
+                        Reference {
+                            document,
+                            position: references.len(),
+                            target: label.clone(),
+                        },
+                        site.clone(),
+                        plan_index,
+                    ));
+                }
+            }
+        }
+    }
+    let mut links = BTreeMap::new();
+    let mut indexes = BTreeMap::new();
+    for (language, located) in by_language {
+        let fault = |label: &str, reason: String| {
+            let (_, site, plan_index) = located
+                .iter()
+                .find(|(reference, _, _)| reference.target == label)
+                .unwrap_or(&located[0]);
+            screen_failure(
+                &plans[*plan_index],
+                site,
+                AssemblyFault::ReferenceDestination {
+                    label: label.into(),
+                    reason,
+                },
+            )
+        };
+        let mut targets = BTreeMap::<String, Target>::new();
+        for (reference, _, _) in &located {
+            if targets.contains_key(&reference.target) {
+                continue;
+            }
+            let mut target = destinations::target_from_inputs(&reference.target, mints, inputs)
+                .map_err(|error| fault(&reference.target, format!("{error:?}")))?;
+            let fragment = destinations::fragment(&target)
+                .map_err(|error| fault(&reference.target, format!("{error:?}")))?;
+            target.available =
+                anchors.contains(&("paper-pilot".into(), language.clone(), fragment));
+            targets.insert(reference.target.clone(), target);
+        }
+        let body: Vec<_> = anchors
+            .iter()
+            .filter(|(_, lang, _)| lang == &language)
+            .filter_map(|(document, _, fragment)| {
+                reading(document).map(|reading| (reading, fragment.clone()))
+            })
+            .collect();
+        let targets: Vec<_> = targets.into_values().collect();
+        let references: Vec<_> = located
+            .iter()
+            .map(|(reference, _, _)| reference.clone())
+            .collect();
+        let entries =
+            destinations::resolve(&targets, &references, &body, &language).map_err(|error| {
+                let label = match &error {
+                    destinations::DestinationError::UnknownTarget(label)
+                    | destinations::DestinationError::DuplicateTarget(label)
+                    | destinations::DestinationError::InvalidFragment(label)
+                    | destinations::DestinationError::MissingHeading(label)
+                    | destinations::DestinationError::UnsupportedOutline(label) => label.as_str(),
+                    destinations::DestinationError::MissingBody { fragment, .. }
+                    | destinations::DestinationError::DuplicateFragment { fragment, .. } => targets
+                        .iter()
+                        .find_map(|target| {
+                            (destinations::fragment(target).ok().as_deref()
+                                == Some(fragment.as_str()))
+                            .then_some(target.label.as_str())
+                        })
+                        .unwrap_or(references[0].target.as_str()),
+                    destinations::DestinationError::ReaderLabel(value) => targets
+                        .iter()
+                        .find(|target| target.decoded_title.contains(value))
+                        .map_or(references[0].target.as_str(), |target| {
+                            target.label.as_str()
+                        }),
+                    _ => references[0].target.as_str(),
+                };
+                fault(label, format!("{error:?}"))
+            })?;
+        for entry in &entries {
+            let owner = match entry.document {
+                destinations::Reading::Paper => "paper-pilot",
+                destinations::Reading::Explainer => "explainer-pilot",
+            };
+            let placed = plans.iter().any(|plan| {
+                plan.document == owner
+                    && plan.language == language
+                    && selected.get(owner).is_some_and(|outputs| {
+                        outputs.contains(&ftoo_manifest::DocumentOutput::Markdown)
+                            && outputs.contains(&ftoo_manifest::DocumentOutput::Fragment)
+                    })
+            });
+            if !placed {
+                let label = targets
+                    .iter()
+                    .find(|target| {
+                        target.document == entry.document
+                            && destinations::fragment(target).ok().as_deref()
+                                == Some(entry.fragment.as_str())
+                    })
+                    .map_or(references[0].target.as_str(), |target| {
+                        target.label.as_str()
+                    });
+                return Err(fault(
+                    label,
+                    "unavailable target has no owning screen".into(),
+                ));
+            }
+        }
+        let mut resolved = BTreeMap::new();
+        for target in &targets {
+            let fragment = destinations::fragment(target)
+                .map_err(|error| fault(&target.label, format!("{error:?}")))?;
+            let owner = match target.document {
+                destinations::Reading::Paper => "paper-pilot",
+                destinations::Reading::Explainer => "explainer-pilot",
+            };
+            if !valid_see_href(owner, &language, &fragment) {
+                return Err(fault(&target.label, "invalid public href".into()));
+            }
+            resolved.insert(
+                target.label.clone(),
+                (
+                    target.locator.clone(),
+                    owner.into(),
+                    language.clone(),
+                    fragment,
+                ),
+            );
+        }
+        links.insert(language.clone(), resolved);
+        indexes.insert(language, entries);
+    }
+    Ok((links, indexes))
+}
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // Both passes share checked ownership and destination identities.
 pub(super) fn plan_screens(
     plans: &mut [DocumentPlan],
     selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
@@ -2212,6 +2577,7 @@ pub(super) fn plan_screens(
     document_sites: &BTreeMap<String, UnitSite>,
     inclusions: &[super::input::Inclusion],
     inputs: &BTreeMap<String, Vec<u8>>,
+    mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
 ) -> Result<(), DocumentError> {
     let mut owned = BTreeMap::<(String, String), OwnedDestination>::new();
     let mut anchors = BTreeSet::new();
@@ -2300,6 +2666,7 @@ pub(super) fn plan_screens(
             }
         }
     }
+    let (links, indexes) = resolve_see(plans, selected, inputs, mints, &anchors)?;
     for plan in plans.iter_mut() {
         let targets = &selected[&plan.document];
         if !targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
@@ -2308,6 +2675,20 @@ pub(super) fn plan_screens(
             continue;
         }
         let positions = &skeletons.documents()[&plan.document];
+        let empty_links = BTreeMap::new();
+        let link = links.get(&plan.language).unwrap_or(&empty_links);
+        for block in &mut plan.blocks {
+            if let Err((label, site)) = bind_see(&mut block.runs, link) {
+                return Err(screen_failure(
+                    plan,
+                    &site,
+                    AssemblyFault::ReferenceDestination {
+                        label,
+                        reason: "unbound reference destination".into(),
+                    },
+                ));
+            }
+        }
         let mut gaps = Vec::new();
         for index in 0..plan.blocks.len() {
             let position = if index == 0 {
@@ -2417,17 +2798,29 @@ pub(super) fn plan_screens(
             }
             refrains.push(refrain);
         }
+        let reading = reading(&plan.document);
+        let index: Vec<_> = indexes
+            .get(&plan.language)
+            .into_iter()
+            .flatten()
+            .filter(|entry| Some(entry.document) == reading)
+            .cloned()
+            .collect();
         let html_gaps = html_gaps(plan);
         let entries = super::bibliography::entries(plan);
+        let mut end_matter = Vec::new();
+        if !index.is_empty() {
+            end_matter.push(ScreenEndMatter::Unavailable(index.clone()));
+        }
+        if !entries.is_empty() {
+            end_matter.push(ScreenEndMatter::References(entries));
+        }
         plan.screen = Some(ScreenPlan {
             gaps,
             refrains,
+            index,
             html_gaps,
-            end_matter: if entries.is_empty() {
-                vec![]
-            } else {
-                vec![ScreenEndMatter::References(entries)]
-            },
+            end_matter,
         });
         check_public_anchors(plan)?;
     }
@@ -2499,6 +2892,34 @@ impl DocumentPlan {
                     Inline::Text(_) | Inline::Styled { .. } => continue,
                     Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                     Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
+                    Inline::See {
+                        label,
+                        locator,
+                        owner,
+                        language,
+                        fragment,
+                        site,
+                    } => {
+                        records.push(EmissionRecord {
+                            kind: EmissionKind::See {
+                                target: label.clone(),
+                            },
+                            unit: block.unit.clone(),
+                            language: self.language.clone(),
+                            target,
+                            occurrence: site.occurrence,
+                            value: if target == DocumentTarget::Markdown {
+                                format!(
+                                    "{locator}\t{}",
+                                    markdown_document_href(owner, language, fragment)
+                                )
+                            } else {
+                                label.clone()
+                            },
+                            site: site.clone(),
+                        });
+                        continue;
+                    }
                     Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
                     Inline::Citation {
                         text,
@@ -2625,6 +3046,35 @@ impl DocumentPlan {
                         occurrence: Some(index),
                         value: gap.message.clone(),
                         site: gap.site.clone(),
+                    });
+                }
+            }
+        }
+        if target == DocumentTarget::Markdown {
+            for section in end_matter(self) {
+                let EndMatter::Unavailable(entries) = section else {
+                    continue;
+                };
+                records.push(EmissionRecord {
+                    kind: EmissionKind::IndexHeading,
+                    unit: String::new(),
+                    language: self.language.clone(),
+                    target,
+                    occurrence: None,
+                    value: "## References to unavailable content".into(),
+                    site: self.blocks[0].site.clone(),
+                });
+                for entry in entries {
+                    records.push(EmissionRecord {
+                        kind: EmissionKind::IndexEntry {
+                            fragment: entry.fragment.clone(),
+                        },
+                        unit: String::new(),
+                        language: self.language.clone(),
+                        target,
+                        occurrence: None,
+                        value: format!("{} — {}. {}", entry.locator, entry.title, entry.message),
+                        site: self.blocks[0].site.clone(),
                     });
                 }
             }
@@ -2931,6 +3381,7 @@ pub(super) fn notation_bytes(
         .find(|range| range.path == arguments)
         .map_or(0..source_length, |range| range.bytes.clone())
 }
+#[allow(clippy::too_many_lines)] // One replacement inventory retains source order across inline kinds.
 fn runs(
     index: usize,
     unit: &ftoo_manifest::CheckedUnit,
@@ -2992,6 +3443,23 @@ fn runs(
                 markdown: markdown.clone(),
                 latex: latex.clone(),
                 pending: pending.clone(),
+                site: occurrence.site().clone(),
+            },
+        ));
+    }
+    for occurrence in text.reference_occurrences() {
+        replacements.push((
+            occurrence
+                .site()
+                .decoded
+                .clone()
+                .expect("admitted occurrence"),
+            Inline::See {
+                label: occurrence.label().into(),
+                locator: String::new(),
+                owner: String::new(),
+                language: String::new(),
+                fragment: String::new(),
                 site: occurrence.site().clone(),
             },
         ));
@@ -3074,6 +3542,7 @@ fn scoped_runs_with_sites(
             let mut site = match run {
                 Inline::Tag { site, .. }
                 | Inline::PaperTag { site, .. }
+                | Inline::See { site, .. }
                 | Inline::Math { site, .. }
                 | Inline::Citation { site, .. }
                 | Inline::BibliographyCitation { site, .. }
@@ -3222,6 +3691,7 @@ fn canonical_run(run: &Inline) -> String {
         Inline::Text(text) => text.clone(),
         Inline::Tag { handle, .. } => format!("@tag{{{handle}}}"),
         Inline::PaperTag { value, .. } => format!("@tag{{{}}}", value.key),
+        Inline::See { label, .. } => format!("@see{{{label}}}"),
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
         Inline::BibliographyCitation { kind, entries, .. } => {
@@ -3448,6 +3918,28 @@ fn recovered_records(
                 write!(body, "``{text}``").expect("string write");
                 (EmissionKind::Mention, text.clone())
             }
+            Recovered::See {
+                label,
+                locator,
+                href,
+            } => {
+                let reference = label.as_deref().unwrap_or("");
+                write!(body, "@see{{{reference}}}").expect("string write");
+                (
+                    EmissionKind::See {
+                        target: reference.into(),
+                    },
+                    if target == DocumentTarget::Markdown {
+                        format!(
+                            "{}\t{}",
+                            locator.as_deref().unwrap_or(""),
+                            href.as_deref().unwrap_or("")
+                        )
+                    } else {
+                        reference.into()
+                    },
+                )
+            }
             Recovered::Styled { .. } => unreachable!("flattened recovery part"),
         };
         let index = records.iter().filter(|r| r.kind == kind).count();
@@ -3535,7 +4027,7 @@ fn region_records(
         .into_iter()
         .filter_map(|run| {
             let (kind, value, site) = match run {
-                Inline::Text(_) | Inline::Styled { .. } => return None,
+                Inline::Text(_) | Inline::Styled { .. } | Inline::See { .. } => return None,
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                 Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
@@ -4302,6 +4794,23 @@ pub(super) fn citation_origins(
     origins
 }
 
+fn insertion_protection(text: &ftoo_manifest::CheckedText) -> Vec<std::ops::Range<usize>> {
+    text.tag_occurrences()
+        .iter()
+        .map(ftoo_manifest::TagOccurrence::site)
+        .chain(
+            text.occurrences()
+                .iter()
+                .map(ftoo_manifest::MathOccurrence::site),
+        )
+        .chain(
+            text.reference_occurrences()
+                .iter()
+                .map(ftoo_manifest::ReferenceOccurrence::site),
+        )
+        .filter_map(|site| site.decoded.clone())
+        .collect()
+}
 fn check_reader_literals(
     unit: &ftoo_manifest::CheckedUnit,
     language: &str,
@@ -4310,16 +4819,8 @@ fn check_reader_literals(
 ) {
     let text = &unit.texts()[language];
     let spans = ftoo_manifest::assembly_text_spans(text);
-    let protected = text
-        .tag_occurrences()
-        .iter()
-        .map(ftoo_manifest::TagOccurrence::site)
-        .chain(
-            text.occurrences()
-                .iter()
-                .map(ftoo_manifest::MathOccurrence::site),
-        )
-        .filter_map(|site| site.decoded.clone())
+    let protected = insertion_protection(text)
+        .into_iter()
         .chain(
             spans
                 .iter()

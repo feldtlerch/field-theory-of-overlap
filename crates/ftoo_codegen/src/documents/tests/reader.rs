@@ -2,6 +2,269 @@ use super::*;
 use ftoo_manifest::{NodeId, ReaderIdentityPosition};
 use std::{fs, path::Path};
 
+fn with_reference(document: &str, file: &str, label: &str) -> DocumentPlan {
+    let site = super::super::input::site(file);
+    DocumentPlan {
+        document: document.into(),
+        language: "en".into(),
+        coverage: Coverage::fixture(document, "fixture"),
+        blocks: vec![Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture".into(),
+            depth: None,
+            quotation: false,
+            paragraph: true,
+            site: site.clone(),
+            runs: vec![Inline::See {
+                label: label.into(),
+                locator: String::new(),
+                owner: String::new(),
+                language: String::new(),
+                fragment: String::new(),
+                site,
+            }],
+        }],
+        screen: None,
+    }
+}
+
+#[test]
+fn reference_fault_uses_the_first_matching_reference_site_and_document() {
+    let plans = [
+        with_reference("explainer-pilot", "explainer.toml", "app:first"),
+        with_reference("paper-pilot", "paper.toml", "app:missing"),
+    ];
+    let selected = BTreeMap::from([
+        (
+            "explainer-pilot".into(),
+            vec![ftoo_manifest::DocumentOutput::Markdown],
+        ),
+        (
+            "paper-pilot".into(),
+            vec![ftoo_manifest::DocumentOutput::Markdown],
+        ),
+    ]);
+    let mints = BTreeMap::from([(
+        "app:first".into(),
+        ftoo_manifest::MintOrigin {
+            kind: ftoo_manifest::MintKind::PaperTex,
+            site: ftoo_manifest::LabelSite::PaperMintFile {
+                file: "appendices.tex".into(),
+            },
+        },
+    )]);
+    let inputs = BTreeMap::from([(
+        "appendices.tex".into(),
+        b"\\appendix\n\\section{First}\n\\label{app:first}\n".to_vec(),
+    )]);
+    let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("reference fault")
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.document.as_deref(), Some("paper-pilot"));
+    assert!(matches!(&diagnostic.site, AssemblySite::Source(site) if site.file == "paper.toml"));
+    assert!(
+        matches!(&diagnostic.fault, AssemblyFault::ReferenceDestination { label, .. } if label == "app:missing")
+    );
+
+    let plans = [
+        with_reference("explainer-pilot", "first.toml", "app:first"),
+        with_reference("paper-pilot", "second.toml", "app:first"),
+    ];
+    let fault = resolve_see(
+        &plans,
+        &selected,
+        &BTreeMap::new(),
+        &mints,
+        &BTreeSet::new(),
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("reference fault")
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert_eq!(diagnostic.document.as_deref(), Some("explainer-pilot"));
+    assert!(matches!(&diagnostic.site, AssemblySite::Source(site) if site.file == "first.toml"));
+    assert!(
+        matches!(&diagnostic.fault, AssemblyFault::ReferenceDestination { label, .. } if label == "app:first")
+    );
+    let plan = &plans[0];
+    let site = &plan.blocks[0].site;
+    assert!(valid_see_href("paper-pilot", "en", "method-self-limit"));
+    assert!(!valid_see_href("paper-pilot", "en", "bad/fragment"));
+    assert!(public_href(plan, site, "paper-pilot", "en", "method-self-limit").is_err());
+    assert!(public_href(plan, site, "paper-pilot", "en", "sec-cwhich--way").is_ok());
+    assert!(public_href(plan, site, "paper-pilot", "en", "bad/fragment").is_err());
+}
+
+#[test]
+fn computed_index_entry_requires_an_owning_screen() {
+    let plans = [with_reference(
+        "explainer-pilot",
+        "explainer.toml",
+        "app:first",
+    )];
+    let selected = BTreeMap::from([(
+        "explainer-pilot".into(),
+        vec![ftoo_manifest::DocumentOutput::Markdown],
+    )]);
+    let mints = BTreeMap::from([(
+        "app:first".into(),
+        ftoo_manifest::MintOrigin {
+            kind: ftoo_manifest::MintKind::PaperTex,
+            site: ftoo_manifest::LabelSite::PaperMintFile {
+                file: "appendices.tex".into(),
+            },
+        },
+    )]);
+    let inputs = BTreeMap::from([(
+        "appendices.tex".into(),
+        b"\\appendix\n\\section{First}\n\\label{app:first}\n".to_vec(),
+    )]);
+    let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("unplaced index entry must refuse")
+    };
+    assert!(
+        matches!(&errors.diagnostics()[0].fault, AssemblyFault::ReferenceDestination { label, reason } if label == "app:first" && reason.contains("no owning screen"))
+    );
+}
+
+#[test]
+fn see_recovery_refuses_changed_target_and_number() {
+    let site = super::super::input::site("units/statements/fixture.toml");
+    let run = Inline::See {
+        label: "app:self-limit".into(),
+        locator: "appendix G".into(),
+        owner: "paper-pilot".into(),
+        language: "en".into(),
+        fragment: "method-self-limit".into(),
+        site,
+    };
+    let expected = expected_run(&run, DocumentTarget::Markdown, false).unwrap();
+    let recover = |source: &str| -> Recovered {
+        recover_markdown(source, std::iter::empty())
+            .unwrap()
+            .remove(0)
+    };
+    let valid = "<a href=\"../paper-pilot/en.md#method-self-limit\">→ appendix G</a><!-- see app:self-limit -->";
+    assert_eq!(recover(valid), expected);
+    assert_ne!(
+        recover(&valid.replace("app:self-limit", "app:cosine")),
+        expected
+    );
+    assert_ne!(
+        recover(&valid.replace("appendix G", "appendix H")),
+        expected
+    );
+    assert_ne!(
+        recover(&valid.replace("method-self-limit", "method-other")),
+        expected
+    );
+    assert_eq!(
+        recover_tex("\\see{app:self-limit}", true, TexLine::NewLine).unwrap(),
+        vec![expected_run(&run, DocumentTarget::Latex, true).unwrap()]
+    );
+}
+
+#[test]
+fn see_recovery_stops_at_its_own_link_after_another_insertion() {
+    let body = "tag<!-- label dec:fixture --> and <a href=\"../paper-pilot/en.md#method-self-limit\">→ appendix G</a><!-- see app:self-limit -->";
+    let recovered = recover_markdown(body, std::iter::once("tag")).unwrap();
+    assert!(matches!(&recovered[0], Recovered::Tag { label, .. } if label == "dec:fixture"));
+    assert!(
+        matches!(&recovered[2], Recovered::See { label: Some(label), locator: Some(locator), .. } if label == "app:self-limit" && locator == "appendix G")
+    );
+    let malformed = body.replace("</a><!-- see", " and <a href=\"other\">bad</a><!-- see");
+    assert!(recover_markdown(&malformed, std::iter::once("tag")).is_none());
+}
+
+#[test]
+fn see_binding_refuses_an_empty_locator_or_destination() {
+    let site = super::super::input::site("reference.toml");
+    let make_run = || Inline::See {
+        label: "app:self-limit".into(),
+        locator: String::new(),
+        owner: String::new(),
+        language: String::new(),
+        fragment: String::new(),
+        site: site.clone(),
+    };
+    for value in [
+        None,
+        Some((
+            String::new(),
+            "paper-pilot".into(),
+            "en".into(),
+            "method-self-limit".into(),
+        )),
+        Some((
+            "appendix G".into(),
+            "paper-pilot".into(),
+            "en".into(),
+            String::new(),
+        )),
+    ] {
+        let mut runs = [make_run()];
+        let links = value.map_or_else(BTreeMap::new, |value| {
+            BTreeMap::from([("app:self-limit".into(), value)])
+        });
+        assert_eq!(
+            bind_see(&mut runs, &links),
+            Err(("app:self-limit".into(), site.clone()))
+        );
+    }
+}
+
+#[test]
+fn see_label_range_is_protected_from_reader_literal_detection() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: super::super::input::read(&root, "units/documents.toml").unwrap(),
+    };
+    let mut statements = super::super::input::sources(
+        &root,
+        &super::super::input::discover(&root, "units/statements", false).unwrap(),
+    )
+    .unwrap();
+    let source = statements
+        .iter_mut()
+        .find(|source| source.file.ends_with("coda-audit-bottoms.toml"))
+        .unwrap();
+    source.bytes = String::from_utf8(source.bytes.clone())
+        .unwrap()
+        .replace("app:self-limit", "app:self:limit")
+        .into_bytes();
+    let corpus = crate::load_unit_sources(declaration, statements).unwrap();
+    let unit = corpus
+        .units()
+        .iter()
+        .find(|unit| unit.label().as_str() == "sec:coda:audit-bottoms")
+        .unwrap();
+    let text = &unit.texts()["en"];
+    let protected = insertion_protection(text);
+    let label = ftoo_manifest::reader_label_literals(text.text())
+        .into_iter()
+        .find(|range| &text.text()[range.clone()] == "app:self:limit")
+        .unwrap();
+    assert!(
+        protected
+            .iter()
+            .any(|range| range.start <= label.start && label.end <= range.end)
+    );
+}
+
+#[test]
+fn index_entry_after_target_becomes_available_refuses_emission() {
+    let plan = excerpt_plan();
+    let mut rendered = super::super::markdown::render(&plan);
+    rendered.push_str("\n## References to unavailable content\n\n<a id=\"method-self-limit\"></a>appendix G — The method’s self-limit. Not yet available in this rendering.\n");
+    assert!(check_emission(&plan, &rendered, DocumentTarget::Markdown).is_err());
+}
+
 #[test]
 fn excerpt_gap_uses_checked_source_lines() {
     let first = super::super::input::Inclusion {
@@ -785,6 +1048,7 @@ fn excerpt_plan() -> DocumentPlan {
     plan.screen = Some(ScreenPlan {
         gaps,
         refrains,
+        index: Vec::new(),
         html_gaps: std::collections::BTreeMap::new(),
         end_matter: vec![],
     });
@@ -1069,6 +1333,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &document_sites,
         &inclusions,
         &inputs,
+        &BTreeMap::new(),
     )
     .unwrap();
     assert_eq!(
@@ -1097,6 +1362,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &document_sites,
         &inclusions,
         &inputs,
+        &BTreeMap::new(),
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1126,6 +1392,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &document_sites,
         &inclusions,
         &inputs,
+        &BTreeMap::new(),
     )
     .unwrap();
     assert!(french.screen.is_none());
@@ -1163,6 +1430,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &document_sites,
         &inclusions,
         &inputs,
+        &BTreeMap::new(),
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1213,6 +1481,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &document_sites,
         &inclusions,
         &inputs,
+        &BTreeMap::new(),
     )
     .unwrap();
     let screen = plans[1].screen.as_ref().unwrap();

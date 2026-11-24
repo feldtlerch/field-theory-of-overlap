@@ -1,6 +1,79 @@
 use super::*;
 
 #[test]
+fn see_insertion_retains_its_label_and_location() {
+    let (documents, mut units) = fixtures();
+    units[0].texts.get_mut("en").unwrap().value.value = "See @see{app:self-limit}.".into();
+    let corpus = admit_unit_drafts(documents.clone(), units.clone()).unwrap();
+    let references = corpus.units()[0].texts()["en"].reference_occurrences();
+    assert_eq!(references.len(), 1);
+    assert_eq!(references[0].label(), "app:self-limit");
+    assert_eq!(references[0].site().decoded, Some(4..24));
+    units[0].texts.get_mut("en").unwrap().value.value = "See @see{}.".into();
+    let error = admit_unit_drafts(documents, units).unwrap_err();
+    assert!(matches!(
+        error.diagnostics()[0].fault,
+        UnitFault::MalformedInsertion {
+            reason: InsertionReason::UnknownForm,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn see_insertion_refuses_malformed_forms_at_their_sites() {
+    for (body, reason) in [
+        ("@see{app:{self-limit}}", InsertionReason::NestedBrace),
+        ("@see{app:self-limit", InsertionReason::Unclosed),
+        ("@see{bad label}", InsertionReason::UnknownForm),
+    ] {
+        let (documents, mut units) = fixtures();
+        units[0].texts.get_mut("en").unwrap().value.value = format!("See {body}.");
+        let error = admit_unit_drafts(documents, units).unwrap_err();
+        assert_eq!(
+            error.diagnostics()[0].site.decoded.as_ref().unwrap().start,
+            4
+        );
+        assert!(matches!(
+            error.diagnostics()[0].fault,
+            UnitFault::MalformedInsertion { reason: actual, .. } if actual == reason
+        ));
+    }
+}
+
+#[test]
+fn see_and_bibliography_insertions_share_source_order() {
+    for (body, see, bibliography) in [
+        ("@see{app:self-limit} @parencite{a:andreoni}", 0, 1),
+        ("@parencite{a:andreoni} @see{app:self-limit}", 1, 0),
+    ] {
+        let scanned = content::scan(&located(body, &["text"])).unwrap();
+        assert_eq!(scanned.references[0].site().occurrence, Some(see));
+        assert_eq!(
+            scanned.bibliography_citations[0].site().occurrence,
+            Some(bibliography)
+        );
+    }
+}
+
+#[test]
+fn see_insertion_refuses_assembly_context_at_its_site() {
+    let source = located("See @see{app:self-limit}.", &["text"]);
+    let error = content::scan_limited(&source, None, false).err().unwrap();
+    let content::AssemblyScanFault::Content(error) = error else {
+        panic!("assembly insertion")
+    };
+    assert_eq!(error.0.decoded, Some(4..9));
+    assert!(matches!(
+        error.1,
+        UnitFault::MalformedInsertion {
+            reason: InsertionReason::UnknownForm,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn inline_style_scanner_retains_spans_and_child_identities() {
     for kind in ["emphasis", "strong", "smallcaps", "regular"] {
         let source =
@@ -45,6 +118,11 @@ fn inline_style_scanner_refuses_located_bad_boundaries() {
         ("See @strong{@math{x}}.", StyledMath, "@math{x}"),
         ("See @smallcaps{@math{x}}.", StyledMath, "@math{x}"),
         ("See @regular{@math{x}}.", StyledMath, "@math{x}"),
+        (
+            "See @emphasis{@see{app:self-limit}}.",
+            StyledReference,
+            "@see{app:self-limit}",
+        ),
         ("See @emphasis{a*b}.", OwnCloser, "*"),
         ("See @strong{a**b}.", OwnCloser, "**"),
     ] {

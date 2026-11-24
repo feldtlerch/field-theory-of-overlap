@@ -699,7 +699,7 @@ fn request(args: &[OsString]) -> Result<Request> {
     if registered_html_gaps {
         if release || !values.contains_key("--built") {
             return Err(
-                "Registered HTML gaps require the built product check without a release flag"
+                "Registered development gaps require the built product check without a release flag"
                     .into(),
             );
         }
@@ -751,15 +751,9 @@ fn run_documents(req: &Request) -> Result<()> {
 fn check_release_documents(req: &Request) -> Result<PathBuf> {
     let assembly = assembly_support(req)?;
     require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
-    let documents = crate::check_documents(&req.root, &assembly)
+    let prepared = crate::check_documents(&req.root, &assembly)
         .map_err(|error| PaperFault::Input(error.to_string()))?;
-    release::part(
-        "HTML block gaps",
-        html_gaps::check(&req.root, documents.html_gap_rows()),
-    )?;
-    if !req.registered_html_gaps {
-        html_gaps::refusal(documents.html_gap_rows())?;
-    }
+    release::screen_parts(&req.root, &prepared, req.registered_html_gaps)?;
     Ok(assembly.directory().to_path_buf())
 }
 fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathBuf> {

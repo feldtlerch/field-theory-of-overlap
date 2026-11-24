@@ -136,6 +136,7 @@ fn check_runs(
             Inline::Tag { .. }
             | Inline::PaperTag { .. }
             | Inline::Citation { .. }
+            | Inline::See { .. }
             | Inline::BibliographyCitation { .. } => {
                 adjacent = Some(MarkdownMathReason::DirectTagOrCitationAdjacency);
             }
@@ -269,6 +270,7 @@ fn next_style_neighbor(runs: &[Inline]) -> Option<StyleNeighbor> {
             Inline::Tag { .. }
             | Inline::PaperTag { .. }
             | Inline::Citation { .. }
+            | Inline::See { .. }
             | Inline::BibliographyCitation { .. } => {
                 return Some(StyleNeighbor::TagOrCitation);
             }
@@ -429,9 +431,23 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
             text(&screen.gaps.last().expect("gap").message)
         )
         .expect("string write");
-        for section in &screen.end_matter {
+        for section in super::plan::end_matter(plan) {
             match section {
-                super::plan::ScreenEndMatter::References(entries) => {
+                super::plan::EndMatter::Unavailable(entries) => {
+                    output.push_str("## References to unavailable content\n\n");
+                    for entry in entries {
+                        writeln!(
+                            output,
+                            "<a id=\"{}\"></a>{} — {}. {}\n",
+                            entry.fragment,
+                            text(&entry.locator),
+                            text(&entry.title),
+                            text(entry.message)
+                        )
+                        .expect("string write");
+                    }
+                }
+                super::plan::EndMatter::References(entries) => {
                     output.push_str("## References\n\n");
                     for entry in entries {
                         writeln!(
@@ -530,6 +546,7 @@ pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
             "<!-- unit ",
             "<!-- label ",
             "<!-- cite ",
+            "<!-- see ",
             "<!-- bibcite ",
             "<!-- bibentry ",
         ]
@@ -698,6 +715,13 @@ pub(super) fn check_reader(
                 }
                 continue;
             }
+            if plan
+                .screen
+                .as_ref()
+                .is_some_and(|screen| screen.index.iter().any(|entry| entry.fragment == fragment))
+            {
+                continue;
+            }
             let Some(handle) = super::plan::inverse_fragment(fragment) else {
                 return Err(role_failure(
                     plan,
@@ -743,7 +767,7 @@ pub(super) fn check_reader(
         ));
     }
     check_quotation_links(plan, reader, known_labels)?;
-    // Erasure produces the reader from the four generated comment forms, so
+    // Erasure produces the reader from the generated comment forms, so
     // repeating erasure cannot independently check equality. Any comment
     // opener remaining in the reader is refused before publication.
     Ok(())
@@ -781,6 +805,27 @@ fn check_quotation_links(
         if let Some(anchor) = href.strip_prefix('#')
             && bibliography.iter().any(|entry| entry.anchor == anchor)
         {
+            continue;
+        }
+        if let Some(after) = reader[end..].strip_prefix("\">→ ")
+            && let Some((locator, _)) = after.split_once("</a>")
+        {
+            let known = plan.blocks.iter().any(|block| {
+                let mut runs = Vec::new();
+                super::plan::flatten_runs(&block.runs, &mut runs);
+                runs.iter().any(|run| matches!(run, Inline::See { locator: number, owner, language, fragment, .. } if locator == number && href == super::plan::markdown_document_href(owner, language, fragment)))
+            });
+            if !known {
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::ReferenceDestination {
+                        label: String::new(),
+                        reason: "reader link differs from checked destination".into(),
+                    },
+                ));
+            }
             continue;
         }
         let Some((_, _, fragment, decoded_handle)) = super::plan::parse_public_href(href) else {
@@ -889,6 +934,21 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                     "{}<!-- label {} -->",
                     text(&value.spelling),
                     value.target
+                )
+                .expect("string write");
+            }
+            Inline::See {
+                label,
+                locator,
+                owner,
+                language,
+                fragment,
+                ..
+            } => {
+                let href = super::plan::markdown_document_href(owner, language, fragment);
+                write!(
+                    output,
+                    "<a href=\"{href}\">→ {locator}</a><!-- see {label} -->"
                 )
                 .expect("string write");
             }

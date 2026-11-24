@@ -40,6 +40,7 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
             },
         ],
         refrains: vec![],
+        index: vec![],
         html_gaps: std::collections::BTreeMap::new(),
         end_matter: vec![],
     });
@@ -264,8 +265,11 @@ fn support_required_html_bibliography_links_and_entries_recover_by_position() {
             "HTML bibliography entry inventory",
         );
     }
-    let plan::ScreenEndMatter::References(planned) =
-        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    let Some(plan::ScreenEndMatter::References(planned)) =
+        plan.screen.as_mut().unwrap().end_matter.get_mut(0)
+    else {
+        panic!("planned References section")
+    };
     planned[0].title = "A changed work".into();
     let error = super::super::html::prose_only(&plan).unwrap_err();
     assert!(
@@ -273,8 +277,11 @@ fn support_required_html_bibliography_links_and_entries_recover_by_position() {
             .contains("HTML bibliography end-matter entries derived from citations"),
         "{error:?}"
     );
-    let plan::ScreenEndMatter::References(planned) =
-        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    let Some(plan::ScreenEndMatter::References(planned)) =
+        plan.screen.as_mut().unwrap().end_matter.get_mut(0)
+    else {
+        panic!("planned References section")
+    };
     planned[0].title = first.title.clone();
     let end_matter = std::mem::take(&mut plan.screen.as_mut().unwrap().end_matter);
     let error = super::super::html::prose_only(&plan).unwrap_err();
@@ -283,8 +290,11 @@ fn support_required_html_bibliography_links_and_entries_recover_by_position() {
         "{error:?}"
     );
     plan.screen.as_mut().unwrap().end_matter = end_matter;
-    let plan::ScreenEndMatter::References(planned) =
-        &mut plan.screen.as_mut().unwrap().end_matter[0];
+    let Some(plan::ScreenEndMatter::References(planned)) =
+        plan.screen.as_mut().unwrap().end_matter.get_mut(0)
+    else {
+        panic!("planned References section")
+    };
     let anchor = planned[0].anchor.clone();
     planned[1].anchor = anchor;
     let error = plan::check_public_anchors(&plan).unwrap_err();
