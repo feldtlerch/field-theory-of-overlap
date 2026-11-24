@@ -458,258 +458,149 @@ class Identities(unittest.TestCase):
     def test_assigned_shadow_scope_refusals(self):
         source = pathlib.Path(__file__).resolve().parents[2]
         repo = self.root/'candidate'
-        compare_words.git(source, 'rev-parse', 'HEAD')
         import subprocess
         subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(source), str(repo)],
                        check=True)
+        revision = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit',
+                        '--allow-empty', '--quiet', '-m', 'fixture candidate'], check=True)
+        candidate = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
         parent_dir = self.root/'parent-snapshot'
         candidate_dir = self.root/'candidate-snapshot'
-        parent = compare_words.parent_snapshot(repo, 'HEAD', parent_dir)
+        parent = compare_words.parent_snapshot(repo, revision, parent_dir)
         held = CapturedInputs(repo)
         inputs = compare_words.snapshot_inputs(repo, candidate_dir, held)
         args = argparse.Namespace(unit='sec:reading:shadow', before_source=None,
-                                  before_revision='HEAD')
+                                  before_revision=revision)
         before, after = compare_words.selected_sources(repo, args, parent,
                                                         parent_dir, candidate_dir)
         envelope = compare_words.source_envelope(parent, parent_dir, candidate_dir,
                                                   inputs, before, after, args.unit)
         self.assertTrue(envelope['available'], envelope['reasons'])
-        revision = parent['commit']
-        assignment = dict(schema=1, author='scope-a', parent=revision,
-                          capability_revision=revision,
-                          capability_digest=compare_words.digest(compare_words.git(
-                              repo, 'rev-parse', '--verify', revision + '^{tree}').strip()),
-                          source=before['source'], source_blob=compare_words.git(
+        assignment = dict(schema=3, parent=revision, candidate=candidate,
+                          source=before['source'], first=before['line'],
+                          last=before['line'], unit=args.unit,
+                          **{'source-blob': compare_words.git(
                               repo, 'rev-parse', '--verify',
                               revision + ':' + before['source']).decode().strip(),
-                          first=before['line'], last=before['line'], unit=args.unit,
-                          unit_path='units/statements/reading-shadow.toml',
-                          expected_generated_classes=['documents', 'paper'])
+                             'unit-path': 'units/statements/reading-shadow.toml'})
         assignment_path = self.root/'assignment.json'
         assignment_path.write_text(json.dumps(assignment))
         evidence = dict(verdict='equal', faults=[], differences=[],
                         units=[dict(unit=args.unit)])
 
-        def check(path=assignment_path, result=evidence, coverage=envelope):
-            return compare_words.assigned_plain_scope(repo, path, result, parent,
+        def check(value=assignment, result=evidence, coverage=envelope):
+            return compare_words.assigned_plain_scope(repo, value, result, parent,
                                                        before, after, coverage)
 
         self.assertEqual(check()['verdict'], 'scope-admissible')
-        original_git = compare_words.git
-
-        def changed_reviewed_code(root, *parts):
-            if parts == ('show', revision + ':tools/paper/compare_words.py'):
-                return b'different reviewed checker bytes'
-            return original_git(root, *parts)
-
-        with mock.patch.object(compare_words, 'git', side_effect=changed_reviewed_code):
-            with self.assertRaises(compare_words.Fault) as raised:
-                check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('CapabilityChanged',
-                          'comparison capability differs: tools/paper/compare_words.py'))
-        first_row = {key: assignment[key] for key in
-                     ('source', 'source_blob', 'first', 'last', 'unit', 'unit_path')}
-        first_row['previous_kind'] = 'native'
-        double = dict(assignment, schema=2, occurrences=[first_row, first_row])
-        assignment_path.write_text(json.dumps(double))
+        self.assertEqual(compare_words.capture_assignment(repo, assignment_path)[0],
+                         assignment)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit',
+                        '--allow-empty', '--quiet', '-m', 'fixture grandchild'], check=True)
+        grandchild = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
         with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.assigned_plain_scope(
-                repo, assignment_path, evidence, parent, before, after, envelope,
-                [(before, after, args.unit), (before, after, args.unit)])
+            check(dict(assignment, candidate=grandchild))
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('AssignmentInvalid', 'assigned source intervals overlap'))
-        other_row = dict(first_row, source='documents/paper/explainer/explainer.tex')
-        assignment_path.write_text(json.dumps(dict(
-            assignment, schema=2, occurrences=[first_row, other_row])))
+                         ('AssignmentInvalid', 'comparison parent is not immediate'))
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', candidate],
+                       check=True, capture_output=True)
+        readme = repo/'README.md'
+        readme_bytes = readme.read_bytes()
+        readme.write_bytes(readme_bytes + b'\nfixture edit\n')
         with self.assertRaises(compare_words.Fault) as raised:
             check()
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('AssignmentInvalid', 'assigned occurrence count differs'))
-        with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.assigned_plain_scope(
-                repo, assignment_path, evidence, parent, before, after, envelope,
-                [(before, after, args.unit), (before, after, args.unit)])
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('AssignmentInvalid', 'assigned source file differs'))
-        assignment_path.write_text(json.dumps(assignment))
-        acceptance = repo/'documents/paper-build/self-description.json'
-        original_acceptance = acceptance.read_bytes()
-        changed_acceptance = json.loads(original_acceptance)
-        changed_acceptance['passages'][0]['reading_acceptance'] = 'changed'
-        acceptance.write_text(json.dumps(changed_acceptance))
+                         ('InputChanged', 'candidate checkout differs from its commit'))
+        subprocess.run(['git', '-C', str(repo), 'add', 'README.md'], check=True)
         with self.assertRaises(compare_words.Fault) as raised:
             check()
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('ProtectedSpan', 'accepted passage identity differs'))
-        acceptance.write_bytes(original_acceptance)
-        exit_code, compared = self.conversion_run(options=dict(
-            repository=repo, assignment=assignment_path))
-        self.assertEqual((exit_code, compared['verdict']), (0, 'equal'))
-        self.assertEqual(compared['scope_admissibility']['verdict'], 'scope-admissible')
-        assignment_path.write_text(json.dumps(dict(assignment, parent='0' * 40)))
-        exit_code, compared = self.conversion_run(options=dict(
-            repository=repo, assignment=assignment_path))
-        self.assertEqual((exit_code, compared['verdict']), (2, 'refused'))
-        self.assertEqual((compared['faults'][0]['rule'], compared['faults'][0]['code'],
-                          compared['faults'][0]['detail']),
-                         ('M082', 'AssignmentInvalid', 'assignment parent differs'))
-        assignment_path.write_text(json.dumps(assignment))
-        cases = (
-            ('wrong parent', dict(assignment, parent='0' * 40),
-             'AssignmentInvalid', 'assignment parent differs'),
-            ('wrong capability', dict(assignment, capability_digest='0' * 64),
-             'AssignmentInvalid', 'capability digest differs'),
-            ('unknown path class', dict(assignment, unit_path='README.md'),
-             'AssignmentInvalid', 'assigned unit path class differs'),
-        )
-        for name, changed, code, detail in cases:
+                         ('InputChanged', 'candidate checkout differs from its commit'))
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', candidate],
+                       check=True, capture_output=True)
+        for name, altered, detail in (
+                ('duplicate', assignment_path.read_text().replace(
+                    '"schema": 3', '"schema": 3, "schema": 3'), 'duplicate assignment key'),
+                ('unknown', json.dumps(dict(assignment, unknown=1)), 'assignment fields differ'),
+                ('snake-case field', json.dumps(dict(
+                    {key: value for key, value in assignment.items()
+                     if key != 'source-blob'}, source_blob=assignment['source-blob'])),
+                 'assignment fields differ'),
+                ('old schema', json.dumps(dict(assignment, schema=2)), 'assignment schema differs')):
             with self.subTest(name=name):
-                assignment_path.write_text(json.dumps(changed))
+                assignment_path.write_text(altered)
                 with self.assertRaises(compare_words.Fault) as raised:
-                    check()
-                self.assertEqual((raised.exception.row['code'],
-                                  raised.exception.row['detail']), (code, detail))
+                    compare_words.capture_assignment(repo, assignment_path)
+                self.assertIn(detail, raised.exception.row['detail'])
+        for name, data in (('utf-16', json.dumps(assignment).encode('utf-16')),
+                           ('byte-order mark', b'\xef\xbb\xbf' +
+                            json.dumps(assignment).encode())):
+            with self.subTest(name=name):
+                assignment_path.write_bytes(data)
+                with self.assertRaises(compare_words.Fault) as raised:
+                    compare_words.capture_assignment(repo, assignment_path)
+                self.assertEqual(raised.exception.row['code'], 'AssignmentInvalid')
         assignment_path.write_text(json.dumps(assignment))
         with self.assertRaises(compare_words.Fault) as raised:
-            check(repo/'candidate-assignment.json')
+            compare_words.capture_assignment(repo, repo/'candidate-assignment.json')
         self.assertEqual(raised.exception.row['detail'],
                          'assignment must be outside the candidate')
-        readme = repo/'README.md'
-        original = readme.read_bytes()
-        readme.write_bytes(original + b'\nchanged\n')
+        changed = dict(assignment, parent='0' * 40)
         with self.assertRaises(compare_words.Fault) as raised:
-            check()
+            check(changed)
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('CapabilityChanged', 'reviewed capability path changed: README.md'))
-        readme.write_bytes(original)
-        checker = repo/'tools/paper/compare_words.py'
-        original_checker = checker.read_bytes()
-        checker.write_bytes(original_checker + b'\n# candidate-supplied capability\n')
+                         ('AssignmentInvalid', 'assignment parent differs'))
+        changed = dict(assignment, **{'unit-path': 'README.md'})
         with self.assertRaises(compare_words.Fault) as raised:
-            check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('CapabilityChanged',
-                          'reviewed capability path changed: tools/paper/compare_words.py'))
-        checker.write_bytes(original_checker)
-        with mock.patch.object(compare_words, 'git', side_effect=lambda root, *parts: (
-                b'changed preparation import' if parts == (
-                    'show', revision + ':tools/paper/bibroute.py') else
-                original_git(root, *parts))):
-            with self.assertRaises(compare_words.Fault) as raised:
-                check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('CapabilityChanged',
-                          'comparison capability differs: tools/paper/bibroute.py'))
-        other_source = repo/'documents/paper/parts/partE.tex'
-        original_other = other_source.read_bytes()
-        other_source.write_bytes(original_other + b'% unrelated\n')
+            check(changed)
+        self.assertEqual(raised.exception.row['detail'],
+                         'assigned unit path class differs')
+        first_row = {key: assignment[key] for key in
+                     ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')}
+        first_row['previous-kind'] = 'native'
+        duplicate = dict(assignment, occurrences=[first_row, first_row])
         with self.assertRaises(compare_words.Fault) as raised:
-            check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('PathIneligible',
-                          'unassigned or capability path changed: documents/paper/parts/partE.tex'))
-        other_source.write_bytes(original_other)
-        capability = 'a' * 40
-        prior = dict(assignment, capability_revision=capability,
-                     capability_digest=compare_words.digest(b'capability-tree'))
-        assignment_path.write_text(json.dumps(prior))
-        readme.write_bytes(original + b'\ncapability revision bytes\n')
-        real_git = compare_words.git
-
-        def older_capability(root, *parts):
-            if parts == ('rev-parse', '--verify', capability + '^{tree}'):
-                return b'capability-tree'
-            if parts == ('diff', '--no-renames', '--name-only', '-z', capability, '--'):
-                return b''
-            if len(parts) == 2 and parts[0] == 'show' and parts[1].startswith(capability + ':'):
-                name = parts[1].split(':', 1)[1]
-                return (repo/name).read_bytes()
-            return real_git(root, *parts)
-
-        with mock.patch.object(compare_words, 'git', side_effect=older_capability):
-            with self.assertRaises(compare_words.Fault) as raised:
-                check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('PathIneligible',
-                          'unassigned or capability path changed: README.md'))
-        readme.write_bytes(original)
-        assignment_path.write_text(json.dumps(assignment))
-        unit = repo/'units/statements/overview.toml'
-        moved_unit = repo/'generated/documents/overview.toml'
-        moved_unit.write_bytes(unit.read_bytes())
-        unit.unlink()
-        import subprocess
-        subprocess.run(['git', '-C', str(repo), 'config', 'diff.renames', 'true'], check=True)
-        subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
-        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
-                        '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet',
-                        '-m', 'fixture content rename'], check=True)
-        hidden = compare_words.git(repo, 'diff', '--find-renames', '--name-only', '-z',
-                                   revision, '--').decode()
-        visible = compare_words.git(repo, 'diff', '--no-renames', '--name-only', '-z',
-                                    revision, '--').decode()
-        self.assertNotIn('units/statements/overview.toml', hidden)
-        self.assertIn('units/statements/overview.toml', visible)
+            compare_words.assigned_plain_scope(
+                repo, duplicate, evidence, parent, before, after, envelope,
+                [(before, after, args.unit), (before, after, args.unit)])
+        self.assertEqual(raised.exception.row['detail'],
+                         'assigned source intervals overlap')
+        wrong_source = dict(first_row, source='documents/paper/explainer/explainer.tex')
         with self.assertRaises(compare_words.Fault) as raised:
-            check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('PathIneligible',
-                          'unassigned or capability path changed: units/statements/overview.toml'))
-        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
-                       check=True, stdout=subprocess.DEVNULL)
-        imported = repo/'tools/paper/bibroute.py'
-        relocated = repo/'generated/documents/bibroute.py'
-        relocated.write_bytes(imported.read_bytes())
-        imported.unlink()
-        subprocess.run(['git', '-C', str(repo), 'config', 'diff.renames', 'true'], check=True)
-        subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
-        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
-                        '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet',
-                        '-m', 'fixture rename'], check=True)
-        hidden = compare_words.git(repo, 'diff', '--find-renames', '--name-only', '-z',
-                                   revision, '--').decode()
-        visible = compare_words.git(repo, 'diff', '--no-renames', '--name-only', '-z',
-                                    revision, '--').decode()
-        self.assertNotIn('tools/paper/bibroute.py', hidden)
-        self.assertIn('tools/paper/bibroute.py', visible)
-        with self.assertRaises(compare_words.Fault) as raised:
-            check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('CapabilityChanged',
-                          'reviewed capability path changed: tools/paper/bibroute.py'))
-        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
-                       check=True, capture_output=True)
-        selected_source = candidate_dir/before['source']
-        old_selected = selected_source.read_bytes()
-        selected_source.write_bytes(old_selected + b'% unaccounted source line\n')
-        changed_envelope = compare_words.source_envelope(
-            parent, parent_dir, candidate_dir, inputs, before, after, args.unit)
-        self.assertFalse(changed_envelope['available'])
-        with self.assertRaises(compare_words.Fault) as raised:
-            check(coverage=changed_envelope)
-        self.assertEqual(raised.exception.row['code'], 'SourceEnvelopeChanged')
-        selected_source.write_bytes(old_selected)
-        assigned_unit = repo/assignment['unit_path']
-        original_unit = assigned_unit.read_bytes()
-        assigned_unit.unlink()
-        assigned_unit.symlink_to(self.root/'external-unit.toml')
-        (self.root/'external-unit.toml').write_bytes(original_unit)
-        with self.assertRaises(compare_words.Fault) as raised:
-            check()
-        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('PathIneligible',
-                          'changed path is not an ordinary file: ' + assignment['unit_path']))
-        assigned_unit.unlink()
-        assigned_unit.write_bytes(original_unit)
+            compare_words.assigned_plain_scope(
+                repo, dict(assignment, occurrences=[first_row, wrong_source]),
+                evidence, parent, before, after, envelope,
+                [(before, after, args.unit), (before, after, args.unit)])
+        self.assertEqual(raised.exception.row['detail'], 'assigned source file differs')
         with self.assertRaises(compare_words.Fault) as raised:
             check(result=dict(evidence, verdict='different',
                               differences=[dict(code='TextDifference')]))
         self.assertEqual(raised.exception.row['code'], 'ComparisonIncomplete')
         with self.assertRaises(compare_words.Fault) as raised:
+            check(coverage=dict(envelope, available=False,
+                                reasons=['unaccounted source line']))
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('SourceEnvelopeChanged', 'unaccounted source line'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.assigned_plain_scope(
+                repo, assignment, evidence, parent, before, after, envelope,
+                [(before, after, args.unit), (before, after, args.unit)])
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('AssignmentInvalid', 'assigned occurrence count differs'))
+        with self.assertRaises(compare_words.Fault) as raised:
             compare_words.decode_located('a \\CheckedSum{b}', {})
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
-                         ('SyntaxUnsupported', '<source>:2: unsupported source scalar U+005C'))
+                         ('SyntaxUnsupported',
+                          '<source>:2: unsupported source scalar U+005C'))
+        layout_line = (repo/'documents/paper/explainer/explainer.tex').read_text(
+            encoding='utf-8').splitlines()[374]
+        self.assertTrue(layout_line.startswith('\\PaperParagraph{lastline}'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.decode_located(layout_line, {})
+        self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
         old = compare_words.git(repo, 'show', revision + ':' + before['source'])
         marker = old[before['marker'][0]:before['marker'][1]]
         protected = dict(passages=[dict(id=999, file=before['source'],
@@ -729,11 +620,249 @@ class Identities(unittest.TestCase):
                 check()
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
                          ('ProtectedSpan', 'assigned interval overlaps bound passage 999'))
+        self.assertFalse(compare_words.unproved_paragraph_layout(
+            b'\\PaperParagraph{stretch=2em}\nThe earlier paragraph.\n\n'))
+        self.assertTrue(compare_words.unproved_paragraph_layout(
+            b'\\PaperParagraph{stretch=2em}\n\n'))
+        self.assertEqual(compare_words.derived_replacement(
+            b'Before\n\nOne sentence.\n\nAfter\n',
+            b'Before\n\n% generated: sec:reading:shadow\n\nAfter\n',
+            'sec:reading:shadow'), (3, 3, 3))
+        self.assertIsNone(compare_words.derived_replacement(
+            b'Before\n\nOne sentence.\n\nAfter\n',
+            b'Changed\n\n% generated: sec:reading:shadow\n\nAfter\n',
+            'sec:reading:shadow'))
+        historical = 'documents/paper/explainer/explainer.tex'
+        self.assertEqual(compare_words.derived_replacement(
+            compare_words.git(source, 'show',
+                              'bbb1add6333c2b0449b0513eb2c8e92a3956120f:' + historical),
+            compare_words.git(source, 'show',
+                              '873125c90a54697397a2604ba2835a303357ee5d:' + historical),
+            'sec:reading:plain-intro'), (47, 50, 47))
+        with mock.patch.object(compare_words, 'unproved_paragraph_layout',
+                               return_value=True):
+            with self.assertRaises(compare_words.Fault) as raised:
+                check()
+        self.assertEqual(raised.exception.row['code'], 'LayoutUnsupported')
+        exit_code, compared = self.conversion_run(options=dict(
+            repository=repo, assignment=assignment_path, before_revision=revision))
+        self.assertEqual((exit_code, compared['verdict']), (0, 'equal'))
+        self.assertEqual(compared['scope_admissibility']['verdict'], 'scope-admissible')
+        exit_code, compared = self.conversion_run(options=dict(
+            repository=repo, assignment=assignment_path, before_revision=revision,
+            unit='sec:wrong'))
+        self.assertEqual((exit_code, compared['verdict']), (2, 'refused'))
+        self.assertEqual((compared['faults'][0]['rule'], compared['faults'][0]['code'],
+                          compared['faults'][0]['detail']),
+                         ('M082', 'AssignmentInvalid',
+                          'comparison selector and captured assignment differ'))
+
+        def replaced_after_capture(path, document, side, value):
+            if document == 'paper' and side == 'before':
+                assignment_path.write_text(json.dumps(dict(assignment, first=0)))
+
+        exit_code, compared = self.conversion_run(
+            replaced_after_capture, dict(repository=repo, assignment=assignment_path,
+                                         before_revision=revision))
+        self.assertEqual((exit_code, compared['verdict']), (2, 'refused'))
+        self.assertTrue(any(row['code'] == 'InputChanged' and row['rule'] == 'M082'
+                            for row in compared['faults']))
+        self.assertEqual(compared['scope_admissibility']['verdict'], 'refused')
+        assignment_path.write_text(json.dumps(assignment))
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
+                       check=True, capture_output=True)
+
+        def committed_change(name, data=None, executable=False, symlink=None):
+            target = repo/name
+            if symlink is not None:
+                target.unlink()
+                target.symlink_to(symlink)
+            elif data is None:
+                target.unlink()
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
+                if executable:
+                    target.chmod(0o755)
+            subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
+            subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                            '-c', 'user.email=fixture@example.invalid', 'commit',
+                            '--quiet', '-m', 'fixture change'], check=True)
+            commit = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+            with self.assertRaises(compare_words.Fault) as raised:
+                check(dict(assignment, candidate=commit))
+            subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
+                           check=True, capture_output=True)
+            subprocess.run(['git', '-C', str(repo), 'clean', '-fd'],
+                           check=True, capture_output=True)
+            return raised.exception.row
+
+        for name in ('README.md', 'documents/paper/parts/partE.tex',
+                     'tools/paper/compare_words.py'):
+            with self.subTest(path=name):
+                row = committed_change(name, (repo/name).read_bytes() + b'\nchanged\n')
+                self.assertEqual((row['code'], row['detail']),
+                                 ('PathIneligible',
+                                  'unassigned or capability path changed: ' + name))
+        row = committed_change('README.md')
+        self.assertEqual((row['code'], row['detail']),
+                         ('PathIneligible',
+                          'unassigned or capability path changed: README.md'))
+        imported = repo/'tools/paper/bibroute.py'
+        relocated = repo/'zz-generated/bibroute.py'
+        relocated.parent.mkdir()
+        relocated.write_bytes(imported.read_bytes())
+        imported.unlink()
+        subprocess.run(['git', '-C', str(repo), 'config', 'diff.renames', 'true'],
+                       check=True)
+        subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit',
+                        '--quiet', '-m', 'fixture rename'], check=True)
+        renamed = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+        hidden = compare_words.git(repo, 'diff', '--find-renames', '--name-only', '-z',
+                                   revision, renamed, '--').decode()
+        visible = compare_words.git(repo, 'diff', '--no-renames', '--name-only', '-z',
+                                    revision, renamed, '--').decode()
+        self.assertNotIn('tools/paper/bibroute.py', hidden)
+        self.assertIn('tools/paper/bibroute.py', visible)
+        with self.assertRaises(compare_words.Fault) as raised:
+            check(dict(assignment, candidate=renamed))
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('PathIneligible',
+                          'unassigned or capability path changed: tools/paper/bibroute.py'))
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
+                       check=True, capture_output=True)
+        subprocess.run(['git', '-C', str(repo), 'clean', '-fd'],
+                       check=True, capture_output=True)
+        rogue = 'generated/documents/unlisted.txt'
+        row = committed_change(rogue, b'unlisted generated text\n')
+        self.assertEqual((row['code'], row['detail']),
+                         ('PathIneligible',
+                          'unassigned or capability path changed: ' + rogue))
+        unit_name = assignment['unit-path']
+        row = committed_change(unit_name, (repo/unit_name).read_bytes(), executable=True)
+        self.assertEqual((row['code'], row['detail']),
+                         ('PathIneligible',
+                          'changed path is not an ordinary file: ' + unit_name))
+        row = committed_change(unit_name, symlink=str(source/unit_name))
+        self.assertEqual((row['code'], row['detail']),
+                         ('PathIneligible',
+                          'changed path is not an ordinary file: ' + unit_name))
+        subprocess.run(['git', '-C', str(repo), 'config', 'core.fileMode', 'false'],
+                       check=True)
+        subprocess.run(['git', '-C', str(repo), 'update-index', '--chmod=+x', '--',
+                        unit_name], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit',
+                        '--quiet', '-m', 'fixture index mode'], check=True)
+        mode_candidate = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+        with self.assertRaises(compare_words.Fault) as raised:
+            check(dict(assignment, candidate=mode_candidate))
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('PathIneligible',
+                          'changed commit path is not an ordinary file: ' + unit_name))
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', revision],
+                       check=True, capture_output=True)
+        subprocess.run(['git', '-C', str(repo), 'config', 'core.fileMode', 'true'],
+                       check=True)
+        acceptance = repo/'documents/paper-build/self-description.json'
+        altered = json.loads(acceptance.read_bytes())
+        altered['passages'][0]['reading_acceptance'] = 'changed'
+        row = committed_change('documents/paper-build/self-description.json',
+                               json.dumps(altered).encode())
+        self.assertEqual((row['code'], row['detail']),
+                         ('ProtectedSpan', 'accepted passage identity differs'))
+
+    def test_authored_substitution_and_offset_only_acceptance(self):
+        source = pathlib.Path(__file__).resolve().parents[2]
+        repo = self.root/'authored-candidate'
+        import subprocess
+        subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(source), str(repo)],
+                       check=True)
+        source_name = 'documents/paper/parts/front.tex'
+        acceptance_name = 'documents/paper-build/self-description.json'
+        unit = 'sec:reading:shadow'
+        marker = ('% generated: ' + unit + '\n').encode()
+        authored = b'A shadow paragraph.\n'
+        source_file = repo/source_name
+        original = source_file.read_bytes()
+        self.assertEqual(original.count(marker), 1)
+        source_file.write_bytes(original.replace(marker, authored, 1))
+
+        def move_offsets():
+            record_path = repo/acceptance_name
+            record = json.loads(record_path.read_bytes())
+            for passage in record['passages']:
+                text = (repo/passage['file']).read_bytes()
+                anchor = passage['anchor'].encode()
+                self.assertEqual(text.count(anchor), 1)
+                at = text.index(anchor)
+                length = passage['end'] - passage['start']
+                positions = [start for start in range(max(0, at - length), at + 1)
+                             if compare_words.digest(text[start:start + length]) ==
+                             passage['sha256']]
+                self.assertEqual(len(positions), 1, passage['id'])
+                passage['start'] = positions[0]
+                passage['end'] = positions[0] + length
+            record_path.write_text(json.dumps(record, indent=2) + '\n')
+
+        def commit(message):
+            subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
+            subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                            '-c', 'user.email=fixture@example.invalid', 'commit',
+                            '--quiet', '-m', message], check=True)
+            return compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+
+        move_offsets()
+        parent_id = commit('fixture authored parent')
+        parent_source = source_file.read_bytes()
+        first = parent_source[:parent_source.index(authored)].count(b'\n') + 1
+        start = parent_source.index(authored)
+        before = dict(kind='authored', source=source_name, line=first,
+                      range=[start, start + len(authored)])
+        after = dict(kind='native', source=source_name, line=first,
+                     marker=[start, start + len(marker)])
+        parent = dict(commit=parent_id)
+        assignment = dict(schema=3, parent=parent_id, source=source_name,
+                          first=first, last=first, unit=unit,
+                          **{'source-blob': compare_words.git(
+                              repo, 'rev-parse', parent_id + ':' + source_name
+                          ).decode().strip(),
+                             'unit-path': 'units/statements/reading-shadow.toml'})
+        evidence = dict(verdict='equal', faults=[], differences=[])
+        envelope = dict(available=True, reasons=[])
+
+        def candidate(extra):
+            source_file.write_bytes(parent_source.replace(authored, marker, 1) + extra)
+            move_offsets()
+            return commit('fixture candidate')
+
+        candidate_id = candidate(b'')
+        for passage in json.loads((repo/acceptance_name).read_bytes())['passages']:
+            source_bytes = (repo/passage['file']).read_bytes()
+            self.assertEqual(compare_words.digest(
+                source_bytes[passage['start']:passage['end']]),
+                passage['sha256'], passage['id'])
+            self.assertEqual(source_bytes.count(passage['anchor'].encode()),
+                             1, passage['id'])
+        self.assertEqual(compare_words.assigned_plain_scope(
+            repo, dict(assignment, candidate=candidate_id), evidence, parent,
+            before, after, envelope)['verdict'], 'scope-admissible')
+        subprocess.run(['git', '-C', str(repo), 'reset', '--hard', parent_id],
+                       check=True, capture_output=True)
+        candidate_id = candidate(b'\n% unrelated edit\n')
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.assigned_plain_scope(
+                repo, dict(assignment, candidate=candidate_id), evidence, parent,
+                before, after, envelope)
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('AssignmentInvalid',
+                          'assigned interval differs from commit source substitution'))
 
     def test_two_assigned_paragraphs_locate_changed_second_word(self):
         source = pathlib.Path(__file__).resolve().parents[2]
         revision = compare_words.git(source, 'rev-parse', 'HEAD').decode().strip()
-        tree = compare_words.git(source, 'rev-parse', 'HEAD^{tree}').strip()
         shadow = ('documents/paper/parts/front.tex', 'sec:reading:shadow',
                   'units/statements/reading-shadow.toml')
         intro = ('documents/paper/explainer/explainer.tex', 'sec:reading:plain-intro',
@@ -745,17 +874,15 @@ class Identities(unittest.TestCase):
             self.fail('the two declared paragraph occurrences are required')
         occurrences = []
         for path, key, unit_path in (shadow, intro):
-            occurrences.append(dict(source=path, source_blob=compare_words.git(
-                source, 'rev-parse', revision + ':' + path).decode().strip(),
-                first=rows[key], last=rows[key], unit=key, unit_path=unit_path,
-                previous_kind='native'))
-        assignment = dict(schema=2, author='two-paragraph-scope', parent=revision,
-                          capability_revision=revision,
-                          capability_digest=compare_words.digest(tree),
-                          expected_generated_classes=['documents', 'paper'],
+            occurrences.append(dict(source=path, first=rows[key], last=rows[key],
+                                    unit=key, **{'source-blob': compare_words.git(
+                                        source, 'rev-parse', revision + ':' + path
+                                    ).decode().strip(), 'unit-path': unit_path,
+                                        'previous-kind': 'native'}))
+        assignment = dict(schema=3, parent=revision, candidate=revision,
                           occurrences=occurrences,
                           **{key: occurrences[0][key] for key in
-                             ('source', 'source_blob', 'first', 'last', 'unit', 'unit_path')})
+                             ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')})
         assigned_path = self.root/'two-paragraph-assignment.json'
         assigned_path.write_text(json.dumps(assignment))
         fragment = read(source/'generated/documents/explainer-pilot/sec-reading-plain-intro.tex')
@@ -959,19 +1086,16 @@ class Identities(unittest.TestCase):
         line = next(position for name, key, _, role, position in scope_fragments(source)
                     if name == path and key == shadow and role == 'paragraph')
         blob = compare_words.git(source, 'rev-parse', revision + ':' + path).decode().strip()
-        first = dict(source=path, source_blob=blob, first=line, last=line,
-                     unit=shadow, unit_path='units/statements/reading-shadow.toml',
-                     previous_kind='native')
+        first = dict(source=path, first=line, last=line, unit=shadow,
+                     **{'source-blob': blob,
+                        'unit-path': 'units/statements/reading-shadow.toml',
+                        'previous-kind': 'native'})
         second_row = dict(first, first=line + 4, last=line + 4, unit=second,
-                          previous_kind='authored')
-        assignment = dict(schema=2, author='same-document-scope', parent=revision,
-                          capability_revision=revision,
-                          capability_digest=compare_words.digest(compare_words.git(
-                              source, 'rev-parse', 'HEAD^{tree}').strip()),
-                          expected_generated_classes=['documents', 'paper'],
+                          **{'previous-kind': 'authored'})
+        assignment = dict(schema=3, parent=revision, candidate=revision,
                           occurrences=[first, second_row],
                           **{key: first[key] for key in
-                             ('source', 'source_blob', 'first', 'last', 'unit', 'unit_path')})
+                             ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')})
         assigned_path = self.root/'same-document-assignment.json'
         assigned_path.write_text(json.dumps(assignment))
         real_sources = compare_words.selected_sources

@@ -1008,29 +1008,108 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
                 source_substitution=substitutions[0] if not additional else substitutions)
 
 
-def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after, envelope,
-                         selections=None):
-    """Check every externally assigned plain occurrence after complete comparison."""
-    path = assignment_path.resolve()
+def capture_assignment(repo, assignment_path):
+    """Read one external scope request, rejecting ambiguous or changing bytes."""
+    try:
+        path = assignment_path.resolve()
+    except (OSError, RuntimeError) as error:
+        raise Fault('AssignmentInvalid', error, 'request') from error
     if not assignment_path.is_absolute() or path == repo or repo in path.parents:
         raise Fault('AssignmentInvalid', 'assignment must be outside the candidate', 'request')
     try:
-        assignment = json.loads(path.read_bytes())
-    except (OSError, ValueError) as error:
+        data = path.read_bytes()
+    except OSError as error:
         raise Fault('AssignmentInvalid', error, 'request') from error
-    expected_fields = {'schema', 'author', 'parent', 'capability_revision',
-                       'capability_digest', 'source', 'source_blob', 'first',
-                       'last', 'unit', 'unit_path', 'expected_generated_classes'}
+    if len(data) > 1048576:
+        raise Fault('AssignmentInvalid', 'assignment exceeds 1048576 bytes', 'request')
+
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise Fault('AssignmentInvalid', 'duplicate assignment key: ' + key, 'request')
+            value[key] = item
+        return value
+
+    try:
+        assignment = json.loads(data.decode('utf-8'), object_pairs_hook=unique)
+    except (ValueError, UnicodeError) as error:
+        raise Fault('AssignmentInvalid', error, 'request') from error
+    fields = {'schema', 'parent', 'candidate', 'source', 'source-blob', 'first',
+              'last', 'unit', 'unit-path'}
     if not isinstance(assignment, dict) or set(assignment) not in (
-            expected_fields, expected_fields | {'occurrences'}):
+            fields, fields | {'occurrences'}):
         raise Fault('AssignmentInvalid', 'assignment fields differ', 'request')
+    if type(assignment['schema']) is not int or assignment['schema'] != 3:
+        raise Fault('AssignmentInvalid', 'assignment schema differs', 'request')
+    for key in ('parent', 'candidate'):
+        if not isinstance(assignment[key], str) or not re.fullmatch(
+                r'[0-9a-f]{40}', assignment[key]):
+            raise Fault('AssignmentInvalid', key + ' is not a full commit id', 'request')
+    for key in ('source', 'source-blob', 'unit', 'unit-path'):
+        if not isinstance(assignment[key], str) or not assignment[key]:
+            raise Fault('AssignmentInvalid', key + ' differs', 'request')
+    for key in ('first', 'last'):
+        if not isinstance(assignment[key], int) or isinstance(assignment[key], bool) or \
+                assignment[key] < 1:
+            raise Fault('AssignmentInvalid', key + ' differs', 'request')
+    rows = assignment.get('occurrences')
+    if rows is not None:
+        fields = {'source', 'source-blob', 'first', 'last', 'unit', 'unit-path',
+                  'previous-kind'}
+        if not isinstance(rows, list) or not rows:
+            raise Fault('AssignmentInvalid', 'occurrence fields differ', 'request')
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != fields or not all(
+                    isinstance(row[key], str) and row[key] for key in
+                    ('source', 'source-blob', 'unit', 'unit-path')) or not all(
+                        isinstance(row[key], int) and not isinstance(row[key], bool) and
+                        row[key] > 0 for key in ('first', 'last')) or row[
+                            'previous-kind'] not in ('authored', 'native'):
+                raise Fault('AssignmentInvalid', 'occurrence fields differ', 'request')
+    return assignment, path, data
+
+
+def unproved_paragraph_layout(prefix):
+    """Conservatively refuse a preceding one-shot instruction without a prose consumer."""
+    for instruction in re.finditer(rb'\\PaperParagraph\{[^{}]*\}', prefix):
+        following = prefix[instruction.end():]
+        boundary = re.search(rb'\n[ \t]*\n', following)
+        if boundary is None:
+            return True
+        passage = following[:boundary.start()]
+        if not any(re.match(rb'[ \t]*[A-Za-z]', line)
+                   for line in passage.splitlines()):
+            return True
+    return False
+
+
+def derived_replacement(before, after, unit):
+    """Recover a single authored paragraph substitution from the commit's source diff."""
+    old_lines = before.splitlines(keepends=True)
+    new_lines = after.splitlines(keepends=True)
+    first = 0
+    while (first < len(old_lines) and first < len(new_lines) and
+           old_lines[first] == new_lines[first]):
+        first += 1
+    old_end = len(old_lines)
+    new_end = len(new_lines)
+    while (old_end > first and new_end > first and
+           old_lines[old_end - 1] == new_lines[new_end - 1]):
+        old_end -= 1
+        new_end -= 1
+    marker = ('% generated: ' + unit + '\n').encode()
+    if first == old_end or new_lines[first:new_end] != [marker]:
+        return None
+    return first + 1, old_end, first + 1
+
+
+def assigned_plain_scope(repo, assignment, evidence, parent, before, after, envelope,
+                         selections=None):
+    """Check every assigned plain occurrence against the supplied commit pair."""
     occurrences = assignment.get('occurrences', [assignment])
-    if (assignment['schema'] != (2 if 'occurrences' in assignment else 1) or
-            not isinstance(occurrences, list) or not occurrences or
-            not isinstance(assignment['author'], str) or
-            not assignment['author'] or
-            assignment['expected_generated_classes'] != ['documents', 'paper']):
-        raise Fault('AssignmentInvalid', 'assignment capability differs', 'request')
+    if not isinstance(occurrences, list) or not occurrences:
+        raise Fault('AssignmentInvalid', 'assignment occurrences differ', 'request')
     if selections is None:
         selections = [(before, after, assignment['unit'])]
     if len(occurrences) != len(selections):
@@ -1038,33 +1117,23 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
     if len({row.get('source') for row in occurrences if isinstance(row, dict)}) != 1:
         raise Fault('AssignmentInvalid', 'assigned source file differs', 'request')
     if 'occurrences' in assignment and occurrences[0] != {
-            key: assignment[key] for key in ('source', 'source_blob', 'first', 'last',
-                                               'unit', 'unit_path')} | {
-                                                   'previous_kind': before['kind']}:
+            key: assignment[key] for key in ('source', 'source-blob', 'first', 'last',
+                                               'unit', 'unit-path')} | {
+                                                   'previous-kind': before['kind']}:
         raise Fault('AssignmentInvalid', 'first occurrence differs', 'request')
-    revision = assignment['capability_revision']
-    if not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40}', revision):
-        raise Fault('AssignmentInvalid', 'capability revision is not a full object id', 'request')
-    tree = git(repo, 'rev-parse', '--verify', revision + '^{tree}').strip()
-    if assignment['capability_digest'] != digest(tree):
-        raise Fault('AssignmentInvalid', 'capability digest differs', 'request')
-    runtime_root = pathlib.Path(__file__).resolve().parents[2]
-    for name in INPUTS:
-        try:
-            actual_runtime = (runtime_root / name).read_bytes()
-            reviewed_runtime = git(repo, 'show', revision + ':' + name)
-        except (OSError, RuntimeError) as error:
-            raise Fault('CapabilityChanged', 'comparison capability is unavailable: ' + name,
-                        'request') from error
-        if actual_runtime != reviewed_runtime:
-            raise Fault('CapabilityChanged', 'comparison capability differs: ' + name,
-                        'request')
     if assignment['parent'] != parent['commit']:
         raise Fault('AssignmentInvalid', 'assignment parent differs', 'snapshot')
     head = git(repo, 'rev-parse', 'HEAD').decode().strip()
-    if head != parent['commit'] and git(repo, 'rev-parse', 'HEAD^').decode().strip() != parent['commit']:
+    relation = git(repo, 'rev-list', '--parents', '-n', '1',
+                   assignment['candidate']).decode().split()
+    if (head != assignment['candidate'] or
+            relation != [assignment['candidate'], parent['commit']]):
         raise Fault('AssignmentInvalid', 'comparison parent is not immediate', 'snapshot')
-    listed = git(repo, 'show', revision + ':documents/paper-build/sources.tsv').decode().splitlines()
+    tracked_dirt = git(repo, 'diff', '--name-only', '-z', 'HEAD', '--')
+    staged_dirt = git(repo, 'diff', '--cached', '--name-only', '-z', 'HEAD', '--')
+    if tracked_dirt or staged_dirt:
+        raise Fault('InputChanged', 'candidate checkout differs from its commit', 'snapshot')
+    listed = git(repo, 'show', parent['commit'] + ':documents/paper-build/sources.tsv').decode().splitlines()
     protected = json.loads(git(repo, 'show', parent['commit'] +
                                ':documents/paper-build/self-description.json'))
     if not envelope['available']:
@@ -1073,24 +1142,25 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
     intervals = {}
     for row, (old_source, new_source, key) in zip(occurrences, selections):
         if not isinstance(row, dict) or (row is not assignment and set(row) not in (
-                {'source', 'source_blob', 'first', 'last', 'unit', 'unit_path'},
-                {'source', 'source_blob', 'first', 'last', 'unit', 'unit_path',
-                 'previous_kind'})):
+                {'source', 'source-blob', 'first', 'last', 'unit', 'unit-path'},
+                {'source', 'source-blob', 'first', 'last', 'unit', 'unit-path',
+                 'previous-kind'})):
             raise Fault('AssignmentInvalid', 'occurrence fields differ', 'request')
         source = row['source']
         if not isinstance(source, str) or source not in listed or not (
                 source.startswith('documents/paper/parts/') or
                 source == 'documents/paper/explainer/explainer.tex'):
             raise Fault('AssignmentInvalid', 'assigned source path class differs', 'snapshot')
-        if row.get('previous_kind', old_source['kind']) != old_source['kind']:
+        if row.get('previous-kind', old_source['kind']) != old_source['kind']:
             raise Fault('AssignmentInvalid', 'assigned previous kind differs', 'snapshot')
-        if (row['source_blob'] != git(repo, 'rev-parse', '--verify',
+        if (row['source-blob'] != git(repo, 'rev-parse', '--verify',
                                      parent['commit'] + ':' + source).decode().strip() or
                 old_source['source'] != source or new_source['source'] != source or
                 row['unit'] != key):
             raise Fault('AssignmentInvalid', 'assigned source or unit differs', 'snapshot')
         first, last = row['first'], row['last']
         old = git(repo, 'show', parent['commit'] + ':' + source)
+        current_source = (repo / source).read_bytes()
         lines = old.splitlines(keepends=True)
         if (not isinstance(first, int) or isinstance(first, bool) or
                 not isinstance(last, int) or isinstance(last, bool) or
@@ -1099,6 +1169,18 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
             raise Fault('AssignmentInvalid', 'assigned source interval differs', 'snapshot')
         start = sum(len(line) for line in lines[:first - 1])
         end = start + sum(len(line) for line in lines[first - 1:last])
+        if len(occurrences) == 1 and old_source['kind'] == 'authored':
+            derived = derived_replacement(old, current_source, key)
+            if derived != (first, last, new_source['line']):
+                raise Fault('AssignmentInvalid',
+                            'assigned interval differs from commit source substitution',
+                            'snapshot')
+        candidate_start = new_source.get('marker', [0])[0]
+        if (unproved_paragraph_layout(old[:start]) or
+                unproved_paragraph_layout(current_source[:candidate_start])):
+            raise Fault('LayoutUnsupported',
+                        'source-local paragraph layout lacks an earlier prose consumer',
+                        'snapshot')
         if old_source['kind'] == 'authored' and old_source['range'] != [start, end]:
             raise Fault('AssignmentInvalid', 'assigned source interval differs', 'snapshot')
         if old_source['kind'] == 'native' and (
@@ -1123,7 +1205,7 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
             if start < place + length and place < end:
                 raise Fault('ProtectedSpan', 'assigned interval overlaps bound passage ' +
                             str(passage['id']), 'snapshot')
-        unit_path = row['unit_path']
+        unit_path = row['unit-path']
         if (not isinstance(unit_path, str) or not re.fullmatch(
                 r'units/statements/[a-z0-9-]+\.toml', unit_path)):
             raise Fault('AssignmentInvalid', 'assigned unit path class differs', 'snapshot')
@@ -1142,6 +1224,8 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
                         'units/skeletons/' +
                         ('explainer-pilot' if source.endswith('/explainer.tex') else
                          'paper-pilot') + '.toml'})
+        allowed.add('generated/documents/' + expected_document + '/' +
+                    row['unit'].replace(':', '-') + '.tex')
     acceptance_path = 'documents/paper-build/self-description.json'
     if (repo / acceptance_path).read_bytes() != git(
             repo, 'show', parent['commit'] + ':' + acceptance_path):
@@ -1173,32 +1257,17 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
                 raise Fault('ProtectedSpan', 'accepted passage offset or bytes differ',
                             'snapshot')
         allowed.add(acceptance_path)
-    def content_path(name):
-        return (name.startswith('documents/paper/parts/') and name.endswith('.tex') or
-                   name == 'documents/paper/explainer/explainer.tex' or
-                   name.startswith('units/statements/') and name.endswith('.toml') or
-                   name.startswith('units/scopes/') and name.endswith('.toml') or
-                   name.startswith('units/skeletons/') and name.endswith('.toml') or
-                   name.startswith('units/displays/') and name.endswith('.toml') or
-                   name == acceptance_path or
-                   name.startswith('generated/documents/') or
-                   name in ('generated/paper/paper.pdf',
-                            'generated/paper/explainer.pdf',
-                            'generated/paper/inputs.json'))
-
-    since_capability = set(git(repo, 'diff', '--no-renames', '--name-only', '-z', revision, '--')
-                           .decode().strip('\x00').split('\x00'))
-    for name in sorted(since_capability - {''}):
-        if not content_path(name):
-            raise Fault('CapabilityChanged', 'reviewed capability path changed: ' + name,
-                        'snapshot')
-    changed = set(git(repo, 'diff', '--no-renames', '--name-only', '-z', parent['commit'], '--')
+    changed = set(git(repo, 'diff', '--no-renames', '--name-only', '-z',
+                      parent['commit'], assignment['candidate'], '--')
                   .decode().strip('\x00').split('\x00'))
     changed.update(git(repo, 'ls-files', '--others', '--exclude-standard', '-z')
                    .decode().strip('\x00').split('\x00'))
     changed.discard('')
+    parent_products = set(git(repo, 'ls-tree', '-r', '--name-only',
+                              parent['commit'], '--', 'generated/documents').decode().splitlines())
     for name in sorted(changed):
-        generated = (name.startswith('generated/documents/') or
+        generated = (name in parent_products or name in allowed and
+                     name.startswith('generated/documents/') or
                      name in ('generated/paper/paper.pdf',
                               'generated/paper/explainer.pdf',
                               'generated/paper/inputs.json'))
@@ -1210,10 +1279,17 @@ def assigned_plain_scope(repo, assignment_path, evidence, parent, before, after,
         if target.is_symlink() or not target.is_file() or target.stat().st_mode & 0o111:
             raise Fault('PathIneligible', 'changed path is not an ordinary file: ' + name,
                         'snapshot')
+        entry = git(repo, 'ls-tree', assignment['candidate'], '--', name).decode().strip()
+        if not entry.startswith('100644 blob ') or not entry.endswith('\t' + name):
+            raise Fault('PathIneligible', 'changed commit path is not an ordinary file: ' +
+                        name, 'snapshot')
+        if target.read_bytes() != git(repo, 'show', assignment['candidate'] + ':' + name):
+            raise Fault('InputChanged', 'changed path differs from candidate commit: ' + name,
+                        'snapshot')
     if evidence['verdict'] != 'equal' or evidence['faults'] or evidence['differences']:
         raise Fault('ComparisonIncomplete', 'complete comparison is not equal', 'final')
-    result = dict(author=assignment['author'], parent=parent['commit'],
-                  capability_revision=revision, source=assignment['source'],
+    result = dict(parent=parent['commit'], candidate=assignment['candidate'],
+                  source=assignment['source'],
                   unit=assignment['unit'], interval=[assignment['first'], assignment['last']],
                   verdict='scope-admissible')
     if 'occurrences' in assignment:
@@ -1244,6 +1320,7 @@ def compare(args):
     copies = {}
     stage = 'snapshot'
     active_index = 0
+    assignment_capture = None
     try:
         selector = getattr(args, 'before_source', None)
         revision = getattr(args, 'before_revision', None)
@@ -1299,9 +1376,22 @@ def compare(args):
         assigned = None
         if getattr(args, 'assignment', None) is not None:
             try:
-                assigned = json.loads(args.assignment.read_bytes())
-            except (OSError, ValueError) as error:
-                raise Fault('AssignmentInvalid', error, 'request') from error
+                assignment_capture = capture_assignment(repo, args.assignment)
+                assigned = assignment_capture[0]
+                evidence['inputs'].append(dict(path=str(assignment_capture[1]),
+                                               sha256=digest(assignment_capture[2])))
+                if args.unit != assigned['unit'] or parent_commit != assigned['parent']:
+                    raise Fault('AssignmentInvalid',
+                                'comparison selector and captured assignment differ', 'request')
+                if selector:
+                    selected = SOURCE.fullmatch(selector)
+                    if selected is None or (selected[2], int(selected[3]), int(selected[4])) != (
+                            assigned['source'], assigned['first'], assigned['last']):
+                        raise Fault('AssignmentInvalid',
+                                    'source selector and captured assignment differ', 'request')
+            except Fault as error:
+                error.row['rule'] = 'M082'
+                raise
         multiple = (isinstance(assigned, dict) and
                     isinstance(assigned.get('occurrences'), list) and
                     len(assigned['occurrences']) > 1)
@@ -1317,8 +1407,8 @@ def compare(args):
                     unit_args = argparse.Namespace(
                         unit=row['unit'], before_source=(
                             f"{parent_commit}:{row['source']}:{row['first']}-{row['last']}"
-                            if row.get('previous_kind') == 'authored' else None),
-                        before_revision=(None if row.get('previous_kind') == 'authored'
+                            if row.get('previous-kind') == 'authored' else None),
+                        before_revision=(None if row.get('previous-kind') == 'authored'
                                          else parent_commit))
                     shift = shifted_marker_line(selections, row['source'], row['first']) - row['first']
                     old, new = selected_sources(repo, unit_args, parent, parent_dir,
@@ -1584,7 +1674,7 @@ def compare(args):
         if getattr(args, 'assignment', None) is not None:
             try:
                 evidence['scope_admissibility'] = assigned_plain_scope(
-                    repo, args.assignment, evidence, parent, before_source,
+                    repo, assigned, evidence, parent, before_source,
                     after_source, envelope, selections)
             except Fault as error:
                 error.row['rule'] = 'M082'
@@ -1604,6 +1694,19 @@ def compare(args):
         evidence['faults'].append(error.row)
     except Exception as error:
         evidence['faults'].append(Fault('PreparationRefused', error, stage).row)
+    if assignment_capture is not None:
+        try:
+            still_captured = (args.assignment.resolve() == assignment_capture[1] and
+                              assignment_capture[1].read_bytes() == assignment_capture[2])
+        except (OSError, RuntimeError):
+            still_captured = False
+        if not still_captured:
+            row = Fault('InputChanged', 'assignment changed after capture', 'final').row
+            row['rule'] = 'M082'
+            evidence['faults'].append(row)
+            evidence['verdict'] = 'refused'
+            if evidence.get('scope_admissibility', {}).get('verdict') == 'scope-admissible':
+                evidence['scope_admissibility'] = dict(verdict='refused', faults=[row])
     evidence['inputs'].sort(key=lambda row: row['path'])
     evidence['faults'].sort(key=lambda row:
                             (STAGES[row['stage']], {'paper': 0, 'explainer': 1}.get(row['document'], 2),

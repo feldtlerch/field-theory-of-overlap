@@ -1174,11 +1174,11 @@ fn assigned_plain_scope_rule_literal() {
         .unwrap();
     assert_eq!(
         rule.statement,
-        "An externally assigned set of plain paragraphs is scope-admissible only when its assignment lies outside the candidate, binds the immediate parent and a full capability revision with matching tree digest, runs the comparison from that revision's recorded code bytes, names every selected source blob, unit and interval in one source file, and permits only fixed generated classes; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a generated class and is an ordinary file, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
+        "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
     );
     assert_eq!(
         rule.scope,
-        "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with an external assignment; no batch-retention claim."
+        "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with a captured assignment and supplied parent/candidate commits; no history-authentication or batch-retention claim."
     );
     assert_eq!(rule.state, RuleState::Enforced);
 }
