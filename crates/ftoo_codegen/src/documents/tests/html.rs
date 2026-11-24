@@ -1,5 +1,57 @@
 use super::*;
 
+#[test]
+fn support_required_complete_flow_display_probe() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let notation = crate::notation::prepare_notation(&catalogue).unwrap();
+    let unit: toml_edit::DocumentMut =
+        include_str!("../../../../../units/statements/explainer-overlap-flow.toml")
+            .parse()
+            .unwrap();
+    let source = unit["unit"]["math"]["flow"].as_str().unwrap();
+    let parsed = ftoo_manifest::parse_assembly_display_math(&catalogue, source).unwrap();
+    let checked = notation
+        .check_document_expression(parsed.into_draft())
+        .unwrap();
+    let rendered = checked
+        .render_display(ftoo_manifest::RenderTarget::Unicode)
+        .unwrap();
+    assert!(rendered.is_display());
+    let returned = notation
+        .mathml_display(&format!("{}.", rendered.source()))
+        .unwrap()
+        .unwrap();
+    let fragment = html_recovery::library_fragment(&returned).unwrap();
+    let mut canonical = String::new();
+    super::super::html::serialize(&fragment, &mut canonical);
+    assert!(canonical.contains("display=\"block\""));
+    let start = canonical.find("<math ").unwrap();
+    let end = canonical.find("</math>").unwrap() + "</math>".len();
+    let math = &canonical[start..end];
+    let template = include_str!("../../../../../registry/html-mathematics/h4.html");
+    let style = ".equation-probe{max-width:100%;min-width:0;overflow-x:auto} .equation-probe:focus-visible{outline:3px solid #a34500;outline-offset:3px} .equation-probe math{font-family:'Pagella Math',math} ";
+    let page = template
+        .replacen(
+            "<title>A reading</title>",
+            "<title>Explainer flow display probe</title>",
+            1,
+        )
+        .replacen(">A reading</a>", ">Explainer flow display probe</a>", 1)
+        .replacen("</style>", &format!("{style}</style>"), 1);
+    let main_start = page.find("<main>").unwrap();
+    let main_end = page.find("</main>").unwrap() + "</main>".len();
+    let body = format!(
+        "<main><h1 id=\"content\">Explainer flow display probe</h1><p>The complete unnumbered flow follows.</p><div class=\"equation-probe\" tabindex=\"0\">{math}</div><p>The stop belongs to the display.</p></main>"
+    );
+    let page = format!("{}{}{}", &page[..main_start], body, &page[main_end..]);
+    assert_eq!(
+        page.as_bytes(),
+        include_bytes!("../../../../../registry/html-mathematics/explainer-flow.html")
+    );
+}
+
 fn support() -> NativeSupport {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     NativeSupport::from_environment(&root).unwrap()
@@ -20,6 +72,7 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
             depth: Some(1),
             quotation: false,
             paragraph: false,
+            equation: false,
             site: site.clone(),
             runs: vec![plan::Inline::Text("A reading".into())],
         },
@@ -378,6 +431,7 @@ fn support_required_html_swapped_notice_and_block_refuses() {
         depth: None,
         quotation: false,
         paragraph: true,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Second words.".into())],
     });
@@ -619,6 +673,7 @@ fn support_required_html_nested_styles_and_quotation_destination() {
         depth: None,
         quotation: true,
         paragraph: false,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Closing words.".into())],
     });

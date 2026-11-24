@@ -105,6 +105,11 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
             block.unit, plan.document, plan.language
         )
         .expect("string write");
+        if block.equation {
+            let (_, source) = block.equation_pair().expect("checked equation body");
+            writeln!(output, "\\[\n{source}.\n\\]\n").expect("string write");
+            continue;
+        }
         if let Some(depth) = block.depth {
             output.push_str(match depth {
                 1 => r"\section*{",

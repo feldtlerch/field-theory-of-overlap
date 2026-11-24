@@ -20,6 +20,7 @@ pub struct SkeletonSection {
 pub enum SkeletonChild {
     Unit(LocatedString),
     Paragraph(LocatedString),
+    Equation(LocatedString),
     Quotation(LocatedString),
     Section(SkeletonSection),
 }
@@ -29,6 +30,7 @@ pub struct SkeletonPosition {
     depth: Option<usize>,
     quotation: bool,
     paragraph: bool,
+    equation: bool,
     site: UnitSite,
 }
 impl SkeletonPosition {
@@ -47,6 +49,10 @@ impl SkeletonPosition {
     #[must_use]
     pub const fn paragraph(&self) -> bool {
         self.paragraph
+    }
+    #[must_use]
+    pub const fn equation(&self) -> bool {
+        self.equation
     }
     #[must_use]
     pub const fn site(&self) -> &UnitSite {
@@ -118,6 +124,7 @@ fn diagnostic(document: &str, unit: Option<&str>, site: &UnitSite, fault: Fault)
 /// Check the complete ordered structure against admitted units and factual sites.
 /// # Errors
 /// Returns every independent ownership fault, or the first resource excess.
+#[allow(clippy::too_many_lines)] // Source-order ownership checks share one traversal.
 pub fn check_skeletons<'a>(
     corpus: &'a LanguageCheckedUnits,
     drafts: &[SkeletonDraft],
@@ -142,9 +149,9 @@ pub fn check_skeletons<'a>(
             .sections
             .iter()
             .rev()
-            .map(|s| (Some(s), &s.heading, Some(1), false, false))
+            .map(|s| (Some(s), &s.heading, Some(1), false, false, false))
             .collect();
-        while let Some((section, location, depth, quotation, paragraph)) = stack.pop() {
+        while let Some((section, location, depth, quotation, paragraph, equation)) = stack.pop() {
             if depth.is_some_and(|d| d > 6) {
                 return Err(vec![diagnostic(
                     document,
@@ -184,22 +191,29 @@ pub fn check_skeletons<'a>(
                 depth,
                 quotation,
                 paragraph,
+                equation,
                 site: location.site.clone(),
             });
             if let Some(section) = section {
                 for child in section.children.iter().rev() {
                     match child {
-                        SkeletonChild::Unit(unit) => stack.push((None, unit, None, false, false)),
+                        SkeletonChild::Unit(unit) => {
+                            stack.push((None, unit, None, false, false, false));
+                        }
                         SkeletonChild::Paragraph(unit) => {
-                            stack.push((None, unit, None, false, true));
+                            stack.push((None, unit, None, false, true, false));
+                        }
+                        SkeletonChild::Equation(unit) => {
+                            stack.push((None, unit, None, false, false, true));
                         }
                         SkeletonChild::Quotation(unit) => {
-                            stack.push((None, unit, None, true, false));
+                            stack.push((None, unit, None, true, false, false));
                         }
                         SkeletonChild::Section(section) => stack.push((
                             Some(section),
                             &section.heading,
                             Some(depth.unwrap_or(0) + 1),
+                            false,
                             false,
                             false,
                         )),

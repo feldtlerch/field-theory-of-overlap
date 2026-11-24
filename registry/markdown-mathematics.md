@@ -1,10 +1,10 @@
 # Markdown mathematics observations · `reg:documents:markdown-mathematics-observations`
 
-The retained candidate pages give each exact body and its surrounding Markdown or HTML context; each M entry and A/B variant in the observation record gives its appearance and the received engine input where captured. Received bytes were measured for M02, M03, M05, M07, M12A, M22B, M25, M31, M42A and M47A; other transport conclusions are inferred from appearance. The signed-out forge view showed public commit 3e95972 at experiments/markdown-view/math/ on 2026-11-18 in Chromium 156 on Linux. Its mathematics engine was unidentified, no mathematical web font loaded, and no installed-font inventory or persistent screenshot or DOM extract was captured. These limits apply to every row below.
+The retained 2026-11-18 candidate pages give each exact body and its surrounding Markdown or HTML context; each M entry and A/B variant in the observation record gives its appearance and the received engine input where captured. Received bytes were measured for M02, M03, M05, M07, M12A, M22B, M25, M31, M42A and M47A; other transport conclusions are inferred from appearance. The signed-out forge view showed public commit 3e95972 at experiments/markdown-view/math/ on 2026-11-18 in Chromium 156 on Linux. Its mathematics engine was unidentified, no mathematical web font loaded, and no installed-font inventory or persistent screenshot or DOM extract was captured. These limits apply to the 2026-11-18 rows below.
 
 The cases are indexed per candidate page; each page holds its variants and exact source context.
 
-| Cases | Exact candidate page | Observation | Admission |
+| Cases | Candidate page or source | Observation | Admission |
 | --- | --- | --- | --- |
 | M01–M08 | [delimiters](markdown-mathematics/2026-11-18/candidates/01-delimiters.md) | [record](markdown-mathematics/2026-11-18/observation.txt) | M02's protected inline spelling; M04's separate-line display spelling; other spellings are evidence only. |
 | M09A/B–M15A/B | [punctuation](markdown-mathematics/2026-11-18/candidates/02-punctuation.md) | [record](markdown-mathematics/2026-11-18/observation.txt) | Protected inline in ordinary prose; delimiter, table, HTML, emphasis and citation-boundary characters in the body are refused. |
@@ -14,6 +14,7 @@ The cases are indexed per candidate page; each page holds its variants and exact
 | M37A/B–M42A/B | [expanded notation](markdown-mathematics/2026-11-18/candidates/06-expanded-notation.md) | [record](markdown-mathematics/2026-11-18/observation.txt) | Transport evidence only; primitive admission remains with checked notation. |
 | M43–M47A/B | [paper constructs](markdown-mathematics/2026-11-18/candidates/07-paper-constructs.md) | [record](markdown-mathematics/2026-11-18/observation.txt) | Evidence only; unresolved fonts, boxes, operators and prime appearance do not authorize replacement spellings. |
 | M48A/B–M51A/B | [failure controls](markdown-mathematics/2026-11-18/candidates/08-failure-controls.md) | [record](markdown-mathematics/2026-11-18/observation.txt) | Evidence only; rejection of an unknown macro or package command does not admit arbitrary commands. |
+| Display spacing, 2026-11-24 | A fourteen-case probe on a test branch, not retained here; the generated explainer reader files are hash-identified in the record | [record](markdown-mathematics/2026-11-24/flow-spacing-observation.md) | The checked dimensioned thick-space spelling in the separate-line double-dollar display under ADR 051; the fenced result is evidence only. |
 
 The [observation sheet](markdown-mathematics/2026-11-18/observation-sheet.md) is the recording protocol with each case's expected appearance; results are in the [observation record](markdown-mathematics/2026-11-18/observation.txt). The observation record and sheet are retained with the observing setup described in neutral terms and their measurements unchanged. Missing screenshots, retained DOM and font inventory cannot be inferred from the textual observations. New observations add a dated evidence set and a row here, leaving this record's earlier observations intact.
 
@@ -29,3 +30,4 @@ The [observation sheet](markdown-mathematics/2026-11-18/observation-sheet.md) is
 | `candidates/08-failure-controls.md` | `5d4ad4bc58606b81a914d4c48852623149bf6a3d7edb8db547e6354371da50b3` |
 | `observation.txt` | `3db14e03ea06932a13e325ea20ef65da9e617e8ac00a79556d8db8af9b6a77a7` |
 | `observation-sheet.md` | `8587edbe8a8a0a53eb5efdfc8b7a61e8d1d093d78cb81e041c3adede86d6d82e` |
+| `2026-11-24/flow-spacing-observation.md` | `195f2de4a7e466020afa6f6d8fdb2b9601db798899d5bbb3f2ebf176e00149ce` |

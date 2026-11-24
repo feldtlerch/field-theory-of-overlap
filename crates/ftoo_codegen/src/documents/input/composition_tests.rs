@@ -103,9 +103,9 @@ fn changed_skeleton_child_kind_refuses() {
     let child = &mut paper.sections[0].children[0];
     *child = match child.clone() {
         SkeletonChild::Unit(value) => SkeletonChild::Paragraph(value),
-        SkeletonChild::Paragraph(value) | SkeletonChild::Quotation(value) => {
-            SkeletonChild::Unit(value)
-        }
+        SkeletonChild::Paragraph(value)
+        | SkeletonChild::Equation(value)
+        | SkeletonChild::Quotation(value) => SkeletonChild::Unit(value),
         SkeletonChild::Section(_) => panic!("excerpt child is not a section"),
     };
     refuses(&root, &declaration, &scopes, &drafts, "skeleton child 0");

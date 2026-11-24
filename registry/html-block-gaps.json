@@ -1,6 +1,12 @@
 {
   "gaps": [
     {
+      "block": 3,
+      "document": "explainer-pilot",
+      "inline-kind": "mathematics",
+      "unit": "eq:explainer:overlap-flow"
+    },
+    {
       "block": 6,
       "document": "paper-pilot",
       "inline-kind": "see-reference",

@@ -1121,6 +1121,9 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     body.strip_prefix("# ").and_then(excerpt_text)
                 } else if block.paragraph {
                     excerpt_paragraph(body, block)
+                } else if block.equation {
+                    recover_block(body, block, DocumentTarget::Markdown)
+                        .map(|_| block.runs.iter().map(canonical_run).collect())
                 } else {
                     excerpt_refrain(body).map(|value| value.0)
                 };
@@ -1134,10 +1137,12 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     site: block.site.clone(),
                 });
                 if index > 0 {
-                    if block.paragraph {
-                        if let Some(found) =
+                    if block.paragraph || block.equation {
+                        if let Some(found) = if block.equation {
+                            recover_block(body, block, DocumentTarget::Markdown)
+                        } else {
                             recover_markdown(body, block.runs.iter().flat_map(inline_handles))
-                        {
+                        } {
                             for (run, recovered) in block.runs.iter().zip(found) {
                                 let (kind, value, site) = match (run, recovered) {
                                     (
@@ -1434,10 +1439,25 @@ pub(super) struct Block {
     pub depth: Option<usize>,
     pub quotation: bool,
     pub paragraph: bool,
+    pub equation: bool,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
 }
 impl Block {
+    pub(super) fn equation_pair(&self) -> Option<(&str, &str)> {
+        if !self.equation {
+            return None;
+        }
+        match self.runs.as_slice() {
+            [
+                Inline::Math {
+                    markdown, latex, ..
+                },
+                Inline::Text(stop),
+            ] if stop == "." => Some((markdown, latex)),
+            _ => None,
+        }
+    }
     pub fn map_pending(
         &mut self,
         book: &ftoo_manifest::AddressBook<'_>,
@@ -1575,6 +1595,30 @@ impl Block {
         flattened.into_iter()
     }
 }
+
+pub(super) fn check_equation_shape(block: &Block) -> Result<(), DocumentError> {
+    if block.equation && block.equation_pair().is_none() {
+        return Err(super::failure(
+            RuleId::M054,
+            AssemblyStage::Ownership,
+            AssemblySite::Source(block.site.clone()),
+            AssemblyFault::UnknownToken {
+                value: block.unit.clone(),
+                expected: vec![
+                    "one display mathematics insertion followed by one terminal stop".into(),
+                ],
+            },
+        ));
+    }
+    Ok(())
+}
+
+// The forge consumes a backslash before punctuation before handing a display
+// to its mathematics renderer. The dimensioned command carries the observed
+// thick-space width through that transport.
+pub(super) fn markdown_display_spelling(source: &str) -> String {
+    source.replace(r"\;", r"\hspace{0.2778em}")
+}
 pub(super) fn flatten_runs<'a>(runs: &'a [Inline], output: &mut Vec<&'a Inline>) {
     for run in runs {
         output.push(run);
@@ -1679,6 +1723,7 @@ impl Coverage {
             depth: None,
             quotation: false,
             paragraph: false,
+            equation: false,
             site: self.site.clone(),
             runs: self.runs.clone(),
         }
@@ -2015,10 +2060,10 @@ pub(super) fn end_matter(plan: &DocumentPlan) -> Vec<EndMatter<'_>> {
         .collect()
 }
 pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
-    (index > 0 && !blocks[index].paragraph).then(|| {
+    (index > 0 && !blocks[index].paragraph && !blocks[index].equation).then(|| {
         blocks[1..index]
             .iter()
-            .filter(|block| !block.paragraph)
+            .filter(|block| !block.paragraph && !block.equation)
             .count()
     })
 }
@@ -2157,7 +2202,9 @@ pub(super) fn check_excerpt_shape(
         && plan.blocks[1..].iter().all(|block| {
             block.depth.is_none()
                 && block.displays.is_empty()
-                && if block.paragraph {
+                && if block.equation {
+                    block.equation_pair().is_some()
+                } else if block.paragraph {
                     !block.runs.is_empty()
                         && block.runs.iter().all(|run| match run {
                             Inline::Text(_)
@@ -2600,7 +2647,7 @@ pub(super) fn plan_screens(
             ));
         }
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            if block.quotation || block.paragraph {
+            if block.quotation || block.paragraph || block.equation {
                 continue;
             }
             let site = positions[index].site();
@@ -2724,7 +2771,7 @@ pub(super) fn plan_screens(
         }
         let mut refrains = Vec::new();
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            if block.paragraph {
+            if block.paragraph || block.equation {
                 continue;
             }
             let source_document = skeletons
@@ -3166,6 +3213,7 @@ fn collect_reader_error(errors: &mut Vec<AssemblyDiagnostic>, error: DocumentErr
         }
     }
 }
+#[allow(clippy::too_many_lines)] // Document positions, recovery sites and screen inventories share one pass.
 pub(super) fn build(
     skeletons: &CheckedSkeletons<'_>,
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
@@ -3176,7 +3224,14 @@ pub(super) fn build(
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
     let corpus = skeletons.corpus();
     let book = welded.integrated().resolved().book();
-    let equations = equations(corpus, notation, displays)?;
+    let equation_units: BTreeSet<_> = skeletons
+        .documents()
+        .values()
+        .flatten()
+        .filter(|position| position.equation())
+        .map(|position| position.unit().to_owned())
+        .collect();
+    let equations = equations(corpus, notation, displays, &equation_units)?;
     let coverage = book.graph().coverage();
     let gate = match coverage.release_gate {
         ftoo_manifest::ReleaseGate::ExplicitPartial => "explicit-partial",
@@ -3223,13 +3278,15 @@ pub(super) fn build(
                     depth: position.depth(),
                     quotation: position.quotation(),
                     paragraph: position.paragraph(),
-                    site: if position.paragraph() {
+                    equation: position.equation(),
+                    site: if position.paragraph() || position.equation() {
                         unit.texts()[language].site().clone()
                     } else {
                         metadata[position.unit()].clone()
                     },
                     runs,
                 };
+                check_equation_shape(&block)?;
                 if let Err(error) = block.map_citations(book, document, language) {
                     collect_reader_error(&mut errors, error);
                 }
@@ -3259,10 +3316,58 @@ pub(super) fn build(
     Ok(plans)
 }
 type Equations = BTreeMap<(String, String), (String, String, Vec<crate::PendingEntry>)>;
+pub(super) fn check_equation_mode(
+    key: &str,
+    source_len: usize,
+    requested: bool,
+    unicode_returned: bool,
+    macro_returned: bool,
+) -> Result<(), (std::ops::Range<usize>, AssemblyFault)> {
+    if unicode_returned == requested && macro_returned == requested {
+        Ok(())
+    } else {
+        Err((
+            0..source_len,
+            AssemblyFault::UnknownToken {
+                value: key.into(),
+                expected: vec!["matching rendered display mode".into()],
+            },
+        ))
+    }
+}
+
+#[allow(clippy::too_many_arguments)] // One diagnostic retains its document, unit, source and mathematical use sites.
+pub(super) fn equation_diagnostic(
+    document: &str,
+    unit: &str,
+    site: &UnitSite,
+    key: &str,
+    uses: Vec<MathUseSite>,
+    bytes: std::ops::Range<usize>,
+    fault: AssemblyFault,
+) -> AssemblyDiagnostic {
+    AssemblyDiagnostic {
+        rule: RuleId::M053,
+        stage: AssemblyStage::Math,
+        document: Some(document.into()),
+        unit: Some(unit.into()),
+        language: None,
+        target: None,
+        site: AssemblySite::Math {
+            definition: site.clone(),
+            key: key.into(),
+            bytes,
+            uses,
+        },
+        fault,
+    }
+}
+#[allow(clippy::too_many_lines)] // Each source is checked for either inline or display mode at the same use sites.
 fn equations(
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     notation: &RenderableNotation<'_, '_, '_>,
     displays: &ftoo_manifest::CheckedDisplays<'_>,
+    equation_units: &BTreeSet<String>,
 ) -> Result<Equations, DocumentError> {
     let mut equations = BTreeMap::new();
     let mut errors = Vec::new();
@@ -3295,27 +3400,82 @@ fn equations(
                     }
                 }
             }
-            let parsed = ftoo_manifest::parse_assembly_math(notation.catalogue(), &source.value);
+            let is_display = equation_units.contains(unit.label().as_str());
+            let parsed = if is_display {
+                ftoo_manifest::parse_assembly_display_math(notation.catalogue(), &source.value)
+            } else {
+                ftoo_manifest::parse_assembly_math(notation.catalogue(), &source.value)
+            };
             let outcome = match parsed {
                 Ok(parsed) => {
                     let ranges = parsed.ranges().to_vec();
-                    notation
-                        .check_expression(parsed.into_draft())
-                        .and_then(|expr| {
-                            let unicode = expr.render(RenderTarget::Unicode)?;
-                            let macro_form = expr.render(RenderTarget::Macro)?;
-                            Ok((
-                                unicode.source().to_owned(),
-                                macro_form.source().to_owned(),
-                                unicode.pending_entries().to_vec(),
-                            ))
-                        })
-                        .map_err(|cause| {
-                            (
-                                notation_bytes(&cause, &ranges, source.value.len()),
-                                AssemblyFault::MathNotation { cause },
-                            )
-                        })
+                    (if is_display {
+                        notation.check_document_expression(parsed.into_draft())
+                    } else {
+                        notation.check_expression(parsed.into_draft())
+                    })
+                    .and_then(|expr| {
+                        let unicode = if is_display {
+                            expr.render_display(RenderTarget::Unicode)?
+                        } else {
+                            expr.render(RenderTarget::Unicode)?
+                        };
+                        let macro_form = if is_display {
+                            expr.render_display(RenderTarget::Macro)?
+                        } else {
+                            expr.render(RenderTarget::Macro)?
+                        };
+                        let markdown_returned = if is_display {
+                            Some(notation.check_markdown_display_source(&format!(
+                                "{}.",
+                                markdown_display_spelling(unicode.source())
+                            ))?)
+                        } else {
+                            None
+                        };
+                        Ok((
+                            unicode.source().to_owned(),
+                            macro_form.source().to_owned(),
+                            unicode.pending_entries().to_vec(),
+                            unicode.is_display(),
+                            macro_form.is_display(),
+                            markdown_returned,
+                        ))
+                    })
+                    .map_err(|cause| {
+                        (
+                            notation_bytes(&cause, &ranges, source.value.len()),
+                            AssemblyFault::MathNotation { cause },
+                        )
+                    })
+                    .and_then(
+                        |(
+                            unicode,
+                            macro_form,
+                            pending,
+                            unicode_returned,
+                            macro_returned,
+                            markdown_returned,
+                        )| {
+                            check_equation_mode(
+                                key,
+                                source.value.len(),
+                                is_display,
+                                unicode_returned,
+                                macro_returned,
+                            )?;
+                            if let Some(markdown_returned) = markdown_returned {
+                                check_equation_mode(
+                                    key,
+                                    source.value.len(),
+                                    is_display,
+                                    markdown_returned,
+                                    markdown_returned,
+                                )?;
+                            }
+                            Ok((unicode, macro_form, pending))
+                        },
+                    )
                 }
                 Err((bytes, fault)) => Err((bytes, fault.into())),
             };
@@ -3323,21 +3483,15 @@ fn equations(
                 Ok(pair) => {
                     equations.insert((unit.label().as_str().to_owned(), key.clone()), pair);
                 }
-                Err((bytes, fault)) => errors.push(AssemblyDiagnostic {
-                    rule: RuleId::M053,
-                    stage: AssemblyStage::Math,
-                    document: Some(unit.document().into()),
-                    unit: Some(unit.label().as_str().into()),
-                    language: None,
-                    target: None,
-                    site: AssemblySite::Math {
-                        definition: source.site.clone(),
-                        key: key.clone(),
-                        bytes,
-                        uses,
-                    },
+                Err((bytes, fault)) => errors.push(equation_diagnostic(
+                    unit.document(),
+                    unit.label().as_str(),
+                    &source.site,
+                    key,
+                    uses,
+                    bytes,
                     fault,
-                }),
+                )),
             }
         }
     }
@@ -3661,6 +3815,27 @@ fn normalize(runs: &mut [Inline]) {
 }
 
 fn recover_block(body: &str, block: &Block, target: DocumentTarget) -> Option<Vec<Recovered>> {
+    if block.equation {
+        let (markdown, latex) = block.equation_pair()?;
+        let expected = if target == DocumentTarget::Markdown {
+            format!("$$\n{}.\n$$", markdown_display_spelling(markdown))
+        } else {
+            format!("\\[\n{latex}.\n\\]")
+        };
+        return (body == expected).then(|| {
+            vec![
+                Recovered::Math(
+                    if target == DocumentTarget::Markdown {
+                        markdown
+                    } else {
+                        latex
+                    }
+                    .into(),
+                ),
+                Recovered::Text(".".into()),
+            ]
+        });
+    }
     if target == DocumentTarget::Markdown {
         let heading = block
             .depth
@@ -4180,6 +4355,7 @@ pub(super) fn display_plans(
                 depth: None,
                 quotation: false,
                 paragraph: false,
+                equation: false,
                 site: region.site(&region.source().site),
                 runs,
                 displays: BTreeMap::new(),
@@ -4937,6 +5113,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         depth: None,
         quotation: false,
         paragraph: false,
+        equation: false,
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),

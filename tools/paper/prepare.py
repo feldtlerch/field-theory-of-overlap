@@ -22,7 +22,7 @@ def scope_fragments(repository):
                 'M079: Inclusion row differs: '+str(number))
         source, unit, fragment, role, line = fields
         require(source.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(source).parts
-                and role in ('refrain', 'paragraph', 'quotation') and int(line) > 0,
+                and role in ('refrain', 'paragraph', 'quotation', 'equation') and int(line) > 0,
                 'M079: Inclusion row differs: '+str(number))
         rows.append((source, unit, fragment, role, int(line)))
     require(rows, 'M079: Checked inclusions absent')
@@ -45,12 +45,20 @@ def paper_master(text, version):
     return paper
 
 
+def equation_tokens(body):
+    """Compare TeX math without ignored layout whitespace, preserving word spaces."""
+    pieces = re.split(rb'(\\text\{[^{}]*\})', body.replace(b'\\times{}', b'\\times'))
+    return b''.join(piece if index % 2 else re.sub(rb'\s+', b'', piece)
+                    for index, piece in enumerate(pieces))
+
+
 def declared_fragments(repository, rows):
     """Validate unique source markers and return their replacement lines."""
     replacements = {}
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
+    equation_bodies = []
     fragments = scope_fragments(repository)
     declared = {(source, unit) for source, unit, _, _, _ in fragments}
     require(len(declared) == len(fragments), 'Duplicate fragment slot')
@@ -62,7 +70,8 @@ def declared_fragments(repository, rows):
         require(positions == [line], 'M055: Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
         expected_macro = {'quotation': b'paperrefrain', 'refrain': b'refrain',
-                          'paragraph': b'PaperNativeParagraph'}[role]
+                          'paragraph': b'PaperNativeParagraph',
+                          'equation': b'PaperNativeEquation'}[role]
         prefix = b'\\'+expected_macro+b'{'+unit.encode()+b'}{'
         require(data.startswith(prefix),
                 ('M055: Fragment label/declaration differs: ' if role == 'paragraph'
@@ -88,6 +97,11 @@ def declared_fragments(repository, rows):
                 require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
                         'M055: Fragment reference binding differs: '+fragment)
             paragraph_bodies.append(b' '.join(body.split()))
+        elif role == 'equation':
+            require(body.startswith(b'\\[') and body.endswith(b'.\\]')
+                    and body.count(b'\\[') == 1 and body.count(b'\\]') == 1,
+                    'M055: Fragment equation envelope differs: '+fragment)
+            equation_bodies.append(equation_tokens(body[2:-3]))
         else:
             require(body and b'{' not in body and b'}' not in body,
                     'Fragment body differs: '+fragment)
@@ -108,6 +122,9 @@ def declared_fragments(repository, rows):
         for paragraph_body in paragraph_bodies:
             require(paragraph_body not in normalized,
                     'M055: Authored paragraph duplicates a declared fragment: '+source)
+        for equation_body in equation_bodies:
+            require(equation_body not in equation_tokens(data),
+                    'M055: Authored equation duplicates a declared fragment: '+source)
     for source in rows:
         for number, line in enumerate((repository/source).read_bytes().splitlines(), 1):
             marker = re.match(rb'\s*%\s*generated\s*:', line)

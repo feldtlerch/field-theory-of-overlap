@@ -78,6 +78,25 @@ fn support_required_math_text_display_spelling_and_layout() {
     assert_ne!(inline, display);
     assert!(display.contains("katex-display"));
     assert!(!inline.contains("katex-display"));
+    assert!(!returned_display_mode(
+        "<span class=\"katex\"><annotation>class=\"katex-display\"</annotation></span>"
+    ));
+    let returned_mode = typeset_with_adapter(
+        RenderTarget::Unicode,
+        screen.source(),
+        rendered_site(
+            RenderOwner::Expression,
+            "inline-for-display",
+            screen.source(),
+            vec![],
+        ),
+        || Ok(Ok(inline)),
+    )
+    .unwrap();
+    assert!(
+        !returned_mode,
+        "the returned inline result cannot certify display mode"
+    );
     let literal = |value: &str| ExprDraft::Literal {
         value: value.into(),
     };
@@ -109,6 +128,27 @@ fn support_required_math_text_display_spelling_and_layout() {
         flow.render_display(RenderTarget::Unicode).unwrap().source(),
         r"\underbrace{\dot{σ}}_{\text{change in overlap}}\;=\;\underbrace{{ω}_{\mathrm{net}}}_{\text{will, signed}}\;-\;\underbrace{γσ}_{\text{decay}}\;+\;\underbrace{\text{reward-fed growth}}_{\text{surplus}×\text{witness density}}"
     );
+    let display_spelling = flow
+        .render_display(RenderTarget::Unicode)
+        .unwrap()
+        .source()
+        .replace(r"\;", r"\hspace{0.2778em}");
+    assert!(
+        renderable
+            .check_markdown_display_source(&format!("{display_spelling}."))
+            .unwrap()
+    );
+    let rejected = renderable
+        .check_markdown_display_source(r"\unsupported{}.")
+        .unwrap_err();
+    assert!(matches!(
+        rejected,
+        NotationRenderError::Admission(ref errors)
+            if errors.diagnostics().iter().any(|diagnostic| matches!(
+                diagnostic.fault,
+                NotationFault::KaTeXRejected { .. }
+            ))
+    ));
     let word = |value: &str| ExprDraft::Text {
         runs: vec![ftoo_manifest::TextRun {
             text: value.into(),
@@ -3198,7 +3238,7 @@ fn committed_adapter_and_ci_pins_are_fixed() {
     assert!(script.contains("function options(mathml = false, display = false)"));
     assert!(script.contains("output: mathml ? 'mathml' : 'htmlAndMathml', displayMode: display, maxExpand: 1000, macros: {}"));
     assert!(script.contains("'--mathml-inline'"));
-    assert!(!script.contains("--mathml-display"));
+    assert!(script.contains("'--mathml-display'"));
 }
 
 #[test]

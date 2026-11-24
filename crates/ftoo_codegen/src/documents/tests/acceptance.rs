@@ -82,6 +82,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         depth: None,
         quotation: false,
         paragraph: true,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text("one—-two".into())],
     };
@@ -109,6 +110,7 @@ fn paper_paragraph_refuses_object_bound_mathematics_at_its_use() {
         depth: None,
         quotation: false,
         paragraph: true,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Math {
             definition_site: site.clone(),
@@ -147,6 +149,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
             depth: None,
             quotation: false,
             paragraph: true,
+            equation: false,
             site: site.clone(),
             runs: vec![plan::Inline::Math {
                 definition_site: site.clone(),
@@ -169,6 +172,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
                     depth: Some(1),
                     quotation: false,
                     paragraph: false,
+                    equation: false,
                     site: site.clone(),
                     runs: vec![plan::Inline::Text("Heading".into())],
                 },
@@ -1011,13 +1015,14 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
     let register: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("registry/html-block-gaps.json"))?)?;
     let registered = register["gaps"].as_array().unwrap();
-    assert_eq!(gaps.len(), 1);
-    assert_eq!(registered.len(), 1);
+    assert_eq!(gaps.len(), 2);
+    assert_eq!(registered.len(), 2);
     let refusal = crate::paper::html_gaps::refusal(gaps)
         .unwrap_err()
         .to_string();
     assert!(refusal.contains("HTML block gaps"));
     assert!(refusal.contains("units/statements/coda-audit-bottoms.toml"));
+    assert!(refusal.contains("units/statements/explainer-overlap-flow.toml"));
     let declaration = crate::UnitSource {
         file: "units/documents.toml".into(),
         bytes: input::read(&root, "units/documents.toml")?,
@@ -1045,6 +1050,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                             match child {
                                 ftoo_manifest::SkeletonChild::Unit(unit)
                                 | ftoo_manifest::SkeletonChild::Paragraph(unit)
+                                | ftoo_manifest::SkeletonChild::Equation(unit)
                                 | ftoo_manifest::SkeletonChild::Quotation(unit) => {
                                     paths.push(format!(
                                         "generated/documents/{document}/{}.tex",
@@ -1407,6 +1413,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
             depth: Some(1),
             quotation: false,
             paragraph: false,
+            equation: false,
             site: input::site("units/statements/fixture.toml"),
             runs: vec![
                 plan::Inline::Text("Before ".into()),
@@ -1493,6 +1500,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 depth: (name == "a").then_some(1),
                 quotation: false,
                 paragraph: false,
+                equation: false,
                 site: input::site(&format!("units/statements/{name}.toml")),
                 runs: vec![plan::Inline::Text(name.to_uppercase())],
             })
@@ -1617,6 +1625,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
             depth: None,
             quotation: false,
             paragraph: false,
+            equation: false,
             site: input::site("units/statements/fixture.toml"),
             runs: ["first", "second", "first"]
                 .into_iter()
@@ -1664,6 +1673,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             depth: None,
             quotation: false,
             paragraph: false,
+            equation: false,
             site: site.clone(),
             runs: vec![
                 plan::Inline::Tag {
@@ -2010,6 +2020,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     depth,
                     quotation: false,
                     paragraph: false,
+                    equation: false,
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
@@ -2026,6 +2037,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     depth: None,
                     quotation: false,
                     paragraph: false,
+                    equation: false,
                     site: origin.clone(),
                     runs: std::mem::take(&mut plan.blocks[0].runs),
                     displays: BTreeMap::new(),
@@ -2037,6 +2049,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     depth: None,
                     quotation: false,
                     paragraph: false,
+                    equation: false,
                     site: input::site("units/displays/fixture.toml"),
                     runs: vec![plan::Inline::Text("Cell.".into())],
                     displays: BTreeMap::new(),
@@ -2334,4 +2347,77 @@ Audit outcomes: \FtdocTag{{v:1}}{{g-audit-0}}% label claim:langevin:coefficient-
         .unwrap()
         + start;
     assert_eq!(&source[start..end], expected);
+}
+#[test]
+fn explainer_flow_matches_captured_source_tokens() {
+    fn tokens(source: &str) -> String {
+        let mut output = String::new();
+        let mut inside_text = false;
+        let mut chars = source.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                output.push(c);
+                if chars.clone().take(5).collect::<String>() == "text{" {
+                    inside_text = true;
+                }
+                continue;
+            }
+            if inside_text && c == '}' {
+                inside_text = false;
+            }
+            if inside_text || !c.is_ascii_whitespace() {
+                output.push(c);
+            }
+        }
+        output
+    }
+    let parent = include_str!("../../../../../registry/explainer-flow-parent.tex");
+    let generated = include_str!(
+        "../../../../../generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex"
+    );
+    let body = generated
+        .strip_prefix(r"\PaperNativeEquation{eq:explainer:overlap-flow}{")
+        .unwrap()
+        .strip_suffix("}\n")
+        .unwrap();
+    assert_eq!(tokens(body), tokens(parent).replace(r"\times", r"\times{}"));
+    let markdown = include_str!("../../../../../generated/documents/explainer-pilot/en.md");
+    let annotated = include_str!("../../../../../generated/documents/explainer-pilot/en.labels.md");
+    let displayed = markdown
+        .split("$$\n")
+        .nth(1)
+        .unwrap()
+        .split("\n$$")
+        .next()
+        .unwrap();
+    let annotated_display = annotated
+        .split("$$\n")
+        .nth(1)
+        .unwrap()
+        .split("\n$$")
+        .next()
+        .unwrap();
+    assert_eq!(displayed, annotated_display);
+    let source_display = tokens(parent)
+        .strip_prefix(r"\[")
+        .unwrap()
+        .strip_suffix(r"\]")
+        .unwrap()
+        .replace(r"\alignrate", r"\dot{σ}")
+        .replace(r"\willnet", r"{ω}_{\mathrm{net}}")
+        .replace(r"\willdecay", "γσ")
+        .replace(r"\times", "×")
+        .replace(r"\;", r"\hspace{0.2778em}");
+    assert_eq!(tokens(displayed), source_display);
+    for changed in [
+        body.replacen(r"\;=\;", "=", 1),
+        body.replacen(r"\;-\;", r"\;+\;", 1),
+        body.replacen("will, signed", "decay", 1),
+        body.replacen(r"\times{}", r"\times", 1),
+    ] {
+        assert_ne!(
+            tokens(&changed),
+            tokens(parent).replace(r"\times", r"\times{}")
+        );
+    }
 }

@@ -16,6 +16,12 @@ Not yet converted: intervening material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+$$
+\underbrace{\dot{σ}}_{\text{change in overlap}}\hspace{0.2778em}=\hspace{0.2778em}\underbrace{{ω}_{\mathrm{net}}}_{\text{will, signed}}\hspace{0.2778em}-\hspace{0.2778em}\underbrace{γσ}_{\text{decay}}\hspace{0.2778em}+\hspace{0.2778em}\underbrace{\text{reward-fed growth}}_{\text{surplus}×\text{witness density}}.
+$$
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <p align="center"><em>Close to all, enemy to none.</em></p>
 <p align="right"><a href="../paper-pilot/en.md#sec-cenemy--to--none">sec:enemy&#45;to&#45;none</a></p>
 

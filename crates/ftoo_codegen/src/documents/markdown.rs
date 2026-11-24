@@ -304,6 +304,33 @@ pub(super) fn check_math_admission(plan: &DocumentPlan) -> Result<(), DocumentEr
         check_runs(plan, None, runs, "audit prose", true)?;
     }
     for (index, block) in plan.blocks.iter().enumerate() {
+        if block.equation {
+            let [
+                Inline::Math {
+                    markdown: source,
+                    site,
+                    definition_site,
+                    key,
+                    ..
+                },
+                Inline::Text(_),
+            ] = block.runs.as_slice()
+            else {
+                unreachable!("checked equation body")
+            };
+            check_math_body(
+                plan,
+                Some(&block.unit),
+                site,
+                definition_site,
+                key,
+                "top-level display",
+                true,
+                &super::plan::markdown_display_spelling(source),
+                None,
+            )?;
+            continue;
+        }
         let (context, admitted) = if plan.screen.is_some() {
             if index == 0 {
                 ("screen heading", false)
@@ -395,6 +422,16 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
                 output.push_str("\n\n");
                 continue;
             }
+            if block.equation {
+                let (source, _) = block.equation_pair().expect("checked equation body");
+                writeln!(
+                    output,
+                    "$$\n{}.\n$$\n",
+                    super::plan::markdown_display_spelling(source)
+                )
+                .expect("string write");
+                continue;
+            }
             let refrain = &screen.refrains[super::plan::refrain_index(&plan.blocks, index)
                 .expect("non-paragraph screen position")];
             if refrain.quotation.is_some() {
@@ -472,6 +509,16 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
             block.unit, plan.document, plan.language
         )
         .expect("string write");
+        if block.equation {
+            let (source, _) = block.equation_pair().expect("checked equation body");
+            writeln!(
+                output,
+                "$$\n{}.\n$$\n",
+                super::plan::markdown_display_spelling(source)
+            )
+            .expect("string write");
+            continue;
+        }
         if let Some(depth) = block.depth {
             write!(output, "{} ", "#".repeat(depth)).expect("string write");
         }

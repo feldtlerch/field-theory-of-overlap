@@ -43,6 +43,7 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
             depth,
             quotation: false,
             paragraph: false,
+            equation: false,
             site: site(),
             runs: vec![
                 insertion(citation),

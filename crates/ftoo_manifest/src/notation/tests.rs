@@ -1687,7 +1687,7 @@ fn document_text_run_cannot_step_past_node_bound() -> TestResult {
                             decoded: 0..1,
                         }],
                     },
-                    primitive(PrimitiveId::Negate, vec![literal("a")]),
+                    primitive(PrimitiveId::Negate, vec![literal("a"), literal("b")]),
                 ],
             ),
         ],
@@ -1708,6 +1708,43 @@ fn document_text_run_cannot_step_past_node_bound() -> TestResult {
             path: argument_path(&[1, 0]),
         }
     );
+    Ok(())
+}
+#[test]
+fn document_text_runs_keep_source_and_decoded_order() -> TestResult {
+    let graph = seed()?;
+    let book = addressing(&graph)?;
+    let catalogue = notation(&book)?;
+    for (first, source, decoded) in [
+        ("a", vec![2..3, 0..1], vec![0..1, 2..3]),
+        ("ab", vec![0..2, 1..2], vec![0..2, 2..3]),
+        ("a", vec![0..1, 2..3], vec![2..3, 0..1]),
+    ] {
+        let expression = ExprDraft::Text {
+            runs: vec![
+                TextRun {
+                    text: first.into(),
+                    source: source[0].clone(),
+                    decoded: decoded[0].clone(),
+                },
+                TextRun {
+                    text: "b".into(),
+                    source: source[1].clone(),
+                    decoded: decoded[1].clone(),
+                },
+            ],
+        };
+        let error = check_document_expression(&catalogue, expression).unwrap_err();
+        assert!(error.diagnostics().iter().any(|diagnostic| diagnostic.fault
+            == NotationFault::InvalidText { value: "b".into() }
+            && diagnostic.site
+                == NotationSite::Expression {
+                    path: vec![
+                        NotationPathPart::Field("runs".into()),
+                        NotationPathPart::Argument(1)
+                    ]
+                }));
+    }
     Ok(())
 }
 // Independent visit arithmetic: a duplicating invocation visits its call, the

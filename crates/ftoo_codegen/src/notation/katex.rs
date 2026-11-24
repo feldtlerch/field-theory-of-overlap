@@ -616,6 +616,16 @@ pub(super) fn invoke_mathml(
         run(support, Some(source.as_bytes()), true, false)
     })
 }
+#[cfg(test)]
+pub(super) fn invoke_mathml_display(
+    support: &Support,
+    source: &str,
+) -> Result<Result<String, String>, NotationAdapterFault> {
+    crate::telemetry::counter("notation.logical_requests", 1);
+    invoke_with(support, false, || {
+        run(support, Some(source.as_bytes()), true, true)
+    })
+}
 pub(super) fn invoke_display(
     support: &Support,
     source: &str,

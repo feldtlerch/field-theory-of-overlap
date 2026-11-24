@@ -1080,6 +1080,23 @@ fn fragment_macro(block: &plan::Block) -> &'static str {
 }
 
 fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
+    if block.equation {
+        let (_, source) = block.equation_pair().ok_or_else(|| {
+            failure(
+                RuleId::M055,
+                AssemblyStage::Emission,
+                AssemblySite::Source(block.site.clone()),
+                AssemblyFault::UnsupportedParagraphBody {
+                    reason: "equation body must contain one display insertion and a terminal stop"
+                        .into(),
+                },
+            )
+        })?;
+        return Ok(format!(
+            "\\PaperNativeEquation{{{}}}{{\\[{source}.\\]}}\n",
+            block.unit
+        ));
+    }
     if block.paragraph {
         return paragraph_fragment_line(block);
     }

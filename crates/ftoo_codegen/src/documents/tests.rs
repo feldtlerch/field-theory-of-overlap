@@ -996,7 +996,8 @@ fn declared_positions(section: &ftoo_manifest::SkeletonSection, out: &mut Vec<(S
     for child in &section.children {
         match child {
             ftoo_manifest::SkeletonChild::Unit(unit)
-            | ftoo_manifest::SkeletonChild::Paragraph(unit) => {
+            | ftoo_manifest::SkeletonChild::Paragraph(unit)
+            | ftoo_manifest::SkeletonChild::Equation(unit) => {
                 out.push((unit.value.clone(), false));
             }
             ftoo_manifest::SkeletonChild::Quotation(unit) => {
@@ -1054,10 +1055,9 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
             continue;
         }
         for language in &corpus.documents()[document] {
-            for position in positions
-                .iter()
-                .filter(|position| position.depth().is_none() && !position.paragraph())
-            {
+            for position in positions.iter().filter(|position| {
+                position.depth().is_none() && !position.paragraph() && !position.equation()
+            }) {
                 let unit = corpus
                     .units()
                     .iter()
@@ -1070,6 +1070,7 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
                     depth: position.depth(),
                     quotation: position.quotation(),
                     paragraph: position.paragraph(),
+                    equation: position.equation(),
                     site: position.site().clone(),
                     runs: vec![plan::Inline::Text(unit.texts()[language].text().into())],
                 };
@@ -1132,6 +1133,12 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         .unwrap()
         .bytes
         .extend_from_slice(b"fr = \"Ce paragraphe presente la theorie.\"\n");
+    multilingual_statements
+        .iter_mut()
+        .find(|source| source.file.ends_with("explainer-overlap-flow.toml"))
+        .unwrap()
+        .bytes
+        .extend_from_slice(b"fr = '@math{flow}.'\n");
     let multilingual = crate::load_unit_sources(
         crate::UnitSource {
             file: "units/documents.toml".into(),
@@ -1211,6 +1218,7 @@ fn typography_apostrophe_contexts() {
         depth,
         quotation: false,
         paragraph: false,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text(text.into())],
     };
@@ -1329,6 +1337,7 @@ fn fragment_macro_follows_planned_quotation() {
         depth: None,
         quotation: false,
         paragraph: false,
+        equation: false,
         site: input::site("units/statements/fixture.toml"),
         runs: vec![plan::Inline::Text("Refrain.".into())],
     };
@@ -1546,6 +1555,7 @@ skeleton={document='main',sections=[{heading='sec:fixture:first',children=[{kind
                 expected: vec![
                     "unit".into(),
                     "paragraph".into(),
+                    "equation".into(),
                     "quotation".into(),
                     "section".into(),
                 ],
@@ -2325,6 +2335,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
             depth: Some(1),
             quotation: false,
             paragraph: false,
+            equation: false,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Coefficient ".into()),
@@ -3508,6 +3519,205 @@ fn fixture_plan_from_text(book: &ftoo_manifest::AddressBook<'_>, text: &str) -> 
 }
 
 #[test]
+fn equation_display_boundaries_and_attachments_recover_from_both_writers() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let mut plan = fixture_plan_from_text(&book, "A display.");
+    let block = &mut plan.blocks[0];
+    block.unit = "eq:fixture:flow".into();
+    block.depth = None;
+    block.paragraph = false;
+    block.equation = true;
+    let site = input::site("units/statements/fixture.toml");
+    block.runs = vec![
+        plan::Inline::Math {
+            definition_site: site.clone(),
+            key: "flow".into(),
+            markdown: r"\underbrace{σ}_{\text{will, signed}}\;+\;\underbrace{γ}_{\text{decay}}"
+                .into(),
+            latex:
+                r"\underbrace{\sigma}_{\text{will, signed}}\;+\;\underbrace{\gamma}_{\text{decay}}"
+                    .into(),
+            pending: vec![],
+            site,
+        },
+        plan::Inline::Text(".".into()),
+    ];
+    for target in [DocumentTarget::Latex, DocumentTarget::Markdown] {
+        let source = if target == DocumentTarget::Latex {
+            latex::render(&plan)
+        } else {
+            markdown::render(&plan)
+        };
+        plan::check_emission(&plan, &source, target).unwrap();
+        if target == DocumentTarget::Markdown {
+            assert!(source.contains(r"\hspace{0.2778em}+\hspace{0.2778em}"));
+            assert!(!source.contains(r"\;+\;"));
+        }
+        let mut changed_sources = vec![
+            source.replacen("will, signed", "decay", 1),
+            source
+                .replacen("will, signed", "swapped attachment", 1)
+                .replacen("decay", "will, signed", 1)
+                .replacen("swapped attachment", "decay", 1),
+            source.replacen("decay}}.\n", "decay}}\n", 1),
+        ];
+        if target == DocumentTarget::Markdown {
+            changed_sources.push(source.replacen(r"\hspace{0.2778em}", r"\;", 1));
+            changed_sources.push(source.replacen(r"\hspace{0.2778em}", ";", 1));
+        }
+        for changed in changed_sources {
+            assert_ne!(changed, source);
+            let error = plan::check_emission(&plan, &changed, target).unwrap_err();
+            assert!(format!("{error:?}").contains("EmissionMismatch"));
+        }
+    }
+    let plan::Inline::Math { markdown, .. } = &mut plan.blocks[0].runs[0] else {
+        unreachable!()
+    };
+    markdown.push(':');
+    let error = markdown::check_math_admission(&plan).unwrap_err();
+    assert!(format!("{error:?}").contains("ForbiddenBodyCharacter"));
+    assert!(format!("{error:?}").contains("top-level display"));
+    let DocumentError::Assembly(errors) = error else {
+        panic!("located display refusal")
+    };
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(input::site("units/statements/fixture.toml"))
+    );
+}
+
+#[test]
+fn equation_shape_refuses_missing_stop_at_source_under_m054() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let mut plan = fixture_plan_from_text(&book, "A display.");
+    let block = &mut plan.blocks[0];
+    block.unit = "eq:fixture:flow".into();
+    block.equation = true;
+    block.runs = vec![plan::Inline::Math {
+        definition_site: block.site.clone(),
+        key: "flow".into(),
+        markdown: "x".into(),
+        latex: "x".into(),
+        pending: vec![],
+        site: block.site.clone(),
+    }];
+    let error = plan::check_equation_shape(block).unwrap_err();
+    let DocumentError::Assembly(errors) = error else {
+        panic!("located refusal")
+    };
+    assert_eq!(errors.diagnostics()[0].rule, RuleId::M054);
+    assert_eq!(
+        errors.diagnostics()[0].site,
+        AssemblySite::Source(block.site.clone())
+    );
+}
+
+#[test]
+fn inline_adapter_markup_is_classified_and_helper_builds_located_equation_diagnostic() {
+    let inline_output = "<span class=\"katex\"><span class=\"katex-html\">x</span></span>";
+    let returned = crate::notation::returned_display_mode(inline_output);
+    let (bytes, fault) =
+        plan::check_equation_mode("flow", 1, true, returned, returned).unwrap_err();
+    let site = input::site("units/statements/explainer-overlap-flow.toml");
+    let diagnostic = plan::equation_diagnostic(
+        "explainer-pilot",
+        "eq:explainer:overlap-flow",
+        &site,
+        "flow",
+        vec![],
+        bytes,
+        fault,
+    );
+    assert_eq!(diagnostic.rule, RuleId::M053);
+    assert_eq!(
+        diagnostic.unit.as_deref(),
+        Some("eq:explainer:overlap-flow")
+    );
+    assert_eq!(
+        diagnostic.site,
+        AssemblySite::Math {
+            definition: site,
+            key: "flow".into(),
+            bytes: 0..1,
+            uses: vec![],
+        }
+    );
+    let AssemblyFault::UnknownToken { expected, .. } = diagnostic.fault else {
+        panic!("mode refusal")
+    };
+    assert_eq!(expected, vec!["matching rendered display mode"]);
+}
+
+#[test]
+fn screen_excerpt_equation_recovery_rejects_attachment_swap() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = reader_fixture_book(&graph);
+    let mut plan = fixture_plan_from_text(&book, "A display.");
+    let site = input::site("units/statements/fixture.toml");
+    plan.blocks[0].unit = "eq:fixture:flow".into();
+    plan.blocks[0].depth = None;
+    plan.blocks[0].paragraph = false;
+    plan.blocks[0].equation = true;
+    plan.blocks[0].runs = vec![
+        plan::Inline::Math {
+            definition_site: site.clone(),
+            key: "flow".into(),
+            markdown: r"\underbrace{σ}_{\text{first}}+\underbrace{γ}_{\text{second}}".into(),
+            latex: r"\underbrace{\sigma}_{\text{first}}+\underbrace{\gamma}_{\text{second}}".into(),
+            pending: vec![],
+            site: site.clone(),
+        },
+        plan::Inline::Text(".".into()),
+    ];
+    plan.blocks.insert(
+        0,
+        plan::Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:heading".into(),
+            depth: Some(1),
+            quotation: false,
+            paragraph: false,
+            equation: false,
+            site: site.clone(),
+            runs: vec![plan::Inline::Text("A reading".into())],
+        },
+    );
+    plan.screen = Some(plan::ScreenPlan {
+        gaps: vec![
+            plan::ScreenGap {
+                position: GapPosition::Before,
+                message: String::new(),
+                site: site.clone(),
+                boundaries: vec![],
+            },
+            plan::ScreenGap {
+                position: GapPosition::After,
+                message: String::new(),
+                site: site.clone(),
+                boundaries: vec![],
+            },
+        ],
+        refrains: vec![],
+        index: vec![],
+        html_gaps: BTreeMap::new(),
+        end_matter: vec![],
+    });
+    let annotated = format!("{}\n", markdown::render(&plan).trim_end_matches('\n'));
+    plan::check_emission(&plan, &annotated, DocumentTarget::Markdown).unwrap();
+    let changed = annotated
+        .replacen("first", "temporary annotation", 1)
+        .replacen("second", "first", 1)
+        .replacen("temporary annotation", "second", 1);
+    assert_ne!(changed, annotated);
+    let error = plan::check_emission(&plan, &changed, DocumentTarget::Markdown).unwrap_err();
+    assert!(format!("{error:?}").contains("EmissionMismatch"));
+}
+
+#[test]
 fn checked_styles_cross_scanner_plan_writers_and_recovery() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = reader_fixture_book(&graph);
@@ -4035,6 +4245,7 @@ fn markdown_style_screen_paragraph_is_observed() {
         depth: Some(1),
         quotation: false,
         paragraph: false,
+        equation: false,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Screen".into())],
     };

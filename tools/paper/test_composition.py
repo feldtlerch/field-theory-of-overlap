@@ -140,6 +140,23 @@ class Composition(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'M055: Fragment marker/declaration differs'):
                 checked_fragments(root, rows)
             source.write_bytes(original)
+            equation_source, _, equation_fragment, _ = next(
+                row for row in FRAGMENTS if row[3] == 'equation')
+            equation_file = root/equation_source
+            source_bytes = equation_file.read_bytes()
+            parent = (repository/'registry/explainer-flow-parent.tex').read_bytes()
+            self.assertIn(b'\\[\n', parent)
+            self.assertIn(b'\n\\]', parent)
+            equation_file.write_bytes(source_bytes + b'\n' + parent + b'\n')
+            with self.assertRaisesRegex(ValueError, 'M055: Authored equation duplicates'):
+                checked_fragments(root, rows)
+            equation_file.write_bytes(source_bytes)
+            equation_output = root/equation_fragment
+            equation_bytes = equation_output.read_bytes()
+            equation_output.write_bytes(equation_bytes.replace(b'\\[', b'\\(', 1))
+            with self.assertRaisesRegex(ValueError, 'M055: Fragment equation envelope differs'):
+                checked_fragments(root, rows)
+            equation_output.write_bytes(equation_bytes)
             math_fragment = root/'generated/documents/paper-pilot/sec-coda-whole-field.tex'
             intact = math_fragment.read_bytes()
             altered = intact.replace(b'\\comovfield{}', b'\\unknown{}', 1)

@@ -306,6 +306,17 @@ pub(super) fn validate(
                     }
                 }
                 for (index, pair) in runs.windows(2).enumerate() {
+                    if pair[0].source.end > pair[1].source.start
+                        || pair[0].decoded.end > pair[1].decoded.start
+                    {
+                        push(
+                            site.field("runs")
+                                .child(NotationPathPart::Argument(index + 1)),
+                            NotationFault::InvalidText {
+                                value: pair[1].text.clone(),
+                            },
+                        );
+                    }
                     let (Some(&left), Some(&right)) = (
                         pair[0].text.as_bytes().last(),
                         pair[1].text.as_bytes().first(),

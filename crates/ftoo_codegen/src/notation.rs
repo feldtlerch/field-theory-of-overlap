@@ -163,7 +163,7 @@ fn typeset(
     source: &str,
     site: NotationSite,
 ) -> Result<()> {
-    typeset_with_mode(support, target, source, site, false)
+    typeset_with_mode(support, target, source, site, false).map(|_| ())
 }
 fn typeset_with_mode(
     support: &support::Support,
@@ -171,14 +171,28 @@ fn typeset_with_mode(
     source: &str,
     site: NotationSite,
     display: bool,
-) -> Result<()> {
-    let result = if display {
-        katex::invoke_display(support, source)?
-    } else {
-        katex::invoke(support, Some(source))?
-    };
-    if let Err(message) = result {
-        return Err(admission(
+) -> Result<bool> {
+    typeset_with_adapter(target, source, site, || {
+        if display {
+            katex::invoke_display(support, source)
+        } else {
+            katex::invoke(support, Some(source))
+        }
+    })
+}
+
+fn typeset_with_adapter(
+    target: RenderTarget,
+    source: &str,
+    site: NotationSite,
+    invoke: impl FnOnce() -> std::result::Result<
+        std::result::Result<String, String>,
+        NotationAdapterFault,
+    >,
+) -> Result<bool> {
+    let result = invoke()?;
+    let markup = result.map_err(|message| {
+        admission(
             RuleId::M051,
             NotationStage::Typesetting,
             site,
@@ -187,9 +201,13 @@ fn typeset_with_mode(
                 source: source.into(),
                 message,
             },
-        ));
-    }
-    Ok(())
+        )
+    })?;
+    Ok(returned_display_mode(&markup))
+}
+
+pub(crate) fn returned_display_mode(markup: &str) -> bool {
+    markup.starts_with("<span class=\"katex-display\">")
 }
 
 /// The only declaration/export surface; construction requires every sweep row.
@@ -224,6 +242,28 @@ pub struct RenderableNotation<'catalogue, 'book, 'graph> {
     pending: Vec<PendingEntry>,
 }
 impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
+    /// Check the complete emitted Markdown display body with the pinned strict adapter.
+    /// # Errors
+    /// Refuses changed support, adapter failure, or rejected display mathematics.
+    pub(crate) fn check_markdown_display_source(&self, source: &str) -> Result<bool> {
+        self.support.scope(
+            &support::repository().join("tools/notation/check.cjs"),
+            || {
+                typeset_with_mode(
+                    &self.support,
+                    RenderTarget::Unicode,
+                    source,
+                    rendered_site(
+                        RenderOwner::Expression,
+                        "markdown display",
+                        source,
+                        Vec::new(),
+                    ),
+                    true,
+                )
+            },
+        )
+    }
     /// Render a checked expanded source as `MathML` through the pinned strict adapter.
     /// # Errors
     /// Refuses unavailable or changed notation support and returns parser refusals unchanged.
@@ -232,6 +272,16 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
         source: &str,
     ) -> std::result::Result<std::result::Result<String, String>, NotationAdapterFault> {
         katex::invoke_mathml(&self.support, source)
+    }
+    /// Render a checked expanded display source as `MathML` through the pinned strict adapter.
+    /// # Errors
+    /// Refuses unavailable or changed notation support and returns parser refusals unchanged.
+    #[cfg(test)]
+    pub(crate) fn mathml_display(
+        &self,
+        source: &str,
+    ) -> std::result::Result<std::result::Result<String, String>, NotationAdapterFault> {
+        katex::invoke_mathml_display(&self.support, source)
     }
     /// # Panics
     /// Panics only if an admitted inherited definition has no derived status, which callers cannot arrange.
@@ -383,15 +433,15 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
             RenderOwner::Expression,
             "expression",
         )?;
-        typeset_with_mode(
+        let unicode_display = typeset_with_mode(
             &self.support,
             RenderTarget::Unicode,
             &expanded.source,
             expanded.site(RenderOwner::Expression, "expression"),
             display,
         )?;
-        let source = match target {
-            RenderTarget::Unicode => expanded.source,
+        let (source, returned_display) = match target {
+            RenderTarget::Unicode => (expanded.source, unicode_display),
             RenderTarget::Macro => {
                 let result = render_expression(
                     self.effective.as_ref(),
@@ -416,7 +466,7 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
                     &result.source,
                     result.site(RenderOwner::Expression, "expression"),
                 )?;
-                typeset_with_mode(
+                let returned_display = typeset_with_mode(
                     &self.support,
                     target,
                     &combined,
@@ -428,13 +478,13 @@ impl<'catalogue, 'book, 'graph> RenderableNotation<'catalogue, 'book, 'graph> {
                     ),
                     display,
                 )?;
-                result.source
+                (result.source, returned_display)
             }
         };
         Ok(RenderedExpression {
             notation: self,
             source,
-            display,
+            display: returned_display,
             uses: expression.uses().to_vec(),
             pending: pending_uses(&self.pending, expression.uses()),
         })

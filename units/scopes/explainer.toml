@@ -9,6 +9,11 @@ unit = "sec:reading:plain-intro"
 role = "paragraph"
 
 [[scope.occurrences]]
+unit = "eq:explainer:overlap-flow"
+role = "equation"
+numbering = "none"
+
+[[scope.occurrences]]
 unit = "sec:say:direction"
 role = "quotation"
 

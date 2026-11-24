@@ -28,12 +28,12 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024; the complete-document release gate and complete-graph boundary are governed by 030; native use of the paper-scoped store is governed by 037|
 |015|Open questions are records|accepted|
 |016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030; retirement of residual authored-source machinery is governed by 036; native use of the paper-scoped store is governed by 037|
-|017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030; eligible native conversion's screen-review timing is governed by 039; transitional screen destinations are governed by 040|
+|017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022 and the observed display thick-space spelling by 051; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030; eligible native conversion's screen-review timing is governed by 039; transitional screen destinations are governed by 040|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
 |020|Meson and Ninja own the warm build graph while Cargo builds Rust|accepted|
 |021|Reader characters in unit prose; target spellings per renderer|accepted; amends 005's prose-text clause; inline-style authoring syntax is governed by 033|
-|022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation; its reserved HTML-delivery question is governed by 042|
+|022|Mathematics transport in forge Markdown|accepted; amends 017's mathematics-dialect reservation; its observed display thick-space spelling is governed by 051; its reserved HTML-delivery question is governed by 042|
 |023|Site-local paper layout with two retained coordinates|accepted; its two-coordinate qualification is superseded by 024|
 |024|Paper layout without source coordinates|accepted; supersedes the layout-pin clauses of 014 and 016; states who accepts changes: the project's owner approves theory changes, and independent review accepts all others; eligible native conversion's review timing is governed by 039|
 |025|Identified progressive reading trees|accepted; amends 001, 002, 005 and 016|
@@ -49,7 +49,8 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |041|Compared inherited support in native documents|accepted; qualifies 032's native sweep exception and embedding-removal condition, and amends M055, M056 and M057; the three additional compared flow declarations and their native sweeps are governed by 044|
 |042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|
-|044|Text and references inside mathematics|accepted; qualifies 004 and 032's mathematical text representation and extends 041's compared support and native sweep; document display and annotation clauses await a consuming scope|
+|044|Text and references inside mathematics|accepted; qualifies 004 and 032's mathematical text representation and extends 041's compared support and native sweep; M054 and M055 govern checked unnumbered equations in TeX and Markdown, while HTML retains a block gap until display observation and admission|
 |046|Registered HTML block gaps|accepted; the development product check inventories withheld HTML passages without changing release refusal; its registered-check and product-test sentences are replaced by 040|
 |047|Paper section and subsection destinations|accepted; extends 040's heading resolution and amends M055|
 |049|Complete conversion checks|accepted; qualifies 039's eligibility, retention sequence, capability, evidence, correction and completion clauses, and its qualifications of 017, 024 and 026|
+|051|Thick spaces in forge Markdown displays|accepted; qualifies 017's pinned-command sentence and 022's display spelling for the observed dimensioned thick space|
