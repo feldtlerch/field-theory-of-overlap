@@ -2048,6 +2048,32 @@ sites = ["fixture"]
 
 
 class ScreenReferenceChecks(unittest.TestCase):
+    def test_regular_heading_counter_and_destination_are_independent(self):
+        class PaperPdf:
+            page = 12
+            def destination(self, anchor):
+                return self.page if anchor == 'subsection.22.1' else None
+
+        pdf = PaperPdf()
+        target = {'default': '22.1', 'page': '12', 'anchor': 'subsection.22.1'}
+        screen = '<a href="../paper-pilot/en.md#the-three-tenses">→ §22.1</a><!-- see subsec:coda:tenses -->'
+        with tempfile.TemporaryDirectory() as directory:
+            repo = pathlib.Path(directory)
+            for owner in ('paper-pilot', 'explainer-pilot'):
+                file = repo/'generated/documents'/owner/'en.labels.md'
+                file.parent.mkdir(parents=True)
+                write(file, screen)
+            check_screen_references(repo, {'subsec:coda:tenses': target}, pdf)
+            changed = dict(target, default='22.2')
+            with self.assertRaisesRegex(ValueError, 'M055: screen/PDF reference number differs'):
+                check_screen_references(repo, {'subsec:coda:tenses': changed}, pdf)
+            pdf.page = None
+            with self.assertRaisesRegex(ValueError, 'M064: missing PDF destination'):
+                check_screen_references(repo, {'subsec:coda:tenses': target}, pdf)
+            pdf.page = 13
+            with self.assertRaisesRegex(ValueError, 'M064: auxiliary/PDF page discrepancy'):
+                check_screen_references(repo, {'subsec:coda:tenses': target}, pdf)
+
     def test_both_reader_documents_bind_to_the_paper_counter(self):
         class PaperPdf:
             def destination(self, anchor):

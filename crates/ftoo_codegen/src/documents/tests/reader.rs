@@ -29,6 +29,28 @@ fn with_reference(document: &str, file: &str, label: &str) -> DocumentPlan {
     }
 }
 
+fn appendix_outline_inputs() -> BTreeMap<String, Vec<u8>> {
+    BTreeMap::from([
+        ("documents/paper/main.tex".into(), b"\\setcounter{section}{-1}\n\\begin{document}\n\\subfile{parts/appendices}\n\\end{document}\n".to_vec()),
+        ("documents/paper-build/sources.tsv".into(), b"documents/paper/parts/appendices.tex\n".to_vec()),
+        ("documents/paper/parts/appendices.tex".into(), b"\\begin{document}\n\\appendix\n\\section{First}\n\\label{app:first}\n\\end{document}\n".to_vec()),
+    ])
+}
+
+fn captured_outline_inputs(root: &Path) -> BTreeMap<String, Vec<u8>> {
+    let list = fs::read_to_string(root.join("documents/paper-build/sources.tsv")).unwrap();
+    list.lines()
+        .filter(|path| {
+            *path == "documents/paper/main.tex" || path.starts_with("documents/paper/parts/")
+        })
+        .map(|path| (path.into(), fs::read(root.join(path)).unwrap()))
+        .chain(std::iter::once((
+            "documents/paper-build/sources.tsv".into(),
+            list.as_bytes().to_vec(),
+        )))
+        .collect()
+}
+
 #[test]
 fn reference_fault_uses_the_first_matching_reference_site_and_document() {
     let plans = [
@@ -50,14 +72,11 @@ fn reference_fault_uses_the_first_matching_reference_site_and_document() {
         ftoo_manifest::MintOrigin {
             kind: ftoo_manifest::MintKind::PaperTex,
             site: ftoo_manifest::LabelSite::PaperMintFile {
-                file: "appendices.tex".into(),
+                file: "documents/paper/parts/appendices.tex".into(),
             },
         },
     )]);
-    let inputs = BTreeMap::from([(
-        "appendices.tex".into(),
-        b"\\appendix\n\\section{First}\n\\label{app:first}\n".to_vec(),
-    )]);
+    let inputs = appendix_outline_inputs();
     let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
         panic!("reference fault")
@@ -115,14 +134,11 @@ fn computed_index_entry_requires_an_owning_screen() {
         ftoo_manifest::MintOrigin {
             kind: ftoo_manifest::MintKind::PaperTex,
             site: ftoo_manifest::LabelSite::PaperMintFile {
-                file: "appendices.tex".into(),
+                file: "documents/paper/parts/appendices.tex".into(),
             },
         },
     )]);
-    let inputs = BTreeMap::from([(
-        "appendices.tex".into(),
-        b"\\appendix\n\\section{First}\n\\label{app:first}\n".to_vec(),
-    )]);
+    let inputs = appendix_outline_inputs();
     let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
         panic!("unplaced index entry must refuse")
@@ -166,6 +182,103 @@ fn see_recovery_refuses_changed_target_and_number() {
     assert_eq!(
         recover_tex("\\see{app:self-limit}", true, TexLine::NewLine).unwrap(),
         vec![expected_run(&run, DocumentTarget::Latex, true).unwrap()]
+    );
+}
+
+#[test]
+fn regular_heading_see_uses_real_master_outline_and_unit_scanner() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let declaration = crate::UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: fs::read(root.join("units/documents.toml")).unwrap(),
+    };
+    let source = fs::read_to_string(root.join("documents/paper/parts/partB.tex")).unwrap();
+    let paragraph_lines: Vec<_> = source.lines().collect();
+    let reference_line = paragraph_lines
+        .iter()
+        .position(|line| line.contains("\\see{subsec:coda:tenses}"))
+        .unwrap();
+    let text = paragraph_lines[reference_line - 2..=reference_line].join(" ");
+    assert!(text.contains("\\see{subsec:coda:tenses}"));
+    let unit = crate::UnitSource {
+        file: "units/statements/heading-see-fixture.toml".into(),
+        bytes: format!("schema = 1\n[unit]\nid = 'sec:fixture:heading-see'\ndocument = 'paper-pilot'\nmath = {{}}\n[unit.texts]\nen = \"{}\"\n", text.replace("\\see{subsec:coda:tenses}", "@see{subsec:coda:tenses}")).into_bytes(),
+    };
+    let corpus = crate::load_unit_sources(declaration, vec![unit]).unwrap();
+    let reference = corpus.units()[0].texts()["en"]
+        .reference_occurrences()
+        .first()
+        .unwrap();
+    assert_eq!(reference.label(), "subsec:coda:tenses");
+    let markdown = crate::load_markdown_files(&root).unwrap();
+    let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown).unwrap();
+    let mint_rows = super::super::registry::paper_mint_rows(
+        &fs::read(root.join("documents/paper-build/label-mints.tsv")).unwrap(),
+    )
+    .unwrap();
+    let integrated = joint.with_paper_mints(mint_rows).unwrap();
+    let mut plan = with_reference(
+        "paper-pilot",
+        "units/statements/heading-see-fixture.toml",
+        reference.label(),
+    );
+    let selected = BTreeMap::from([(
+        "paper-pilot".into(),
+        vec![
+            ftoo_manifest::DocumentOutput::Markdown,
+            ftoo_manifest::DocumentOutput::Fragment,
+        ],
+    )]);
+    let inputs = captured_outline_inputs(&root);
+    let (links, indexes) = resolve_see(
+        std::slice::from_ref(&plan),
+        &selected,
+        &inputs,
+        integrated.mints(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    let entry = &indexes["en"][0];
+    assert_eq!(
+        (&entry.fragment[..], &entry.title[..], &entry.locator[..]),
+        ("the-three-tenses", "The three tenses", "§22.1")
+    );
+    bind_see(&mut plan.blocks[0].runs, &links["en"]).unwrap();
+    let mut emitted = String::new();
+    super::super::markdown::inline(&mut emitted, &plan.blocks[0].runs);
+    assert_eq!(
+        emitted,
+        "<a href=\"../paper-pilot/en.md#the-three-tenses\">→ §22.1</a><!-- see subsec:coda:tenses -->"
+    );
+    assert_eq!(
+        recover_markdown(&emitted, std::iter::empty()).unwrap(),
+        vec![expected_run(&plan.blocks[0].runs[0], DocumentTarget::Markdown, false).unwrap()]
+    );
+    for changed in [
+        emitted.replace("§22.1", "§22.2"),
+        emitted.replace("the-three-tenses", "wrong"),
+        emitted.replace("paper-pilot", "explainer-pilot"),
+    ] {
+        assert_ne!(
+            recover_markdown(&changed, std::iter::empty()).unwrap(),
+            vec![expected_run(&plan.blocks[0].runs[0], DocumentTarget::Markdown, false).unwrap()]
+        );
+    }
+    let mut index_plan = excerpt_plan();
+    let screen = index_plan.screen.as_mut().unwrap();
+    screen.index.push(entry.clone());
+    screen
+        .end_matter
+        .push(ScreenEndMatter::Unavailable(vec![entry.clone()]));
+    let index_rendered = super::super::markdown::render(&index_plan);
+    assert!(check_emission(&index_plan, &index_rendered, DocumentTarget::Markdown).is_ok());
+    assert!(
+        check_emission(
+            &index_plan,
+            &index_rendered.replace("The three tenses", "Changed title"),
+            DocumentTarget::Markdown
+        )
+        .is_err()
     );
 }
 

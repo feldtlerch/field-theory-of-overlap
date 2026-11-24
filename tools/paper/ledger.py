@@ -73,7 +73,9 @@ def check_destination(document, key, anchor, auxiliary_page, destination_page):
 
 
 def screen_references(screen, paper_auxiliary):
-    see = list(re.finditer(r'<a href="[^"]+">→ (appendix [A-Z])</a><!-- see ([A-Za-z][A-Za-z0-9_:-]*) -->', screen))
+    component = r'(?:0|[1-9][0-9]*)'
+    locator = rf'(?:appendix [A-Z]|§{component}(?:\.{component})?)'
+    see = list(re.finditer(rf'<a href="[^"]+">→ ({locator})</a><!-- see ([A-Za-z][A-Za-z0-9_:-]*) -->', screen))
     require(len(see)==screen.count('<!-- see '), 'M055: malformed generated see reference')
     checked=[]
     for match in see:
@@ -81,7 +83,8 @@ def screen_references(screen, paper_auxiliary):
         target = paper_auxiliary.get(label)
         require(target is not None and target['default'] and target['page'] and target['anchor'],
                 'M055: paper reference target absent: '+label)
-        require(locator == 'appendix '+target['default'],
+        expected = ('appendix ' if locator.startswith('appendix ') else '§') + target['default']
+        require(locator == expected,
                 'M055: screen/PDF reference number differs: '+label)
         checked.append((label,target))
     return checked

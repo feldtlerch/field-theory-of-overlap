@@ -45,9 +45,10 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |037|Native paper-tagged paragraphs|accepted|
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
 |039|Mechanical conversion and final residual review|accepted; amends 005, 009, 017, 024 and 026 for eligible native conversion|
-|040|Explicit transitional destinations in a placeholder index|accepted; qualifies 017's missing-content, reference and placeholder clauses as amended by 030; extends 046's registered product check to screen destinations and content gaps; amends M055 and M065|
+|040|Explicit transitional destinations in a placeholder index|accepted; qualifies 017's missing-content, reference and placeholder clauses as amended by 030; extends 046's registered product check to screen destinations and content gaps; amends M055 and M065; section and subsection resolution is governed by 047|
 |041|Compared inherited support in native documents|accepted; qualifies 032's native sweep exception and embedding-removal condition, and amends M055, M056 and M057; the three additional compared flow declarations and their native sweeps are governed by 044|
 |042|HTML mathematics transport and faces|accepted; amends 017's HTML-delivery and font-choice reservations for the admitted MathML profile|
 |043|Source-decided line-end comparison|accepted; qualifies 038's line-end interpretation and extends M077|
 |044|Text and references inside mathematics|accepted; qualifies 004 and 032's mathematical text representation and extends 041's compared support and native sweep; document display and annotation clauses await a consuming scope|
 |046|Registered HTML block gaps|accepted; the development product check inventories withheld HTML passages without changing release refusal; its registered-check and product-test sentences are replaced by 040|
+|047|Paper section and subsection destinations|accepted; extends 040's heading resolution and amends M055|

@@ -500,11 +500,22 @@ pub(crate) fn prepare_context(
     let display_sources = input::sources(root, &display_files)?;
     let (drafts, display_drafts) = input::assembly_sources(&sources, &display_sources)?;
     let inclusions = input::composition(root, &declaration, &scope_sources, &drafts)?;
+    let master_sources = input::read(root, "documents/paper-build/sources.tsv")?;
+    let master_sources = std::str::from_utf8(&master_sources).map_err(|_| {
+        DocumentError::Input(DocumentInputFault::InvalidSourceName {
+            value: "documents/paper-build/sources.tsv".into(),
+        })
+    })?;
     merge_checked_input(
         &mut inputs,
         "documents/paper-build/sources.tsv".into(),
-        input::read(root, "documents/paper-build/sources.tsv")?,
+        master_sources.as_bytes().to_vec(),
     )?;
+    for path in master_sources.lines().filter(|path| {
+        *path == "documents/paper/main.tex" || path.starts_with("documents/paper/parts/")
+    }) {
+        merge_checked_input(&mut inputs, path.into(), input::read(root, path)?)?;
+    }
     for inclusion in &inclusions {
         merge_checked_input(
             &mut inputs,
