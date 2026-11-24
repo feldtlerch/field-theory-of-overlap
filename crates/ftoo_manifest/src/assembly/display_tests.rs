@@ -496,6 +496,7 @@ fn corpus() -> LanguageCheckedUnits {
         table_site: site.clone(),
         math_site: site.clone(),
         texts_site: site.clone(),
+        documentary_targets: BTreeMap::new(),
         math: BTreeMap::new(),
         texts: BTreeMap::from([(
             "en".into(),
@@ -835,7 +836,7 @@ fn display_and_documentary_register_statements_are_exact() {
             ),
             (
                 RuleId::M060,
-                "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle. Target labels use the unit-label grammar or a name in the paper's label-mint inventory; authority labels always use the unit-label grammar.",
+                "Documentary handles have immutable bindings to uniquely minted non-theory labels; their ordered provenance ledger admits each handle once and permits only terminal retirement; label-shaped documentary handles are refused and each documentary label has at most one live handle throughout replay; retained target and authority mints resolve, derived live and retired stores partition all admitted documentary handles, and resolution returns the bound documentary label only for a live exact handle. Target labels use the unit-label grammar or an exact paper-origin target evidenced by the paper's label-mint inventory or a checked native unit documentary-targets entry; both paper origins remain outside strict-unit scope, and authority labels always use the unit-label grammar.",
                 "The complete documentary tag registry, its joint-mint binding context and common-resolver documentary branch, including unused and retired handles.",
                 RuleState::Enforced,
                 None
@@ -1572,6 +1573,7 @@ fn display_three_languages_resolve_each_site_and_use_the_smallest_reference_lang
         table_site: at.clone(),
         math_site: at.clone(),
         texts_site: at.clone(),
+        documentary_targets: BTreeMap::new(),
         math: BTreeMap::new(),
         texts: languages
             .into_iter()
@@ -1760,6 +1762,7 @@ fn display_cross_unit_body_swaps_cannot_cancel_each_owners_mismatch() {
         table_site: site(),
         math_site: site(),
         texts_site: site(),
+        documentary_targets: BTreeMap::new(),
         math: BTreeMap::new(),
         texts: BTreeMap::from([(
             "en".into(),

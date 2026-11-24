@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/partF.tex"
+
+[[scope.occurrences]]
+unit = "sec:boundary:ratio-rate"
+role = "paragraph"

@@ -1,6 +1,83 @@
 use super::*;
 
 #[test]
+fn auxiliary_paper_handles_have_one_declared_english_placement() {
+    let (mut documents, mut units) = fixtures();
+    let paper = documents.documents["main"].clone();
+    documents.documents.insert("paper-pilot".into(), paper);
+    units[0].document.value = "paper-pilot".into();
+    units[0].documentary_targets.insert(
+        "representation".into(),
+        entry("bd:rep", &["unit", "documentary-targets", "representation"]),
+    );
+    units[0].texts.get_mut("en").unwrap().value.value =
+        "@handle{representation} is the boundary.".into();
+    let admitted = admit_unit_drafts(documents.clone(), units.clone()).unwrap();
+    let placement = &admitted.units()[0].texts()["en"].handle_occurrences()[0];
+    assert_eq!(placement.selector(), "representation");
+    assert_eq!(placement.site().decoded, Some(0..23));
+    assert_eq!(
+        admitted.units()[0].documentary_targets()["representation"].value,
+        "bd:rep"
+    );
+
+    for (body, expected) in [
+        ("A @handle{unknown} boundary.", "UnknownHandle"),
+        ("The boundary.", "UnusedHandle"),
+        (
+            "@handle{representation} and @handle{representation}.",
+            "RepeatedHandle",
+        ),
+        (
+            "@emphasis{@handle{representation}} boundary.",
+            "StyledHandle",
+        ),
+    ] {
+        let mut changed = units.clone();
+        changed[0].texts.get_mut("en").unwrap().value.value = body.into();
+        let refused = admit_unit_drafts(documents.clone(), changed).unwrap_err();
+        assert!(
+            format!("{refused:?}").contains(expected),
+            "{body}: {refused:?}"
+        );
+    }
+    for key in ["bd rep", "sec:paper:target"] {
+        let mut changed = units.clone();
+        changed[0]
+            .documentary_targets
+            .get_mut("representation")
+            .unwrap()
+            .value
+            .value = key.into();
+        let refused = admit_unit_drafts(documents.clone(), changed).unwrap_err();
+        assert!(
+            format!("{refused:?}").contains("InvalidDocumentaryTarget"),
+            "{key}: {refused:?}"
+        );
+        assert_eq!(refused.diagnostics()[0].rule, RuleId::M039);
+    }
+    units[0].texts.get_mut("en").unwrap().value.value = "The boundary.".into();
+    units[0].texts.insert(
+        "fr".into(),
+        entry(
+            "@handle{representation} est la limite.",
+            &["unit", "texts", "fr"],
+        ),
+    );
+    documents
+        .documents
+        .get_mut("paper-pilot")
+        .unwrap()
+        .required_languages
+        .push(LocatedString {
+            value: "fr".into(),
+            site: units[0].id.site.clone(),
+        });
+    let refused = admit_unit_drafts(documents, units).unwrap_err();
+    assert!(format!("{refused:?}").contains("HandleOutsidePaperEnglish"));
+}
+
+#[test]
 fn see_insertion_retains_its_label_and_location() {
     let (documents, mut units) = fixtures();
     units[0].texts.get_mut("en").unwrap().value.value = "See @see{app:self-limit}.".into();
@@ -420,6 +497,7 @@ fn fixtures() -> (DocumentDraft, Vec<UnitDraft>) {
             table_site: site("statement.toml", &["unit"]),
             math_site: site("statement.toml", &["unit", "math"]),
             texts_site: site("statement.toml", &["unit", "texts"]),
+            documentary_targets: BTreeMap::new(),
             math: BTreeMap::new(),
             texts: BTreeMap::from([(
                 "en".to_owned(),
@@ -1021,7 +1099,7 @@ fn register_final_unit_statements() {
     let expected = [
         (
             RuleId::M039,
-            "Unit metadata carries a well-formed label unique within the admitted unit corpus and references a declared document language contract; document names obey the admitted grammar.",
+            "Unit metadata carries a well-formed primary label unique within the admitted unit corpus and references a declared document language contract; document names obey the admitted grammar. Auxiliary paper-mint metadata declares distinct local names and canonical paper keys; unknown fields, aliases, duplicate declarations and use outside an owning English paper paragraph refuse.",
             "Statement-unit metadata and document declaration names in one corpus admission.",
         ),
         (
@@ -1031,7 +1109,7 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M041,
-            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics.",
+            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics. Each auxiliary paper mint is declared once in metadata and has exactly one visible local-selector placement in its owning English paper paragraph; unknown, unused, repeated or nested selectors and placements in other roles refuse.",
             "Every authored statement text, shared math entry and local math insertion.",
         ),
     ];

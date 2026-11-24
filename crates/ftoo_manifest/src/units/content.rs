@@ -1,7 +1,7 @@
 use super::{
-    BibliographyCitationKind, BibliographyCitationOccurrence, CheckedText, InsertionReason,
-    LocatedString, MathOccurrence, ReferenceOccurrence, TagOccurrence, UnitFault, UnitSite,
-    local_name,
+    BibliographyCitationKind, BibliographyCitationOccurrence, CheckedText, HandleOccurrence,
+    InsertionReason, LocatedString, MathOccurrence, ReferenceOccurrence, TagOccurrence, UnitFault,
+    UnitSite, local_name,
 };
 use std::ops::Range;
 
@@ -47,6 +47,7 @@ pub(super) struct ScannedText {
     pub prose: bool,
     pub math: Vec<MathOccurrence>,
     pub tags: Vec<TagOccurrence>,
+    pub handles: Vec<HandleOccurrence>,
     pub references: Vec<ReferenceOccurrence>,
     pub bibliography_citations: Vec<BibliographyCitationOccurrence>,
     pub styles: Vec<StyleOccurrence>,
@@ -54,6 +55,7 @@ pub(super) struct ScannedText {
 fn insertion_index(scanned: &ScannedText, active_style: bool) -> usize {
     scanned.math.len()
         + scanned.tags.len()
+        + scanned.handles.len()
         + scanned.references.len()
         + scanned.bibliography_citations.len()
         + scanned.styles.len()
@@ -62,6 +64,7 @@ fn insertion_index(scanned: &ScannedText, active_style: bool) -> usize {
 enum Insertion {
     Math(MathOccurrence),
     Tag(TagOccurrence),
+    Handle(HandleOccurrence),
     Reference(ReferenceOccurrence),
     BibliographyCitation(BibliographyCitationOccurrence),
 }
@@ -92,6 +95,7 @@ pub(super) fn scan_limited(
         prose: false,
         math: Vec::new(),
         tags: Vec::new(),
+        handles: Vec::new(),
         references: Vec::new(),
         bibliography_citations: Vec::new(),
         styles: Vec::new(),
@@ -105,6 +109,7 @@ pub(super) fn scan_limited(
                 span_index
                     + scanned.math.len()
                     + scanned.tags.len()
+                    + scanned.handles.len()
                     + scanned.references.len()
                     + scanned.bibliography_citations.len()
                     + scanned.styles.len()
@@ -270,7 +275,12 @@ pub(super) fn scan_limited(
             .into());
         }
         let insertion = insertion(source, start, index, &mut chars)?;
-        if !styles && matches!(&insertion, Insertion::BibliographyCitation(_)) {
+        if !styles
+            && matches!(
+                &insertion,
+                Insertion::BibliographyCitation(_) | Insertion::Handle(_)
+            )
+        {
             return Err(malformed(
                 source,
                 start,
@@ -285,7 +295,10 @@ pub(super) fn scan_limited(
         if active_style.is_some()
             && matches!(
                 &insertion,
-                Insertion::Math(_) | Insertion::Reference(_) | Insertion::BibliographyCitation(_)
+                Insertion::Math(_)
+                    | Insertion::Reference(_)
+                    | Insertion::BibliographyCitation(_)
+                    | Insertion::Handle(_)
             )
         {
             return Err(malformed(
@@ -299,6 +312,8 @@ pub(super) fn scan_limited(
                     InsertionReason::StyledMath
                 } else if matches!(&insertion, Insertion::Reference(_)) {
                     InsertionReason::StyledReference
+                } else if matches!(&insertion, Insertion::Handle(_)) {
+                    InsertionReason::StyledHandle
                 } else {
                     InsertionReason::StyledBibliographyCitation
                 },
@@ -311,6 +326,7 @@ pub(super) fn scan_limited(
             let site = match &insertion {
                 Insertion::Math(value) => value.site.clone(),
                 Insertion::Tag(value) => value.site.clone(),
+                Insertion::Handle(value) => value.site.clone(),
                 Insertion::Reference(value) => value.site.clone(),
                 Insertion::BibliographyCitation(value) => value.site.clone(),
             };
@@ -319,6 +335,7 @@ pub(super) fn scan_limited(
         match insertion {
             Insertion::Math(value) => scanned.math.push(value),
             Insertion::Tag(value) => scanned.tags.push(value),
+            Insertion::Handle(value) => scanned.handles.push(value),
             Insertion::Reference(value) => scanned.references.push(value),
             Insertion::BibliographyCitation(value) => scanned.bibliography_citations.push(value),
         }
@@ -404,6 +421,45 @@ fn insertion(
     index: usize,
     chars: &mut impl Iterator<Item = (usize, char)>,
 ) -> Result<Insertion, ScanFault> {
+    if source.value[start..].starts_with("@handle{") {
+        for _ in 0..7 {
+            chars.next();
+        }
+        for (position, c) in chars.by_ref() {
+            if c == '{' {
+                return Err(malformed(
+                    source,
+                    start,
+                    position + 1,
+                    index,
+                    InsertionReason::NestedBrace,
+                ));
+            }
+            if c == '}' {
+                let selector = &source.value[start + 8..position];
+                if !local_name(selector) {
+                    return Err(malformed(
+                        source,
+                        start,
+                        position + 1,
+                        index,
+                        InsertionReason::BadMathName,
+                    ));
+                }
+                return Ok(Insertion::Handle(HandleOccurrence {
+                    selector: selector.to_owned(),
+                    site: at(source, start, position + 1, Some(index)),
+                }));
+            }
+        }
+        return Err(malformed(
+            source,
+            start,
+            source.value.len(),
+            index,
+            InsertionReason::Unclosed,
+        ));
+    }
     if source.value[start..].starts_with("@see{") {
         for _ in 0..4 {
             chars.next();

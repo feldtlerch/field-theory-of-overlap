@@ -50,6 +50,7 @@ mod reader_tests;
 mod retained_tests;
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)] // Citation identity remains inline in the shared run representation.
 pub(super) enum Inline {
     Text(String),
     Tag {
@@ -60,6 +61,7 @@ pub(super) enum Inline {
     },
     PaperTag {
         value: ftoo_manifest::PaperTagValue,
+        mint: Option<String>,
         site: UnitSite,
     },
     See {
@@ -249,12 +251,27 @@ fn recover_markdown<'a>(
     let mut at = 0;
     while at < body.len() {
         let tail = &body[at..];
-        if tail.starts_with("<!-- label ") || tail.starts_with("<!-- cite ") {
+        if tail.starts_with("<!-- label ")
+            || tail.starts_with("<!-- cite ")
+            || tail.starts_with("<!-- handle ")
+        {
             let citation = tail.starts_with("<!-- cite ");
-            let comment_prefix = if citation { 10 } else { 11 };
+            let mint = tail.starts_with("<!-- handle ");
+            let comment_prefix = if citation {
+                10
+            } else if mint {
+                12
+            } else {
+                11
+            };
             let tail = &tail[comment_prefix..];
             let end = tail.find(" -->")?;
-            let label = &tail[..end];
+            let (selector, label) = if mint {
+                let (selector, key) = tail[..end].split_once(' ')?;
+                (Some(selector), key)
+            } else {
+                (None, &tail[..end])
+            };
             let handle = handles
                 .iter()
                 .copied()
@@ -273,7 +290,7 @@ fn recover_markdown<'a>(
                 Recovered::Tag {
                     handle: handle.into(),
                     label: label.into(),
-                    token: None,
+                    token: selector.map(str::to_owned),
                 }
             });
             at += comment_prefix + end + 4;
@@ -639,6 +656,19 @@ fn recover_tex(body: &str, prose: bool, initial_line: TexLine) -> Option<Vec<Rec
             output.push(Recovered::Math(tail[..end].into()));
             at += 2 + end + 2;
             line = TexLine::MidLine;
+        } else if let Some(rest) = tail.strip_prefix(r"\handle{") {
+            let end = rest.find('}')?;
+            if rest[..end].contains('{') {
+                return None;
+            }
+            flush_text(&mut output, &mut text);
+            output.push(Recovered::Tag {
+                handle: rest[..end].into(),
+                label: rest[..end].into(),
+                token: None,
+            });
+            at += r"\handle{".len() + end + 1;
+            line = TexLine::MidLine;
         } else if let Some(rest) = tail.strip_prefix(r"\see{") {
             let end = rest.find('}')?;
             if rest[..end].contains('{') {
@@ -743,10 +773,12 @@ fn expected_run(run: &Inline, target: DocumentTarget, prose: bool) -> Option<Rec
             label: label.clone(),
             token: (target == DocumentTarget::Latex).then(|| token.clone()),
         },
-        Inline::PaperTag { value, .. } => Recovered::Tag {
+        Inline::PaperTag { value, mint, .. } => Recovered::Tag {
             handle: value.spelling.clone(),
             label: value.target.clone(),
-            token: None,
+            token: (target == DocumentTarget::Markdown)
+                .then(|| mint.clone())
+                .flatten(),
         },
         Inline::See {
             label,
@@ -2938,7 +2970,9 @@ impl DocumentPlan {
                 let (kind, value, site) = match run {
                     Inline::Text(_) | Inline::Styled { .. } => continue,
                     Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
-                    Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
+                    Inline::PaperTag { value, site, .. } => {
+                        (EmissionKind::Tag, &value.target, site)
+                    }
                     Inline::See {
                         label,
                         locator,
@@ -3213,7 +3247,35 @@ fn collect_reader_error(errors: &mut Vec<AssemblyDiagnostic>, error: DocumentErr
         }
     }
 }
+pub(super) fn check_handle_position(
+    document: &str,
+    unit: &ftoo_manifest::CheckedUnit,
+    language: &str,
+    paragraph: bool,
+    paper_documents: &BTreeSet<String>,
+    errors: &mut Vec<AssemblyDiagnostic>,
+) {
+    if paragraph && paper_documents.contains(document) {
+        return;
+    }
+    for placement in unit.texts()[language].handle_occurrences() {
+        errors.push(AssemblyDiagnostic {
+            rule: RuleId::M039,
+            stage: AssemblyStage::Emission,
+            document: Some(document.into()),
+            unit: Some(unit.label().as_str().into()),
+            language: Some(language.into()),
+            target: None,
+            site: AssemblySite::Source(placement.site().clone()),
+            fault: AssemblyFault::UnsupportedParagraphBody {
+                reason: "auxiliary handle is outside an owning paper paragraph".into(),
+            },
+        });
+    }
+}
+
 #[allow(clippy::too_many_lines)] // Document positions, recovery sites and screen inventories share one pass.
+#[allow(clippy::too_many_arguments)] // All checked document inputs remain explicit at this boundary.
 pub(super) fn build(
     skeletons: &CheckedSkeletons<'_>,
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
@@ -3221,6 +3283,8 @@ pub(super) fn build(
     metadata: &BTreeMap<String, UnitSite>,
     displays: &ftoo_manifest::CheckedDisplays<'_>,
     bibliography: &str,
+    paper_lookup: Option<&super::registry::CheckedPaperLookup>,
+    paper_documents: &BTreeSet<String>,
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
     let corpus = skeletons.corpus();
     let book = welded.integrated().resolved().book();
@@ -3269,7 +3333,23 @@ pub(super) fn build(
                     .find(|(_, u)| u.label().as_str() == position.unit())
                     .expect("checked skeleton unit");
                 check_reader_literals(unit, language, displays, &mut errors);
-                let runs = runs(index, unit, language, welded, &equations, bibliography)?;
+                check_handle_position(
+                    document,
+                    unit,
+                    language,
+                    position.paragraph(),
+                    paper_documents,
+                    &mut errors,
+                );
+                let runs = runs(
+                    index,
+                    unit,
+                    language,
+                    welded,
+                    &equations,
+                    bibliography,
+                    paper_lookup,
+                )?;
                 let bodies = display_plans(index, unit, language, welded, &equations, displays);
                 let mut block = Block {
                     pending_names: BTreeMap::new(),
@@ -3535,6 +3615,43 @@ pub(super) fn notation_bytes(
         .find(|range| range.path == arguments)
         .map_or(0..source_length, |range| range.bytes.clone())
 }
+pub(super) fn checked_handle_binding(
+    key: &str,
+    site: &UnitSite,
+    resolve: impl Fn(&str) -> Option<ftoo_manifest::PaperResolution>,
+) -> Result<ftoo_manifest::PaperTagValue, DocumentError> {
+    let value = resolve(key)
+        .and_then(|resolution| match resolution {
+            ftoo_manifest::PaperResolution::Available(value) => Some(value),
+            ftoo_manifest::PaperResolution::Unavailable { .. } => None,
+        })
+        .ok_or_else(|| {
+            DocumentError::PaperLookup(super::registry::PaperLookupError {
+                rule: ftoo_manifest::RuleId::M039,
+                site: site.to_string(),
+                fault: super::registry::PaperLookupFault::ProtocolInvalid {
+                    reason: format!(
+                        "auxiliary paper target {key:?} has no available checked binding"
+                    ),
+                },
+            })
+        })?;
+    if value.key != key || value.spelling != key || value.alias_site.is_some() {
+        return Err(DocumentError::PaperLookup(
+            super::registry::PaperLookupError {
+                rule: ftoo_manifest::RuleId::M039,
+                site: site.to_string(),
+                fault: super::registry::PaperLookupFault::ProtocolInvalid {
+                    reason: format!(
+                        "auxiliary paper target {key:?} is not a canonical printed key"
+                    ),
+                },
+            },
+        ));
+    }
+    Ok(value)
+}
+
 #[allow(clippy::too_many_lines)] // One replacement inventory retains source order across inline kinds.
 fn runs(
     index: usize,
@@ -3543,6 +3660,7 @@ fn runs(
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     equations: &Equations,
     bibliography: &str,
+    paper_lookup: Option<&super::registry::CheckedPaperLookup>,
 ) -> Result<Vec<Inline>, DocumentError> {
     let text = &unit.texts()[language];
     let mut replacements = Vec::new();
@@ -3577,8 +3695,29 @@ fn runs(
                 },
                 ftoo_manifest::ResolvedTagTarget::Paper(value) => Inline::PaperTag {
                     value: value.clone(),
+                    mint: None,
                     site: occurrence.site().clone(),
                 },
+            },
+        ));
+    }
+    for placement in text.handle_occurrences() {
+        let declaration = &unit.documentary_targets()[placement.selector()];
+        let key = &declaration.value;
+        let mut value = checked_handle_binding(key, placement.site(), |key| {
+            paper_lookup.and_then(|lookup| lookup.resolve(key))
+        })?;
+        value.target.clone_from(key);
+        replacements.push((
+            placement
+                .site()
+                .decoded
+                .clone()
+                .expect("admitted placement"),
+            Inline::PaperTag {
+                value,
+                mint: Some(placement.selector().to_owned()),
+                site: placement.site().clone(),
             },
         ));
     }
@@ -3865,7 +4004,10 @@ fn canonical_run(run: &Inline) -> String {
     match run {
         Inline::Text(text) => text.clone(),
         Inline::Tag { handle, .. } => format!("@tag{{{handle}}}"),
-        Inline::PaperTag { value, .. } => format!("@tag{{{}}}", value.key),
+        Inline::PaperTag { value, mint, .. } => mint.as_ref().map_or_else(
+            || format!("@tag{{{}}}", value.key),
+            |selector| format!("@handle{{{selector}}}"),
+        ),
         Inline::See { label, .. } => format!("@see{{{label}}}"),
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
@@ -3906,6 +4048,11 @@ fn recovered_tag_site(
                     site,
                     ..
                 } if expected == handle => Some(site),
+                Inline::PaperTag {
+                    value,
+                    mint: Some(_),
+                    site,
+                } if value.spelling == *handle => Some(site),
                 _ => None,
             })
             .collect()
@@ -3994,8 +4141,37 @@ fn recovered_records(
                 body.push_str(text);
                 continue;
             }
-            Recovered::Tag { handle, label, .. } => {
-                write!(body, "@tag{{{handle}}}").expect("string write");
+            Recovered::Tag {
+                handle,
+                label,
+                token,
+            } => {
+                let selector = block
+                    .runs
+                    .iter()
+                    .flat_map(inline_handles)
+                    .find(|candidate| *candidate == handle)
+                    .and_then(|_| {
+                        let mut flattened = Vec::new();
+                        flatten_runs(&block.runs, &mut flattened);
+                        flattened.into_iter().find_map(|run| match run {
+                            Inline::PaperTag {
+                                value,
+                                mint: Some(selector),
+                                ..
+                            } if value.spelling == *handle => Some(selector.as_str()),
+                            _ => None,
+                        })
+                    });
+                if let Some(selector) = selector {
+                    if target == DocumentTarget::Markdown && token.as_deref() != Some(selector) {
+                        body.push_str("@invalid-handle");
+                    } else {
+                        write!(body, "@handle{{{selector}}}").expect("string write");
+                    }
+                } else {
+                    write!(body, "@tag{{{handle}}}").expect("string write");
+                }
                 (EmissionKind::Tag, label.clone())
             }
             Recovered::Math(source) => {
@@ -4204,7 +4380,7 @@ fn region_records(
             let (kind, value, site) = match run {
                 Inline::Text(_) | Inline::Styled { .. } | Inline::See { .. } => return None,
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
-                Inline::PaperTag { value, site } => (EmissionKind::Tag, &value.target, site),
+                Inline::PaperTag { value, site, .. } => (EmissionKind::Tag, &value.target, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
                 Inline::Citation {
                     text,
@@ -4751,7 +4927,7 @@ fn citation_run(
         | ftoo_manifest::MintKind::OpenQuestion => {
             ftoo_manifest::AddressTarget::Documentary(text.clone())
         }
-        ftoo_manifest::MintKind::PaperTex => {
+        ftoo_manifest::MintKind::PaperTex | ftoo_manifest::MintKind::UnitPaperMint => {
             unreachable!("strict unit integration refuses paper mints")
         }
     };
@@ -4956,6 +5132,7 @@ pub(super) fn citation_origins(
                 },
             ),
             ftoo_manifest::LabelSite::RustHistory { .. }
+            | ftoo_manifest::LabelSite::UnitPaperMint { .. }
             | ftoo_manifest::LabelSite::PaperMintFile { .. }
             | ftoo_manifest::LabelSite::PaperTagRow { .. }
             | ftoo_manifest::LabelSite::MintContext => unreachable!("checked mint origin"),
@@ -5117,7 +5294,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),
-        runs: runs(0, unit, "en", welded, &BTreeMap::new(), "").unwrap(),
+        runs: runs(0, unit, "en", welded, &BTreeMap::new(), "", None).unwrap(),
     };
     block.map_citations(book, "fixture", "en").unwrap();
     DocumentPlan {

@@ -43,6 +43,7 @@ fn corpus_labels(labels: &[&str]) -> LanguageCheckedUnits {
                 table_site: site.clone(),
                 math_site: site.clone(),
                 texts_site: site.clone(),
+                documentary_targets: BTreeMap::new(),
                 math: BTreeMap::new(),
                 texts: BTreeMap::from([(
                     "en".into(),
@@ -55,6 +56,116 @@ fn corpus_labels(labels: &[&str]) -> LanguageCheckedUnits {
             .collect(),
     )
     .unwrap()
+}
+
+fn paper_corpus_with_target(target: &str) -> LanguageCheckedUnits {
+    paper_corpus_with_target_text(target, "The @handle{paper} boundary.")
+}
+fn paper_corpus_with_target_text(target: &str, text: &str) -> LanguageCheckedUnits {
+    let site = UnitSite {
+        file: "units/statements/fixture.toml".into(),
+        path: vec![],
+        anchor: SourceAnchor::Unavailable,
+        decoded: None,
+        occurrence: None,
+    };
+    let located = |value: &str| LocatedString {
+        value: value.into(),
+        site: site.clone(),
+    };
+    let language = DocumentEntryDraft {
+        key_site: site.clone(),
+        table_site: site.clone(),
+        languages_site: site.clone(),
+        required_languages: vec![located("en")],
+    };
+    crate::admit_unit_drafts(
+        DocumentDraft {
+            documents_site: site.clone(),
+            documents: BTreeMap::from([
+                ("main".into(), language.clone()),
+                ("paper-pilot".into(), language),
+            ]),
+        },
+        vec![UnitDraft {
+            id: located("sec:fixture:paper"),
+            document: located("paper-pilot"),
+            table_site: site.clone(),
+            math_site: site.clone(),
+            texts_site: site.clone(),
+            documentary_targets: BTreeMap::from([(
+                "paper".into(),
+                LocatedEntryDraft {
+                    key_site: site.clone(),
+                    value: located(target),
+                },
+            )]),
+            math: BTreeMap::new(),
+            texts: BTreeMap::from([(
+                "en".into(),
+                LocatedEntryDraft {
+                    key_site: site.clone(),
+                    value: located(text),
+                },
+            )]),
+        }],
+    )
+    .unwrap()
+}
+
+#[test]
+fn native_paper_mint_is_unique_before_strict_projection() {
+    let corpus = paper_corpus_with_target("bd:rep");
+    let markdown = check_markdown_sources(vec![source("fixture.md", RECORDS)]).unwrap();
+    let joint = collect_joint_mints(&corpus, &markdown).unwrap();
+    let origin = &joint.mints()["bd:rep"];
+    assert_eq!(origin.kind, MintKind::UnitPaperMint);
+    assert!(matches!(origin.site, LabelSite::UnitPaperMint { .. }));
+    let duplicate = joint
+        .clone()
+        .with_paper_mints(vec![("bd:rep".into(), "paper.tex".into())]);
+    assert!(format!("{duplicate:?}").contains("DuplicateMint"));
+    assert!(!joint.clone().strict_units().mints().contains_key("bd:rep"));
+    let graph = crate::validate(crate::seed_draft()).unwrap();
+    let book = crate::addressing(&graph).unwrap();
+    let resolved = crate::resolve_unit_tags(&corpus, &book).unwrap();
+    let strict = integrate_joint_labels(&resolved, &joint).unwrap_err();
+    assert!(format!("{strict:?}").contains("PaperMintInStrictScope"));
+    let strict = integrate_joint_labels(&resolved, &joint.strict_units());
+    assert!(strict.is_ok(), "{:?}", strict.err());
+}
+
+#[test]
+fn native_paper_mint_does_not_resolve_a_unit_citation() {
+    let corpus = paper_corpus_with_target_text(
+        "bd:rep",
+        "The @handle{paper} boundary cites `sec:paper:target`.",
+    );
+    let clean = check_markdown_sources(vec![source("fixture.md", RECORDS)]).unwrap();
+    let mut joint = collect_joint_mints(&corpus, &clean).unwrap();
+    assert_eq!(joint.mints()["bd:rep"].kind, MintKind::UnitPaperMint);
+    let site = corpus.units()[0].texts()["en"].handle_occurrences()[0]
+        .site()
+        .clone();
+    joint.mints.insert(
+        "sec:paper:target".into(),
+        MintOrigin {
+            kind: MintKind::UnitPaperMint,
+            site: LabelSite::UnitPaperMint {
+                unit: "sec:fixture:paper".into(),
+                selector: "target".into(),
+                declaration: site.clone(),
+                placement: site,
+            },
+        },
+    );
+    let graph = crate::validate(crate::seed_draft()).unwrap();
+    let book = crate::addressing(&graph).unwrap();
+    let resolved = crate::resolve_unit_tags(&corpus, &book).unwrap();
+    let integrated = integrate_joint_labels(&resolved, &joint.strict_units()).unwrap();
+    let error = crate::weld_units(&integrated).unwrap_err();
+    assert!(format!("{error:?}").contains("UnresolvedUnitCitation"));
+    assert!(format!("{error:?}").contains("Joint"));
 }
 fn identity_origin() -> MintOrigin {
     MintOrigin {

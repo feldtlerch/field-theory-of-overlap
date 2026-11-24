@@ -419,6 +419,24 @@ fn joint_mints(
                     },
                 });
         }
+        if let Some(text) = unit.texts().get("en") {
+            for placement in text.handle_occurrences() {
+                if let Some(target) = unit.documentary_targets().get(placement.selector()) {
+                    mints
+                        .entry(target.value.clone())
+                        .or_default()
+                        .push(MintOrigin {
+                            kind: MintKind::UnitPaperMint,
+                            site: LabelSite::UnitPaperMint {
+                                unit: unit.label().as_str().to_owned(),
+                                selector: placement.selector().to_owned(),
+                                declaration: target.site.clone(),
+                                placement: placement.site().clone(),
+                            },
+                        });
+                }
+            }
+        }
     }
     mints
 }
@@ -430,7 +448,7 @@ pub fn integrate_labels<'r, 'm, 'u, 'b, 'g>(
     markdown: &'m CheckedMarkdown,
 ) -> Result<LabelIntegratedUnits<'r, 'm, 'u, 'b, 'g>, LabelErrors> {
     let joint = collect_joint_mints(resolved.corpus(), markdown)?;
-    integrate_joint_labels(resolved, &joint)
+    integrate_joint_labels(resolved, &joint.strict_units())
 }
 /// Integrate references using the same admitted mint inventory as the registry.
 /// # Errors
@@ -443,7 +461,7 @@ pub fn integrate_joint_labels<'r, 'm, 'u, 'b, 'g>(
     if let Some((label, origin)) = joint
         .mints
         .iter()
-        .find(|(_, origin)| origin.kind == MintKind::PaperTex)
+        .find(|(_, origin)| matches!(origin.kind, MintKind::PaperTex | MintKind::UnitPaperMint))
     {
         return Err(LabelErrors(vec![diagnostic(
             RuleId::M063,
@@ -532,6 +550,14 @@ impl JointMints<'_, '_> {
     #[must_use]
     pub fn mints(&self) -> &BTreeMap<String, MintOrigin> {
         &self.mints
+    }
+    /// Project an already duplicate-checked inventory into strict-unit scope.
+    #[must_use]
+    pub fn strict_units(mut self) -> Self {
+        self.mints.retain(|_, origin| {
+            !matches!(origin.kind, MintKind::PaperTex | MintKind::UnitPaperMint)
+        });
+        self
     }
     /// Extend the documentary target context with the paper's label-mint inventory.
     /// These origins cannot serve as confirmation records, which remain Markdown mints.

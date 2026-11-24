@@ -38,6 +38,11 @@ Not yet converted: intervening material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:boundary:ratio-rate document paper-pilot language en -->
+bd:rep<!-- handle representation bd:rep --> is the representability boundary, a ratio: where against&#45;gradient will becomes load&#45;bearing. bd:fab<!-- handle fabrication bd:fab --> is the fabrication line, a rate: where authored witnesses outpace anchored ones and the funded fake goes stable. A ratio and a rate are not one curve; equating them would collapse will&#45;space onto reward&#45;space.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:coda:audit-bottoms document paper-pilot language en -->
 The audit bottoms out here, for the framework’s own reasons &#40;<a href="../paper-pilot/en.md#method-self-limit">→ appendix G</a><!-- see app:self-limit -->&#41;: no formalism contains the reading, no instrument reads the future at the instant — so the document, read, concludes its own audit has no formal close. This is not a weakness but the shape of the thing: it stands on exactly two feet, the unreadable&#45;now and the settled&#45;later, on a ground neither reaches.
 

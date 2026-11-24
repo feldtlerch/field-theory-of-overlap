@@ -15,7 +15,8 @@ FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).reso
 
 def checked_fragments(root, rows):
     with patch('identities.bindings') as bindings:
-        bindings.return_value.get.return_value = {'source_status': 'paper'}
+        bindings.return_value.get.side_effect = lambda name: {
+            'source_status': 'paper', 'spelling': name}
         return declared_fragments(root, rows)
 
 

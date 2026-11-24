@@ -11,6 +11,7 @@ children = [
   { kind = "unit", unit = "sec:say:harm-enlargement" },
   { kind = "unit", unit = "sec:say:wonder-beauty" },
   { kind = "unit", unit = "sec:say:enemy-to-none" },
+  { kind = "paragraph", unit = "sec:boundary:ratio-rate" },
   { kind = "paragraph", unit = "sec:coda:audit-bottoms" },
   { kind = "paragraph", unit = "sec:coda:whole-field" },
   { kind = "unit", unit = "sec:coda:record-limit" },

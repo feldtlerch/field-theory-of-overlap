@@ -34,7 +34,8 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
         )
         .unwrap();
     let resolved = crate::units::checked_resolution(&root, &declaration, &corpus, &book).unwrap();
-    let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint).unwrap();
+    let integrated =
+        ftoo_manifest::integrate_joint_labels(&resolved, &joint.strict_units()).unwrap();
     let welded = ftoo_manifest::weld_units(&integrated).unwrap();
     let sources = input::sources(&root, &input::discover(&root, "units/skeletons", false)?)?;
     let displays = input::sources(&root, &input::discover(&root, "units/displays", true)?)?;
@@ -47,6 +48,11 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     let displays = ftoo_manifest::check_displays(&display_drafts, &skeletons, &welded).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
     let bibliography = fs::read_to_string(root.join("documents/paper/references.bib"))?;
+    let paper_lookup = registry::CheckedPaperLookup::check(&root)?;
+    let paper_documents = crate::units::toml::paper_contexts(&declaration)
+        .unwrap()
+        .into_keys()
+        .collect();
     let directory = Directory::new();
     let path = directory.0.join("historical.tex");
     crate::notation::with_preparation(None, &catalogue, |notation| -> Result<(), DocumentError> {
@@ -59,6 +65,8 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
             &metadata,
             &displays,
             &bibliography,
+            Some(&paper_lookup),
+            &paper_documents,
         )?;
         let plan = plans
             .iter()

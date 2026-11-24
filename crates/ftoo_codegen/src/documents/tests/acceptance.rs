@@ -39,6 +39,14 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
             .find(|artifact| artifact.path() == path)
             .unwrap()
     };
+    let authored = std::fs::read_to_string(root.join("units/statements/boundary-ratio-rate.toml"))?;
+    assert!(authored.contains("@handle{representation}"));
+    assert!(authored.contains("@handle{fabrication}"));
+    let handle_fragment = std::str::from_utf8(
+        artifact("generated/documents/paper-pilot/sec-boundary-ratio-rate.tex").bytes(),
+    )?;
+    assert!(handle_fragment.contains(r"\handle{bd:rep}"));
+    assert!(handle_fragment.contains(r"\handle{bd:fab}"));
     let fragment = "generated/documents/paper-pilot/sec-reading-shadow.tex";
     assert_eq!(
         artifact(fragment).bytes(),
@@ -98,6 +106,109 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         )),
     );
     Ok(())
+}
+
+#[test]
+fn paper_handle_binding_refuses_unbound_alias_and_noncanonical_values() {
+    let site = input::site("units/statements/fixture.toml");
+    let value = ftoo_manifest::PaperTagValue {
+        key: "bd:rep".into(),
+        spelling: "bd:rep".into(),
+        target: "bd:rep".into(),
+        target_kind: "paper".into(),
+        lookup_site: ftoo_manifest::PaperEvidenceSite {
+            file: "paper-tags.tsv".into(),
+            line: 1,
+        },
+        alias_site: None,
+        declaration_sites: vec![],
+    };
+    assert_eq!(
+        plan::checked_handle_binding("bd:rep", &site, |_| {
+            Some(ftoo_manifest::PaperResolution::Available(value.clone()))
+        }),
+        Ok(value.clone())
+    );
+    for (resolution, reason) in [
+        (None, "no available checked binding"),
+        (
+            Some(ftoo_manifest::PaperResolution::Unavailable {
+                status: "alias".into(),
+            }),
+            "no available checked binding",
+        ),
+        (
+            Some(ftoo_manifest::PaperResolution::Available(
+                ftoo_manifest::PaperTagValue {
+                    key: "bd:alias".into(),
+                    ..value.clone()
+                },
+            )),
+            "not a canonical printed key",
+        ),
+        (
+            Some(ftoo_manifest::PaperResolution::Available(
+                ftoo_manifest::PaperTagValue {
+                    spelling: "BD:rep".into(),
+                    ..value.clone()
+                },
+            )),
+            "not a canonical printed key",
+        ),
+        (
+            Some(ftoo_manifest::PaperResolution::Available(
+                ftoo_manifest::PaperTagValue {
+                    alias_site: Some(ftoo_manifest::PaperEvidenceSite {
+                        file: "paper-tags.tsv".into(),
+                        line: 2,
+                    }),
+                    ..value.clone()
+                },
+            )),
+            "not a canonical printed key",
+        ),
+    ] {
+        let error =
+            plan::checked_handle_binding("bd:rep", &site, |_| resolution.clone()).unwrap_err();
+        let DocumentError::PaperLookup(error) = error else {
+            panic!("paper lookup refusal")
+        };
+        assert_eq!(error.rule, RuleId::M039);
+        assert!(format!("{error:?}").contains(reason), "{error:?}");
+    }
+}
+
+#[test]
+fn authored_paper_handles_require_an_owning_paper_paragraph() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source = |path: &str| crate::UnitSource {
+        file: path.into(),
+        bytes: std::fs::read(root.join(path)).unwrap(),
+    };
+    let corpus = crate::load_unit_sources(
+        source("units/documents.toml"),
+        vec![source("units/statements/boundary-ratio-rate.toml")],
+    )
+    .unwrap();
+    let unit = &corpus.units()[0];
+    assert_eq!(unit.texts()["en"].handle_occurrences().len(), 2);
+    let paper = BTreeSet::from(["paper-pilot".into()]);
+    let mut errors = vec![];
+    plan::check_handle_position("paper-pilot", unit, "en", true, &paper, &mut errors);
+    assert_eq!(errors, Vec::new());
+    for (document, paragraph) in [("paper-pilot", false), ("main", true)] {
+        plan::check_handle_position(document, unit, "en", paragraph, &paper, &mut errors);
+        assert_eq!(errors.len(), 2);
+        assert!(
+            errors
+                .iter()
+                .all(|diagnostic| diagnostic.rule == RuleId::M039)
+        );
+        assert!(errors.iter().all(|diagnostic| {
+            format!("{:?}", diagnostic.fault).contains("outside an owning paper paragraph")
+        }));
+        errors.clear();
+    }
 }
 
 #[test]

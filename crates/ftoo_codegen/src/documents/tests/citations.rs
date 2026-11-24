@@ -458,7 +458,7 @@ fn context_graph(
         paragraph: false,
         equation: false,
         site: site.clone(),
-        runs: runs(0, unit, "en", &welded, &BTreeMap::new(), "").unwrap(),
+        runs: runs(0, unit, "en", &welded, &BTreeMap::new(), "", None).unwrap(),
     };
     check(&book, unit, &welded, block);
 }
@@ -487,6 +487,7 @@ fn literal_corpus(text: &str, math: BTreeMap<String, LocatedEntryDraft>) -> Lang
             table_site: site.clone(),
             math_site: site.clone(),
             texts_site: site.clone(),
+            documentary_targets: BTreeMap::new(),
             math,
             texts: BTreeMap::from([(
                 "en".into(),
@@ -792,14 +793,33 @@ pub(in crate::documents) fn support_required_literal_build_controls(
                 let expected = DocumentError::Assembly(
                     AssemblyErrors::from_diagnostics(vec![expected]).unwrap(),
                 );
-                let actual = build(&skeletons, welded, notation, &metadata, &displays, "")
-                    .err()
-                    .unwrap();
+                let actual = build(
+                    &skeletons,
+                    welded,
+                    notation,
+                    &metadata,
+                    &displays,
+                    "",
+                    None,
+                    &BTreeSet::new(),
+                )
+                .err()
+                .unwrap();
                 assert_eq!(actual, expected);
                 assert_eq!(actual.to_string(), expected.to_string());
             } else {
                 assert_eq!(errors, vec![]);
-                let plans = build(&skeletons, welded, notation, &metadata, &displays, "").unwrap();
+                let plans = build(
+                    &skeletons,
+                    welded,
+                    notation,
+                    &metadata,
+                    &displays,
+                    "",
+                    None,
+                    &BTreeSet::new(),
+                )
+                .unwrap();
                 for plan in plans {
                     assert_eq!(
                         check_emission(&plan, &latex::render(&plan), DocumentTarget::Latex),
@@ -1855,6 +1875,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
                 table_site: site.clone(),
                 math_site: site.clone(),
                 texts_site: site.clone(),
+                documentary_targets: BTreeMap::new(),
                 math: BTreeMap::new(),
                 texts: languages(),
             })
@@ -1864,6 +1885,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
                 table_site: site.clone(),
                 math_site: site.clone(),
                 texts_site: site.clone(),
+                documentary_targets: BTreeMap::new(),
                 math: BTreeMap::new(),
                 texts: BTreeMap::from([(
                     "en".into(),

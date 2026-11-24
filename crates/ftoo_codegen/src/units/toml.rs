@@ -491,13 +491,24 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
             documents,
         }))
     } else {
-        let fields = fixed(root[1], &["id", "document", "math", "texts"])?;
+        let mut allowed = vec!["id", "document", "math", "texts"];
+        if root[1]
+            .fields
+            .iter()
+            .any(|(key, _, _)| key == "documentary-targets")
+        {
+            allowed.push("documentary-targets");
+        }
+        let fields = fixed(root[1], &allowed)?;
         Ok(Draft::Unit(Box::new(UnitDraft {
             id: string(fields[0])?,
             document: string(fields[1])?,
             table_site: root[1].site.clone(),
             math_site: fields[2].site.clone(),
             texts_site: fields[3].site.clone(),
+            documentary_targets: fields
+                .get(4)
+                .map_or(Ok(BTreeMap::new()), |field| entries(field))?,
             math: entries(fields[2])?,
             texts: entries(fields[3])?,
         })))

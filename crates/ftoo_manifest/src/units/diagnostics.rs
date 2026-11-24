@@ -109,6 +109,7 @@ pub enum InsertionReason {
     StyledMath,
     StyledReference,
     StyledBibliographyCitation,
+    StyledHandle,
     OwnCloser,
 }
 
@@ -205,6 +206,22 @@ pub enum UnitFault {
     UnusedMath {
         name: String,
     },
+    InvalidDocumentaryTarget {
+        selector: String,
+        key: String,
+    },
+    UnknownHandle {
+        selector: String,
+    },
+    UnusedHandle {
+        selector: String,
+    },
+    RepeatedHandle {
+        selector: String,
+    },
+    HandleOutsidePaperEnglish {
+        selector: String,
+    },
     ResolutionFault {
         cause: TagResolutionFault,
     },
@@ -250,7 +267,12 @@ impl UnitFault {
             Self::BlankMath { .. } => 22,
             Self::UnsupportedMathSyntax { .. } => 23,
             Self::UnknownMath { .. } => 24,
-            Self::UnusedMath { .. } => 25,
+            Self::UnusedMath { .. }
+            | Self::InvalidDocumentaryTarget { .. }
+            | Self::UnknownHandle { .. }
+            | Self::UnusedHandle { .. }
+            | Self::RepeatedHandle { .. }
+            | Self::HandleOutsidePaperEnglish { .. } => 25,
             Self::ResolutionFault { .. } | Self::PaperTagUnavailable { .. } => 26,
             Self::DocumentaryTagTarget { .. } => 50,
             Self::UnknownToken { .. } => 51,

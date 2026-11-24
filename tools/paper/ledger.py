@@ -1,9 +1,11 @@
 """Check final shipped occurrences against lookup, auxiliary anchors and PDF destinations."""
 import argparse
 import collections
+import hashlib
 import json
 import pathlib
 import re
+import tomllib
 from common import read, require, timed, write
 from identities import bindings
 from pdf_text import Pdf
@@ -38,8 +40,9 @@ def occurrence_differences(observed, emitted):
             for k in sorted(observed.keys() | emitted.keys()) if observed[k] != emitted[k]]
 
 
-def auxiliary(path, job):
+def auxiliary(path, job, unique_keys=()):
     result = {}
+    counts = collections.Counter()
     pending=[path/(job+'.aux')]; seen=set()
     while pending:
         file=pending.pop()
@@ -47,12 +50,16 @@ def auxiliary(path, job):
         seen.add(file)
         for line in read(file).splitlines():
             m=re.match(r'\\zref@newlabel\{([^}]+)\}',line)
-            if m: result[m[1]] = {k:property_value(line,k) for k in ('default','page','anchor','title')}
+            if m:
+                counts[m[1]] += 1
+                result[m[1]] = {k:property_value(line,k) for k in ('default','page','anchor','title')}
             include=re.match(r'\\@input\{([^}]+)\}',line)
             if include:
                 part=path/include[1]
                 require(part.resolve().is_relative_to(path.resolve()),'Auxiliary input escapes work area')
                 pending.append(part)
+    for key in unique_keys:
+        require(counts[key] == 1, 'M055: Auxiliary definition count differs: '+key)
     return result
 
 
@@ -97,11 +104,73 @@ def check_screen_references(repo, paper_auxiliary, paper_pdf):
             check_destination('main',label,target['anchor'],int(target['page']),paper_pdf.destination(target['anchor']))
 
 
+def check_paragraph_tag_modes(repo, rows):
+    """Bind converted tags and handle placements to their authored source and shipped mode."""
+    for row in (repo/'generated/documents/inclusions.tsv').read_text(encoding='utf-8').splitlines():
+        source, unit, fragment, role, marker = row.split('\t')
+        if role != 'paragraph':
+            continue
+        body = (repo/fragment).read_bytes()
+        tags = [key.decode('ascii') for key in re.findall(rb'\\ftag\{([^{}]+)\}', body)]
+        handles = [key.decode('ascii') for key in re.findall(rb'\\handle\{([^{}]+)\}', body)]
+        if not tags and not handles:
+            continue
+        candidates = list((repo/'units/statements').glob('*.toml'))
+        owners = [path for path in candidates if tomllib.loads(path.read_text(encoding='utf-8'))['unit']['id'] == unit]
+        require(len(owners) == 1, 'M055: Paragraph tag owner differs: '+unit)
+        owner = tomllib.loads(owners[0].read_text(encoding='utf-8'))['unit']
+        authored = owner['texts']['en']
+        targets = owner.get('documentary-targets', {})
+        selectors = re.findall(r'@handle\{([^{}]+)\}', authored)
+        require(all(selector in targets for selector in selectors)
+                and handles == [targets[selector] for selector in selectors],
+                'M055: Paragraph handle command sequence differs: '+unit)
+        require(tags == re.findall(r'@tag\{([^{}]+)\}', authored),
+                'M055: Paragraph tag command sequence differs: '+unit)
+        site = source.removeprefix('documents/paper/')
+        interval = {int(marker), int(marker)+1}
+        def at_marker(item):
+            prefix, sep, line = item['site'].rpartition(':')
+            return sep and prefix == site and line.isdecimal() and int(line) in interval
+        for index,key in enumerate(tags):
+            identities = [item for item in rows if item['document'] == 'main' and item['kind'] == 'identity'
+                          and item['key'] == key and at_marker(item)]
+            locators = [item for item in rows if item['document'] == 'main' and item['kind'] == 'locator'
+                        and item['key'] == key and at_marker(item)]
+            require(len(identities) == 1 and len(locators) <= 1,
+                    'M055: Paragraph tag shipped association differs: '+unit+':'+key)
+            legacy = unit == 'sec:log:andreoni-joint' and key == 'J:occ' and index == 0
+            if legacy:
+                raw = owners[0].read_bytes()
+                blob = b'blob '+str(len(raw)).encode()+b'\0'+raw
+                require(hashlib.sha1(blob).hexdigest() == 'e0707ffeb20702a77341af79505cc1732997303f',
+                        'M055: Located paragraph tag owner changed: '+unit)
+            require(len(locators) == int(legacy),
+                    'M055: Paragraph tag print mode differs: '+unit+':'+key)
+
+
+def check_auxiliary_destinations(keys, targets, pdf):
+    """Require the destination of each generated auxiliary mint, including unreferenced ones."""
+    for key in keys:
+        target = targets.get(key)
+        require(target is not None, 'M064: unresolved auxiliary target: '+key)
+        anchor = target.get('anchor', '')
+        check_destination('main', key, anchor, int(target['page']), pdf.destination(anchor))
+
+
 def check(repo, work):
     lookup = bindings(repo)
     paper = work/'paper'
     docs = {job:Pdf(paper/(job+'.pdf')) for job in ('main','main_explainer')}
-    aux = {job:auxiliary(paper,job) for job in docs}
+    fragments = (repo/'generated/documents/inclusions.tsv').read_text(encoding='utf-8').splitlines()
+    auxiliary_keys = set()
+    for row in fragments:
+        fields = row.split('\t')
+        require(len(fields) == 5, 'M055: Inclusion row differs')
+        body = (repo/fields[2]).read_bytes()
+        auxiliary_keys.update(key.decode('ascii') for key in re.findall(rb'\\handle\{([^{}]+)\}', body))
+    aux = {job:auxiliary(paper,job, auxiliary_keys if job == 'main' else ()) for job in docs}
+    check_auxiliary_destinations(auxiliary_keys, aux['main'], docs['main'])
     check_screen_references(repo,aux['main'],docs['main'])
     rows=[]; issues=[]; observed=collections.Counter()
     known={v['spelling'].casefold() for v in lookup.values()}
@@ -150,6 +219,7 @@ def check(repo, work):
         write(work/(job+'-text.json'),json.dumps(pages,ensure_ascii=False,indent=2)+'\n')
         write(work/(job+'-bookmarks.json'),json.dumps(bookmarks,ensure_ascii=False,indent=2)+'\n')
     write(work/'identity-ledger.json',json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
+    check_paragraph_tag_modes(repo, rows)
     emitted=collections.Counter((r['document'],r['page'],r['spelling'].casefold()) for r in rows if r['spelling'] and r['visibility']=='page')
     coverage=occurrence_differences(observed,emitted)
     write(work/'identity-coverage.json',json.dumps(coverage,indent=2)+'\n')

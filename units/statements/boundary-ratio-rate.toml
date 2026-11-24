@@ -1,0 +1,13 @@
+schema = 1
+
+[unit]
+id = "sec:boundary:ratio-rate"
+document = "paper-pilot"
+math = {}
+
+[unit.documentary-targets]
+representation = "bd:rep"
+fabrication = "bd:fab"
+
+[unit.texts]
+en = "@handle{representation} is the representability boundary, a ratio: where against-gradient will becomes load-bearing. @handle{fabrication} is the fabrication line, a rate: where authored witnesses outpace anchored ones and the funded fake goes stable. A ratio and a rate are not one curve; equating them would collapse will-space onto reward-space."

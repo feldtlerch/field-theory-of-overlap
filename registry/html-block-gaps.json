@@ -7,7 +7,7 @@
       "unit": "eq:explainer:overlap-flow"
     },
     {
-      "block": 6,
+      "block": 7,
       "document": "paper-pilot",
       "inline-kind": "see-reference",
       "unit": "sec:coda:audit-bottoms"

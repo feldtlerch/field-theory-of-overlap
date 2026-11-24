@@ -489,8 +489,9 @@ pub(crate) fn prepare_context(
         paper_lookup.as_ref().and_then(|lookup| lookup.resolve(key))
     })
     .map_err(|e| DocumentError::Units(crate::UnitLoadError::Admission(e)))?;
-    let integrated = ftoo_manifest::integrate_joint_labels(&resolved, &joint)
-        .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
+    let integrated =
+        ftoo_manifest::integrate_joint_labels(&resolved, &joint.clone().strict_units())
+            .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let welded = ftoo_manifest::weld_units(&integrated).map_err(DocumentError::Weld)?;
     let skeleton_files = input::discover(root, "units/skeletons", false)?;
     let scope_files = input::discover(root, "units/scopes", false)?;
@@ -603,6 +604,8 @@ pub(crate) fn prepare_context(
             &metadata,
             &displays,
             bibliography,
+            paper_lookup.as_ref(),
+            &paper_documents,
         )?;
         plan::plan_screens(
             &mut plans,
@@ -784,8 +787,15 @@ fn metadata(
         let tree = crate::units::toml::parse(&statement.file, text).expect("admitted syntax");
         let fields =
             crate::units::toml::fixed(&tree, &["schema", "unit"]).expect("admitted fields");
-        let unit = crate::units::toml::fixed(fields[1], &["id", "document", "math", "texts"])
-            .expect("admitted fields");
+        let mut allowed = vec!["id", "document", "math", "texts"];
+        if fields[1]
+            .fields
+            .iter()
+            .any(|(key, _, _)| key == "documentary-targets")
+        {
+            allowed.push("documentary-targets");
+        }
+        let unit = crate::units::toml::fixed(fields[1], &allowed).expect("admitted fields");
         let id = crate::units::toml::string(unit[0]).expect("admitted id");
         owners.insert(id.value.clone(), unit[1].site.clone());
         metadata.insert(id.value, id.site);
@@ -1142,8 +1152,14 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
                 }
                 body.push_str(&emitted);
             }
-            plan::Inline::PaperTag { value, .. } => {
-                write!(body, "\\ftag{{{}}}", value.key).expect("string write");
+            plan::Inline::PaperTag { value, mint, .. } => {
+                write!(
+                    body,
+                    "\\{}{{{}}}",
+                    if mint.is_some() { "handle" } else { "ftag" },
+                    value.key
+                )
+                .expect("string write");
             }
             plan::Inline::See { label, .. } => {
                 write!(body, "\\see{{{label}}}").expect("string write");

@@ -1206,6 +1206,7 @@ fn paper_tag_reader_span() {
                         alias_site: None,
                         declaration_sites: vec![evidence],
                     },
+                    mint: None,
                     site: site.clone(),
                 },
                 Inline::Text(" span.".into()),
@@ -3146,6 +3147,73 @@ fn markdown_handles_are_local_to_the_recovered_region() {
         check_emission(&plan, &source, DocumentTarget::Markdown),
         Ok(())
     );
+}
+
+#[test]
+fn paper_mint_handle_recovers_its_position_key_and_selector() {
+    use ftoo_manifest::{PaperEvidenceSite, PaperTagValue};
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let mut plan = self::plan(&book);
+    let site = plan.blocks[0].site.clone();
+    let evidence = PaperEvidenceSite {
+        file: "documents/paper-build/paper-tags.tsv".into(),
+        line: 1,
+    };
+    let handle = |key: &str, selector: &str| Inline::PaperTag {
+        value: PaperTagValue {
+            key: key.into(),
+            spelling: key.into(),
+            target: key.into(),
+            target_kind: "documentary".into(),
+            lookup_site: evidence.clone(),
+            alias_site: None,
+            declaration_sites: vec![evidence.clone()],
+        },
+        mint: Some(selector.into()),
+        site: site.clone(),
+    };
+    plan.blocks[0].runs = vec![
+        handle("bd:rep", "representation"),
+        Inline::Text(" and ".into()),
+        handle("bd:fab", "fabrication"),
+    ];
+    for target in [DocumentTarget::Latex, DocumentTarget::Markdown] {
+        let output = render(&plan, target);
+        assert_eq!(check_emission(&plan, &output, target), Ok(()));
+        let changed = match target {
+            DocumentTarget::Latex => output.replacen(r"\handle{bd:rep}", r"\handle{bd:fab}", 1),
+            DocumentTarget::Markdown => output.replacen(
+                "<!-- handle representation bd:rep -->",
+                "<!-- handle fabrication bd:rep -->",
+                1,
+            ),
+        };
+        assert_ne!(changed, output);
+        assert!(check_emission(&plan, &changed, target).is_err());
+        let missing = match target {
+            DocumentTarget::Latex => output.replacen(r"\handle{bd:rep}", "", 1),
+            DocumentTarget::Markdown => {
+                output.replacen("bd:rep<!-- handle representation bd:rep -->", "", 1)
+            }
+        };
+        assert_ne!(missing, output);
+        assert!(check_emission(&plan, &missing, target).is_err());
+        let first = match target {
+            DocumentTarget::Latex => r"\handle{bd:rep}",
+            DocumentTarget::Markdown => "bd:rep<!-- handle representation bd:rep -->",
+        };
+        let second = match target {
+            DocumentTarget::Latex => r"\handle{bd:fab}",
+            DocumentTarget::Markdown => "bd:fab<!-- handle fabrication bd:fab -->",
+        };
+        let swapped = output
+            .replacen(first, "SWAP_HANDLE", 1)
+            .replacen(second, first, 1)
+            .replacen("SWAP_HANDLE", second, 1);
+        assert_ne!(swapped, output);
+        assert!(check_emission(&plan, &swapped, target).is_err());
+    }
 }
 
 fn premise_plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {

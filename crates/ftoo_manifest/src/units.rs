@@ -43,6 +43,7 @@ pub struct UnitDraft {
     pub table_site: UnitSite,
     pub math_site: UnitSite,
     pub texts_site: UnitSite,
+    pub documentary_targets: BTreeMap<String, LocatedEntryDraft>,
     pub math: BTreeMap<String, LocatedEntryDraft>,
     pub texts: BTreeMap<String, LocatedEntryDraft>,
 }
@@ -80,6 +81,22 @@ impl MathOccurrence {
 pub struct TagOccurrence {
     input: String,
     site: UnitSite,
+}
+/// A visible local placement of an auxiliary paper mint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HandleOccurrence {
+    selector: String,
+    site: UnitSite,
+}
+impl HandleOccurrence {
+    #[must_use]
+    pub fn selector(&self) -> &str {
+        &self.selector
+    }
+    #[must_use]
+    pub fn site(&self) -> &UnitSite {
+        &self.site
+    }
 }
 /// One located authored see reference.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -141,6 +158,7 @@ pub struct CheckedText {
     source: LocatedString,
     occurrences: Vec<MathOccurrence>,
     tags: Vec<TagOccurrence>,
+    handles: Vec<HandleOccurrence>,
     references: Vec<ReferenceOccurrence>,
     bibliography_citations: Vec<BibliographyCitationOccurrence>,
     styles: Vec<content::StyleOccurrence>,
@@ -163,6 +181,10 @@ impl CheckedText {
         &self.tags
     }
     #[must_use]
+    pub fn handle_occurrences(&self) -> &[HandleOccurrence] {
+        &self.handles
+    }
+    #[must_use]
     pub fn reference_occurrences(&self) -> &[ReferenceOccurrence] {
         &self.references
     }
@@ -177,6 +199,7 @@ pub struct CheckedUnit {
     label: UnitLabel,
     document: String,
     math: BTreeMap<String, LocatedString>,
+    documentary_targets: BTreeMap<String, LocatedString>,
     texts: BTreeMap<String, CheckedText>,
 }
 impl CheckedUnit {
@@ -191,6 +214,10 @@ impl CheckedUnit {
     #[must_use]
     pub fn math(&self) -> &BTreeMap<String, LocatedString> {
         &self.math
+    }
+    #[must_use]
+    pub fn documentary_targets(&self) -> &BTreeMap<String, LocatedString> {
+        &self.documentary_targets
     }
     #[must_use]
     pub fn texts(&self) -> &BTreeMap<String, CheckedText> {
@@ -502,6 +529,7 @@ pub fn admit_unit_drafts(
     })
 }
 
+#[allow(clippy::too_many_lines)] // Admission reports metadata and text faults in their authored order.
 fn check_unit(
     unit: UnitDraft,
     required: &[LocatedString],
@@ -524,6 +552,88 @@ fn check_unit(
         }
     }
     let (texts, used, scanner_failed) = check_texts(&unit, &required_names, errors);
+    let mut placed = BTreeMap::<String, usize>::new();
+    for (selector, entry) in &unit.documentary_targets {
+        if !local_name(selector)
+            || entry.value.value.is_empty()
+            || label_name(&entry.value.value)
+            || !entry.value.value.contains(':')
+            || !entry
+                .value
+                .value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'-' | b'_'))
+        {
+            errors.push(diagnostic(
+                RuleId::M039,
+                UnitStage::Metadata,
+                Some(&unit.id.value),
+                None,
+                &entry.key_site,
+                UnitFault::InvalidDocumentaryTarget {
+                    selector: selector.clone(),
+                    key: entry.value.value.clone(),
+                },
+            ));
+        }
+    }
+    for (language, text) in &texts {
+        for handle in text.handle_occurrences() {
+            let selector = handle.selector();
+            if !unit.documentary_targets.contains_key(selector) {
+                errors.push(diagnostic(
+                    RuleId::M041,
+                    UnitStage::Content,
+                    Some(&unit.id.value),
+                    Some(language),
+                    handle.site(),
+                    UnitFault::UnknownHandle {
+                        selector: selector.to_owned(),
+                    },
+                ));
+            }
+            if language != "en" {
+                errors.push(diagnostic(
+                    RuleId::M041,
+                    UnitStage::Content,
+                    Some(&unit.id.value),
+                    Some(language),
+                    handle.site(),
+                    UnitFault::HandleOutsidePaperEnglish {
+                        selector: selector.to_owned(),
+                    },
+                ));
+            }
+            let count = placed.entry(selector.to_owned()).or_default();
+            *count += 1;
+            if *count > 1 {
+                errors.push(diagnostic(
+                    RuleId::M041,
+                    UnitStage::Content,
+                    Some(&unit.id.value),
+                    Some(language),
+                    handle.site(),
+                    UnitFault::RepeatedHandle {
+                        selector: selector.to_owned(),
+                    },
+                ));
+            }
+        }
+    }
+    for (selector, entry) in &unit.documentary_targets {
+        if !placed.contains_key(selector) {
+            errors.push(diagnostic(
+                RuleId::M041,
+                UnitStage::Content,
+                Some(&unit.id.value),
+                Some("en"),
+                &entry.key_site,
+                UnitFault::UnusedHandle {
+                    selector: selector.clone(),
+                },
+            ));
+        }
+    }
     for (name, entry) in &unit.math {
         if !local_name(name) {
             errors.push(diagnostic(
@@ -562,6 +672,11 @@ fn check_unit(
         label: UnitLabel(unit.id.value),
         document: unit.document.value,
         math: unit.math.into_iter().map(|(k, v)| (k, v.value)).collect(),
+        documentary_targets: unit
+            .documentary_targets
+            .into_iter()
+            .map(|(k, v)| (k, v.value))
+            .collect(),
         texts,
     }
 }
@@ -593,6 +708,7 @@ fn check_texts(
                 prose,
                 math: occurrences,
                 tags,
+                handles,
                 references,
                 bibliography_citations,
                 styles,
@@ -630,6 +746,7 @@ fn check_texts(
                         source: entry.value.clone(),
                         occurrences,
                         tags,
+                        handles,
                         references,
                         bibliography_citations,
                         styles,

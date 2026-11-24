@@ -3483,6 +3483,7 @@ fn reader_fixture_corpus(text: &str) -> ftoo_manifest::LanguageCheckedUnits {
             table_site: site.clone(),
             math_site: site.clone(),
             texts_site: site.clone(),
+            documentary_targets: BTreeMap::new(),
             math: BTreeMap::new(),
             texts: BTreeMap::from([(
                 "en".into(),

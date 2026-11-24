@@ -58,6 +58,7 @@ def declared_fragments(repository, rows):
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
+    auxiliary_keys = set()
     equation_bodies = []
     fragments = scope_fragments(repository)
     declared = {(source, unit) for source, unit, _, _, _ in fragments}
@@ -82,7 +83,7 @@ def declared_fragments(repository, rows):
         body = data[len(prefix):-2]
         if role == 'paragraph':
             checked_math = rb'\\\(\\(?:comovfield|willvirtue|gensym)\{\}\\\)'
-            allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|'
+            allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|\\handle\{[A-Za-z][A-Za-z0-9_:-]*\}|'
                        rb'\\see\{[A-Za-z][A-Za-z0-9_:-]*\}|\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
                        + checked_math + rb')+')
             require(body and re.fullmatch(allowed, body),
@@ -93,6 +94,13 @@ def declared_fragments(repository, rows):
                 row = available.get(key.decode('ascii'))
                 require(row is not None and row['source_status'] in ('paper', 'alias'),
                         'M055: Fragment tag binding differs: '+fragment)
+            for key in re.findall(rb'\\handle\{([^{}]+)\}', body):
+                name = key.decode('ascii')
+                row = available.get(name)
+                require(row is not None and row['source_status'] == 'paper' and row['spelling'] == name,
+                        'M055: Fragment handle binding differs: '+fragment)
+                require(name not in auxiliary_keys, 'M055: Duplicate auxiliary handle: '+name)
+                auxiliary_keys.add(name)
             for key in re.findall(rb'\\see\{([^{}]+)\}', body):
                 require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
                         'M055: Fragment reference binding differs: '+fragment)
@@ -110,6 +118,15 @@ def declared_fragments(repository, rows):
         marker_at[(source, positions[0])] = marker.rstrip(b'\n')
     for source in rows:
         data = (repository/source).read_bytes()
+        for key in auxiliary_keys:
+            encoded = re.escape(key.encode('ascii'))
+            references = rb'\\(?:ftag\*?|ptg|ftooindexrow|zcref|cref|Cref|autoref|ref|see)\s*\{'+encoded+rb'\}'
+            remaining = re.sub(references, b'', data)
+            remaining = re.sub(rb'\\ftaglist\{[^{}]*\}', b'', remaining)
+            remaining = re.sub(rb'(?m)^\\prop_gput:Nnn \\g_ftoo_[A-Za-z_]+_prop \{ [^{}]+ \} \{ [^{}]+ \}$', b'', remaining)
+            occurrence = rb'(?<![A-Za-z0-9_:-])'+encoded+rb'(?![A-Za-z0-9_:-])'
+            require(not re.search(occurrence, remaining),
+                    'M055: Retained authored auxiliary target outside a reference: '+source+':'+key)
         for match in re.finditer(rb'\\(?:paper)?refrain\{([^}]*)\}\{([^}]*)\}', data, re.S):
             label, body = match.groups()
             require(label not in {unit.encode() for _, unit, _, _, _ in fragments}

@@ -592,6 +592,7 @@ pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
             "<!-- generated document ",
             "<!-- unit ",
             "<!-- label ",
+            "<!-- handle ",
             "<!-- cite ",
             "<!-- see ",
             "<!-- bibcite ",
@@ -975,14 +976,24 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
             Inline::Tag { handle, label, .. } => {
                 write!(output, "{}<!-- label {label} -->", text(handle)).expect("string write");
             }
-            Inline::PaperTag { value, .. } => {
-                write!(
-                    output,
-                    "{}<!-- label {} -->",
-                    text(&value.spelling),
-                    value.target
-                )
-                .expect("string write");
+            Inline::PaperTag { value, mint, .. } => {
+                if let Some(selector) = mint {
+                    write!(
+                        output,
+                        "{}<!-- handle {selector} {} -->",
+                        text(&value.spelling),
+                        value.key
+                    )
+                    .expect("string write");
+                } else {
+                    write!(
+                        output,
+                        "{}<!-- label {} -->",
+                        text(&value.spelling),
+                        value.target
+                    )
+                    .expect("string write");
+                }
             }
             Inline::See {
                 label,

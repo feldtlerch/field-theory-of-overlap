@@ -179,8 +179,14 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
                     .expect("string write");
                 commented = true;
             }
-            Inline::PaperTag { value, .. } => {
-                write!(output, "\\ftag{{{}}}", value.key).expect("string write");
+            Inline::PaperTag { value, mint, .. } => {
+                write!(
+                    output,
+                    "\\{}{{{}}}",
+                    if mint.is_some() { "handle" } else { "ftag" },
+                    value.key
+                )
+                .expect("string write");
             }
             Inline::See { label, .. } => {
                 write!(output, "\\see{{{label}}}").expect("string write");

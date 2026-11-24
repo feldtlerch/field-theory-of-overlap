@@ -272,6 +272,14 @@ fn public_run_text(
     paper: &[Range<usize>],
 ) -> Result<(), DocumentError> {
     let label_character = |c: char| c.is_alphanumeric() || matches!(c, ':' | '-' | '_');
+    if paper.iter().any(|range| {
+        range.start > range.end
+            || range.end > value.len()
+            || !value.is_char_boundary(range.start)
+            || !value.is_char_boundary(range.end)
+    }) {
+        return Err(mismatch(plan, "HTML reader label literal"));
+    }
     if ftoo_manifest::reader_label_literals(value)
         .iter()
         .any(|range| !paper.contains(range))

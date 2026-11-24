@@ -32,7 +32,7 @@
     "documents/paper/parts/partC.tex": "fdfce0e270d14818050f26fabc0cf3a2083037d9732653d4c391816817cd523e",
     "documents/paper/parts/partD.tex": "d911a3d9b21d81ead5d6b48240a985a069b593dc0066445caa9c5b164e14ecfc",
     "documents/paper/parts/partE.tex": "f60d29ade91a03779983f641bc475883447f4d410e3dda7b4b71b4cabd50ba5f",
-    "documents/paper/parts/partF.tex": "dd184e24e4eb7bae87011ec2d1af28c76404120d29d17dc3f3ba6c1a7c3d6cad",
+    "documents/paper/parts/partF.tex": "dffacc0efe1789271d02f1d7b09378932bb2ef487ce542d75ab2a2efb155ca2f",
     "documents/paper/parts/partG.tex": "0caf098c70b94ce085a17b2eb941082465ade7ac963a282daabe72913e4a0cc6",
     "documents/paper/references.bib": "280fcfc82c0b4c49c152542b18d1cfd430b1bdbadda6207ffb3ee37f3021f003",
     "generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex": "11359e1de3ee35ae570cb6b90262136a182d5cdaa02ffe4a743e529068e329ca",
@@ -40,7 +40,8 @@
     "generated/documents/explainer-pilot/sec-reading-plain-intro.tex": "bff5ce6a32209e04390233e3e51ffe40038e9e3a9ce32b4c5a846111ec19c690",
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
-    "generated/documents/inclusions.tsv": "eb3b213e7859636629048ce1208bb4368da1823a2c8e63fe6f10e76d7f77ac4d",
+    "generated/documents/inclusions.tsv": "81e6b56d762b988df4c03bf3bf0aa9a35108a0a0ce9fdd9321656285a2f47126",
+    "generated/documents/paper-pilot/sec-boundary-ratio-rate.tex": "857219fcb015bf0e79527423e2d9aed58789f1d7b0f934de44af94d43ed1446b",
     "generated/documents/paper-pilot/sec-coda-audit-bottoms.tex": "33de11f3485b7ad8798e7024f1e35aaa79939728cd7d9dba4b7ac8d825a5c227",
     "generated/documents/paper-pilot/sec-coda-record-limit.tex": "5ef0afd8c91d085aaa545b7790d6ddbf4b1776e52f72d189566bc75cdbc1dc22",
     "generated/documents/paper-pilot/sec-coda-whole-field.tex": "1903ea4bc8e2a7a131fecf5d370fcc515fd483fc077e0d1ff858e62113ac221c",
@@ -55,6 +56,6 @@
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "d524ed575efa0b8ef720ed883cb99ee8bf75beba1328e265c1b48852197c94c2"
+    "tools/paper/prepare.py": "8dee23a9862299eef4ba4afb80dff8904a468bffa6c542a041aff175ae77fdac"
   }
 }

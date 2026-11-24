@@ -16,7 +16,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |002|Four-axis status and declared coverage|accepted; reading lifecycle and availability are governed by 025|
 |003|Tags: human-facing handles bound to labels|accepted; handle coverage and audit-independent addressing are governed by 016; reader Markdown label comments are governed by 017|
 |004|The closed notation AST with two renderers and derived tiers|accepted; inherited definitions' referent prerequisite and pending presentation are governed by 032; bounded document-expression text is governed by 044|
-|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025; eligible native conversion's cross-target judgment is governed by 039|
+|005|Statement units: one text per language, per-target displays|accepted; the paper pair is governed by 014; prose typography is governed by 021; progressive reading assembly is governed by 025; eligible native conversion's cross-target judgment is governed by 039; auxiliary paper mints are governed by 048|
 |006|Generated artifacts are byte-gated; generate and check share one path|accepted; input-equivalent docs-only changes are governed by 018 and ordinary paper-pair reuse by 019|
 |007|The audit runs on a public certified-calculation engine|accepted|
 |008|Publication: fresh history and the severity gate|accepted|
@@ -27,7 +27,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |013|Workspace norms: edition, lints, toolchain|accepted|
 |014|The paper pair: authored LaTeX, reproducible build, checked addressing|accepted; source authority, the statement-unit exception and rendering targets are governed by 016; layout selection is governed by 023 and 024; the complete-document release gate and complete-graph boundary are governed by 030; native use of the paper-scoped store is governed by 037|
 |015|Open questions are records|accepted|
-|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030; retirement of residual authored-source machinery is governed by 036; native use of the paper-scoped store is governed by 037|
+|016|Admission and native document renderings|accepted; retention of reader Markdown label comments is governed by 017; layout-pin clauses and passage-renewal acceptance are governed by 024; progressive ownership and quotation transfer are governed by 025; the complete-document release gate, complete-graph boundary and native-model boundary are governed by 030; retirement of residual authored-source machinery is governed by 036; native use of the paper-scoped store is governed by 037; the auxiliary paper-mint metadata route is governed by 048|
 |017|Screen rendering contracts|accepted; forge Markdown mathematics transport is governed by 022 and the observed display thick-space spelling by 051; HTML mathematics delivery and font choice are governed by 042; named passage-renewal acceptance is governed by 024; the complete-document release gate is governed by 030; eligible native conversion's screen-review timing is governed by 039; transitional screen destinations are governed by 040|
 |018|Docs-only gate inherits document bytes through input equivalence|accepted|
 |019|The paper pair reuses exact-input production across ordinary rounds|accepted; amends 006 for the paper pair|
@@ -42,7 +42,7 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |032|Inherited notation before graph binding|accepted; qualifies 004's referent prerequisite and pending presentation while retaining 022's strict expanded screen contract; native support is governed by 041; bounded document-expression text, admission timing for the three additional inherited definitions and their registered-variance counts are governed by 044|
 |033|Inline styles in unit prose|accepted; decides the authoring syntax reserved by 021; retains 022's mathematics boundary|
 |036|Relationship dispositions at the complete-graph boundary|accepted; amends 030's relationship-checking clauses and 016's residual-machinery retirement clause|
-|037|Native paper-tagged paragraphs|accepted|
+|037|Native paper-tagged paragraphs|accepted; auxiliary visible handle placements and paper-key reader spans are governed by 048|
 |038|Independent complete-document text comparison|accepted; line-end interpretation is governed by 043|
 |039|Mechanical conversion and final residual review|accepted; amends 005, 009, 017, 024 and 026 for eligible native conversion; complete conversion checks and evidence retention are governed by 049|
 |040|Explicit transitional destinations in a placeholder index|accepted; qualifies 017's missing-content, reference and placeholder clauses as amended by 030; extends 046's registered product check to screen destinations and content gaps; amends M055 and M065; section and subsection resolution is governed by 047|
@@ -52,5 +52,6 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |044|Text and references inside mathematics|accepted; qualifies 004 and 032's mathematical text representation and extends 041's compared support and native sweep; M054 and M055 govern checked unnumbered equations in TeX and Markdown, while HTML retains a block gap until display observation and admission|
 |046|Registered HTML block gaps|accepted; the development product check inventories withheld HTML passages without changing release refusal; its registered-check and product-test sentences are replaced by 040|
 |047|Paper section and subsection destinations|accepted; extends 040's heading resolution and amends M055|
+|048|Native reference forms and handle placements|accepted; visible auxiliary handles and their paper-origin evidence are admitted; forced-bare tags, silent handles, located-tag print-mode evidence and direct-reference counter-context forms await consumers|
 |049|Complete conversion checks|accepted; qualifies 039's eligibility, retention sequence, capability, evidence, correction and completion clauses, and its qualifications of 017, 024 and 026|
 |051|Thick spaces in forge Markdown displays|accepted; qualifies 017's pinned-command sentence and 022's display spelling for the observed dimensioned thick space|

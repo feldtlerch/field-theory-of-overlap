@@ -378,6 +378,7 @@ fn support_required_html_paper_tag_span_allows_following_punctuation_only_when_p
                 alias_site: None,
                 declaration_sites: vec![evidence],
             },
+            mint: None,
             site,
         },
         plan::Inline::Text(": yes.".into()),
@@ -1212,6 +1213,7 @@ fn support_required_html_paper_key_exception_is_exact() {
                 alias_site: None,
                 declaration_sites: vec![evidence],
             },
+            mint: None,
             site: site.clone(),
         },
         plan::Inline::Text(" span.".into()),
@@ -1252,6 +1254,48 @@ fn support_required_html_paper_key_exception_is_exact() {
         format!("{error:?}").contains("HTML reader label literal"),
         "{error:?}"
     );
+}
+
+#[test]
+fn support_required_html_auxiliary_handles_keep_both_plain_spans() {
+    let support = support();
+    let mut plan = prose_plan("Words.");
+    let site = input::site("auxiliary-handles.toml");
+    let evidence = ftoo_manifest::PaperEvidenceSite {
+        file: "documents/paper-build/paper-tags.tsv".into(),
+        line: 1,
+    };
+    let handle = |key: &str, selector: &str| plan::Inline::PaperTag {
+        value: ftoo_manifest::PaperTagValue {
+            key: key.into(),
+            spelling: key.into(),
+            target: key.into(),
+            target_kind: "documentary".into(),
+            lookup_site: evidence.clone(),
+            alias_site: None,
+            declaration_sites: vec![evidence.clone()],
+        },
+        mint: Some(selector.into()),
+        site: site.clone(),
+    };
+    plan.blocks[1].runs = vec![
+        handle("bd:rep", "representation"),
+        plan::Inline::Text(" and ".into()),
+        handle("bd:fab", "fabrication"),
+    ];
+    let labels = ["bd:rep", "bd:fab"];
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &labels, None).unwrap();
+    assert!(rendered.contains("<p>bd:rep and bd:fab</p>"));
+    html_recovery::check(&plan, &fonts, &[], &labels, &rendered).unwrap();
+    for changed in [
+        rendered.replacen("bd:rep and bd:fab", "bd:fab and bd:rep", 1),
+        rendered.replacen("bd:rep and bd:fab", "bd:rep and ", 1),
+        rendered.replacen("bd:rep and bd:fab", "bd:rep and bd:rep", 1),
+    ] {
+        assert_ne!(changed, rendered);
+        assert!(html_recovery::check(&plan, &fonts, &[], &labels, &changed).is_err());
+    }
 }
 
 #[test]

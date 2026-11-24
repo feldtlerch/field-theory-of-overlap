@@ -5,6 +5,80 @@ const LABEL: &str = "dec:fixture:target";
 const AUTHORITY: &str = "dec:fixture:authority";
 
 #[test]
+fn native_paper_origin_evidences_documentary_target_without_strict_citation() {
+    let site = UnitSite {
+        file: "units/statements/fixture-paper.toml".into(),
+        path: vec![],
+        anchor: SourceAnchor::Unavailable,
+        decoded: None,
+        occurrence: None,
+    };
+    let located = |value: &str| LocatedString {
+        value: value.into(),
+        site: site.clone(),
+    };
+    let language = DocumentEntryDraft {
+        key_site: site.clone(),
+        table_site: site.clone(),
+        languages_site: site.clone(),
+        required_languages: vec![located("en")],
+    };
+    let corpus = admit_unit_drafts(
+        DocumentDraft {
+            documents_site: site.clone(),
+            documents: BTreeMap::from([
+                ("main".into(), language.clone()),
+                ("paper-pilot".into(), language),
+            ]),
+        },
+        vec![UnitDraft {
+            id: located("sec:fixture:paper"),
+            document: located("paper-pilot"),
+            table_site: site.clone(),
+            math_site: site.clone(),
+            texts_site: site.clone(),
+            documentary_targets: BTreeMap::from([(
+                "boundary".into(),
+                LocatedEntryDraft {
+                    key_site: site.clone(),
+                    value: located("B:fixture"),
+                },
+            )]),
+            math: BTreeMap::new(),
+            texts: BTreeMap::from([(
+                "en".into(),
+                LocatedEntryDraft {
+                    key_site: site.clone(),
+                    value: located("The @handle{boundary} boundary."),
+                },
+            )]),
+        }],
+    )
+    .unwrap();
+    let mut sources = markdown().sources().to_vec();
+    sources.push(MarkdownSource {
+        file: "history.md".into(),
+        bytes: "# Kernel · `proposal:manifest:kernel-bite`\n# Addressing · `proposal:manifest:addressing-lifecycle-bite`\n".as_bytes().to_vec(),
+    });
+    let markdown = check_markdown_sources(sources).unwrap();
+    let joint = collect_joint_mints(&corpus, &markdown).unwrap();
+    let graph = seed().unwrap();
+    let draft = vec![event(0, "fixture", Some("B:fixture"))];
+    let book = addressing(&graph)
+        .unwrap()
+        .with_documentary(&joint, draft)
+        .unwrap();
+    assert_eq!(
+        book.documentary().next().unwrap().origin().kind,
+        MintKind::UnitPaperMint
+    );
+    let resolved = resolve_unit_tags(&corpus, &book).unwrap();
+    assert!(integrate_joint_labels(&resolved, &joint).is_err());
+    let strict = integrate_joint_labels(&resolved, &joint.strict_units());
+    assert!(strict.is_ok(), "{:?}", strict.err());
+}
+
+#[test]
 fn paper_mint_targets_reuse_admission_without_becoming_confirmation_records() {
     let graph = seed().unwrap();
     let corpus = corpus();
@@ -327,6 +401,7 @@ fn corpus_text(text: &str) -> LanguageCheckedUnits {
             table_site: site.clone(),
             math_site: site.clone(),
             texts_site: site.clone(),
+            documentary_targets: BTreeMap::new(),
             math: BTreeMap::new(),
             texts: BTreeMap::from([(
                 "en".into(),

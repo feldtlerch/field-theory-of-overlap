@@ -41,6 +41,12 @@ pub enum LabelSite {
         unit: String,
         site: UnitSite,
     },
+    UnitPaperMint {
+        unit: String,
+        selector: String,
+        declaration: UnitSite,
+        placement: UnitSite,
+    },
 }
 impl fmt::Display for LabelSite {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -69,6 +75,15 @@ impl fmt::Display for LabelSite {
                 field,
             } => write!(f, "rust-history {file:?} event {ordinal} field {field:?}"),
             Self::Unit { unit, site } => write!(f, "unit {unit:?} at {site}"),
+            Self::UnitPaperMint {
+                unit,
+                selector,
+                declaration,
+                placement,
+            } => write!(
+                f,
+                "unit {unit:?} selector {selector:?} declared at {declaration}, placed at {placement}"
+            ),
         }
     }
 }
@@ -77,6 +92,7 @@ pub enum MintKind {
     RustIdentity,
     Markdown,
     UnitMetadata,
+    UnitPaperMint,
     PaperTex,
     OpenQuestion,
 }

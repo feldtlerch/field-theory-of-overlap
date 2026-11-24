@@ -348,10 +348,9 @@ fn history(
             } else if label
                 && !crate::units::label_name(&value.value)
                 && !(field == "label"
-                    && mints
-                        .mints()
-                        .get(&value.value)
-                        .is_some_and(|origin| origin.kind == MintKind::PaperTex))
+                    && mints.mints().get(&value.value).is_some_and(|origin| {
+                        matches!(origin.kind, MintKind::PaperTex | MintKind::UnitPaperMint)
+                    }))
             {
                 Some(MetadataReason::InvalidLabel)
             } else {
@@ -601,7 +600,9 @@ impl AddressBook<'_> {
             mints
                 .mints()
                 .iter()
-                .filter(|(_, origin)| origin.kind != MintKind::PaperTex)
+                .filter(|(_, origin)| {
+                    !matches!(origin.kind, MintKind::PaperTex | MintKind::UnitPaperMint)
+                })
                 .map(|(label, origin)| (label.clone(), origin.clone()))
                 .collect(),
         );

@@ -51,6 +51,7 @@ fn drafts(texts: &[(&str, &str)]) -> (DocumentDraft, UnitDraft) {
             table_site: location.clone(),
             math_site: location.clone(),
             texts_site: location.clone(),
+            documentary_targets: BTreeMap::new(),
             math: BTreeMap::new(),
             texts: texts
                 .iter()

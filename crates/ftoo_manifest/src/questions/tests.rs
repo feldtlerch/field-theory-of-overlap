@@ -754,6 +754,7 @@ fn units(id: &str) -> crate::LanguageCheckedUnits {
             table_site: site(vec![]),
             math_site: site(vec![]),
             texts_site: site(vec![]),
+            documentary_targets: BTreeMap::new(),
             math: BTreeMap::new(),
             texts: BTreeMap::from([(
                 "en".into(),
