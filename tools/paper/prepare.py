@@ -116,6 +116,17 @@ def declared_fragments(repository, rows):
     return replacements
 
 
+def package_names(repository, rows):
+    """Return package members requested by the declared paper sources."""
+    sources = b'\n'.join((repository / path).read_bytes() for path in rows)
+    packages = set()
+    for group in re.findall(rb'\\(?:usepackage|RequirePackage)(?:\[[^]]*\])?\{([^}]+)\}',
+                            sources):
+        packages.update(part.decode('utf-8').strip() + '.sty'
+                        for part in group.split(b','))
+    return packages
+
+
 def prepare(repository, support, work):
     root = repository/'documents/paper-build'
     require(not work.exists(), 'Work directory must not exist')
@@ -125,10 +136,7 @@ def prepare(repository, support, work):
     fragments = declared_fragments(repository, rows)
     settings, lock, engine, bundle = runtime(repository, support)
     locked = {f['member']:f['sha256'] for f in lock['bundle']['files']}
-    sources = b'\n'.join((repository/d).read_bytes() for d in rows)
-    packages = set()
-    for group in re.findall(rb'\\(?:usepackage|RequirePackage)(?:\[[^]]*\])?\{([^}]+)\}',sources):
-        packages.update(p.decode('utf-8').strip()+'.sty' for p in group.split(b','))
+    packages = package_names(repository, rows)
     for name in sorted(packages | set(settings['fonts']) | {'biblatex.bst'}):
         require(name in locked, 'Input absent from lock: '+name)
         require(hashlib.sha256((support/'bundle'/name).read_bytes()).hexdigest() == locked[name], 'Bundle input differs: '+name)

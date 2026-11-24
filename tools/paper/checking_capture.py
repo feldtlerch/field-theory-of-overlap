@@ -45,7 +45,7 @@ import sys
 import time
 
 from common import runtime
-from prepare import prepare
+from prepare import package_names, prepare
 
 
 PART_B = pathlib.Path('documents/paper/parts/partB.tex')
@@ -525,10 +525,7 @@ def preparation_changes(repository):
 def required_packages(repository):
     source_list = (repository / 'documents/paper-build/sources.tsv').read_text(
         encoding='utf-8').splitlines()
-    source = b'\n'.join((repository / name).read_bytes() for name in source_list)
-    return sorted({name.decode('utf-8').strip() + '.sty' for group in re.findall(
-        rb'\\(?:usepackage|RequirePackage)(?:\[[^]]*\])?\{([^}]+)\}', source)
-                   for name in group.split(b',')})
+    return sorted(package_names(repository, source_list))
 
 
 def support_identity(repository, support, packages):

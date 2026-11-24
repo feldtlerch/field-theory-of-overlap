@@ -40,6 +40,18 @@ def changed_file(path, suffix):
 
 
 def stored_controls():
+    repository = pathlib.Path(__file__).resolve().parents[2]
+    inside = repository / 'inside-checking-capture-control'
+    refuses(lambda: dirty_controls(repository, None, inside),
+            'Dirty control area lies inside the repository')
+    early = subprocess.run(
+        [sys.executable, '-B', str(pathlib.Path(__file__).resolve()), '--live',
+         str(repository), str(repository / 'absent-support'), str(inside)],
+        capture_output=True, text=True, encoding='utf-8')
+    if (early.returncode == 0 or early.stdout or
+            'Dirty control area lies inside the repository' not in early.stderr or
+            inside.exists()):
+        raise AssertionError('Live work area was not refused before capture')
     pair = load(FIXTURES / 'checking-capture-provenance.json')
     if pair.get('schema') != 1:
         raise AssertionError('Unsupported stored provenance pair schema')
@@ -67,6 +79,10 @@ def stored_controls():
     broken['prepared_inputs'].pop('parts/coda.tex')
     refuses(lambda: capture.validate_envelope_record(broken, left['capture']),
             'Malformed prepared input inventory')
+    broken = copy.deepcopy(left['envelope'])
+    broken['prepared_inputs'].pop('data/ftoo_index.tex')
+    refuses(lambda: capture.validate_envelope_record(broken, left['capture']),
+            'Malformed instrumentation inventory')
     broken = copy.deepcopy(left['capture'])
     broken['run']['engine_exit'] = 1
     refuses(lambda: capture.validate_envelope_record(left['envelope'], broken),
@@ -158,7 +174,13 @@ def live_controls(repository, support, area):
     print('Live pair and provenance refusals passed')
 
 
+def require_external_area(repository, area):
+    if area.resolve().is_relative_to(repository.resolve()):
+        raise ValueError('Dirty control area lies inside the repository')
+
+
 def dirty_controls(repository, support, area):
+    require_external_area(repository, area)
     copied = area / 'dirty-repository'
     shutil.copytree(repository, copied,
                     ignore=shutil.ignore_patterns('.review-inputs', '.design', '__pycache__'))
@@ -235,6 +257,8 @@ def main():
     parser.add_argument('--live', nargs=3, metavar=('REPOSITORY', 'SUPPORT', 'AREA'),
                         type=pathlib.Path)
     args = parser.parse_args()
+    if args.live:
+        require_external_area(args.live[0], args.live[2])
     stored_controls()
     if args.live:
         repository, support, area = args.live

@@ -44,12 +44,13 @@ jobs:
       - name: support-independent tests
         env:
           CARGO_NET_OFFLINE: 'true'
-        # The full product battery runs this test: paper input declarations and the Python identity and composition controls.
+        # The full battery runs the Python suites (skipped here for wall time) and the table evidence controls (which need the system PDF reader); smoke checks paper input declarations.
         run: >-
           time unshare --user --map-user=$(id -u) --map-group=$(id -g) --net
           "$HOME/.cargo/bin/cargo"
           test --workspace --locked -- --skip support_required
-          --skip actual_input_declarations_run_without_support
+          --skip paper_python_identity_composition_reference_suites
+          --skip table_evidence_controls
       - name: labels
         env:
           CARGO_NET_OFFLINE: 'true'

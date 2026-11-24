@@ -54,6 +54,6 @@
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "a9e001ce36f300ded1a27896db34e9a69c6b29ea76b20b5850a1a919750f5127",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "aa4dd0afff25ea43813c06ab19cd178f9121067a941712811eb18576b5d29dd0"
+    "tools/paper/prepare.py": "773f0f0fd2fab03fe2548c7fa3d6928c7b8cedc7fabbd08347cd306349b8cd1e"
   }
 }

@@ -332,6 +332,28 @@ fn checking_capture_fixture_controls() {
 }
 
 #[test]
+fn checking_capture_provenance_controls() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/test_checking_capture.py"]),
+    )
+    .unwrap();
+}
+
+#[test]
+fn table_evidence_controls() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/test_table_evidence.py"]),
+    )
+    .unwrap();
+}
+
+#[test]
 fn bibliography_pdf_inventory_controls() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     command_output(Command::new("python3").current_dir(&root).args([
@@ -512,7 +534,7 @@ fn byte_windows_locate_changes_lengths_and_empty_auxiliary_presence() {
 }
 
 #[test]
-fn actual_input_declarations_run_without_support() {
+fn paper_input_declarations_are_fixed_without_support() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let plan = inputs(&root, None).unwrap();
     let sources = fs::read_to_string(root.join("documents/paper-build/sources.tsv")).unwrap();
@@ -550,6 +572,11 @@ fn actual_input_declarations_run_without_support() {
     ] {
         assert!(plan["inputs"].get(path).is_none(), "{path}");
     }
+}
+
+#[test]
+fn paper_python_identity_composition_reference_suites() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let status = Command::new("python3")
         .args(["-B", "tools/paper/test_identities.py"])
         .current_dir(&root)
