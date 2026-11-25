@@ -62,6 +62,7 @@ pub use documentary::*;
 mod units;
 mod weld;
 pub use units::LabelSpanReason;
+pub use units::corpus;
 pub use weld::{
     LabelMember, LabelSide, LabelUseSite, ResolvedUnitCitation, TagMember, TagSide, WeldDiagnostic,
     WeldErrors, WeldFault, WeldStage, WeldedLanguage, WeldedUnit, WeldedUnits, weld_units,

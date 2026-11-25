@@ -8,7 +8,7 @@ mod display;
 mod html;
 mod html_recovery;
 mod inherited_support;
-mod input;
+pub(crate) mod input;
 mod latex;
 mod lock_scan;
 mod markdown;

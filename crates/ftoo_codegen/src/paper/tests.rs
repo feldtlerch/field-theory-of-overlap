@@ -600,3 +600,23 @@ fn paper_python_identity_composition_reference_suites() {
             .success()
     );
 }
+
+#[test]
+fn import_request_stays_outside_paper_production() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let args = vec![
+        OsString::from("import-dry-run"),
+        OsString::from("--repository"),
+        root.clone().into_os_string(),
+        OsString::from("--output-dir"),
+        root.join("generated/import-test-output").into_os_string(),
+    ];
+    let req = request(&args).unwrap();
+    assert_eq!(req.operation, "import-dry-run");
+    assert!(
+        run(&args)
+            .unwrap_err()
+            .to_string()
+            .contains("output overlaps the source tree")
+    );
+}

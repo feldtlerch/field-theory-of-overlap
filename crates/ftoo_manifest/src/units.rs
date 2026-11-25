@@ -1,6 +1,7 @@
 //! Statement metadata, language completeness and opaque shared mathematics.
 //! Draft admission proves no byte provenance, theory identity, weld or rendering.
 mod content;
+pub mod corpus;
 mod diagnostics;
 pub(crate) mod spans;
 #[cfg(test)]

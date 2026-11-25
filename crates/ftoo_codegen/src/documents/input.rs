@@ -16,12 +16,12 @@ use ftoo_manifest::{
 use std::{collections::BTreeMap, fs, io, path::Path};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct Inclusion {
-    pub(super) source: String,
-    pub(super) unit: String,
-    pub(super) fragment: String,
-    pub(super) role: String,
-    pub(super) line: usize,
+pub(crate) struct Inclusion {
+    pub(crate) source: String,
+    pub(crate) unit: String,
+    pub(crate) fragment: String,
+    pub(crate) role: String,
+    pub(crate) line: usize,
 }
 const EXCERPTS: [(&str, &str, Option<&str>); 2] = [
     ("paper-pilot", "sec:pilot:paper-excerpt", Some("paper")),
@@ -144,6 +144,17 @@ pub(super) fn composition(
     skeletons: &[SkeletonDraft],
 ) -> Result<Vec<Inclusion>, DocumentError> {
     compose(root, declaration, scope_sources, Some(skeletons))
+}
+
+/// Check source-scope ownership for a diagnostic corpus read without selecting skeleton output.
+pub(crate) fn import_inclusions(root: &Path) -> Result<Vec<Inclusion>, DocumentError> {
+    let declaration = UnitSource {
+        file: "units/documents.toml".into(),
+        bytes: read(root, "units/documents.toml")?,
+    };
+    let files = discover(root, "units/scopes", false)?;
+    let scopes = sources(root, &files)?;
+    compose(root, &declaration, &scopes, None)
 }
 
 fn compose(

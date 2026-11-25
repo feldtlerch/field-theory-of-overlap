@@ -1,4 +1,5 @@
 //! Strict authored TOML input, separate from the projection contract.
+pub mod corpus;
 mod files;
 #[cfg(test)]
 mod tests;

@@ -645,7 +645,7 @@ fn request(args: &[OsString]) -> Result<Request> {
     let mut iter = args.iter();
     let operation = iter
         .next()
-        .ok_or("Expected generate, check or documents operation")?
+        .ok_or("Expected generate, check, documents or import-dry-run operation")?
         .to_str()
         .ok_or("Non-UTF8 command")?
         .to_owned();
@@ -657,6 +657,7 @@ fn request(args: &[OsString]) -> Result<Request> {
         "publish",
         "documents-generate",
         "documents-check",
+        "import-dry-run",
         "documents-check-gaps",
     ]
     .contains(&operation.as_str())
@@ -778,6 +779,9 @@ fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathB
 /// Returns a located input, subprocess, fixed-point or byte-comparison failure.
 pub fn run(args: &[OsString]) -> Result<()> {
     let req = request(args)?;
+    if req.operation == "import-dry-run" {
+        return run_import(&req);
+    }
     let built = req.values.contains_key("--built");
     if req.operation.starts_with("documents-") {
         return run_documents(&req);
@@ -874,6 +878,24 @@ pub fn run(args: &[OsString]) -> Result<()> {
     } else {
         compare(&req.root, &work, &receipt)
     }
+}
+
+fn run_import(req: &Request) -> Result<()> {
+    if req.release
+        || req.values.contains_key("--support")
+        || req.values.contains_key("--work")
+        || req.values.contains_key("--built")
+    {
+        return Err("Import dry run takes only repository and output directory".into());
+    }
+    let output = req
+        .values
+        .get("--output-dir")
+        .ok_or("Import output directory required")?;
+    let report =
+        crate::units::corpus::dry_run(&req.root, Path::new(output)).map_err(PaperFault::Input)?;
+    eprintln!("import dry run: {}", report["fully_decoded_outer"]);
+    Ok(())
 }
 
 #[cfg(test)]
