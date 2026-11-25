@@ -3,6 +3,31 @@ use super::{PaperFault, Result, bytes, check_reading_acceptance, compare, text};
 use serde_json::Value;
 use std::path::Path;
 
+pub(super) fn write_registers(root: &Path, prepared: &crate::PreparedDocuments) -> Result<()> {
+    for (name, expected) in [
+        (
+            "registry/screen-destination-gaps.json",
+            canonical_destinations(&prepared.screen_gap_inventory())?,
+        ),
+        (
+            "registry/html-block-gaps.json",
+            super::html_gaps::canonical(prepared.html_gap_rows())?,
+        ),
+    ] {
+        let path = root.join(name);
+        if path.is_symlink() {
+            return Err(PaperFault::Input(format!(
+                "{name}: derived register is a symlink"
+            )));
+        }
+        if std::fs::read(&path).ok().as_deref() != Some(expected.as_slice()) {
+            std::fs::write(&path, expected)
+                .map_err(|error| PaperFault::Input(format!("{name}: {error}")))?;
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn part<T>(part: &'static str, result: Result<T>) -> Result<T> {
     result.map_err(|fault| PaperFault::Release {
         part,

@@ -505,6 +505,10 @@ class Identities(unittest.TestCase):
             check(dict(assignment, candidate=grandchild))
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
                          ('AssignmentInvalid', 'comparison parent is not immediate'))
+        with self.assertRaises(compare_words.Fault) as raised:
+            check()
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('AssignmentInvalid', 'comparison parent is not immediate'))
         subprocess.run(['git', '-C', str(repo), 'reset', '--hard', candidate],
                        check=True, capture_output=True)
         readme = repo/'README.md'
@@ -515,12 +519,21 @@ class Identities(unittest.TestCase):
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
                          ('InputChanged', 'candidate checkout differs from its commit'))
         subprocess.run(['git', '-C', str(repo), 'add', 'README.md'], check=True)
+        readme.write_bytes(readme_bytes)
         with self.assertRaises(compare_words.Fault) as raised:
             check()
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
                          ('InputChanged', 'candidate checkout differs from its commit'))
         subprocess.run(['git', '-C', str(repo), 'reset', '--hard', candidate],
                        check=True, capture_output=True)
+        register = repo/'registry/screen-destination-gaps.json'
+        stored_register = register.read_bytes()
+        register.write_bytes(stored_register + b' ')
+        with self.assertRaises(compare_words.Fault) as raised:
+            check()
+        self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
+                         ('InputChanged', 'candidate checkout differs from its commit'))
+        register.write_bytes(stored_register)
         for name, altered, detail in (
                 ('duplicate', assignment_path.read_text().replace(
                     '"schema": 3', '"schema": 3, "schema": 3'), 'duplicate assignment key'),
@@ -558,6 +571,10 @@ class Identities(unittest.TestCase):
             check(changed)
         self.assertEqual(raised.exception.row['detail'],
                          'assigned unit path class differs')
+        changed = dict(assignment, unit='sec:reading:other')
+        with self.assertRaises(compare_words.Fault) as raised:
+            check(changed)
+        self.assertEqual(raised.exception.row['code'], 'AssignmentInvalid')
         first_row = {key: assignment[key] for key in
                      ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')}
         first_row['previous-kind'] = 'native'
@@ -708,6 +725,10 @@ class Identities(unittest.TestCase):
         self.assertEqual((row['code'], row['detail']),
                          ('PathIneligible',
                           'unassigned or capability path changed: README.md'))
+        register = 'registry/html-block-gaps.json'
+        row = committed_change(register, (repo / register).read_bytes() + b' ')
+        self.assertEqual((row['code'], row['detail']),
+                         ('PathIneligible', 'derived register needs canonical checking'))
         imported = repo/'tools/paper/bibroute.py'
         relocated = repo/'zz-generated/bibroute.py'
         relocated.parent.mkdir()
@@ -839,6 +860,10 @@ class Identities(unittest.TestCase):
             return commit('fixture candidate')
 
         candidate_id = candidate(b'')
+        self.assertNotEqual(compare_words.git(repo, 'show',
+                            parent_id + ':' + acceptance_name),
+                            compare_words.git(repo, 'show',
+                            candidate_id + ':' + acceptance_name))
         for passage in json.loads((repo/acceptance_name).read_bytes())['passages']:
             source_bytes = (repo/passage['file']).read_bytes()
             self.assertEqual(compare_words.digest(

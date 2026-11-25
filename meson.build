@@ -89,6 +89,15 @@ test('regression', cargo, args: ['test', '--locked', '--offline', '--workspace',
 test('byte-gate', codegen, args: ['check', '--repository', source,
   '--built', meson.current_build_dir() / 'paper'],
   depends: pair, suite: 'product', timeout: 60, is_parallel: false, workdir: source)
+test('complete-proof-controls', python,
+  args: ['-B', source / 'tools/paper/test_complete_gate.py'],
+  suite: 'unit', timeout: 60, is_parallel: false, workdir: source)
+test('complete-plain-conversion', python,
+  args: ['-B', source / 'tools/paper/test_complete_gate.py', '--repository', source,
+    '--binary', codegen, '--support', support,
+    '--work', meson.current_build_dir() / 'complete-plain-conversion'],
+  depends: codegen, suite: 'complete', timeout: 1800, is_parallel: false,
+  env: notation_env, workdir: source)
 test('live-release', codegen, args: ['check-registered-html-gaps', '--repository', source,
   '--support', support, '--built', meson.current_build_dir() / 'paper'],
   depends: pair, suite: 'product', timeout: 300, is_parallel: false,

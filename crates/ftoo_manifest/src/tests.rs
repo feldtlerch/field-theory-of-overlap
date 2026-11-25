@@ -548,7 +548,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
         M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M077,
-        M078, M079, M082,
+        M078, M079, M082, M083,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -558,7 +558,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
             M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
-            M071, M072, M073, M074, M077, M078, M079, M082
+            M071, M072, M073, M074, M077, M078, M079, M082, M083
         ]
     );
     for rule in RULES {
@@ -569,7 +569,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
             | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
-            | M071 | M073 | M074 | M077 | M078 | M079 | M082 => RuleState::Enforced,
+            | M071 | M073 | M074 | M077 | M078 | M079 | M082 | M083 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
             M072 => RuleState::DeferredPaperUnits,
@@ -633,7 +633,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 78);
+    assert_eq!(RULES.len(), 79);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -713,7 +713,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        67
+        68
     );
     assert_eq!(
         RULES
@@ -1174,11 +1174,37 @@ fn assigned_plain_scope_rule_literal() {
         .unwrap();
     assert_eq!(
         rule.statement,
-        "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
+        "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes, including registry/screen-destination-gaps.json and registry/html-block-gaps.json only after both equal their canonical candidate-plan recomputation; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
     );
     assert_eq!(
         rule.scope,
         "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with a captured assignment and supplied parent/candidate commits; no history-authentication or batch-retention claim."
     );
     assert_eq!(rule.state, RuleState::Enforced);
+}
+
+#[test]
+fn complete_plain_conversion_rule_literal() {
+    let rule = RULES
+        .iter()
+        .find(|rule| rule.number == RuleId::M083)
+        .unwrap();
+    assert_eq!(
+        rule.statement,
+        "A complete check of one assigned plain explainer paragraph requires M082 scope admission, exactly one new plain unit and its one structural occurrence, canonical parent and candidate documents including their screens, the parent's committed PDFs and receipt, a fresh candidate paper pair equal to its committed PDFs and receipt, and a complete M077 comparison. Checking captures are produced in this run from independently prepared inputs on each side, validated against those inputs and their outputs, and compared for unchanged outcomes. A missing, stale, unsupported or different proof refuses; this check does not itself retain a conversion or authorize release."
+    );
+    assert_eq!(
+        rule.scope,
+        "One assigned authored explainer paragraph replaced by one native plain paragraph in an immediate parent/candidate commit pair, through tools/paper/complete_gate.py run from the parent's checkout; no several-occurrence, theory-change or automatic-retention claim."
+    );
+    assert_eq!(rule.state, RuleState::Enforced);
+    let guide = include_str!("../../../tools/paper/README.md");
+    let section = guide
+        .split_once("`rule:paper:complete-plain-conversion`")
+        .unwrap()
+        .1
+        .trim_start();
+    let (statement, scoped) = section.split_once("\n\nScope: ").unwrap();
+    assert_eq!(statement, rule.statement);
+    assert_eq!(scoped.split_once("\n\n").unwrap().0, rule.scope);
 }

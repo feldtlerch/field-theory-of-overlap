@@ -1104,8 +1104,26 @@ def derived_replacement(before, after, unit):
     return first + 1, old_end, first + 1
 
 
+def register_kinds(old_screen, new_screen, old_html, new_html):
+    """The plain profile moves existing gap kinds but admits no new kind."""
+    known_gaps = {(row['document'], row['language'], row['message'])
+                  for row in old_screen['content-gaps']}
+    if (new_screen['entries'] != old_screen['entries'] or
+            any((row['document'], row['language'], row['message']) not in known_gaps
+                for row in new_screen['content-gaps'])):
+        raise Fault('RegisterKindChanged', 'screen register adds a new row kind',
+                    'snapshot')
+    old_kinds = sorted((row['document'], row['unit'], row['inline-kind'])
+                       for row in old_html['gaps'])
+    new_kinds = sorted((row['document'], row['unit'], row['inline-kind'])
+                       for row in new_html['gaps'])
+    if new_kinds != old_kinds:
+        raise Fault('RegisterKindChanged', 'HTML register changes row kinds',
+                    'snapshot')
+
+
 def assigned_plain_scope(repo, assignment, evidence, parent, before, after, envelope,
-                         selections=None):
+                         selections=None, paper_binary=None, support=None):
     """Check every assigned plain occurrence against the supplied commit pair."""
     occurrences = assignment.get('occurrences', [assignment])
     if not isinstance(occurrences, list) or not occurrences:
@@ -1263,6 +1281,25 @@ def assigned_plain_scope(repo, assignment, evidence, parent, before, after, enve
     changed.update(git(repo, 'ls-files', '--others', '--exclude-standard', '-z')
                    .decode().strip('\x00').split('\x00'))
     changed.discard('')
+    registers = {'registry/screen-destination-gaps.json',
+                 'registry/html-block-gaps.json'}
+    if changed & registers:
+        if paper_binary is None or support is None:
+            raise Fault('PathIneligible', 'derived register needs canonical checking',
+                        'snapshot')
+        result = subprocess.run((str(paper_binary), 'documents-check-gaps',
+                                 '--repository', str(repo), '--support', str(support)),
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise Fault('RegisterMismatch', result.stderr.strip(), 'snapshot')
+        old_screen = json.loads(git(repo, 'show', parent['commit'] +
+                                    ':registry/screen-destination-gaps.json'))
+        new_screen = json.loads((repo / 'registry/screen-destination-gaps.json').read_bytes())
+        old_html = json.loads(git(repo, 'show', parent['commit'] +
+                                  ':registry/html-block-gaps.json'))
+        new_html = json.loads((repo / 'registry/html-block-gaps.json').read_bytes())
+        register_kinds(old_screen, new_screen, old_html, new_html)
+        allowed.update(registers)
     parent_products = set(git(repo, 'ls-tree', '-r', '--name-only',
                               parent['commit'], '--', 'generated/documents').decode().splitlines())
     for name in sorted(changed):
@@ -1299,7 +1336,7 @@ def assigned_plain_scope(repo, assignment, evidence, parent, before, after, enve
     return result
 
 
-def compare(args):
+def compare(args, captured_assignment=None, paper_binary=None, support=None):
     repo = args.repository.resolve()
     output = args.output
     if not output.is_absolute():
@@ -1376,7 +1413,8 @@ def compare(args):
         assigned = None
         if getattr(args, 'assignment', None) is not None:
             try:
-                assignment_capture = capture_assignment(repo, args.assignment)
+                assignment_capture = (captured_assignment if captured_assignment is not None
+                                      else capture_assignment(repo, args.assignment))
                 assigned = assignment_capture[0]
                 evidence['inputs'].append(dict(path=str(assignment_capture[1]),
                                                sha256=digest(assignment_capture[2])))
@@ -1675,7 +1713,7 @@ def compare(args):
             try:
                 evidence['scope_admissibility'] = assigned_plain_scope(
                     repo, assigned, evidence, parent, before_source,
-                    after_source, envelope, selections)
+                    after_source, envelope, selections, paper_binary, support)
             except Fault as error:
                 error.row['rule'] = 'M082'
                 if evidence['verdict'] == 'different':

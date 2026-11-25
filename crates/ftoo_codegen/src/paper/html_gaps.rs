@@ -36,7 +36,7 @@ pub(crate) fn refusal(gaps: &[HtmlGapRow]) -> Result<()> {
     })
 }
 
-fn canonical(gaps: &[HtmlGapRow]) -> Result<Vec<u8>> {
+pub(super) fn canonical(gaps: &[HtmlGapRow]) -> Result<Vec<u8>> {
     let expected = json!({"schema": 1, "gaps": rows(gaps)});
     let mut bytes =
         serde_json::to_vec_pretty(&expected).map_err(|error| format!("{REGISTER}: {error}"))?;

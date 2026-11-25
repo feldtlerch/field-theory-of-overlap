@@ -657,6 +657,7 @@ fn request(args: &[OsString]) -> Result<Request> {
         "publish",
         "documents-generate",
         "documents-check",
+        "documents-check-gaps",
     ]
     .contains(&operation.as_str())
     {
@@ -739,9 +740,13 @@ fn run_documents(req: &Request) -> Result<()> {
     let assembly = assembly_support(req)?;
     require_notation_support(std::env::var_os("FTOO_NOTATION_SUPPORT").as_deref())?;
     if req.operation == "documents-generate" {
-        crate::generate_documents(&req.root, &assembly)
-            .map(|_| ())
-            .map_err(|error| PaperFault::Input(error.to_string()))
+        let prepared = crate::generate_documents(&req.root, &assembly)
+            .map_err(|error| PaperFault::Input(error.to_string()))?;
+        release::write_registers(&req.root, &prepared)
+    } else if req.operation == "documents-check-gaps" {
+        let prepared = crate::check_documents(&req.root, &assembly)
+            .map_err(|error| PaperFault::Input(error.to_string()))?;
+        release::screen_parts(&req.root, &prepared, true)
     } else {
         crate::check_documents(&req.root, &assembly)
             .map(|_| ())

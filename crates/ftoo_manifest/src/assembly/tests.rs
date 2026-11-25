@@ -394,7 +394,7 @@ fn assembly_register_preserves_prior_rules_and_reader_identity_amendments() {
                 .count(),
             RULES.iter().filter(|r| r.deferred_reason.is_some()).count()
         ),
-        (78, 67, 5, 6)
+        (79, 68, 5, 6)
     );
 }
 fn literal(value: &str) -> ExprDraft {

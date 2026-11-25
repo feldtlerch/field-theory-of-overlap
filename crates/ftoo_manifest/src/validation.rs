@@ -89,6 +89,7 @@ pub enum RuleId {
     M078,
     M079,
     M082,
+    M083,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -110,7 +111,7 @@ pub struct RuleSpec {
     pub deferred_reason: Option<&'static str>,
 }
 
-pub const RULES: [RuleSpec; 78] = [
+pub const RULES: [RuleSpec; 79] = [
     RuleSpec {
         number: RuleId::M001,
         statement: "Input is valid UTF-8 without a BOM.",
@@ -654,8 +655,15 @@ pub const RULES: [RuleSpec; 78] = [
     },
     RuleSpec {
         number: RuleId::M082,
-        statement: "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required.",
+        statement: "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes, including registry/screen-destination-gaps.json and registry/html-block-gaps.json only after both equal their canonical candidate-plan recomputation; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required.",
         scope: "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with a captured assignment and supplied parent/candidate commits; no history-authentication or batch-retention claim.",
+        state: RuleState::Enforced,
+        deferred_reason: None,
+    },
+    RuleSpec {
+        number: RuleId::M083,
+        statement: "A complete check of one assigned plain explainer paragraph requires M082 scope admission, exactly one new plain unit and its one structural occurrence, canonical parent and candidate documents including their screens, the parent's committed PDFs and receipt, a fresh candidate paper pair equal to its committed PDFs and receipt, and a complete M077 comparison. Checking captures are produced in this run from independently prepared inputs on each side, validated against those inputs and their outputs, and compared for unchanged outcomes. A missing, stale, unsupported or different proof refuses; this check does not itself retain a conversion or authorize release.",
+        scope: "One assigned authored explainer paragraph replaced by one native plain paragraph in an immediate parent/candidate commit pair, through tools/paper/complete_gate.py run from the parent's checkout; no several-occurrence, theory-change or automatic-retention claim.",
         state: RuleState::Enforced,
         deferred_reason: None,
     },
