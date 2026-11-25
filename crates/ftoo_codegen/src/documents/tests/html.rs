@@ -223,6 +223,53 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
     plan
 }
 
+#[test]
+fn support_required_html_virtue_link_recovers_its_destination_style_and_word() {
+    let support = support();
+    let mut plan = prose_plan("Words.");
+    plan.blocks[1].runs = vec![
+        plan::Inline::Text("The ".into()),
+        plan::Inline::Virtue {
+            word: "wonder".into(),
+            companion: false,
+            key: "v:wonder".into(),
+            semantic: "sem:weld:wonder".into(),
+            owner: "paper-pilot".into(),
+            language: "en".into(),
+            fragment: "virtue-wonder".into(),
+            site: input::site("virtue-html.toml"),
+        },
+        plan::Inline::Text(".".into()),
+    ];
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[], None).unwrap();
+    html_recovery::check(&plan, &fonts, &[], &[], &rendered).unwrap();
+    let link =
+        "<a href=\"../paper-pilot/en.html#virtue-wonder\"><strong><em>wonder</em></strong></a>";
+    assert!(rendered.contains(link));
+    for (changed, reason) in [
+        (
+            link.replace("#virtue-wonder", "#virtue-beauty"),
+            "HTML virtue link",
+        ),
+        (
+            link.replace(
+                "<strong><em>wonder</em></strong>",
+                "<em><strong>wonder</strong></em>",
+            ),
+            "HTML virtue strong",
+        ),
+        (
+            link.replace("wonder</em>", "beauty</em>"),
+            "HTML virtue word",
+        ),
+    ] {
+        let mutation = rendered.replacen(link, &changed, 1);
+        let fault = html_recovery::check(&plan, &fonts, &[], &[], &mutation).unwrap_err();
+        assert!(format!("{fault:?}").contains(reason), "{fault:?}");
+    }
+}
+
 fn math(site: UnitSite) -> plan::Inline {
     plan::Inline::Math {
         definition_site: site.clone(),

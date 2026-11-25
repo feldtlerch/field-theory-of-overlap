@@ -105,6 +105,22 @@ pub struct ReferenceOccurrence {
     label: String,
     site: UnitSite,
 }
+/// One literal roster word retained at its authored insertion.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VirtueOccurrence {
+    word: String,
+    site: UnitSite,
+}
+impl VirtueOccurrence {
+    #[must_use]
+    pub fn word(&self) -> &str {
+        &self.word
+    }
+    #[must_use]
+    pub fn site(&self) -> &UnitSite {
+        &self.site
+    }
+}
 impl ReferenceOccurrence {
     #[must_use]
     pub fn label(&self) -> &str {
@@ -161,6 +177,7 @@ pub struct CheckedText {
     tags: Vec<TagOccurrence>,
     handles: Vec<HandleOccurrence>,
     references: Vec<ReferenceOccurrence>,
+    virtues: Vec<VirtueOccurrence>,
     bibliography_citations: Vec<BibliographyCitationOccurrence>,
     styles: Vec<content::StyleOccurrence>,
 }
@@ -188,6 +205,10 @@ impl CheckedText {
     #[must_use]
     pub fn reference_occurrences(&self) -> &[ReferenceOccurrence] {
         &self.references
+    }
+    #[must_use]
+    pub fn virtue_occurrences(&self) -> &[VirtueOccurrence] {
+        &self.virtues
     }
     #[must_use]
     pub fn bibliography_citations(&self) -> &[BibliographyCitationOccurrence] {
@@ -711,6 +732,7 @@ fn check_texts(
                 tags,
                 handles,
                 references,
+                virtues,
                 bibliography_citations,
                 styles,
             }) => {
@@ -741,6 +763,7 @@ fn check_texts(
                         ));
                     }
                 }
+                check_virtue_language(unit, language, &virtues, errors);
                 texts.insert(
                     language.clone(),
                     CheckedText {
@@ -749,6 +772,7 @@ fn check_texts(
                         tags,
                         handles,
                         references,
+                        virtues,
                         bibliography_citations,
                         styles,
                     },
@@ -773,6 +797,30 @@ fn check_texts(
         }
     }
     (texts, used, scanner_failed)
+}
+
+fn check_virtue_language(
+    unit: &UnitDraft,
+    language: &str,
+    virtues: &[VirtueOccurrence],
+    errors: &mut Vec<UnitDiagnostic>,
+) {
+    if language == "en" {
+        return;
+    }
+    for occurrence in virtues {
+        errors.push(diagnostic(
+            RuleId::M041,
+            UnitStage::Content,
+            Some(&unit.id.value),
+            Some(language),
+            occurrence.site(),
+            UnitFault::VirtueContext {
+                word: occurrence.word().into(),
+                document: unit.document.value.clone(),
+            },
+        ));
+    }
 }
 
 /// A live identity at one authored occurrence, accessible through its resolved corpus.

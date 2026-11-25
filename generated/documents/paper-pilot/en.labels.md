@@ -48,6 +48,11 @@ The audit bottoms out here, for the framework’s own reasons &#40;<a href="../p
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:coda:eight-words document paper-pilot language en -->
+What the document welded, gathered — each word standing on the bone it was welded to: <a href="../paper-pilot/en.md#virtue-wonder"><strong><em>wonder</em></strong></a><!-- virtue v:wonder --> and <a href="../paper-pilot/en.md#virtue-beauty"><strong><em>beauty</em></strong></a><!-- virtue v:beauty -->, the will that crosses before the reward exists and what it finds on the far side; <a href="../paper-pilot/en.md#virtue-goodness"><strong><em>goodness</em></strong></a><!-- virtue v:goodness --> and <a href="../paper-pilot/en.md#virtue-kindness"><strong><em>kindness</em></strong></a><!-- virtue v:kindness -->, the enlargement that raises real overlap, the second its quiet form at the modest good; <a href="../paper-pilot/en.md#virtue-love"><strong><em>love</em></strong></a><!-- virtue v:love -->, the overlap drawing the self&#45;boundary along held edges, the only rule that funds the grenade; <a href="../paper-pilot/en.md#virtue-wisdom"><strong><em>wisdom</em></strong></a><!-- virtue v:wisdom -->, the guard of the whole orthant boundary, refusing self&#45;erasure on one wall and exploitation on the other; <a href="../paper-pilot/en.md#virtue-truth"><strong><em>truth</em></strong></a><!-- virtue v:truth -->, anchored legibility built against the toll&#45;keeper; and <a href="../paper-pilot/en.md#virtue-health"><strong><em>health</em></strong></a><!-- virtue v:health -->, the self&#45;floor, the boundary self&#45;deception is defined as crossing.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:coda:whole-field document paper-pilot language en -->
 To love is to hold another&#39;s fate as partly your own; to be wise is to widen that holding without erasing the holder. The judge everyone can trust, the reporter who favours no one, and the self for whom every good act returns are not three but one, reached the one way the whole field points: by raising $`S`$ toward all until your field is the whole field and you are enemy to none — folding every other&#39;s goods by every other&#39;s own measure — at the price, in the plural dimension of outcomes, of bearing all of it. And it can be counterfeited by anyone with funding enough to look beloved, so the last thing the field can do is the first thing it most needs: to tell the woven from the one only paid to seem so — which settles, if ever, in arrears, the only way unposted prices are ever read: spent, at a crossing, by other hands.
 
@@ -65,6 +70,22 @@ Not yet converted: later material is omitted from this excerpt.
 ## References to unavailable content
 
 <a id="method-self-limit"></a>appendix G — The method’s self&#45;limit. Not yet available in this rendering.
+
+<a id="virtue-wonder"></a>wonder. Not yet available in this rendering.
+
+<a id="virtue-beauty"></a>beauty. Not yet available in this rendering.
+
+<a id="virtue-goodness"></a>goodness. Not yet available in this rendering.
+
+<a id="virtue-kindness"></a>kindness. Not yet available in this rendering.
+
+<a id="virtue-love"></a>love. Not yet available in this rendering.
+
+<a id="virtue-wisdom"></a>wisdom. Not yet available in this rendering.
+
+<a id="virtue-truth"></a>truth. Not yet available in this rendering.
+
+<a id="virtue-health"></a>health. Not yet available in this rendering.
 
 ## References
 

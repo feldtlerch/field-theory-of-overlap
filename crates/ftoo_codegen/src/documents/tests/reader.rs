@@ -78,7 +78,15 @@ fn reference_fault_uses_the_first_matching_reference_site_and_document() {
         },
     )]);
     let inputs = appendix_outline_inputs();
-    let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
+    let fault = resolve_see(
+        &plans,
+        &selected,
+        &inputs,
+        &mints,
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+    )
+    .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
         panic!("reference fault")
     };
@@ -99,6 +107,7 @@ fn reference_fault_uses_the_first_matching_reference_site_and_document() {
         &BTreeMap::new(),
         &mints,
         &BTreeSet::new(),
+        &BTreeMap::new(),
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -117,6 +126,120 @@ fn reference_fault_uses_the_first_matching_reference_site_and_document() {
     assert!(public_href(plan, site, "paper-pilot", "en", "method-self-limit").is_err());
     assert!(public_href(plan, site, "paper-pilot", "en", "sec-cwhich--way").is_ok());
     assert!(public_href(plan, site, "paper-pilot", "en", "bad/fragment").is_err());
+}
+
+#[test]
+fn virtue_key_cannot_enter_the_heading_reference_form() {
+    let plans = [with_reference("paper-pilot", "reference.toml", "v:wonder")];
+    let selected = BTreeMap::from([(
+        "paper-pilot".into(),
+        vec![ftoo_manifest::DocumentOutput::Markdown],
+    )]);
+    let fault = resolve_see(
+        &plans,
+        &selected,
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("typed reference fault")
+    };
+    let diagnostic = &errors.diagnostics()[0];
+    assert!(
+        matches!(&diagnostic.fault, AssemblyFault::ReferenceDestination { label, reason }
+        if label == "v:wonder" && reason == "virtue requires its typed occurrence")
+    );
+    assert!(
+        matches!(&diagnostic.site, AssemblySite::Source(site) if site.file == "reference.toml")
+    );
+}
+
+#[test]
+fn virtue_occurrence_requires_a_screen_document() {
+    let mut plan = with_reference("paper-pilot", "virtue.toml", "v:wonder");
+    plan.blocks[0].runs[0] = Inline::Virtue {
+        word: "wonder".into(),
+        companion: false,
+        key: String::new(),
+        semantic: String::new(),
+        owner: String::new(),
+        language: String::new(),
+        fragment: String::new(),
+        site: super::super::input::site("virtue.toml"),
+    };
+    let selected = BTreeMap::from([(
+        "paper-pilot".into(),
+        vec![ftoo_manifest::DocumentOutput::Latex],
+    )]);
+    let fault = resolve_see(
+        &[plan],
+        &selected,
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("virtue screen fault")
+    };
+    assert!(matches!(&errors.diagnostics()[0].fault,
+        AssemblyFault::ReferenceDestination { label, reason }
+        if label == "v:wonder" && reason == "virtue requires a screen document"));
+}
+
+#[test]
+fn virtue_occurrence_refuses_an_unsupported_reading_at_its_site() {
+    let site = super::super::input::site("virtue-reading.toml");
+    let mut plan = with_reference("other-reading", "virtue-reading.toml", "v:wonder");
+    plan.blocks[0].runs[0] = Inline::Virtue {
+        word: "wonder".into(),
+        companion: false,
+        key: String::new(),
+        semantic: String::new(),
+        owner: String::new(),
+        language: String::new(),
+        fragment: String::new(),
+        site: site.clone(),
+    };
+    let evidence = ftoo_manifest::PaperEvidenceSite {
+        file: "paper-tags.tsv".into(),
+        line: 1,
+    };
+    let virtues = BTreeMap::from([(
+        "wonder".into(),
+        super::super::registry::VirtueBinding {
+            word: "wonder".into(),
+            key: "v:wonder".into(),
+            target: "sem:weld:wonder".into(),
+            class_site: evidence.clone(),
+            slug_site: evidence,
+        },
+    )]);
+    let selected = BTreeMap::from([(
+        "other-reading".into(),
+        vec![ftoo_manifest::DocumentOutput::Markdown],
+    )]);
+    let fault = resolve_see(
+        &[plan],
+        &selected,
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        &BTreeSet::new(),
+        &virtues,
+    )
+    .unwrap_err();
+    let DocumentError::Assembly(errors) = fault else {
+        panic!("virtue reading fault")
+    };
+    assert!(matches!(&errors.diagnostics()[0].fault,
+        AssemblyFault::ReferenceDestination { label, reason }
+        if label == "v:wonder" && reason == "unsupported virtue reading"));
+    assert!(matches!(&errors.diagnostics()[0].site,
+        AssemblySite::Source(actual) if actual == &site));
 }
 
 #[test]
@@ -140,7 +263,15 @@ fn computed_index_entry_requires_an_owning_screen() {
         },
     )]);
     let inputs = appendix_outline_inputs();
-    let fault = resolve_see(&plans, &selected, &inputs, &mints, &BTreeSet::new()).unwrap_err();
+    let fault = resolve_see(
+        &plans,
+        &selected,
+        &inputs,
+        &mints,
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+    )
+    .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
         panic!("unplaced index entry must refuse")
     };
@@ -237,6 +368,7 @@ fn regular_heading_see_uses_real_master_outline_and_unit_scanner() {
         &inputs,
         integrated.mints(),
         &BTreeSet::new(),
+        &BTreeMap::new(),
     )
     .unwrap();
     let entry = &indexes["en"][0];
@@ -244,7 +376,7 @@ fn regular_heading_see_uses_real_master_outline_and_unit_scanner() {
         (&entry.fragment[..], &entry.title[..], &entry.locator[..]),
         ("the-three-tenses", "The three tenses", "§22.1")
     );
-    bind_see(&mut plan.blocks[0].runs, &links["en"]).unwrap();
+    bind_see(&mut plan.blocks[0].runs, &links["en"], &BTreeMap::new()).unwrap();
     let mut emitted = String::new();
     super::super::markdown::inline(&mut emitted, &plan.blocks[0].runs);
     assert_eq!(
@@ -296,6 +428,49 @@ fn see_recovery_stops_at_its_own_link_after_another_insertion() {
 }
 
 #[test]
+fn virtue_recovery_retains_link_word_and_command_mode() {
+    let markdown = "<a href=\"../paper-pilot/en.md#virtue-wonder\"><strong><em>wonder</em></strong></a><!-- virtue v:wonder -->";
+    let expected = || Recovered::Virtue {
+        word: "wonder".into(),
+        key: Some("v:wonder".into()),
+        href: Some("../paper-pilot/en.md#virtue-wonder".into()),
+        companion: None,
+    };
+    assert_eq!(
+        recover_markdown(markdown, std::iter::empty()),
+        Some(vec![expected()])
+    );
+    for changed in [
+        markdown.replace("virtue-wonder", "virtue-other"),
+        markdown.replace("<strong><em>", "<em><strong>"),
+        markdown.replace("wonder</em>", "other</em>"),
+    ] {
+        assert_ne!(
+            recover_markdown(&changed, std::iter::empty()),
+            Some(vec![expected()])
+        );
+    }
+    assert_eq!(
+        recover_tex(r"\papervirtue{wonder}", true, TexLine::NewLine),
+        Some(vec![Recovered::Virtue {
+            word: "wonder".into(),
+            key: None,
+            href: None,
+            companion: Some(true),
+        }])
+    );
+    assert_ne!(
+        recover_tex(r"\virtue{wonder}", true, TexLine::NewLine),
+        Some(vec![Recovered::Virtue {
+            word: "wonder".into(),
+            key: None,
+            href: None,
+            companion: Some(true),
+        }])
+    );
+}
+
+#[test]
 fn see_binding_refuses_an_empty_locator_or_destination() {
     let site = super::super::input::site("reference.toml");
     let make_run = || Inline::See {
@@ -326,10 +501,29 @@ fn see_binding_refuses_an_empty_locator_or_destination() {
             BTreeMap::from([("app:self-limit".into(), value)])
         });
         assert_eq!(
-            bind_see(&mut runs, &links),
+            bind_see(&mut runs, &links, &BTreeMap::new()),
             Err(("app:self-limit".into(), site.clone()))
         );
     }
+}
+
+#[test]
+fn virtue_binding_refuses_an_unknown_word_at_its_site() {
+    let site = super::super::input::site("explainer-virtue.toml");
+    let mut runs = [Inline::Virtue {
+        word: "unknown".into(),
+        companion: true,
+        key: String::new(),
+        semantic: String::new(),
+        owner: String::new(),
+        language: String::new(),
+        fragment: String::new(),
+        site: site.clone(),
+    }];
+    assert_eq!(
+        bind_see(&mut runs, &BTreeMap::new(), &BTreeMap::new()),
+        Err(("v:unknown".into(), site))
+    );
 }
 
 #[test]
@@ -1455,6 +1649,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &inclusions,
         &inputs,
         &BTreeMap::new(),
+        None,
     )
     .unwrap();
     assert_eq!(
@@ -1484,6 +1679,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &inclusions,
         &inputs,
         &BTreeMap::new(),
+        None,
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1514,6 +1710,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &inclusions,
         &inputs,
         &BTreeMap::new(),
+        None,
     )
     .unwrap();
     assert!(french.screen.is_none());
@@ -1552,6 +1749,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &inclusions,
         &inputs,
         &BTreeMap::new(),
+        None,
     )
     .unwrap_err();
     let DocumentError::Assembly(errors) = fault else {
@@ -1603,6 +1801,7 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         &inclusions,
         &inputs,
         &BTreeMap::new(),
+        None,
     )
     .unwrap();
     let screen = plans[1].screen.as_ref().unwrap();

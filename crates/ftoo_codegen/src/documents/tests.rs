@@ -1135,6 +1135,12 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         .extend_from_slice(b"fr = \"Ce paragraphe presente la theorie.\"\n");
     multilingual_statements
         .iter_mut()
+        .find(|source| source.file.ends_with("explainer-eight-words.toml"))
+        .unwrap()
+        .bytes
+        .extend_from_slice(b"fr = \"Huit mots.\"\n");
+    multilingual_statements
+        .iter_mut()
         .find(|source| source.file.ends_with("explainer-overlap-flow.toml"))
         .unwrap()
         .bytes

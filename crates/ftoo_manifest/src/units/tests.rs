@@ -1,6 +1,51 @@
 use super::*;
 
 #[test]
+fn virtue_insertion_retains_word_order_and_refuses_styled_or_nonliteral_forms() {
+    let scanned =
+        content::scan(&located("@virtue{wonder} and @virtue{beauty}", &["text"])).unwrap();
+    assert_eq!(
+        scanned
+            .virtues
+            .iter()
+            .map(VirtueOccurrence::word)
+            .collect::<Vec<_>>(),
+        vec!["wonder", "beauty"]
+    );
+    assert_eq!(scanned.virtues[0].site().occurrence, Some(0));
+    assert_eq!(scanned.virtues[1].site().occurrence, Some(1));
+    for (body, reason) in [
+        ("@strong{@virtue{wonder}}", InsertionReason::StyledReference),
+        ("@virtue{Wonder}", InsertionReason::UnknownForm),
+        ("@virtue{\\name}", InsertionReason::UnknownForm),
+        ("@virtue{wonder", InsertionReason::Unclosed),
+    ] {
+        let error = content::scan(&located(body, &["text"])).err().unwrap();
+        assert!(matches!(error.1,
+            UnitFault::MalformedInsertion { reason: actual, .. } if actual == reason));
+    }
+    let (mut documents, mut units) = fixtures();
+    let mut explainer = documents.documents["main"].clone();
+    explainer.required_languages.push(LocatedString {
+        value: "fr".into(),
+        site: site(
+            "documents.toml",
+            &["documents", "explainer", "required-languages"],
+        ),
+    });
+    documents.documents.insert("explainer".into(), explainer);
+    units[0].document.value = "explainer".into();
+    units[0].texts.insert(
+        "fr".into(),
+        entry("Voir @virtue{wonder}.", &["unit", "texts", "fr"]),
+    );
+    let error = admit_unit_drafts(documents, units).unwrap_err();
+    assert!(matches!(&error.diagnostics()[0].fault,
+        UnitFault::VirtueContext { word, .. } if word == "wonder"));
+    assert_eq!(error.diagnostics()[0].rule, RuleId::M041);
+}
+
+#[test]
 fn auxiliary_paper_handles_have_one_declared_english_placement() {
     let (mut documents, mut units) = fixtures();
     let paper = documents.documents["main"].clone();
@@ -1109,7 +1154,7 @@ fn register_final_unit_statements() {
         ),
         (
             RuleId::M041,
-            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics. Each auxiliary paper mint is declared once in metadata and has exactly one visible local-selector placement in its owning English paper paragraph; unknown, unused, repeated or nested selectors and placements in other roles refuse.",
+            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics. Each auxiliary paper mint is declared once in metadata and has exactly one visible local-selector placement in its owning English paper paragraph; unknown, unused, repeated or nested selectors and placements in other roles refuse. A virtue insertion names one literal roster word, retains its site, and is admitted only as a top-level insertion in an English paragraph of a paper-context document or of the explainer reading, which uses the companion form; a nested, unknown or nonliteral word refuses.",
             "Every authored statement text, shared math entry and local math insertion.",
         ),
     ];

@@ -191,6 +191,12 @@ fn emit_inline(output: &mut String, runs: &[Inline], prose: bool) {
             Inline::See { label, .. } => {
                 write!(output, "\\see{{{label}}}").expect("string write");
             }
+            Inline::Virtue {
+                word, companion, ..
+            } => {
+                let command = if *companion { "papervirtue" } else { "virtue" };
+                write!(output, "\\{command}{{{word}}}").expect("string write");
+            }
             Inline::Math { latex, .. } => {
                 write!(output, "\\({latex}\\)").expect("string write");
             }

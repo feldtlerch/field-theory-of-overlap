@@ -616,6 +616,7 @@ pub(crate) fn prepare_context(
             &inclusions,
             &inputs,
             registry_joint.mints(),
+            paper_lookup.as_ref(),
         )?;
         let gap_rows = html_gap_rows(&plans, &selected);
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
@@ -1119,6 +1120,7 @@ fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
     ))
 }
 
+#[allow(clippy::too_many_lines)] // Fragment forms share one marker and one refusal site.
 fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
     use std::fmt::Write;
     let refuse = |reason: &str| {
@@ -1163,6 +1165,12 @@ fn paragraph_fragment_line(block: &plan::Block) -> Result<String, DocumentError>
             }
             plan::Inline::See { label, .. } => {
                 write!(body, "\\see{{{label}}}").expect("string write");
+            }
+            plan::Inline::Virtue {
+                word, companion, ..
+            } => {
+                let command = if *companion { "papervirtue" } else { "virtue" };
+                write!(body, "\\{command}{{{word}}}").expect("string write");
             }
             plan::Inline::Math { latex, site, .. } => {
                 if !plan::native_paragraph_command(latex) {

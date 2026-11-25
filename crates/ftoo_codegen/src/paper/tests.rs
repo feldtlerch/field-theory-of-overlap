@@ -102,14 +102,20 @@ fn support_required_release_refuses_each_registered_gap_part() -> Result<()> {
         "/unused-built-pair".into(),
     ])?;
     assert!(!req.registered_html_gaps);
+    let assembly = assembly_support(&req)?;
+    let mut prepared = crate::check_documents(&req.root, &assembly)
+        .map_err(|error| PaperFault::Input(error.to_string()))?;
     let PaperFault::Release { part, reason } = check_release_documents(&req).unwrap_err() else {
         panic!("ordinary release must refuse the checked screen destination gap")
     };
     assert_eq!(part, "screen destinations");
-    assert!(reason.contains("entries: 1"));
-    let assembly = assembly_support(&req)?;
-    let mut prepared = crate::check_documents(&req.root, &assembly)
-        .map_err(|error| PaperFault::Input(error.to_string()))?;
+    assert!(reason.contains(&format!(
+            "entries: {}",
+            prepared.screen_gap_inventory()["entries"]
+                .as_array()
+                .unwrap()
+                .len()
+        )));
     let scratch = Scratch::new();
     fs::create_dir_all(scratch.0.join("registry")).unwrap();
     fs::copy(

@@ -146,7 +146,16 @@ fn checked_file(root: &Path, name: &str) -> Result<Vec<u8>, PaperLookupError> {
 #[derive(Debug)]
 pub(crate) struct CheckedPaperLookup {
     entries: BTreeMap<String, PaperResolution>,
+    virtues: BTreeMap<String, VirtueBinding>,
     inputs: BTreeMap<String, Vec<u8>>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct VirtueBinding {
+    pub word: String,
+    pub key: String,
+    pub target: String,
+    pub class_site: PaperEvidenceSite,
+    pub slug_site: PaperEvidenceSite,
 }
 impl CheckedPaperLookup {
     #[must_use]
@@ -156,6 +165,10 @@ impl CheckedPaperLookup {
     #[must_use]
     pub(crate) fn inputs(&self) -> &BTreeMap<String, Vec<u8>> {
         &self.inputs
+    }
+    #[must_use]
+    pub(crate) fn virtues(&self) -> &BTreeMap<String, VirtueBinding> {
+        &self.virtues
     }
     pub(crate) fn check(root: &Path) -> Result<Self, PaperLookupError> {
         Self::check_with(root, "python3")
@@ -200,9 +213,13 @@ impl CheckedPaperLookup {
         }
         let value = ftoo_manifest::strict_json(&bytes)
             .map_err(|error| protocol("assembly-json", format!("{error}")))?;
-        let top = fields(&value, &["schema", "inputs", "bindings"], "assembly-json")?;
-        if top[0] != &JsonValue::Integer("1".into()) {
-            return Err(protocol("schema", "expected integer one"));
+        let top = fields(
+            &value,
+            &["schema", "inputs", "bindings", "virtues"],
+            "assembly-json",
+        )?;
+        if top[0] != &JsonValue::Integer("2".into()) {
+            return Err(protocol("schema", "expected integer two"));
         }
         let mut inputs = BTreeMap::new();
         for row in array(top[1], "inputs", 512)? {
@@ -318,7 +335,61 @@ impl CheckedPaperLookup {
             };
             entries.insert(key.into(), resolution);
         }
-        Ok(Self { entries, inputs })
+        let mut virtues = BTreeMap::new();
+        for row in array(top[3], "virtues", 256)? {
+            let values = fields(
+                row,
+                &["word", "key", "target", "class_site", "slug_site"],
+                "virtues",
+            )?;
+            let word = string(values[0], "virtues.word")?;
+            let key = string(values[1], "virtues.key")?;
+            let target = string(values[2], "virtues.target")?;
+            if word.is_empty()
+                || !word.bytes().all(|byte| byte.is_ascii_lowercase())
+                || key != format!("v:{word}")
+                || virtues
+                    .keys()
+                    .next_back()
+                    .is_some_and(|last: &String| last.as_str() >= word)
+            {
+                return Err(protocol(word, "virtue word, key or order differs"));
+            }
+            let Some(PaperResolution::Available(binding)) = entries.get(key) else {
+                return Err(protocol(word, "virtue lacks a paper binding"));
+            };
+            if binding.target != target
+                || binding.target_kind != "node"
+                || binding.alias_site.is_some()
+            {
+                return Err(protocol(word, "virtue target differs"));
+            }
+            let class_site = evidence(values[3], "virtues.class_site")?;
+            let slug_site = evidence(values[4], "virtues.slug_site")?;
+            if class_site.file != "documents/paper/data/ftoo_manifest.tex"
+                || slug_site.file != class_site.file
+            {
+                return Err(protocol(word, "virtue declaration site differs"));
+            }
+            virtues.insert(
+                word.into(),
+                VirtueBinding {
+                    word: word.into(),
+                    key: key.into(),
+                    target: target.into(),
+                    class_site,
+                    slug_site,
+                },
+            );
+        }
+        if virtues.is_empty() {
+            return Err(protocol("virtues", "virtue roster is empty"));
+        }
+        Ok(Self {
+            entries,
+            virtues,
+            inputs,
+        })
     }
 }
 

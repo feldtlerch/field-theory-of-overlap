@@ -14,8 +14,8 @@ from unittest import mock
 import argparse
 from common import read, write, timed
 import compare_words
-from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds
-from ledger import leaks, occurrence_differences, ledger_binding, check_destination, screen_references, check_screen_references
+from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds, virtue_roster
+from ledger import leaks, occurrence_differences, ledger_binding, check_destination, screen_references, check_screen_references, virtue_site, check_native_virtue_row, check_virtue_context, check_virtue_inventory, check_companion_mints, auxiliary, native_virtue_plan
 from prepare import declared_fragments, versioned, paper_master, scope_fragments
 
 FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
@@ -23,6 +23,67 @@ PARENT_REVISION = '68643f63939af28693897b84478e1e4988c40e32'
 
 
 class Identities(unittest.TestCase):
+    def test_virtue_ledger_inventory_refusals(self):
+        position = ('documents/paper/parts/coda.tex', 8)
+        native = {position: ('sec:coda:eight-words', [('virtue', 'wonder')])}
+        seen = collections.Counter({(*position, 0): 1})
+        first = collections.Counter({'v:wonder': 1})
+        roster = {'v:wonder': {}}
+        paper_auxiliary = {'v:wonder': {'anchor': 'virtue-wonder'}}
+        check_virtue_inventory(native, seen, first, roster, paper_auxiliary)
+        for changed_seen, changed_first, changed_auxiliary, reason in [
+            (collections.Counter(), first, paper_auxiliary, 'native virtue occurrence missing or repeated'),
+            (collections.Counter({(*position, 0): 2}), first, paper_auxiliary,
+             'native virtue occurrence missing or repeated'),
+            (seen, collections.Counter(), paper_auxiliary, 'virtue first-use count differs'),
+            (seen, collections.Counter({'v:wonder': 2}), paper_auxiliary,
+             'virtue first-use count differs'),
+            (seen, first, {}, 'virtue auxiliary definition absent'),
+        ]:
+            with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
+                check_virtue_inventory(native, changed_seen, changed_first, roster, changed_auxiliary)
+        for key, kind, job, reason in [
+            ('v:unknown', 'virtue-later', 'main', 'unknown virtue roster key'),
+            ('v:wonder', 'virtue-companion', 'main', 'virtue command mode/document differs'),
+        ]:
+            with self.subTest(reason=reason), self.assertRaisesRegex(ValueError, reason):
+                check_virtue_context(key, kind, job, roster, key)
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            write(root/'main.aux', '\\zref@newlabel{v:wonder}\n\\zref@newlabel{v:wonder}\n')
+            with self.assertRaisesRegex(ValueError, 'duplicate virtue auxiliary definition'):
+                auxiliary(root, 'main')
+            fragments = root/'generated/documents'
+            fragments.mkdir(parents=True)
+            write(fragments/'virtue.tex', '\\virtue{wonder}')
+            row = 'documents/paper/parts/coda.tex\tsec:coda:eight-words\tgenerated/documents/virtue.tex\tparagraph\t8\n'
+            write(fragments/'inclusions.tsv', row + row)
+            with self.assertRaisesRegex(ValueError, 'duplicate native virtue inclusion'):
+                native_virtue_plan(root)
+
+    def test_virtue_site_and_native_mode_refuse_changed_occurrences(self):
+        self.assertEqual(virtue_site('parts/coda.tex:86#virtue=0'),
+                         ('documents/paper/parts/coda.tex', 86, 0))
+        for site in ('parts/coda.tex:86#virtue=00', 'parts/coda.tex:86#virtue=-1',
+                     '../coda.tex:86#virtue=0', '/parts/coda.tex:86#virtue=0',
+                     'parts/coda.tex:86'):
+            with self.subTest(site=site), self.assertRaisesRegex(ValueError, 'M064:'):
+                virtue_site(site)
+        calls = [('virtue', 'wonder'), ('virtue', 'beauty')]
+        check_native_virtue_row('v:wonder', 'virtue-later', 0, 'sec:coda:eight-words', calls)
+        for key, kind, index, fault in [
+            ('v:beauty', 'virtue-later', 0, 'mode/word differs'),
+            ('v:wonder', 'virtue-first', 0, 'mode/word differs'),
+            ('v:wonder', 'virtue-companion', 0, 'mode/word differs'),
+            ('v:wonder', 'virtue-later', 2, 'extra native virtue occurrence'),
+        ]:
+            with self.subTest(key=key, kind=kind, index=index), self.assertRaisesRegex(ValueError, fault):
+                check_native_virtue_row(key, kind, index, 'sec:coda:eight-words', calls)
+        check_companion_mints({}, {'v:wonder': {}})
+        for key in ('v:wonder', 'FTOO-v:wonder'):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'companion virtue minted'):
+                check_companion_mints({key: {}}, {'v:wonder': {}})
+
     def test_source_line_end_interpretations(self):
         cases = (
             ('the dependence', 'the de-\npendence', 'remove-discretionary'),
@@ -1259,6 +1320,29 @@ class Identities(unittest.TestCase):
                          [('source/tags', 'direct')])
         self.assertEqual(record['faults'], [])
 
+    def test_companion_virtue_token_keeps_word_and_identity(self):
+        roster = {'wonder': {'key': 'v:wonder', 'target': 'sem:weld:wonder'}}
+        located = compare_words.decode_located('The \\papervirtue{wonder}.', {},
+                                               'documents/paper/explainer/explainer.tex', virtues=roster)
+        self.assertEqual(located['virtues'], [
+            {'command': 'papervirtue', 'word': 'wonder', 'key': 'v:wonder',
+             'target': 'sem:weld:wonder'}])
+        self.assertEqual(located['extracted'], 'The wonder.')
+        self.assertNotEqual(located['virtues'], compare_words.decode_located(
+            'The wonder.', {}, 'documents/paper/explainer/explainer.tex', virtues=roster)['virtues'])
+        for body, path, reason in [
+            ('\\papervirtue{unknown}', 'documents/paper/explainer/explainer.tex',
+             'unknown virtue roster word: unknown'),
+            ('\\papervirtue{wonder}', 'documents/paper/parts/coda.tex',
+             'unsupported virtue command or document'),
+            ('\\virtue{wonder}', 'documents/paper/parts/coda.tex',
+             'unsupported source scalar U\\+005C'),
+            ('\\papervirtue{\\name}', 'documents/paper/explainer/explainer.tex',
+             'unsupported virtue command or document'),
+        ]:
+            with self.subTest(body=body, path=path), self.assertRaisesRegex(compare_words.Fault, reason):
+                compare_words.decode_located(body, {}, path, virtues=roster)
+
     def conversion_run(self, change=None, options=None):
         source = pathlib.Path(__file__).resolve().parents[2]
         fragment = read(source/'generated/documents/paper-pilot/sec-reading-shadow.tex')
@@ -1707,8 +1791,12 @@ class Identities(unittest.TestCase):
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
         self.assertEqual((result['faults'][0]['code'], result['faults'][0]['stage']),
                          ('InputChanged', 'final'))
-        with mock.patch.object(compare_words.CapturedInputs, 'verify',
-                               side_effect=ValueError('captured input changed')):
+        original_verify = compare_words.CapturedInputs.verify
+        def changed_verify(captured):
+            if captured.repo == source:
+                raise ValueError('captured input changed')
+            return original_verify(captured)
+        with mock.patch.object(compare_words.CapturedInputs, 'verify', changed_verify):
             exit_code, result = self.conversion_run()
         self.assertEqual((exit_code, result['verdict']), (2, 'refused'))
         self.assertEqual(result['faults'][0]['code'], 'InputChanged')
@@ -2008,8 +2096,10 @@ class Identities(unittest.TestCase):
 
     def test_assembly_json_evidence_and_refusals(self):
         value=json.loads(assembly_json(self.root))
-        self.assertEqual(list(value), ['schema','inputs','bindings'])
-        self.assertEqual(value['schema'], 1)
+        self.assertEqual(list(value), ['schema','inputs','bindings','virtues'])
+        self.assertEqual(value['schema'], 2)
+        self.assertEqual([row['word'] for row in value['virtues']],
+                         sorted(row['word'] for row in value['virtues']))
         self.assertEqual([entry['path'] for entry in value['inputs']],
                          sorted({entry['path'] for entry in value['inputs']}))
         rows={row['key']:row for row in value['bindings']}
@@ -2027,6 +2117,26 @@ class Identities(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,
                                         'M063: key evidence differs: dyn:exact'):
                 _assignment_line(lines,'dyn:exact','reader-tags.toml')
+
+    def test_virtue_roster_refuses_changed_class_slug_and_binding(self):
+        file = 'documents/paper/data/ftoo_manifest.tex'
+        original = read(self.root/file)
+        rows = virtue_roster(self.root, bindings(self.root), CapturedInputs(self.root))
+        self.assertIn(('wonder', 'v:wonder'), [(row['word'], row['key']) for row in rows])
+        for old, new, fault in [
+            ('{ sem:weld:wonder } { virtue-weld }', '{ sem:weld:wonder } { other }',
+             'M063: virtue class or slug differs: v:wonder'),
+            ('{ sem:weld:wonder } { wonder }', '{ sem:weld:wonder } { beauty }',
+             'M063: virtue class or slug differs: v:wonder'),
+            ('{ sem:weld:wonder } { wonder }', '{ sem:weld:wonder } { Wonder }',
+             'M063: virtue class or slug differs: v:wonder'),
+        ]:
+            with self.subTest(new=new):
+                self.assertIn(old, original)
+                write(self.root/file, original.replace(old, new, 1))
+                with self.assertRaisesRegex(ValueError, fault):
+                    virtue_roster(self.root, bindings(self.root), CapturedInputs(self.root))
+        write(self.root/file, original)
 
     def test_release_refuses_explicit_candidates(self):
         rows=bindings(self.root,True)

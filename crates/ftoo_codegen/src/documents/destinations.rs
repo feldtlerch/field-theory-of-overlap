@@ -10,6 +10,7 @@ pub(super) enum Reading {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Address {
     Heading { override_fragment: Option<String> },
+    Virtue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,6 +38,13 @@ pub(super) struct IndexEntry {
     pub title: String,
     pub locator: String,
     pub message: &'static str,
+}
+pub(super) fn index_text(entry: &IndexEntry) -> String {
+    if entry.locator.is_empty() {
+        format!("{}. {}", entry.title, entry.message)
+    } else {
+        format!("{} — {}. {}", entry.locator, entry.title, entry.message)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -632,6 +640,7 @@ pub(super) fn fragment(target: &Target) -> Result<String, DestinationError> {
         Address::Heading { override_fragment } => override_fragment
             .clone()
             .or_else(|| title_fragment(&target.decoded_title)),
+        Address::Virtue => Some(format!("virtue-{}", target.decoded_title)),
     }
     .ok_or_else(|| DestinationError::InvalidFragment(target.label.clone()))?;
     if !valid_fragment(&candidate) {

@@ -178,6 +178,48 @@ def _assignment_line(text, key, file):
     return _site(file, text.count('\n', 0, found[0].start()) + 1)
 
 
+def virtue_roster(repo, rows, captured):
+    """Bind source-declared virtue slugs to canonical paper tags on one captured input."""
+    file = 'documents/paper/data/ftoo_manifest.tex'
+    source = captured.read(repo/file)
+    facts = {}
+    pattern = re.compile(r'^\\prop_gput:Nnn \\g_ftoo_id_to_(class|slug)_prop \{ ([^{}]+) \} \{ ([^{}]+) \}$', re.M)
+    for match in pattern.finditer(source):
+        kind, target, value = match.groups()
+        declared = facts.setdefault(target, {})
+        require(kind not in declared, 'M063: repeated '+kind+' declaration: '+target)
+        declared[kind] = (value, _site(file, source.count('\n', 0, match.start()) + 1))
+    roster = []
+    words = set()
+    paper_tags = captured.read(repo/'documents/paper-build/paper-tags.tsv').splitlines()
+    paper = {fields[0]: (fields[1], fields[2]) for line in paper_tags
+             if not line.startswith('#') for fields in [line.split('\t')]}
+    for key, (target, kind) in paper.items():
+        if not key.startswith('v:'):
+            continue
+        declared = facts.get(target, {})
+        require(kind == 'node' and declared.get('class', (None,))[0] == 'virtue-weld' and
+                declared.get('slug', (None,))[0] == key.removeprefix('v:'),
+                'M063: virtue class or slug differs: '+key)
+    for target, declared in facts.items():
+        if declared.get('class', (None,))[0] != 'virtue-weld':
+            continue
+        require('slug' in declared, 'M063: virtue lacks slug: '+target)
+        word, slug_site = declared['slug']
+        require(bool(re.fullmatch(r'[a-z]+', word)), 'M063: invalid virtue slug: '+target)
+        require(word not in words, 'M063: duplicate virtue slug: '+word)
+        words.add(word)
+        key = 'v:'+word
+        require(paper.get(key) == (target, 'node'), 'M063: virtue paper binding differs: '+key)
+        binding = rows.get(key)
+        require(binding is not None and binding['source_status'] == 'paper' and
+                binding['target'] == target, 'M063: virtue lookup differs: '+key)
+        roster.append({'word': word, 'key': key, 'target': target,
+                       'class_site': declared['class'][1], 'slug_site': slug_site})
+    require(bool(roster), 'M063: virtue roster is empty')
+    return sorted(roster, key=lambda row: row['word'])
+
+
 def assembly_json(repo):
     """Serialize checked bindings and the captured validity closure for assembly."""
     captured = CapturedInputs(repo)
@@ -185,6 +227,7 @@ def assembly_json(repo):
     paths = input_paths(repo, captured)
     for path in paths:
         captured.read_bytes(repo/path)
+    virtues = virtue_roster(repo, rows, captured)
     paper_file = 'documents/paper-build/paper-tags.tsv'
     source_file = 'documents/paper/data/ftoo_manifest.tex'
     paper_lines = {}
@@ -221,10 +264,10 @@ def assembly_json(repo):
         wire.append({'key': key, 'spelling': spelling, 'status': status, 'target': target,
                      'target_kind': kind, 'lookup_site': lookup, 'alias_site': alias,
                      'declaration_sites': evidence})
-    result = {'schema': 1,
+    result = {'schema': 2,
               'inputs': [{'path': path, 'sha256': hashlib.sha256(captured.bytes[path]).hexdigest()}
                          for path in paths],
-              'bindings': wire}
+              'bindings': wire, 'virtues': virtues}
     captured.verify()
     return json.dumps(result, ensure_ascii=False, separators=(',', ':'))+'\n'
 

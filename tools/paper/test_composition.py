@@ -14,9 +14,15 @@ FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).reso
 
 
 def checked_fragments(root, rows):
-    with patch('identities.bindings') as bindings:
+    from identities import CapturedInputs, bindings as real_bindings, virtue_roster
+    repository = pathlib.Path(__file__).resolve().parents[2]
+    roster = virtue_roster(repository, real_bindings(repository), CapturedInputs(repository))
+    with (patch('identities.bindings') as bindings,
+          patch('prepare.bindings') as fragment_bindings,
+          patch('prepare.virtue_roster', return_value=roster)):
         bindings.return_value.get.side_effect = lambda name: {
             'source_status': 'paper', 'spelling': name}
+        fragment_bindings.return_value = real_bindings(repository)
         return declared_fragments(root, rows)
 
 
@@ -177,6 +183,21 @@ class Composition(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'M055: Fragment body differs'):
                 checked_fragments(root, rows)
             math_fragment.write_bytes(intact)
+            virtue_fragment = root/'generated/documents/paper-pilot/sec-coda-eight-words.tex'
+            virtue_intact = virtue_fragment.read_bytes()
+            for changed, fault in [
+                (virtue_intact.replace(b'\\virtue{wonder}', b'\\papervirtue{wonder}', 1),
+                 'M055: Fragment virtue binding differs'),
+                (virtue_intact.replace(b'\\virtue{wonder}', b'\\virtue{unknown}', 1),
+                 'M055: Fragment virtue binding differs'),
+                (virtue_intact.replace(b'\\virtue{wonder}', b'\\virtue{\\name}', 1),
+                 'M055: Fragment body differs'),
+            ]:
+                self.assertNotEqual(changed, virtue_intact)
+                virtue_fragment.write_bytes(changed)
+                with self.assertRaisesRegex(ValueError, fault):
+                    checked_fragments(root, rows)
+            virtue_fragment.write_bytes(virtue_intact)
             self.assertEqual(len(scope_fragments(root)), expected)
 
 

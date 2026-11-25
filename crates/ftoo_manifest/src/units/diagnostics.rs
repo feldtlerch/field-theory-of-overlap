@@ -189,6 +189,10 @@ pub enum UnitFault {
         reason: InsertionReason,
         fragment: String,
     },
+    VirtueContext {
+        word: String,
+        document: String,
+    },
     InvalidMathName {
         value: String,
     },
@@ -262,7 +266,7 @@ impl UnitFault {
             Self::UndeclaredLanguage { .. } => 17,
             Self::BlankText => 18,
             Self::UnsupportedTextCharacter { .. } => 19,
-            Self::MalformedInsertion { .. } => 20,
+            Self::MalformedInsertion { .. } | Self::VirtueContext { .. } => 20,
             Self::InvalidMathName { .. } => 21,
             Self::BlankMath { .. } => 22,
             Self::UnsupportedMathSyntax { .. } => 23,

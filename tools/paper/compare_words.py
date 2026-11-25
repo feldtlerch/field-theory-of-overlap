@@ -13,7 +13,7 @@ import tomllib
 import unicodedata
 
 from identities import (CHECK_INPUTS, INPUTS as BINDING_INPUTS,
-                        CapturedInputs, bindings, input_paths)
+                        CapturedInputs, bindings, input_paths, virtue_roster)
 from inputs import inventory
 from meson_adapter import pdf_libraries
 from pdf_text import Pdf
@@ -113,7 +113,7 @@ def decode_paragraph(body, lookup):
     return decoded['extracted'], decoded['semantic'], decoded['tags']
 
 
-def decode_located(body, lookup, path='<source>', base_offset=0):
+def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     """Decode the admitted prose grammar with source byte ranges and separators."""
     data = body.encode('utf-8')
     if len(data) > 65536:
@@ -123,6 +123,7 @@ def decode_located(body, lookup, path='<source>', base_offset=0):
         positions.append(positions[-1] + len(char.encode('utf-8')))
     tokens = []
     tags = []
+    virtue_tokens = []
     separator = None
     i = 0
 
@@ -142,7 +143,22 @@ def decode_located(body, lookup, path='<source>', base_offset=0):
             continue
         tag = TAG.match(body, i)
         details = None
-        if tag:
+        virtue = re.match(r'\\papervirtue\{([^{}]*)\}', body[i:]) if char == '\\' else None
+        if virtue:
+            word = virtue[1]
+            companion_source = (path.startswith('documents/paper/explainer/') or
+                                path.startswith('generated/documents/explainer-pilot/'))
+            if not companion_source or not re.fullmatch(r'[a-z]+', word):
+                invalid('unsupported virtue command or document', i)
+            row = (virtues or {}).get(word)
+            if row is None:
+                invalid('unknown virtue roster word: '+word, i)
+            detail = dict(command='papervirtue', word=word, key=row['key'], target=row['target'])
+            virtue_tokens.append(detail)
+            kind = 'virtue'
+            semantic = extracted = word
+            i += virtue.end()
+        elif tag:
             key = tag[1]
             row = lookup.get(key)
             if row is None or row['source_status'] not in ('paper', 'alias'):
@@ -201,7 +217,7 @@ def decode_located(body, lookup, path='<source>', base_offset=0):
         if len(tokens) > 16384:
             raise Fault('CorrespondenceLimit', 'source exceeds 16384 tokens: ' + path, 'snapshot')
         separator = None
-    return dict(tokens=tokens, tags=tags, source_bytes=data, base_offset=base_offset,
+    return dict(tokens=tokens, tags=tags, virtues=virtue_tokens, source_bytes=data, base_offset=base_offset,
                 extracted=''.join((' ' if row['separator_before'] and n else '') +
                                   row['extracted'] for n, row in enumerate(tokens)),
                 semantic=''.join((' ' if row['separator_before'] and n else '') +
@@ -1470,13 +1486,22 @@ def compare(args, captured_assignment=None, paper_binary=None, support=None):
         # Each side resolves tags against the binding bytes captured for that side.
         before_lookup = bindings(parent_dir)
         after_lookup = bindings(snapshot)
+        before_captured = CapturedInputs(parent_dir)
+        after_captured = CapturedInputs(snapshot)
+        before_virtues = {row['word']: row for row in virtue_roster(parent_dir, before_lookup, before_captured)}
+        after_virtues = {row['word']: row for row in virtue_roster(snapshot, after_lookup, after_captured)}
+        try:
+            before_captured.verify()
+            after_captured.verify()
+        except (OSError, ValueError) as error:
+            raise Fault('InputChanged', error, 'snapshot') from error
         decoded = []
         all_tags = []
         for old, new, key in selections:
             old_decoded = decode_located(old['body'].decode('utf-8'), before_lookup,
-                                         old['path'], old['range'][0])
+                                         old['path'], old['range'][0], before_virtues)
             new_decoded = decode_located(new['body'].decode('utf-8'), after_lookup,
-                                         new['path'], new['range'][0])
+                                         new['path'], new['range'][0], after_virtues)
             decoded.append((old_decoded, new_decoded))
             all_tags.extend(old_decoded['tags'] + new_decoded['tags'])
             old['sha256'] = digest(old['blob_bytes'])
@@ -1551,6 +1576,14 @@ def compare(args, captured_assignment=None, paper_binary=None, support=None):
                 difference = dict(
                     code='TextDifference', part='source/tags',
                     before=old_decoded['tags'], after=new_decoded['tags'],
+                    proof='direct')
+                if len(selections) > 1:
+                    difference['unit'] = key
+                evidence['differences'].append(difference)
+            if old_decoded['virtues'] != new_decoded['virtues']:
+                difference = dict(
+                    code='TextDifference', part='source/virtues',
+                    before=old_decoded['virtues'], after=new_decoded['virtues'],
                     proof='direct')
                 if len(selections) > 1:
                     difference['unit'] = key

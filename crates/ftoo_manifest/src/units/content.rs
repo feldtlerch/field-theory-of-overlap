@@ -1,7 +1,7 @@
 use super::{
     BibliographyCitationKind, BibliographyCitationOccurrence, CheckedText, HandleOccurrence,
     InsertionReason, LocatedString, MathOccurrence, ReferenceOccurrence, TagOccurrence, UnitFault,
-    UnitSite, local_name,
+    UnitSite, VirtueOccurrence, local_name,
 };
 use std::ops::Range;
 
@@ -49,6 +49,7 @@ pub(super) struct ScannedText {
     pub tags: Vec<TagOccurrence>,
     pub handles: Vec<HandleOccurrence>,
     pub references: Vec<ReferenceOccurrence>,
+    pub virtues: Vec<VirtueOccurrence>,
     pub bibliography_citations: Vec<BibliographyCitationOccurrence>,
     pub styles: Vec<StyleOccurrence>,
 }
@@ -57,6 +58,7 @@ fn insertion_index(scanned: &ScannedText, active_style: bool) -> usize {
         + scanned.tags.len()
         + scanned.handles.len()
         + scanned.references.len()
+        + scanned.virtues.len()
         + scanned.bibliography_citations.len()
         + scanned.styles.len()
         + usize::from(active_style)
@@ -66,6 +68,7 @@ enum Insertion {
     Tag(TagOccurrence),
     Handle(HandleOccurrence),
     Reference(ReferenceOccurrence),
+    Virtue(VirtueOccurrence),
     BibliographyCitation(BibliographyCitationOccurrence),
 }
 pub(crate) enum AssemblyScanFault {
@@ -97,6 +100,7 @@ pub(super) fn scan_limited(
         tags: Vec::new(),
         handles: Vec::new(),
         references: Vec::new(),
+        virtues: Vec::new(),
         bibliography_citations: Vec::new(),
         styles: Vec::new(),
     };
@@ -111,6 +115,7 @@ pub(super) fn scan_limited(
                     + scanned.tags.len()
                     + scanned.handles.len()
                     + scanned.references.len()
+                    + scanned.virtues.len()
                     + scanned.bibliography_citations.len()
                     + scanned.styles.len()
                     + usize::from(active_style.is_some())
@@ -264,7 +269,10 @@ pub(super) fn scan_limited(
             continue;
         }
         let index = insertion_index(&scanned, active_style.is_some());
-        if !styles && source.value[start..].starts_with("@see{") {
+        if !styles
+            && (source.value[start..].starts_with("@see{")
+                || source.value[start..].starts_with("@virtue{"))
+        {
             return Err(malformed(
                 source,
                 start,
@@ -297,6 +305,7 @@ pub(super) fn scan_limited(
                 &insertion,
                 Insertion::Math(_)
                     | Insertion::Reference(_)
+                    | Insertion::Virtue(_)
                     | Insertion::BibliographyCitation(_)
                     | Insertion::Handle(_)
             )
@@ -310,7 +319,7 @@ pub(super) fn scan_limited(
                 index,
                 if matches!(&insertion, Insertion::Math(_)) {
                     InsertionReason::StyledMath
-                } else if matches!(&insertion, Insertion::Reference(_)) {
+                } else if matches!(&insertion, Insertion::Reference(_) | Insertion::Virtue(_)) {
                     InsertionReason::StyledReference
                 } else if matches!(&insertion, Insertion::Handle(_)) {
                     InsertionReason::StyledHandle
@@ -328,6 +337,7 @@ pub(super) fn scan_limited(
                 Insertion::Tag(value) => value.site.clone(),
                 Insertion::Handle(value) => value.site.clone(),
                 Insertion::Reference(value) => value.site.clone(),
+                Insertion::Virtue(value) => value.site.clone(),
                 Insertion::BibliographyCitation(value) => value.site.clone(),
             };
             return Err(AssemblyScanFault::Limit(site));
@@ -337,6 +347,7 @@ pub(super) fn scan_limited(
             Insertion::Tag(value) => scanned.tags.push(value),
             Insertion::Handle(value) => scanned.handles.push(value),
             Insertion::Reference(value) => scanned.references.push(value),
+            Insertion::Virtue(value) => scanned.virtues.push(value),
             Insertion::BibliographyCitation(value) => scanned.bibliography_citations.push(value),
         }
     }
@@ -421,7 +432,8 @@ fn insertion(
     index: usize,
     chars: &mut impl Iterator<Item = (usize, char)>,
 ) -> Result<Insertion, ScanFault> {
-    if source.value[start..].starts_with("@handle{") {
+    let virtue = source.value[start..].starts_with("@virtue{");
+    if virtue || source.value[start..].starts_with("@handle{") {
         for _ in 0..7 {
             chars.next();
         }
@@ -436,8 +448,26 @@ fn insertion(
                 ));
             }
             if c == '}' {
-                let selector = &source.value[start + 8..position];
-                if !local_name(selector) {
+                let argument = &source.value[start + 8..position];
+                if virtue
+                    && (argument.is_empty()
+                        || !argument.bytes().all(|byte| byte.is_ascii_lowercase()))
+                {
+                    return Err(malformed(
+                        source,
+                        start,
+                        position + 1,
+                        index,
+                        InsertionReason::UnknownForm,
+                    ));
+                }
+                if virtue {
+                    return Ok(Insertion::Virtue(VirtueOccurrence {
+                        word: argument.into(),
+                        site: at(source, start, position + 1, Some(index)),
+                    }));
+                }
+                if !local_name(argument) {
                     return Err(malformed(
                         source,
                         start,
@@ -447,7 +477,7 @@ fn insertion(
                     ));
                 }
                 return Ok(Insertion::Handle(HandleOccurrence {
-                    selector: selector.to_owned(),
+                    selector: argument.to_owned(),
                     site: at(source, start, position + 1, Some(index)),
                 }));
             }

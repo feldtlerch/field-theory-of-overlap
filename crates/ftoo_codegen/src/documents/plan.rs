@@ -72,6 +72,16 @@ pub(super) enum Inline {
         fragment: String,
         site: UnitSite,
     },
+    Virtue {
+        word: String,
+        companion: bool,
+        key: String,
+        semantic: String,
+        owner: String,
+        language: String,
+        fragment: String,
+        site: UnitSite,
+    },
     Math {
         definition_site: UnitSite,
         key: String,
@@ -128,6 +138,12 @@ enum Recovered {
         label: Option<String>,
         locator: Option<String>,
         href: Option<String>,
+    },
+    Virtue {
+        word: String,
+        key: Option<String>,
+        href: Option<String>,
+        companion: Option<bool>,
     },
     Styled {
         kind: StyleKind,
@@ -308,6 +324,28 @@ fn recover_markdown<'a>(
             let (citation, consumed) = recover_bibliography_markdown(tail)?;
             output.push(citation);
             at += consumed;
+        } else if tail
+            .strip_prefix("<a href=\"")
+            .and_then(|after| after.split_once("\">"))
+            .is_some_and(|(_, body)| body.starts_with("<strong><em>"))
+        {
+            let end = tail.find(" -->")? + 4;
+            let value = &tail[..end];
+            let value = value.strip_prefix("<a href=\"")?;
+            let (href, value) = value.split_once("\"><strong><em>")?;
+            let (word, value) = value.split_once("</em></strong></a><!-- virtue ")?;
+            let key = value.strip_suffix(" -->")?;
+            if word.is_empty() || !word.bytes().all(|byte| byte.is_ascii_lowercase()) {
+                return None;
+            }
+            flush_text(&mut output, &mut text);
+            output.push(Recovered::Virtue {
+                word: word.into(),
+                key: Some(key.into()),
+                href: Some(href.into()),
+                companion: None,
+            });
+            at += end;
         } else if let Some(after) = tail.strip_prefix("<a href=\"") {
             let (inside, after) = after.split_once("</a>")?;
             let (href, locator) = inside.split_once("\">→ ")?;
@@ -656,6 +694,26 @@ fn recover_tex(body: &str, prose: bool, initial_line: TexLine) -> Option<Vec<Rec
             output.push(Recovered::Math(tail[..end].into()));
             at += 2 + end + 2;
             line = TexLine::MidLine;
+        } else if tail.starts_with(r"\virtue{") || tail.starts_with(r"\papervirtue{") {
+            let (companion, prefix) = if tail.starts_with(r"\papervirtue{") {
+                (true, r"\papervirtue{")
+            } else {
+                (false, r"\virtue{")
+            };
+            let rest = &tail[prefix.len()..];
+            let end = rest.find('}')?;
+            if !rest[..end].bytes().all(|byte| byte.is_ascii_lowercase()) || end == 0 {
+                return None;
+            }
+            flush_text(&mut output, &mut text);
+            output.push(Recovered::Virtue {
+                word: rest[..end].into(),
+                key: None,
+                href: None,
+                companion: Some(companion),
+            });
+            at += prefix.len() + end + 1;
+            line = TexLine::MidLine;
         } else if let Some(rest) = tail.strip_prefix(r"\handle{") {
             let end = rest.find('}')?;
             if rest[..end].contains('{') {
@@ -792,6 +850,21 @@ fn expected_run(run: &Inline, target: DocumentTarget, prose: bool) -> Option<Rec
             locator: (target == DocumentTarget::Markdown).then(|| locator.clone()),
             href: (target == DocumentTarget::Markdown)
                 .then(|| markdown_document_href(owner, language, fragment)),
+        },
+        Inline::Virtue {
+            word,
+            key,
+            companion,
+            owner,
+            language,
+            fragment,
+            ..
+        } => Recovered::Virtue {
+            word: word.clone(),
+            key: (target == DocumentTarget::Markdown).then(|| key.clone()),
+            href: (target == DocumentTarget::Markdown)
+                .then(|| markdown_document_href(owner, language, fragment)),
+            companion: (target == DocumentTarget::Latex).then_some(*companion),
         },
         Inline::Math {
             markdown, latex, ..
@@ -1204,6 +1277,19 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                                             target: label.clone(),
                                         },
                                         format!("{locator}\t{href}"),
+                                        site,
+                                    ),
+                                    (
+                                        Inline::Virtue { key, site, .. },
+                                        Recovered::Virtue {
+                                            word,
+                                            key: Some(found_key),
+                                            href: Some(href),
+                                            ..
+                                        },
+                                    ) if key == &found_key => (
+                                        EmissionKind::Virtue { key: key.clone() },
+                                        format!("{word}\t{href}"),
                                         site,
                                     ),
                                     (
@@ -2242,7 +2328,8 @@ pub(super) fn check_excerpt_shape(
                             Inline::Text(_)
                             | Inline::PaperTag { .. }
                             | Inline::BibliographyCitation { .. }
-                            | Inline::See { .. } => true,
+                            | Inline::See { .. }
+                            | Inline::Virtue { .. } => true,
                             Inline::Math { latex, .. } => native_paragraph_command(latex),
                             Inline::Styled {
                                 kind: StyleKind::Emphasis,
@@ -2454,6 +2541,7 @@ fn reading(document: &str) -> Option<super::destinations::Reading> {
 fn bind_see(
     runs: &mut [Inline],
     links: &BTreeMap<String, (String, String, String, String)>,
+    virtues: &BTreeMap<String, super::registry::VirtueBinding>,
 ) -> Result<(), (String, UnitSite)> {
     for run in runs {
         match run {
@@ -2464,6 +2552,7 @@ fn bind_see(
                 language,
                 fragment,
                 site,
+                ..
             } => {
                 let Some((number, document, lang, anchor)) = links.get(label) else {
                     return Err((label.clone(), site.clone()));
@@ -2477,7 +2566,30 @@ fn bind_see(
                 language.clone_from(lang);
                 fragment.clone_from(anchor);
             }
-            Inline::Styled { children, .. } => bind_see(children, links)?,
+            Inline::Virtue {
+                word,
+                key,
+                semantic,
+                owner,
+                language,
+                fragment,
+                site,
+                ..
+            } => {
+                let label = format!("v:{word}");
+                let Some(binding) = virtues.get(word) else {
+                    return Err((label, site.clone()));
+                };
+                let Some((_, document, lang, anchor)) = links.get(&label) else {
+                    return Err((label, site.clone()));
+                };
+                key.clone_from(&binding.key);
+                semantic.clone_from(&binding.target);
+                owner.clone_from(document);
+                language.clone_from(lang);
+                fragment.clone_from(anchor);
+            }
+            Inline::Styled { children, .. } => bind_see(children, links, virtues)?,
             _ => {}
         }
     }
@@ -2492,11 +2604,29 @@ fn resolve_see(
     inputs: &BTreeMap<String, Vec<u8>>,
     mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
     anchors: &BTreeSet<(String, String, String)>,
+    virtues: &BTreeMap<String, super::registry::VirtueBinding>,
 ) -> Result<(SeeLinks, SeeIndexes), DocumentError> {
     use super::destinations::{self, Reference, Target};
     let mut by_language: BTreeMap<String, Vec<(Reference, UnitSite, usize)>> = BTreeMap::new();
     for (plan_index, plan) in plans.iter().enumerate() {
         if !selected[&plan.document].contains(&ftoo_manifest::DocumentOutput::Markdown) {
+            for block in &plan.blocks {
+                let mut runs = Vec::new();
+                flatten_runs(&block.runs, &mut runs);
+                if let Some(Inline::Virtue { word, site, .. }) = runs
+                    .into_iter()
+                    .find(|run| matches!(run, Inline::Virtue { .. }))
+                {
+                    return Err(screen_failure(
+                        plan,
+                        site,
+                        AssemblyFault::ReferenceDestination {
+                            label: format!("v:{word}"),
+                            reason: "virtue requires a screen document".into(),
+                        },
+                    ));
+                }
+            }
             continue;
         }
         for block in &plan.blocks {
@@ -2504,6 +2634,16 @@ fn resolve_see(
             flatten_runs(&block.runs, &mut runs);
             for run in runs {
                 if let Inline::See { label, site, .. } = run {
+                    if label.starts_with("v:") {
+                        return Err(screen_failure(
+                            plan,
+                            site,
+                            AssemblyFault::ReferenceDestination {
+                                label: label.clone(),
+                                reason: "virtue requires its typed occurrence".into(),
+                            },
+                        ));
+                    }
                     let Some(document) = reading(&plan.document) else {
                         return Err(screen_failure(
                             plan,
@@ -2520,6 +2660,48 @@ fn resolve_see(
                             document,
                             position: references.len(),
                             target: label.clone(),
+                        },
+                        site.clone(),
+                        plan_index,
+                    ));
+                } else if let Inline::Virtue { word, site, .. } = run {
+                    let label = format!("v:{word}");
+                    if plan.language != "en" {
+                        return Err(screen_failure(
+                            plan,
+                            site,
+                            AssemblyFault::ReferenceDestination {
+                                label,
+                                reason: "virtue requires an English paragraph".into(),
+                            },
+                        ));
+                    }
+                    if !virtues.contains_key(word) {
+                        return Err(screen_failure(
+                            plan,
+                            site,
+                            AssemblyFault::ReferenceDestination {
+                                label,
+                                reason: "unknown virtue roster word".into(),
+                            },
+                        ));
+                    }
+                    let Some(document) = reading(&plan.document) else {
+                        return Err(screen_failure(
+                            plan,
+                            site,
+                            AssemblyFault::ReferenceDestination {
+                                label,
+                                reason: "unsupported virtue reading".into(),
+                            },
+                        ));
+                    };
+                    let references = by_language.entry(plan.language.clone()).or_default();
+                    references.push((
+                        Reference {
+                            document,
+                            position: references.len(),
+                            target: label,
                         },
                         site.clone(),
                         plan_index,
@@ -2550,8 +2732,22 @@ fn resolve_see(
             if targets.contains_key(&reference.target) {
                 continue;
             }
-            let mut target = destinations::target_from_inputs(&reference.target, mints, inputs)
-                .map_err(|error| fault(&reference.target, format!("{error:?}")))?;
+            let mut target = if let Some(word) = reference.target.strip_prefix("v:") {
+                let binding = virtues
+                    .get(word)
+                    .ok_or_else(|| fault(&reference.target, "unknown virtue roster word".into()))?;
+                Target {
+                    document: destinations::Reading::Paper,
+                    label: binding.key.clone(),
+                    decoded_title: binding.word.clone(),
+                    address: destinations::Address::Virtue,
+                    available: false,
+                    locator: String::new(),
+                }
+            } else {
+                destinations::target_from_inputs(&reference.target, mints, inputs)
+                    .map_err(|error| fault(&reference.target, format!("{error:?}")))?
+            };
             let fragment = destinations::fragment(&target)
                 .map_err(|error| fault(&reference.target, format!("{error:?}")))?;
             target.available =
@@ -2663,7 +2859,10 @@ pub(super) fn plan_screens(
     inclusions: &[super::input::Inclusion],
     inputs: &BTreeMap<String, Vec<u8>>,
     mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
+    lookup: Option<&super::registry::CheckedPaperLookup>,
 ) -> Result<(), DocumentError> {
+    let empty_virtues = BTreeMap::new();
+    let virtues = lookup.map_or(&empty_virtues, super::registry::CheckedPaperLookup::virtues);
     let mut owned = BTreeMap::<(String, String), OwnedDestination>::new();
     let mut anchors = BTreeSet::new();
     for plan in plans.iter() {
@@ -2751,7 +2950,7 @@ pub(super) fn plan_screens(
             }
         }
     }
-    let (links, indexes) = resolve_see(plans, selected, inputs, mints, &anchors)?;
+    let (links, indexes) = resolve_see(plans, selected, inputs, mints, &anchors, virtues)?;
     for plan in plans.iter_mut() {
         let targets = &selected[&plan.document];
         if !targets.contains(&ftoo_manifest::DocumentOutput::Markdown)
@@ -2763,7 +2962,7 @@ pub(super) fn plan_screens(
         let empty_links = BTreeMap::new();
         let link = links.get(&plan.language).unwrap_or(&empty_links);
         for block in &mut plan.blocks {
-            if let Err((label, site)) = bind_see(&mut block.runs, link) {
+            if let Err((label, site)) = bind_see(&mut block.runs, link, virtues) {
                 return Err(screen_failure(
                     plan,
                     &site,
@@ -3007,6 +3206,33 @@ impl DocumentPlan {
                         });
                         continue;
                     }
+                    Inline::Virtue {
+                        word,
+                        key,
+                        owner,
+                        language,
+                        fragment,
+                        site,
+                        ..
+                    } => {
+                        records.push(EmissionRecord {
+                            kind: EmissionKind::Virtue { key: key.clone() },
+                            unit: block.unit.clone(),
+                            language: self.language.clone(),
+                            target,
+                            occurrence: site.occurrence,
+                            value: if target == DocumentTarget::Markdown {
+                                format!(
+                                    "{word}\t{}",
+                                    markdown_document_href(owner, language, fragment)
+                                )
+                            } else {
+                                word.clone()
+                            },
+                            site: site.clone(),
+                        });
+                        continue;
+                    }
                     Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),
                     Inline::Citation {
                         text,
@@ -3160,7 +3386,7 @@ impl DocumentPlan {
                         language: self.language.clone(),
                         target,
                         occurrence: None,
-                        value: format!("{} — {}. {}", entry.locator, entry.title, entry.message),
+                        value: super::destinations::index_text(entry),
                         site: self.blocks[0].site.clone(),
                     });
                 }
@@ -3763,6 +3989,25 @@ fn runs(
             },
         ));
     }
+    for occurrence in text.virtue_occurrences() {
+        replacements.push((
+            occurrence
+                .site()
+                .decoded
+                .clone()
+                .expect("admitted occurrence"),
+            Inline::Virtue {
+                word: occurrence.word().into(),
+                companion: unit.document() == "explainer-pilot",
+                key: String::new(),
+                semantic: String::new(),
+                owner: String::new(),
+                language: String::new(),
+                fragment: String::new(),
+                site: occurrence.site().clone(),
+            },
+        ));
+    }
     for occurrence in text.bibliography_citations() {
         let entries = occurrence
             .keys()
@@ -3842,6 +4087,7 @@ fn scoped_runs_with_sites(
                 Inline::Tag { site, .. }
                 | Inline::PaperTag { site, .. }
                 | Inline::See { site, .. }
+                | Inline::Virtue { site, .. }
                 | Inline::Math { site, .. }
                 | Inline::Citation { site, .. }
                 | Inline::BibliographyCitation { site, .. }
@@ -4015,6 +4261,7 @@ fn canonical_run(run: &Inline) -> String {
             |selector| format!("@handle{{{selector}}}"),
         ),
         Inline::See { label, .. } => format!("@see{{{label}}}"),
+        Inline::Virtue { word, .. } => format!("@virtue{{{word}}}"),
         Inline::Math { key, .. } => format!("@math{{{key}}}"),
         Inline::Citation { text, .. } => format!("`{text}`"),
         Inline::BibliographyCitation { kind, entries, .. } => {
@@ -4297,6 +4544,21 @@ fn recovered_records(
                     },
                 )
             }
+            Recovered::Virtue {
+                word, key, href, ..
+            } => {
+                write!(body, "@virtue{{{word}}}").expect("string write");
+                (
+                    EmissionKind::Virtue {
+                        key: key.clone().unwrap_or_else(|| format!("v:{word}")),
+                    },
+                    if target == DocumentTarget::Markdown {
+                        format!("{word}\t{}", href.as_deref().unwrap_or(""))
+                    } else {
+                        word.clone()
+                    },
+                )
+            }
             Recovered::Styled { .. } => unreachable!("flattened recovery part"),
         };
         let index = records.iter().filter(|r| r.kind == kind).count();
@@ -4385,6 +4647,9 @@ fn region_records(
         .filter_map(|run| {
             let (kind, value, site) = match run {
                 Inline::Text(_) | Inline::Styled { .. } | Inline::See { .. } => return None,
+                Inline::Virtue {
+                    word, key, site, ..
+                } => (EmissionKind::Virtue { key: key.clone() }, word, site),
                 Inline::Tag { label, site, .. } => (EmissionKind::Tag, label, site),
                 Inline::PaperTag { value, site, .. } => (EmissionKind::Tag, &value.target, site),
                 Inline::Math { key, site, .. } => (EmissionKind::Math, key, site),

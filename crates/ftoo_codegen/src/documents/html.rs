@@ -439,6 +439,11 @@ fn licence_nodes(fonts: &Fonts) -> Vec<Node> {
 pub(super) enum Destination<'a> {
     Artifact(&'a DocumentPlan),
     Quotation(&'a super::plan::ScreenQuotation),
+    Virtue {
+        owner: &'a str,
+        language: &'a str,
+        fragment: &'a str,
+    },
 }
 
 pub(super) fn destination(value: Destination<'_>) -> String {
@@ -453,6 +458,13 @@ pub(super) fn destination(value: Destination<'_>) -> String {
             "../{}/{}.html#{}",
             quotation.owner_document, quotation.language, quotation.fragment
         ),
+        Destination::Virtue {
+            owner,
+            language,
+            fragment,
+        } => {
+            format!("../{owner}/{language}.html#{fragment}")
+        }
     }
 }
 
@@ -522,6 +534,28 @@ fn inline(runs: &[Inline], prepared: &[MathRun], block: usize) -> Vec<Node> {
                 )
             }
             Inline::See { .. } => unreachable!("unrealizable block withheld before emission"),
+            Inline::Virtue {
+                word,
+                owner,
+                language,
+                fragment,
+                ..
+            } => {
+                let href = destination(Destination::Virtue {
+                    owner,
+                    language,
+                    fragment,
+                });
+                element(
+                    "a",
+                    &[("href", &href)],
+                    vec![element(
+                        "strong",
+                        &[],
+                        vec![element("em", &[], vec![Node::Text(word.clone())])],
+                    )],
+                )
+            }
         });
     }
     nodes
@@ -558,6 +592,7 @@ pub(super) fn unrealizable_kinds(runs: &[Inline], math_allowed: bool) -> BTreeSe
             | Inline::Tag { .. }
             | Inline::PaperTag { .. }
             | Inline::Citation { .. }
+            | Inline::Virtue { .. }
             | Inline::Mention { .. } => {}
         }
     }
@@ -643,7 +678,8 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             Inline::Styled { children, .. } => first_unrealizable(children),
             Inline::Math { site, .. }
             | Inline::BibliographyCitation { site, .. }
-            | Inline::See { site, .. } => Some(site),
+            | Inline::See { site, .. }
+            | Inline::Virtue { site, .. } => Some(site),
             _ => None,
         })
     }
@@ -654,7 +690,8 @@ pub(super) fn prose_only(plan: &DocumentPlan) -> Result<(), DocumentError> {
             | Inline::Citation { site, .. }
             | Inline::BibliographyCitation { site, .. }
             | Inline::Math { site, .. }
-            | Inline::See { site, .. } => Some(site),
+            | Inline::See { site, .. }
+            | Inline::Virtue { site, .. } => Some(site),
             Inline::Styled { children, .. } => first_heading_fault(children),
             _ => None,
         })
@@ -733,7 +770,10 @@ pub(super) fn plain(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&plain(children)),
-            Inline::Math { .. } | Inline::BibliographyCitation { .. } | Inline::See { .. } => {
+            Inline::Math { .. }
+            | Inline::BibliographyCitation { .. }
+            | Inline::See { .. }
+            | Inline::Virtue { .. } => {
                 unreachable!("unrealizable heading refused before title")
             }
         }
@@ -927,10 +967,11 @@ pub(super) fn model(
                         &[],
                         vec![
                             element("a", &[("id", &entry.fragment)], vec![]),
-                            Node::Text(format!(
-                                "{} — {}. {}",
-                                entry.locator, entry.title, entry.message
-                            )),
+                            Node::Text(if entry.locator.is_empty() {
+                                format!("{}. {}", entry.title, entry.message)
+                            } else {
+                                format!("{} — {}. {}", entry.locator, entry.title, entry.message)
+                            }),
                         ],
                     ));
                 }

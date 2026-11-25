@@ -409,7 +409,10 @@ fn flat(runs: &[Inline]) -> String {
             Inline::PaperTag { value, .. } => result.push_str(&value.spelling),
             Inline::Citation { identity, .. } => result.push_str(&identity.handle),
             Inline::Styled { children, .. } => result.push_str(&flat(children)),
-            Inline::Math { .. } | Inline::BibliographyCitation { .. } | Inline::See { .. } => {
+            Inline::Math { .. }
+            | Inline::BibliographyCitation { .. }
+            | Inline::See { .. }
+            | Inline::Virtue { .. } => {
                 unreachable!("unrealizable heading refused before recovery")
             }
         }
@@ -647,6 +650,44 @@ fn runs(
                     .get(at)
                     .ok_or_else(|| mismatch(plan, "HTML bibliography citation position"))?;
                 bibliography_citation(plan, known, node, *kind, entries, label)?;
+                at += 1;
+            }
+            Inline::Virtue {
+                word,
+                owner,
+                language,
+                fragment,
+                ..
+            } => {
+                flush(&mut pending, &mut paper, &mut at)?;
+                let node = actual
+                    .get(at)
+                    .ok_or_else(|| mismatch(plan, "HTML virtue position"))?;
+                let href = super::html::destination(super::html::Destination::Virtue {
+                    owner,
+                    language,
+                    fragment,
+                });
+                let linked = element(
+                    plan,
+                    known,
+                    node,
+                    "a",
+                    &[("href", &href)],
+                    "HTML virtue link",
+                )?;
+                let bold = linked
+                    .first()
+                    .ok_or_else(|| mismatch(plan, "HTML virtue strong"))?;
+                let bold = element(plan, known, bold, "strong", &[], "HTML virtue strong")?;
+                let italic = bold
+                    .first()
+                    .ok_or_else(|| mismatch(plan, "HTML virtue emphasis"))?;
+                let italic = element(plan, known, italic, "em", &[], "HTML virtue emphasis")?;
+                text(plan, known, italic, word, "HTML virtue word")?;
+                if linked.len() != 1 || bold.len() != 1 {
+                    return Err(mismatch(plan, "HTML virtue nesting"));
+                }
                 at += 1;
             }
             Inline::See { .. } => unreachable!("unrealizable block withheld before recovery"),
@@ -1122,7 +1163,7 @@ fn check_main(
                         plan,
                         known,
                         std::slice::from_ref(copy),
-                        &format!("{} — {}. {}", entry.locator, entry.title, entry.message),
+                        &super::destinations::index_text(entry),
                         "HTML unavailable-content entry text",
                     )?;
                     at += 1;

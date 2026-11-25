@@ -46,6 +46,13 @@ fn declared_corpus_is_accounted_and_repeatable() {
     assert_eq!(a["source_count"], 12);
     assert_eq!(a["accounted_bytes"], a["source_bytes"]);
     assert_eq!(a["transfer_ready"], false);
+    let declared_native = fs::read_to_string(root.join("generated/documents/inclusions.tsv"))
+        .unwrap()
+        .lines()
+        .map(|row| row.split_once('\t').unwrap().0)
+        .filter(|source| body_path(source))
+        .map(|_| 1_u64)
+        .sum::<u64>();
     assert_eq!(
         a["files"]
             .as_array()
@@ -53,7 +60,7 @@ fn declared_corpus_is_accounted_and_repeatable() {
             .iter()
             .map(|row| row["existing_native_inclusions"].as_u64().unwrap())
             .sum::<u64>(),
-        15
+        declared_native
     );
     assert_eq!(
         fs::read(first.join("draft.json")).unwrap(),

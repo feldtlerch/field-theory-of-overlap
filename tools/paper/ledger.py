@@ -4,15 +4,17 @@ import collections
 import hashlib
 import json
 import pathlib
+import posixpath
 import re
 import tomllib
 from common import read, require, timed, write
-from identities import bindings
+from identities import CapturedInputs, bindings, virtue_roster
 from pdf_text import Pdf
 
 INPUTS = ['tools/paper/ledger.py', 'tools/paper/identities.py', 'tools/paper/pdf_text.py',
           'generated/manifest.json', 'registry/documentary-tags.toml',
           'documents/paper-build/label-mints.tsv', 'documents/paper/data/ftoo_manifest.tex',
+          'documents/paper-build/paper-tags.tsv', 'generated/documents/inclusions.tsv',
           'generated/documents/paper-pilot/en.labels.md',
           'generated/documents/explainer-pilot/en.labels.md']
 LEAK = re.compile(r'\b[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)+', re.I)
@@ -52,6 +54,8 @@ def auxiliary(path, job, unique_keys=()):
             m=re.match(r'\\zref@newlabel\{([^}]+)\}',line)
             if m:
                 counts[m[1]] += 1
+                require(not (m[1].startswith('v:') and counts[m[1]] > 1),
+                        'M064: duplicate virtue auxiliary definition: '+m[1])
                 result[m[1]] = {k:property_value(line,k) for k in ('default','page','anchor','title')}
             include=re.match(r'\\@input\{([^}]+)\}',line)
             if include:
@@ -65,11 +69,69 @@ def auxiliary(path, job, unique_keys=()):
 
 def ledger_binding(lookup, kind, key, spelling, status):
     source_key=key.removeprefix('FTOO-')
-    if kind not in ('locator','title-locator'):
+    if kind not in ('locator','title-locator','virtue-first','virtue-later','virtue-companion'):
         require(source_key in lookup, 'M064: unbound ledger key: '+key)
         row=lookup[source_key]
         require((spelling,status)==(row['spelling'],row['status']), 'M064: ledger binding differs: '+key)
     return source_key
+
+
+def native_virtue_plan(repo):
+    """Join checked inclusion positions to their generated command order."""
+    native = {}
+    for row in read(repo/'generated/documents/inclusions.tsv').splitlines():
+        source, unit, fragment, role, line = row.split('\t')
+        if role != 'paragraph':
+            continue
+        body = read(repo/fragment)
+        calls = re.findall(r'\\(papervirtue|virtue)\{([a-z]+)\}', body)
+        if calls:
+            key = (pathlib.PurePosixPath(source).as_posix(), int(line))
+            require(key not in native, 'M064: duplicate native virtue inclusion: '+unit)
+            native[key] = (unit, calls)
+    return native
+
+
+def virtue_site(site):
+    match = re.fullmatch(r'([^#]+):([1-9][0-9]*)#virtue=(0|[1-9][0-9]*)',site)
+    require(match is not None, 'M064: malformed virtue occurrence site: '+site)
+    file, line, index = match.groups()
+    file = posixpath.normpath(file)
+    require(not file.startswith('../') and file != '..' and not file.startswith('/'),
+            'M064: virtue occurrence site escapes paper: '+site)
+    return 'documents/paper/'+file.lstrip('/'), int(line), int(index)
+
+
+def check_native_virtue_row(source_key, kind, occurrence, unit, calls):
+    require(occurrence < len(calls), 'M064: extra native virtue occurrence: '+unit)
+    form, word = calls[occurrence]
+    require(source_key == 'v:'+word and
+            (form == 'papervirtue') == (kind == 'virtue-companion') and
+            kind != 'virtue-first',
+            'M064: native virtue mode/word differs: '+unit)
+
+
+def check_virtue_context(source_key, kind, job, virtues, key):
+    require(source_key in virtues, 'M064: unknown virtue roster key: '+key)
+    require((job == 'main_explainer') == (kind == 'virtue-companion'),
+            'M064: virtue command mode/document differs: '+key)
+
+
+def check_virtue_inventory(native, native_seen, shipped_first, virtues, paper_auxiliary):
+    for (source,line_number),(unit,calls) in native.items():
+        for index,_ in enumerate(calls):
+            require(native_seen[(source,line_number,index)] == 1,
+                    'M064: native virtue occurrence missing or repeated: '+unit+'#'+str(index))
+    for key in virtues:
+        require(shipped_first[key] == 1, 'M064: virtue first-use count differs: '+key)
+        require(key in paper_auxiliary and paper_auxiliary[key]['anchor'],
+                'M064: virtue auxiliary definition absent: '+key)
+
+
+def check_companion_mints(companion_auxiliary, virtues):
+    for key in virtues:
+        require(key not in companion_auxiliary and 'FTOO-'+key not in companion_auxiliary,
+                'M064: companion virtue minted a destination: '+key)
 
 
 def check_destination(document, key, anchor, auxiliary_page, destination_page):
@@ -160,6 +222,12 @@ def check_auxiliary_destinations(keys, targets, pdf):
 
 def check(repo, work):
     lookup = bindings(repo)
+    captured = CapturedInputs(repo)
+    virtues = {row['key']: row for row in virtue_roster(repo, lookup, captured)}
+    captured.verify()
+    native = native_virtue_plan(repo)
+    native_seen = collections.Counter()
+    shipped_first = collections.Counter()
     paper = work/'paper'
     docs = {job:Pdf(paper/(job+'.pdf')) for job in ('main','main_explainer')}
     fragments = (repo/'generated/documents/inclusions.tsv').read_text(encoding='utf-8').splitlines()
@@ -171,6 +239,7 @@ def check(repo, work):
         auxiliary_keys.update(key.decode('ascii') for key in re.findall(rb'\\handle\{([^{}]+)\}', body))
     aux = {job:auxiliary(paper,job, auxiliary_keys if job == 'main' else ()) for job in docs}
     check_auxiliary_destinations(auxiliary_keys, aux['main'], docs['main'])
+    check_companion_mints(aux['main_explainer'], virtues)
     check_screen_references(repo,aux['main'],docs['main'])
     rows=[]; issues=[]; observed=collections.Counter()
     known={v['spelling'].casefold() for v in lookup.values()}
@@ -182,6 +251,16 @@ def check(repo, work):
             require(document==job and page.isdecimal() and 1<=int(page)<=pdf.count, 'M064: invalid shipped page: '+line)
             target_job='main' if key.startswith('FTOO-') or (job=='main_explainer' and not key.startswith('x')) else job
             source_key=ledger_binding(lookup, kind, key, spelling, status)
+            if kind in ('virtue-first','virtue-later','virtue-companion'):
+                check_virtue_context(source_key, kind, job, virtues, key)
+                source, line_number, occurrence = virtue_site(site)
+                expected = native.get((source,line_number))
+                if expected is not None:
+                    unit, calls = expected
+                    check_native_virtue_row(source_key, kind, occurrence, unit, calls)
+                    native_seen[(source,line_number,occurrence)] += 1
+                if kind == 'virtue-first':
+                    shipped_first[source_key] += 1
             target=aux[target_job].get(source_key)
             if target:
                 anchor=target.get('anchor','')
@@ -218,6 +297,7 @@ def check(repo, work):
                                  site='outline:'+bookmark['anchor'],visibility='outline'))
         write(work/(job+'-text.json'),json.dumps(pages,ensure_ascii=False,indent=2)+'\n')
         write(work/(job+'-bookmarks.json'),json.dumps(bookmarks,ensure_ascii=False,indent=2)+'\n')
+    check_virtue_inventory(native, native_seen, shipped_first, virtues, aux['main'])
     write(work/'identity-ledger.json',json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
     check_paragraph_tag_modes(repo, rows)
     emitted=collections.Counter((r['document'],r['page'],r['spelling'].casefold()) for r in rows if r['spelling'] and r['visibility']=='page')

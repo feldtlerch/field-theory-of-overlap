@@ -41,7 +41,7 @@ fn paper_protocol_is_bound() {
     std::fs::write(root.join("fixtures/input.txt"), b"checked input").unwrap();
     let digest = crate::hex(&sha2::Sha256::digest(b"checked input"));
     let baseline = format!(
-        r#"{{"schema":1,"inputs":[{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}}]}}"#
+        r#"{{"schema":2,"inputs":[{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}},{{"key":"v:wonder","spelling":"v:wonder","status":"paper","target":"sem:weld:wonder","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":2}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper/data/ftoo_manifest.tex","line":3}}]}}],"virtues":[{{"word":"wonder","key":"v:wonder","target":"sem:weld:wonder","class_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":1}},"slug_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":2}}}}]}}"#
     );
     let without_declaration_sites = baseline.replace(
         r#""declaration_sites":[{"file":"documents/paper-build/paper-tags.tsv","line":1}]"#,
@@ -67,10 +67,11 @@ fn paper_protocol_is_bound() {
     );
     assert_eq!(value.lookup_site.line, 1);
     let alias = baseline
-        .replace("\"status\":\"paper\"", "\"status\":\"alias\"")
-        .replace(
+        .replacen("\"status\":\"paper\"", "\"status\":\"alias\"", 1)
+        .replacen(
             "\"alias_site\":null",
             "\"alias_site\":{\"file\":\"documents/paper-build/reader-tags.toml\",\"line\":2}",
+            1,
         )
         .replace(
             "\"line\":1}]",
@@ -98,7 +99,8 @@ fn paper_protocol_is_bound() {
         .split("\"bindings\":[")
         .nth(1)
         .unwrap()
-        .strip_suffix("]}")
+        .split("],\"virtues\":")
+        .next()
         .unwrap();
     let oversized_inputs = baseline.replacen(
         &repeated_input,
@@ -107,7 +109,7 @@ fn paper_protocol_is_bound() {
     );
     for (response, site) in [
         (
-            baseline.replacen("\"schema\":1", "\"schema\":2", 1),
+            baseline.replacen("\"schema\":2", "\"schema\":1", 1),
             "schema",
         ),
         (
@@ -198,6 +200,18 @@ fn paper_protocol_is_bound() {
         ),
         (oversized_inputs, "inputs"),
         (
+            baseline.replacen("\"word\":\"wonder\"", "\"word\":\"Wonder\"", 1),
+            "Wonder",
+        ),
+        (
+            baseline.replacen(
+                "\"target\":\"sem:weld:wonder\"",
+                "\"target\":\"sem:weld:other\"",
+                1,
+            ),
+            "wonder",
+        ),
+        (
             baseline.replacen(
                 "\"bindings\":[",
                 &format!(
@@ -218,6 +232,37 @@ fn paper_protocol_is_bound() {
             error.fault,
             PaperLookupFault::ProtocolInvalid { .. }
         ));
+    }
+    for (response, site, reason) in [
+        (
+            baseline.replacen(
+                &baseline[baseline.find("\"virtues\":[").unwrap()..baseline.len() - 1],
+                "\"virtues\":[]",
+                1,
+            ),
+            "virtues",
+            "virtue roster is empty",
+        ),
+        (
+            baseline.replacen(
+                "\"virtues\":[{\"word\":\"wonder\",\"key\":\"v:wonder\"",
+                "\"virtues\":[{\"word\":\"wonder\",\"key\":\"v:other\"",
+                1,
+            ),
+            "wonder",
+            "virtue word, key or order differs",
+        ),
+    ] {
+        write_response(&response);
+        let error = CheckedPaperLookup::check(root).unwrap_err();
+        assert_eq!(error.rule, RuleId::M063);
+        assert_eq!(error.site, site);
+        assert_eq!(
+            error.fault,
+            PaperLookupFault::ProtocolInvalid {
+                reason: reason.into()
+            }
+        );
     }
     let link = root.join("fixtures/link.txt");
     std::os::unix::fs::symlink(root.join("fixtures/input.txt"), &link).unwrap();

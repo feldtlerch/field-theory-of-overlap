@@ -685,6 +685,9 @@ impl fmt::Display for AssemblyErrors {
 impl std::error::Error for AssemblyErrors {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EmissionKind {
+    Virtue {
+        key: String,
+    },
     See {
         target: String,
     },

@@ -33,7 +33,7 @@
       "position": 3
     },
     {
-      "after-unit": "sec:coda:record-limit",
+      "after-unit": "sec:explainer:eight-words",
       "before-unit": "sec:say:enemy-to-none",
       "document": "explainer-pilot",
       "language": "en",
@@ -41,12 +41,20 @@
       "position": 4
     },
     {
+      "after-unit": "sec:coda:record-limit",
+      "before-unit": "sec:explainer:eight-words",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 5
+    },
+    {
       "after-unit": null,
       "before-unit": "sec:coda:record-limit",
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 5
+      "position": 6
     },
     {
       "after-unit": "sec:reading:shadow",
@@ -105,7 +113,7 @@
       "position": 6
     },
     {
-      "after-unit": "sec:coda:whole-field",
+      "after-unit": "sec:coda:eight-words",
       "before-unit": "sec:coda:audit-bottoms",
       "document": "paper-pilot",
       "language": "en",
@@ -113,12 +121,20 @@
       "position": 7
     },
     {
+      "after-unit": "sec:coda:whole-field",
+      "before-unit": "sec:coda:eight-words",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 8
+    },
+    {
       "after-unit": "sec:log:andreoni-joint",
       "before-unit": "sec:coda:record-limit",
       "document": "paper-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 9
+      "position": 10
     },
     {
       "after-unit": null,
@@ -126,7 +142,7 @@
       "document": "paper-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 10
+      "position": 11
     }
   ],
   "entries": [
@@ -137,6 +153,70 @@
       "locator": "appendix G",
       "message": "Not yet available in this rendering.",
       "title": "The method’s self-limit"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-wonder",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "wonder"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-beauty",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "beauty"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-goodness",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "goodness"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-kindness",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "kindness"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-love",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "love"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-wisdom",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "wisdom"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-truth",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "truth"
+    },
+    {
+      "document": "paper-pilot",
+      "fragment": "virtue-health",
+      "language": "en",
+      "locator": "",
+      "message": "Not yet available in this rendering.",
+      "title": "health"
     }
   ],
   "schema": 1

@@ -137,6 +137,7 @@ fn check_runs(
             | Inline::PaperTag { .. }
             | Inline::Citation { .. }
             | Inline::See { .. }
+            | Inline::Virtue { .. }
             | Inline::BibliographyCitation { .. } => {
                 adjacent = Some(MarkdownMathReason::DirectTagOrCitationAdjacency);
             }
@@ -271,6 +272,7 @@ fn next_style_neighbor(runs: &[Inline]) -> Option<StyleNeighbor> {
             | Inline::PaperTag { .. }
             | Inline::Citation { .. }
             | Inline::See { .. }
+            | Inline::Virtue { .. }
             | Inline::BibliographyCitation { .. } => {
                 return Some(StyleNeighbor::TagOrCitation);
             }
@@ -473,15 +475,26 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
                 super::plan::EndMatter::Unavailable(entries) => {
                     output.push_str("## References to unavailable content\n\n");
                     for entry in entries {
-                        writeln!(
-                            output,
-                            "<a id=\"{}\"></a>{} — {}. {}\n",
-                            entry.fragment,
-                            text(&entry.locator),
-                            text(&entry.title),
-                            text(entry.message)
-                        )
-                        .expect("string write");
+                        if entry.locator.is_empty() {
+                            writeln!(
+                                output,
+                                "<a id=\"{}\"></a>{}. {}\n",
+                                entry.fragment,
+                                text(&entry.title),
+                                text(entry.message)
+                            )
+                            .expect("string write");
+                        } else {
+                            writeln!(
+                                output,
+                                "<a id=\"{}\"></a>{} — {}. {}\n",
+                                entry.fragment,
+                                text(&entry.locator),
+                                text(&entry.title),
+                                text(entry.message)
+                            )
+                            .expect("string write");
+                        }
                     }
                 }
                 super::plan::EndMatter::References(entries) => {
@@ -595,6 +608,7 @@ pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
             "<!-- handle ",
             "<!-- cite ",
             "<!-- see ",
+            "<!-- virtue ",
             "<!-- bibcite ",
             "<!-- bibentry ",
         ]
@@ -876,6 +890,34 @@ fn check_quotation_links(
             }
             continue;
         }
+        if let Some(after) = reader[end..].strip_prefix("\"><strong><em>") {
+            let Some((word, _)) = after.split_once("</em></strong></a>") else {
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::InvalidQuotationHref { href: href.into() },
+                ));
+            };
+            let known = plan.blocks.iter().any(|block| {
+                let mut runs = Vec::new();
+                super::plan::flatten_runs(&block.runs, &mut runs);
+                runs.iter().any(|run| matches!(run, Inline::Virtue { word: planned, owner, language, fragment, .. }
+                    if planned == word && href == super::plan::markdown_document_href(owner, language, fragment)))
+            });
+            if !known {
+                return Err(role_failure(
+                    plan,
+                    false,
+                    start..end,
+                    AssemblyFault::ReferenceDestination {
+                        label: format!("v:{word}"),
+                        reason: "reader virtue link differs from checked destination".into(),
+                    },
+                ));
+            }
+            continue;
+        }
         let Some((_, _, fragment, decoded_handle)) = super::plan::parse_public_href(href) else {
             return Err(role_failure(
                 plan,
@@ -969,6 +1011,7 @@ fn select_leak(leak: &mut Option<(Range<usize>, String)>, bytes: Range<usize>, v
     }
 }
 
+#[allow(clippy::too_many_lines)] // The ordered insertion arms share one output cursor and source order.
 pub(super) fn inline(output: &mut String, runs: &[Inline]) {
     for run in runs {
         match run {
@@ -1007,6 +1050,21 @@ pub(super) fn inline(output: &mut String, runs: &[Inline]) {
                 write!(
                     output,
                     "<a href=\"{href}\">→ {locator}</a><!-- see {label} -->"
+                )
+                .expect("string write");
+            }
+            Inline::Virtue {
+                word,
+                key,
+                owner,
+                language,
+                fragment,
+                ..
+            } => {
+                let href = super::plan::markdown_document_href(owner, language, fragment);
+                write!(
+                    output,
+                    "<a href=\"{href}\"><strong><em>{word}</em></strong></a><!-- virtue {key} -->"
                 )
                 .expect("string write");
             }

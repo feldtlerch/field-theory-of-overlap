@@ -137,15 +137,44 @@
       \str_if_eq:nnT{#2}{tbl:verify}{
         \bool_set_true:N\l_paper_whole_itself_bool\hyphenation{itself}}
       \PaperCaptionTag{#1}{#2}}}
+  \prop_new:N \g_paper_virtue_site_next_prop
+  \tl_new:N \l_paper_virtue_site_tl
+  \tl_new:N \l_paper_virtue_index_tl
+  \tl_new:N \l_paper_virtue_row_tl
+  \tl_new:N \l_paper_virtue_mode_tl
+  \cs_generate_variant:Nn \prop_gput:Nnn { NVn, NVx }
+  \cs_new_protected:Npn \paper_virtue_ship:n #1 {
+    \protected@write\PaperLedger{}{\jobname|\thepage|#1}}
+  \cs_new_protected:Npn \paper_virtue_record:nn #1#2 {
+    \tl_set:Nx \l_paper_virtue_site_tl
+      {\CurrentFilePath/\CurrentFile\c_colon_str\the\inputlineno}
+    \prop_get:NVNTF \g_paper_virtue_site_next_prop \l_paper_virtue_site_tl
+      \l_paper_virtue_index_tl
+      {\prop_gput:NVx \g_paper_virtue_site_next_prop \l_paper_virtue_site_tl
+        {\int_eval:n {\l_paper_virtue_index_tl + 1}}}
+      {\tl_set:Nn \l_paper_virtue_index_tl {0}
+       \prop_gput:NVn \g_paper_virtue_site_next_prop \l_paper_virtue_site_tl {1}}
+    \tl_set:Nx \l_paper_virtue_row_tl
+      {#1|#2|||\l_paper_virtue_site_tl\c_hash_str virtue=\l_paper_virtue_index_tl}
+    \exp_args:NV \paper_virtue_ship:n \l_paper_virtue_row_tl}
   \cs_if_exist:NT\virtue{
     \NewCommandCopy\PaperVirtue\virtue
-    \RenewDocumentCommand\virtue{m}{\PaperVirtue{#1}\PaperTitleLocator{v:#1}}}
+    \RenewDocumentCommand\virtue{m}{
+      \prop_if_in:NnTF \g_ftoo_virtue_prop {#1}
+        {\tl_set:Nn \l_paper_virtue_mode_tl {virtue-later}}
+        {\tl_set:Nn \l_paper_virtue_mode_tl {virtue-first}}
+      \PaperVirtue{#1}
+      \paper_virtue_record:nn {\l_paper_virtue_mode_tl} {v:#1}
+      \PaperTitleLocator{v:#1}}}
   \cs_if_exist:NT\ftoo_virtue_link:n{
     \cs_new_eq:NN\paper_virtue_link:n\ftoo_virtue_link:n
     \cs_set_protected:Npn\ftoo_virtue_link:n#1{\paper_virtue_link:n{#1}\PaperTitleLocator{v:#1}}}
   \cs_if_exist:NT\papervirtue{
     \NewCommandCopy\PaperCompanionVirtue\papervirtue
-    \RenewDocumentCommand\papervirtue{m}{\PaperCompanionVirtue{#1}\PaperTitleLocator{FTOO-v:#1}}}
+    \RenewDocumentCommand\papervirtue{m}{
+      \PaperCompanionVirtue{#1}
+      \paper_virtue_record:nn {virtue-companion} {FTOO-v:#1}
+      \PaperTitleLocator{FTOO-v:#1}}}
   \NewCommandCopy\PaperTexttt\texttt
   \RenewDocumentCommand\texttt{m}{
     \group_begin:\tl_set:Nx\l_tmpa_tl{#1}

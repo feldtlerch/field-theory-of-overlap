@@ -6,7 +6,7 @@ import re
 import shutil
 import tomllib
 from bibroute import derive
-from identities import emit, label_mints
+from identities import CapturedInputs, bindings, emit, label_mints, virtue_roster
 from common import require, read, write, timed, runtime
 
 INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/fontconfig.conf", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
@@ -83,7 +83,7 @@ def declared_fragments(repository, rows):
         body = data[len(prefix):-2]
         if role == 'paragraph':
             checked_math = rb'\\\(\\(?:comovfield|willvirtue|gensym)\{\}\\\)'
-            allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|\\handle\{[A-Za-z][A-Za-z0-9_:-]*\}|'
+            allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|\\handle\{[A-Za-z][A-Za-z0-9_:-]*\}|\\(?:paper)?virtue\{[a-z]+\}|'
                        rb'\\see\{[A-Za-z][A-Za-z0-9_:-]*\}|\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
                        + checked_math + rb')+')
             require(body and re.fullmatch(allowed, body),
@@ -104,6 +104,16 @@ def declared_fragments(repository, rows):
             for key in re.findall(rb'\\see\{([^{}]+)\}', body):
                 require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
                         'M055: Fragment reference binding differs: '+fragment)
+            virtue_calls = re.findall(rb'\\(papervirtue|virtue)\{([a-z]+)\}', body)
+            if virtue_calls:
+                captured = CapturedInputs(repository)
+                roster = {row['word'] for row in virtue_roster(repository,
+                          bindings(repository, captured=captured), captured)}
+                captured.verify()
+                expected = b'papervirtue' if source.startswith('documents/paper/explainer/') else b'virtue'
+                require(all(command == expected and word.decode('ascii') in roster
+                            for command, word in virtue_calls),
+                        'M055: Fragment virtue binding differs: '+fragment)
             paragraph_bodies.append(b' '.join(body.split()))
         elif role == 'equation':
             require(body.startswith(b'\\[') and body.endswith(b'.\\]')

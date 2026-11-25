@@ -9,17 +9,21 @@ unit = "sec:reading:plain-intro"
 role = "paragraph"
 
 [[scope.occurrences]]
+unit = "sec:say:direction"
+role = "quotation"
+
+[[scope.occurrences]]
 unit = "eq:explainer:overlap-flow"
 role = "equation"
 numbering = "none"
 
 [[scope.occurrences]]
-unit = "sec:say:direction"
+unit = "sec:say:enemy-to-none"
 role = "quotation"
 
 [[scope.occurrences]]
-unit = "sec:say:enemy-to-none"
-role = "quotation"
+unit = "sec:explainer:eight-words"
+role = "paragraph"
 
 [[scope.occurrences]]
 unit = "sec:coda:record-limit"
