@@ -34,6 +34,52 @@ fn nested_count(block: &ftoo_manifest::corpus::BlockDraft) -> usize {
     block.children.len() + block.children.iter().map(nested_count).sum::<usize>()
 }
 
+#[derive(Default)]
+struct FaultCounts {
+    occurrences: usize,
+    blocks: BTreeSet<(String, usize)>,
+    solo: BTreeSet<(String, usize)>,
+    examples: Vec<Value>,
+}
+
+fn all_fault_rows(sources: &[SourceDraft], source_bytes: &BTreeMap<String, Vec<u8>>) -> Value {
+    let mut rows: BTreeMap<String, FaultCounts> = BTreeMap::new();
+    for source in sources {
+        let text = String::from_utf8_lossy(&source_bytes[&source.path]);
+        let mut by_block: BTreeMap<usize, BTreeSet<&str>> = BTreeMap::new();
+        for refusal in &source.refusals {
+            by_block
+                .entry(refusal.outer_block_index)
+                .or_default()
+                .insert(&refusal.code);
+        }
+        for refusal in &source.refusals {
+            let entry = rows.entry(refusal.code.clone()).or_default();
+            entry.occurrences += 1;
+            let identity = (source.path.clone(), refusal.outer_block_index);
+            entry.blocks.insert(identity.clone());
+            if by_block
+                .get(&refusal.outer_block_index)
+                .is_some_and(|codes| codes.len() == 1)
+            {
+                entry.solo.insert(identity);
+            }
+            if entry.examples.len() < 3 {
+                let line = text
+                    .lines()
+                    .nth(refusal.site.start_line.saturating_sub(1))
+                    .unwrap_or("");
+                entry
+                    .examples
+                    .push(json!({"path":source.path,"line":refusal.site.start_line,"source":line}));
+            }
+        }
+    }
+    json!(rows.into_iter().map(|(kind, counts)| {
+        (kind, json!({"occurrences":counts.occurrences,"blocks":counts.blocks.len(),"sole_kind_blocks":counts.solo.len(),"examples":counts.examples}))
+    }).collect::<BTreeMap<_, _>>())
+}
+
 fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Value {
     let mut files = Vec::new();
     let mut kinds_total: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
@@ -79,7 +125,7 @@ fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Va
         }
         let text = String::from_utf8_lossy(&source_bytes[&source.path]);
         let mut refusal_kinds: BTreeMap<String, usize> = BTreeMap::new();
-        for refusal in &source.refusals {
+        for refusal in source.refusals.iter().filter(|refusal| refusal.is_primary) {
             *refusal_kinds.entry(refusal.code.clone()).or_default() += 1;
             let entry = refusals_total.entry(refusal.code.clone()).or_default();
             entry.0 += 1;
@@ -107,7 +153,8 @@ fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Va
             "path":source.path,"byte_length":source.byte_length,"accounted_bytes":accounted,
             "fully_decoded_outer":decoded,"remaining_outer":unresolved,"existing_native_inclusions":native,
             "nested_occurrences":nested,"unresolved_mathematics":source.math.len(),"kinds":kind_rows,
-            "refusal_kinds":refusal_kinds,"first_fault_kinds":refusal_kinds.keys().collect::<Vec<_>>()
+            "refusal_kinds":refusal_kinds,"first_fault_kinds":refusal_kinds.keys().collect::<Vec<_>>(),
+            "all_faults":all_fault_rows(std::slice::from_ref(source), source_bytes)
         }));
     }
     let kind_rows: BTreeMap<_, _> = kinds_total.into_iter().map(|(kind, (fully_decoded, refused, source_line_incidence))|
@@ -115,7 +162,7 @@ fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Va
     json!({
         "schema":1,"source_list_digest":corpus.source_list_digest,"source_count":corpus.sources.len(),
         "fully_decoded_outer":decoded_total,"remaining_outer":unresolved_total,
-        "kinds":kind_rows,"refusal_kinds":refusals_total,
+        "kinds":kind_rows,"refusal_kinds":refusals_total,"all_faults":all_fault_rows(&corpus.sources, source_bytes),
         "accounted_bytes":accounted_total,"source_bytes":source_bytes.values().map(Vec::len).sum::<usize>(),
         "transfer_ready":false,"files":files
     })

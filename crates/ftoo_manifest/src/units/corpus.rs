@@ -166,6 +166,8 @@ pub struct MathDraft {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Refusal {
+    pub outer_block_index: usize,
+    pub is_primary: bool,
     pub code: String,
     pub site: Site,
     pub block_kind: BlockKind,

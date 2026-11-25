@@ -71,6 +71,30 @@ fn declared_corpus_is_accounted_and_repeatable() {
 }
 
 #[test]
+fn all_fault_rows_count_occurrences_blocks_and_solo_clears() {
+    let path = "documents/paper/parts/example.tex";
+    let source = "A \\unknown{x}, $x$, and \\unknown{y}.\n\nOnly \\quad.\n";
+    let draft = import_source(path, source.as_bytes(), "digest".into(), &[]).unwrap();
+    let bytes = BTreeMap::from([(path.to_owned(), source.as_bytes().to_vec())]);
+    let rows = all_fault_rows(&[draft], &bytes);
+    assert_eq!(rows["unsupported command \\unknown"]["occurrences"], 2);
+    assert_eq!(rows["unsupported command \\unknown"]["blocks"], 1);
+    assert_eq!(rows["unsupported command \\unknown"]["sole_kind_blocks"], 0);
+    assert_eq!(rows["unresolved mathematics"]["occurrences"], 1);
+    assert_eq!(rows["unsupported command \\quad"]["sole_kind_blocks"], 1);
+    let display_source = "\\begin{equation}x\\end{equation}\n";
+    let display = import_source(path, display_source.as_bytes(), "digest".into(), &[]).unwrap();
+    assert_eq!(display.math.len(), 1);
+    let display_bytes = BTreeMap::from([(path.to_owned(), display_source.as_bytes().to_vec())]);
+    let display_rows = all_fault_rows(&[display], &display_bytes);
+    assert_eq!(display_rows.as_object().unwrap().len(), 1);
+    assert_eq!(
+        display_rows["unsupported environment equation"]["sole_kind_blocks"],
+        1
+    );
+}
+
+#[test]
 fn output_inside_a_source_directory_refuses_before_writing() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output = root.join("generated/import-dry-run-test");

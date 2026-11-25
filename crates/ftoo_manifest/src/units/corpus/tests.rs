@@ -1,3 +1,4 @@
+use super::import::{COMMANDS, Production, production};
 use super::*;
 
 fn draft(text: &str) -> SourceDraft {
@@ -69,6 +70,140 @@ fn paragraph_keeps_escaped_punctuation_and_inline_structure() {
     );
     assert_eq!(result.metadata_targets[1].occurrence, 1);
     assert_eq!(result.refusals.len(), 0);
+}
+
+#[test]
+fn en_space_is_a_named_intent_and_following_words_remain_content() {
+    let first = draft("\\textbf{Ties.}\\enspace Next word.\n");
+    let changed = draft("\\textbf{Ties.}\\enspace Other word.\n");
+    let BlockFields::Paragraph { runs, .. } = &first.blocks[0].fields else {
+        panic!("paragraph fields")
+    };
+    assert!(
+        matches!(runs.as_slice(), [Run::Style { .. }, Run::Text { decoded, spacing_intent }, Run::Text { decoded: following, .. }]
+        if decoded == " " && spacing_intent == "en-space" && following == "Next word.\n")
+    );
+    assert_ne!(first.blocks[0].fields, changed.blocks[0].fields);
+    let unsupported = draft("Words \\quad follow.\n");
+    assert_eq!(unsupported.refusals[0].code, "unsupported command \\quad");
+    let nested = draft("\\emph{word \\quad} remains.\n");
+    assert_eq!(nested.blocks[0].status, BlockStatus::Unresolved);
+    let line_end = draft("\\textbf{Ties.}\\enspace\nNext word.\n");
+    let BlockFields::Paragraph { runs, .. } = &line_end.blocks[0].fields else {
+        panic!("paragraph fields")
+    };
+    assert!(
+        matches!(runs.as_slice(), [Run::Style { .. }, Run::Text { decoded, spacing_intent }, Run::Text { decoded: following, .. }]
+        if decoded == " " && spacing_intent == "en-space" && following == "Next word.\n")
+    );
+}
+
+#[test]
+fn one_command_table_distinguishes_exact_names() {
+    assert_eq!(production("\\enspace"), Some(Production::Spacing));
+    assert_eq!(production("\\gradeword"), None);
+    assert_eq!(production("\\parencite"), Some(Production::Citation));
+    let names: std::collections::BTreeSet<_> = COMMANDS.iter().map(|(name, _)| name).collect();
+    assert_eq!(names.len(), COMMANDS.len());
+    let prefix =
+        draft("\\PaperDisplayParagraphX{equation}{lastline}\\begin{equation}x\\end{equation}\n");
+    assert_eq!(
+        prefix.refusals[0].code,
+        "unsupported command \\PaperDisplayParagraphX"
+    );
+}
+
+#[test]
+fn malformed_hook_argument_refuses_instead_of_absorbing_content() {
+    let source = "\\spend{open \\unknown\nNext.\n";
+    let result = draft(source);
+    assert_eq!(result.refusals[0].code, "unbalanced argument of \\spend");
+    assert!(
+        result
+            .refusals
+            .iter()
+            .any(|fault| fault.code == "unsupported command \\unknown")
+    );
+    assert_eq!(result.accounting.last().unwrap().end_byte, source.len());
+}
+
+#[test]
+fn comment_braces_do_not_close_a_hook_argument() {
+    let source = "\\grade{nec% } ignored\nplus}\n";
+    let result = draft(source);
+    assert_eq!(result.events[0].source, "\\grade{nec% } ignored\nplus}");
+}
+
+#[test]
+fn refused_block_keeps_each_located_fault() {
+    let result = draft("A \\unknown{x}, $x$, and \\unknown{y}.\n");
+    assert_eq!(result.blocks.len(), 1);
+    assert_eq!(result.refusals.len(), 3);
+    assert_eq!(
+        result
+            .refusals
+            .iter()
+            .filter(|fault| fault.is_primary)
+            .count(),
+        1
+    );
+    assert_eq!(
+        result
+            .refusals
+            .iter()
+            .filter(|fault| fault.code == "unsupported command \\unknown")
+            .count(),
+        2
+    );
+    assert_eq!(
+        result
+            .refusals
+            .iter()
+            .filter(|fault| fault.code == "unresolved mathematics")
+            .count(),
+        1
+    );
+    assert!(
+        result
+            .refusals
+            .iter()
+            .all(|fault| fault.outer_block_index == 0)
+    );
+    let comment = draft("A \\emph{first% } ignored\nsecond}.\n");
+    assert!(
+        comment
+            .refusals
+            .iter()
+            .any(|fault| fault.code == "comment in content")
+    );
+    let display = draft("\\begin{equation}x\\end{equation}\n");
+    assert_eq!(display.refusals.len(), 1);
+    assert_eq!(display.refusals[0].code, "unsupported environment equation");
+    assert_eq!(display.math.len(), 1);
+}
+
+#[test]
+fn container_children_begin_after_header_and_group_paragraph_lines() {
+    let source =
+        "\\begin{remark}[A title]First line\ncontinues.\n\nSecond paragraph.\n\\end{remark}\n";
+    let result = draft(source);
+    assert_eq!(result.blocks[0].children.len(), 2);
+    assert_eq!(
+        result.blocks[0].children[0].site.start_byte,
+        source.find("First line").unwrap()
+    );
+    assert_eq!(result.blocks[0].children[0].site.end_line, 2);
+    assert_eq!(result.blocks[0].children[1].site.start_line, 4);
+    assert_eq!(result.blocks[0].status, BlockStatus::Unresolved);
+    let hooked = draft("\\begin{remark}[T]\\grade{nec}\nProse.\n\\end{remark}\n");
+    assert_eq!(hooked.blocks[0].children.len(), 1);
+    assert_eq!(hooked.blocks[0].children[0].status, BlockStatus::Decoded);
+    assert_eq!(hooked.blocks[0].children[0].site.start_line, 2);
+    let display = draft(
+        "\\begin{remark}[T]\\PaperDisplayParagraph{equation}{lastline}\\begin{equation}\nx\n\\end{equation}\nAfter.\n\\end{remark}\n",
+    );
+    assert_eq!(display.blocks[0].children[0].kind, BlockKind::Display);
+    assert_eq!(display.blocks[0].children[1].kind, BlockKind::Paragraph);
 }
 
 #[test]
@@ -274,6 +409,7 @@ fn known_marker_is_not_copied_as_prose() {
     for altered in [
         "  % generated: sec:test:body\n",
         "% generated: sec:test:body\r\n",
+        "\\label{sec:other}% generated: sec:test:body\n",
     ] {
         let result = import_source(
             "documents/paper/parts/front.tex",
@@ -291,6 +427,23 @@ fn changed_captured_input_refuses() {
     assert!(matches!(
         ensure_unchanged("source.tex", b"same", b"sane"),
         Err(ImportFault::InputChanged { .. })
+    ));
+}
+
+#[test]
+fn accounting_refusal_owner_must_name_the_first_fault() {
+    let source = "A \\unknown{x}, $x$.\n";
+    let mut result = draft(source);
+    assert_eq!(result.refusals.len(), 2);
+    assert!(result.refusals[0].is_primary);
+    assert!(!result.refusals[1].is_primary);
+    result.accounting[0].owner = AccountOwner::Refusal(1);
+    assert!(matches!(
+        validate_accounting(&result, source.as_bytes()),
+        Err(ImportFault::Accounting {
+            reason: "secondary refusal owner",
+            ..
+        })
     ));
 }
 
