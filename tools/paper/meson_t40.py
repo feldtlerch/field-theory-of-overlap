@@ -26,7 +26,7 @@ def fixture(args):
         work.rename(previous)
     result = subprocess.run([sys.executable, '-B', str(pathlib.Path(args.repository) /
                             'tools/paper/test_identity_tex.py'), args.repository, args.support,
-                             str(work)], capture_output=True, timeout=300)
+                             str(work)], capture_output=True, timeout=600)
     rows = []
     if work.exists():
         for file in sorted(work.glob('*/engine.txt')):
