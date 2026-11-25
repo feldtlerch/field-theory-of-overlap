@@ -11,14 +11,24 @@ pub(super) struct Entry {
     pub author: String,
     pub year: String,
     pub title: String,
-    pub journal: String,
-    pub volume: String,
-    pub number: String,
-    pub pages: String,
-    pub doi: String,
+    pub details: Details,
     pub raw: String,
     pub label: String,
     pub anchor: String,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum Details {
+    Article {
+        journal: String,
+        volume: String,
+        number: String,
+        pages: String,
+        doi: String,
+    },
+    Book {
+        publisher: String,
+        address: String,
+    },
 }
 
 pub(super) const DERIVED_KEYS: [&str; 7] = [
@@ -62,7 +72,7 @@ fn braced(source: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn fields(mut source: &str) -> Option<BTreeMap<String, String>> {
+fn fields(mut source: &str, book: bool) -> Option<BTreeMap<String, String>> {
     let mut result = BTreeMap::new();
     while !source.trim().is_empty() {
         source = source.trim_start_matches(|c: char| c.is_whitespace() || c == ',');
@@ -71,10 +81,18 @@ fn fields(mut source: &str) -> Option<BTreeMap<String, String>> {
         }
         let equal = source.find('=')?;
         let name = source[..equal].trim();
-        if !matches!(
-            name.to_ascii_lowercase().as_str(),
-            "author" | "title" | "journal" | "volume" | "number" | "pages" | "year" | "doi"
-        ) {
+        let admitted = if book {
+            matches!(
+                name.to_ascii_lowercase().as_str(),
+                "author" | "title" | "publisher" | "address" | "year"
+            )
+        } else {
+            matches!(
+                name.to_ascii_lowercase().as_str(),
+                "author" | "title" | "journal" | "volume" | "number" | "pages" | "year" | "doi"
+            )
+        };
+        if !admitted {
             return None;
         }
         source = source[equal + 1..].trim_start();
@@ -116,7 +134,7 @@ fn headers(source: &str) -> Option<Vec<(&str, &str, &str)>> {
         let (body, tail) = braced(value)?;
         if !kind.eq_ignore_ascii_case("string") {
             let (key, _) = body.split_once(',')?;
-            result.push((kind, key.trim(), value));
+            result.push((kind, key.trim(), &value[..value.len() - tail.len()]));
         }
         rest = tail;
     }
@@ -189,11 +207,31 @@ fn literal_fields(values: &[&str], pages: &str) -> bool {
         && !pages.contains("---")
 }
 
+#[cfg(test)]
 pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry, DocumentError> {
+    resolve_with_derived(
+        source,
+        "",
+        key,
+        site,
+        ftoo_manifest::BibliographyCitationKind::Parenthetical,
+    )
+}
+
+#[allow(clippy::too_many_lines)] // Keep the stock/derived comparison and shared collision check in one admission.
+pub(super) fn resolve_with_derived(
+    source: &str,
+    derived: &str,
+    key: &str,
+    site: &UnitSite,
+    kind: ftoo_manifest::BibliographyCitationKind,
+) -> Result<Entry, DocumentError> {
+    let book = key == "a:sencapability";
     // bibroute.py changes these entries before the paper typesets them.
-    if DERIVED_KEYS
-        .iter()
-        .any(|changed| changed.eq_ignore_ascii_case(key))
+    if !book
+        && DERIVED_KEYS
+            .iter()
+            .any(|changed| changed.eq_ignore_ascii_case(key))
     {
         return Err(refuse(
             site,
@@ -201,14 +239,22 @@ pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry,
             "entry changed by bibliography derivation",
         ));
     }
-    let headers =
+    let stock_headers =
         headers(source).ok_or_else(|| refuse(site, key, "closed bibliography entries"))?;
-    let selected: Vec<_> = headers
+    let selected: Vec<_> = stock_headers
         .iter()
         .filter(|(_, candidate, _)| candidate.eq_ignore_ascii_case(key))
         .collect();
-    if selected.len() != 1 || !selected[0].0.eq_ignore_ascii_case("article") {
-        return Err(refuse(site, key, "one bibliography article entry"));
+    if selected.len() != 1
+        || !selected[0]
+            .0
+            .eq_ignore_ascii_case(if book { "book" } else { "article" })
+    {
+        return Err(refuse(
+            site,
+            key,
+            "one bibliography entry of the admitted kind",
+        ));
     }
     let entry = selected[0].2;
     let (body, _) = braced(entry).ok_or_else(|| refuse(site, key, "closed bibliography entry"))?;
@@ -218,8 +264,8 @@ pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry,
     if !entry_key.eq_ignore_ascii_case(key) {
         return Err(refuse(site, key, "matching bibliography entry key"));
     }
-    let values =
-        fields(content).ok_or_else(|| refuse(site, key, "simple braced article fields"))?;
+    let values = fields(content, book)
+        .ok_or_else(|| refuse(site, key, "simple braced bibliography fields"))?;
     let get = |field: &str| {
         values
             .get(field)
@@ -247,15 +293,81 @@ pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry,
         return Err(refuse(site, key, "four-digit publication year"));
     }
     let title = get("title")?;
-    let journal = get("journal")?;
-    let volume = get("volume")?;
-    let number = get("number")?;
-    let pages = get("pages")?;
-    let doi = get("doi")?;
-    if !literal_fields(&[&author, &title, &journal, &volume, &number, &doi], &pages) {
-        return Err(refuse(site, key, "literal bibliography fields"));
-    }
-    for (_, other_key, other_body) in &headers {
+    let (details, citation_name, raw) = if book {
+        if kind != ftoo_manifest::BibliographyCitationKind::Parenthetical {
+            return Err(refuse(
+                site,
+                key,
+                "textual book citation has no admitted consumer",
+            ));
+        }
+        let publisher = get("publisher")?;
+        let address = get("address")?;
+        if values.len() != 5 || !literal_fields(&[&author, &title, &publisher, &address], "") {
+            return Err(refuse(site, key, "literal book fields"));
+        }
+        let derived_headers =
+            headers(derived).ok_or_else(|| refuse(site, key, "closed derived bibliography"))?;
+        let matches: Vec<_> = derived_headers
+            .iter()
+            .filter(|(_, candidate, _)| candidate.eq_ignore_ascii_case(key))
+            .collect();
+        if matches.len() != 1 || !matches[0].0.eq_ignore_ascii_case("book") {
+            return Err(refuse(site, key, "one derived book entry"));
+        }
+        let derived_raw = matches[0].2;
+        let prefix = format!("{{{key},\n  shortauthor = {{{{");
+        let rest = derived_raw
+            .strip_prefix(&prefix)
+            .ok_or_else(|| refuse(site, key, "derived shortauthor insertion"))?;
+        let (shortauthor, tail) = rest
+            .split_once("}},\n")
+            .ok_or_else(|| refuse(site, key, "derived shortauthor insertion"))?;
+        if format!("{{{key},\n{tail}") != entry {
+            return Err(refuse(site, key, "derived book row differs"));
+        }
+        let ending = format!(" {surname}");
+        let initials = shortauthor
+            .strip_suffix(&ending)
+            .ok_or_else(|| refuse(site, key, "derived shortauthor shape"))?;
+        if initials.is_empty()
+            || !initials.split(' ').all(|part| {
+                part.len() == 2
+                    && part.as_bytes()[0].is_ascii_uppercase()
+                    && part.as_bytes()[1] == b'.'
+            })
+        {
+            return Err(refuse(site, key, "derived shortauthor shape"));
+        }
+        (
+            Details::Book { publisher, address },
+            shortauthor.to_owned(),
+            format!("@book{derived_raw}"),
+        )
+    } else {
+        let journal = get("journal")?;
+        let volume = get("volume")?;
+        let number = get("number")?;
+        let pages = get("pages")?;
+        let doi = get("doi")?;
+        if values.len() != 8
+            || !literal_fields(&[&author, &title, &journal, &volume, &number, &doi], &pages)
+        {
+            return Err(refuse(site, key, "literal bibliography fields"));
+        }
+        (
+            Details::Article {
+                journal,
+                volume,
+                number,
+                pages: pages.replace("--", "–"),
+                doi,
+            },
+            surname.to_owned(),
+            format!("@article{{{body}}}"),
+        )
+    };
+    for (_, other_key, other_body) in &stock_headers {
         if other_key.eq_ignore_ascii_case(key) {
             continue;
         }
@@ -270,19 +382,14 @@ pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry,
             return Err(refuse(site, key, "unique bibliography surname and year"));
         }
     }
-    let raw = format!("@article{{{body}}}");
-    let label = format!("{surname} {year}");
+    let label = format!("{citation_name} {year}");
     let anchor = format!("bibliography-{}-{year}", surname.to_ascii_lowercase());
     Ok(Entry {
         key: key.into(),
         author,
         year,
         title,
-        journal,
-        volume,
-        number,
-        pages: pages.replace("--", "–"),
-        doi,
+        details,
         raw,
         label,
         anchor,
@@ -290,17 +397,22 @@ pub(super) fn resolve(source: &str, key: &str, site: &UnitSite) -> Result<Entry,
 }
 
 pub(super) fn screen_text(entry: &Entry) -> String {
-    format!(
-        "{}, {}. {}. {} {}({}), {}. DOI: {}.",
-        entry.author,
-        entry.year,
-        entry.title,
-        entry.journal,
-        entry.volume,
-        entry.number,
-        entry.pages,
-        entry.doi
-    )
+    match &entry.details {
+        Details::Article {
+            journal,
+            volume,
+            number,
+            pages,
+            doi,
+        } => format!(
+            "{}, {}. {}. {} {}({}), {}. DOI: {}.",
+            entry.author, entry.year, entry.title, journal, volume, number, pages, doi
+        ),
+        Details::Book { publisher, address } => format!(
+            "{}, {}. {}. {}: {}.",
+            entry.author, entry.year, entry.title, address, publisher
+        ),
+    }
 }
 
 pub(super) fn screen_citation_piece(
@@ -309,7 +421,13 @@ pub(super) fn screen_citation_piece(
 ) -> String {
     match kind {
         ftoo_manifest::BibliographyCitationKind::Parenthetical => entry.label.clone(),
-        ftoo_manifest::BibliographyCitationKind::Textual => entry.label.replace(' ', " (") + ")",
+        ftoo_manifest::BibliographyCitationKind::Textual => {
+            let (name, year) = entry
+                .label
+                .rsplit_once(' ')
+                .expect("checked citation label");
+            format!("{name} ({year})")
+        }
     }
 }
 

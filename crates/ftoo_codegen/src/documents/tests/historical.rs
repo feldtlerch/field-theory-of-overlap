@@ -66,6 +66,7 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
             &displays,
             &bibliography,
             Some(&paper_lookup),
+            paper_lookup.inputs(),
             &paper_documents,
         )?;
         let plan = plans

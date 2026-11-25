@@ -20,16 +20,22 @@ pub struct SkeletonSection {
 pub enum SkeletonChild {
     Unit(LocatedString),
     Paragraph(LocatedString),
+    Econ(LocatedString),
     Equation(LocatedString),
     Quotation(LocatedString),
     Section(SkeletonSection),
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProseRole {
+    Paragraph,
+    Econ,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SkeletonPosition {
     unit: String,
     depth: Option<usize>,
     quotation: bool,
-    paragraph: bool,
+    prose: Option<ProseRole>,
     equation: bool,
     site: UnitSite,
 }
@@ -48,11 +54,15 @@ impl SkeletonPosition {
     }
     #[must_use]
     pub const fn paragraph(&self) -> bool {
-        self.paragraph
+        self.prose.is_some()
     }
     #[must_use]
     pub const fn equation(&self) -> bool {
         self.equation
+    }
+    #[must_use]
+    pub const fn econ(&self) -> bool {
+        matches!(self.prose, Some(ProseRole::Econ))
     }
     #[must_use]
     pub const fn site(&self) -> &UnitSite {
@@ -149,9 +159,11 @@ pub fn check_skeletons<'a>(
             .sections
             .iter()
             .rev()
-            .map(|s| (Some(s), &s.heading, Some(1), false, false, false))
+            .map(|s| (Some(s), &s.heading, Some(1), false, false, false, false))
             .collect();
-        while let Some((section, location, depth, quotation, paragraph, equation)) = stack.pop() {
+        while let Some((section, location, depth, quotation, paragraph, equation, econ)) =
+            stack.pop()
+        {
             if depth.is_some_and(|d| d > 6) {
                 return Err(vec![diagnostic(
                     document,
@@ -177,6 +189,29 @@ pub fn check_skeletons<'a>(
                 )]);
             }
             positions += 1;
+            if let Some(unit) = corpus
+                .units()
+                .iter()
+                .find(|unit| unit.label().as_str() == location.value)
+                && unit.econ().is_some() != econ
+            {
+                errors.push(diagnostic(
+                    document,
+                    Some(&location.value),
+                    &location.site,
+                    Fault::WrongOwner {
+                        label: location.value.clone(),
+                        expected: "econ metadata and role agree".into(),
+                        actual: if econ {
+                            "econ role without metadata"
+                        } else {
+                            "econ metadata without role"
+                        }
+                        .into(),
+                        declared_at: location.site.clone(),
+                    },
+                ));
+            }
             if quotation {
                 quotation_reference(corpus, document, location, &mut errors);
             } else {
@@ -190,7 +225,13 @@ pub fn check_skeletons<'a>(
                 unit: location.value.clone(),
                 depth,
                 quotation,
-                paragraph,
+                prose: if econ {
+                    Some(ProseRole::Econ)
+                } else if paragraph {
+                    Some(ProseRole::Paragraph)
+                } else {
+                    None
+                },
                 equation,
                 site: location.site.clone(),
             });
@@ -198,21 +239,25 @@ pub fn check_skeletons<'a>(
                 for child in section.children.iter().rev() {
                     match child {
                         SkeletonChild::Unit(unit) => {
-                            stack.push((None, unit, None, false, false, false));
+                            stack.push((None, unit, None, false, false, false, false));
                         }
                         SkeletonChild::Paragraph(unit) => {
-                            stack.push((None, unit, None, false, true, false));
+                            stack.push((None, unit, None, false, true, false, false));
+                        }
+                        SkeletonChild::Econ(unit) => {
+                            stack.push((None, unit, None, false, false, false, true));
                         }
                         SkeletonChild::Equation(unit) => {
-                            stack.push((None, unit, None, false, false, true));
+                            stack.push((None, unit, None, false, false, true, false));
                         }
                         SkeletonChild::Quotation(unit) => {
-                            stack.push((None, unit, None, true, false, false));
+                            stack.push((None, unit, None, true, false, false, false));
                         }
                         SkeletonChild::Section(section) => stack.push((
                             Some(section),
                             &section.heading,
                             Some(depth.unwrap_or(0) + 1),
+                            false,
                             false,
                             false,
                             false,

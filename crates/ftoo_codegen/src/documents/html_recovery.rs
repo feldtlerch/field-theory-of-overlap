@@ -830,8 +830,18 @@ fn stylesheet(plan: &DocumentPlan, fonts: &Fonts, nodes: &[Node]) -> Result<(), 
             return Err(mismatch(plan, "HTML font byte identity"));
         }
     }
-    let layout = "body{font-family:'Pagella',serif;max-width:46rem;margin:auto;padding:0 1rem;line-height:1.5}h1{font-weight:700}a:focus-visible,summary:focus-visible{outline:3px solid #a34500;outline-offset:3px}.refrain{text-align:center;font-style:italic}.attribution{text-align:right;font-size:smaller}.gap{color:#444}.licenses pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:'Pagella',serif}";
-    if lines.next() != Some(layout) {
+    let mut layout = String::from(
+        "body{font-family:'Pagella',serif;max-width:46rem;margin:auto;padding:0 1rem;line-height:1.5}h1{font-weight:700}a:focus-visible,summary:focus-visible{outline:3px solid #a34500;outline-offset:3px}.refrain{text-align:center;font-style:italic}.attribution{text-align:right;font-size:smaller}.gap{color:#444}",
+    );
+    if plan.blocks.iter().any(|block| block.econ.is_some()) {
+        layout.push_str(
+            ".econ{background:#f7f6f3;padding:1rem;margin:1rem 0}.econ footer{text-align:right}",
+        );
+    }
+    layout.push_str(
+        ".licenses pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:'Pagella',serif}",
+    );
+    if lines.next() != Some(layout.as_str()) {
         return Err(mismatch(plan, "HTML stylesheet layout and fallback"));
     }
     let mono = fonts.0.iter().any(|(face, _)| face.family == "Inconsolata");
@@ -1003,6 +1013,85 @@ fn check_main(
                 &gap.message,
                 "HTML withheld block sentence",
             )?;
+            at += 1;
+            continue;
+        }
+        if let Some(econ) = &block.econ {
+            let header_id = format!("{}-header", econ.fragment);
+            let section = element(
+                plan,
+                known,
+                body,
+                "section",
+                &[
+                    ("class", "econ"),
+                    ("id", &econ.fragment),
+                    ("aria-labelledby", &header_id),
+                ],
+                "HTML econ section",
+            )?;
+            let [header, body, footer] = section else {
+                return Err(mismatch(plan, "HTML econ inventory"));
+            };
+            let header = element(plan, known, header, "header", &[], "HTML econ header")?;
+            let [header] = header else {
+                return Err(mismatch(plan, "HTML econ header inventory"));
+            };
+            let header = element(
+                plan,
+                known,
+                header,
+                "p",
+                &[("id", &header_id)],
+                "HTML econ heading",
+            )?;
+            let [strong, reference] = header else {
+                return Err(mismatch(plan, "HTML econ heading inventory"));
+            };
+            let strong = element(plan, known, strong, "strong", &[], "HTML econ title")?;
+            text(
+                plan,
+                known,
+                strong,
+                &format!("Economics {}. {}", econ.number, econ.title),
+                "HTML econ number and title",
+            )?;
+            let expected = format!(" (on {})", econ.reference);
+            let [Node::Text(actual)] = std::slice::from_ref(reference) else {
+                return Err(mismatch(plan, "HTML econ reference"));
+            };
+            let begin = expected.find(&econ.reference).expect("checked reference");
+            public_run_text(
+                plan,
+                known,
+                actual,
+                std::slice::from_ref(&(begin..begin + econ.reference.len())),
+            )?;
+            if actual != &expected {
+                return Err(mismatch(plan, "HTML econ reference"));
+            }
+            let body = element(plan, known, body, "p", &[], "HTML econ body")?;
+            runs(plan, known, &block.runs, body, false, index, prepared)?;
+            let footer = element(plan, known, footer, "footer", &[], "HTML econ footer")?;
+            let [footer] = footer else {
+                return Err(mismatch(plan, "HTML econ footer inventory"));
+            };
+            let footer = element(plan, known, footer, "p", &[], "HTML econ footer text")?;
+            let expected = format!("{} · d:{}", econ.target, econ.departure);
+            let [Node::Text(actual)] = footer else {
+                return Err(mismatch(plan, "HTML econ footer text"));
+            };
+            let departure = format!("d:{}", econ.departure);
+            let second = expected.find(&departure).expect("checked departure");
+            public_run_text(
+                plan,
+                known,
+                actual,
+                &[0..econ.target.len(), second..second + departure.len()],
+            )?;
+            if actual != &expected {
+                return Err(mismatch(plan, "HTML econ footer text"));
+            }
             at += 1;
             continue;
         }

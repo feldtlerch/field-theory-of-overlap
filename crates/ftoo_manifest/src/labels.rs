@@ -419,6 +419,25 @@ fn joint_mints(
                     },
                 });
         }
+        if let Some(econ) = unit.econ() {
+            let (selector, declaration) = unit
+                .documentary_targets()
+                .iter()
+                .find(|(_, target)| target.value == econ.target.value)
+                .expect("checked econ target selector");
+            mints
+                .entry(econ.target.value.clone())
+                .or_default()
+                .push(MintOrigin {
+                    kind: MintKind::UnitPaperMint,
+                    site: LabelSite::UnitPaperMint {
+                        unit: unit.label().as_str().to_owned(),
+                        selector: selector.clone(),
+                        declaration: declaration.site.clone(),
+                        placement: econ.target.site.clone(),
+                    },
+                });
+        }
         if let Some(text) = unit.texts().get("en") {
             for placement in text.handle_occurrences() {
                 if let Some(target) = unit.documentary_targets().get(placement.selector()) {

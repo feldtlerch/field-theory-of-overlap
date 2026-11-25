@@ -10,7 +10,7 @@ use ftoo_manifest::{
 };
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt,
     io::Read,
     path::Path,
@@ -148,6 +148,9 @@ pub(crate) struct CheckedPaperLookup {
     entries: BTreeMap<String, PaperResolution>,
     virtues: BTreeMap<String, VirtueBinding>,
     inputs: BTreeMap<String, Vec<u8>>,
+    departures: BTreeMap<String, String>,
+    native_targets: BTreeMap<String, (String, PaperEvidenceSite)>,
+    derived_bibliography: String,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct VirtueBinding {
@@ -165,6 +168,68 @@ impl CheckedPaperLookup {
     #[must_use]
     pub(crate) fn inputs(&self) -> &BTreeMap<String, Vec<u8>> {
         &self.inputs
+    }
+    #[must_use]
+    pub(crate) fn departure(&self, slug: &str) -> Option<&str> {
+        self.departures.get(slug).map(String::as_str)
+    }
+    #[must_use]
+    pub(crate) fn native_target(&self, key: &str) -> Option<&(String, PaperEvidenceSite)> {
+        self.native_targets.get(key)
+    }
+    #[must_use]
+    pub(crate) fn derived_bibliography(&self) -> &str {
+        &self.derived_bibliography
+    }
+    pub(crate) fn validate_econ(
+        &self,
+        corpus: &ftoo_manifest::LanguageCheckedUnits,
+    ) -> Result<(), PaperLookupError> {
+        let mut seen = BTreeSet::new();
+        for unit in corpus.units() {
+            let Some(econ) = unit.econ() else {
+                continue;
+            };
+            let key = &econ.target.value;
+            let declaration = unit
+                .documentary_targets()
+                .values()
+                .find(|target| target.value == *key)
+                .ok_or_else(|| protocol(key, "native target declaration absent"))?;
+            let (owner, site) = self
+                .native_targets
+                .get(key)
+                .ok_or_else(|| protocol(key, "native target row absent"))?;
+            if owner != unit.label().as_str()
+                || site.file != declaration.site.file
+                || !seen.insert(key.clone())
+            {
+                return Err(protocol(key, "native target owner differs"));
+            }
+            let bytes = self
+                .inputs
+                .get(&site.file)
+                .ok_or_else(|| protocol(key, "native target source absent"))?;
+            let ftoo_manifest::SourceAnchor::Bytes(start, _) = &declaration.site.anchor else {
+                return Err(protocol(key, "native target has no byte site"));
+            };
+            if *start > bytes.len()
+                || site.line != bytes[..*start].split(|byte| *byte == b'\n').count()
+            {
+                return Err(protocol(key, "native target field site differs"));
+            }
+            if !matches!(self.entries.get(key), Some(PaperResolution::Available(value)) if value.target != *key && value.key == *key)
+            {
+                return Err(protocol(key, "native target binding is not canonical"));
+            }
+        }
+        if seen.len() != self.native_targets.len() {
+            return Err(protocol(
+                "native_targets",
+                "native target row has no admitted unit",
+            ));
+        }
+        Ok(())
     }
     #[must_use]
     pub(crate) fn virtues(&self) -> &BTreeMap<String, VirtueBinding> {
@@ -215,7 +280,15 @@ impl CheckedPaperLookup {
             .map_err(|error| protocol("assembly-json", format!("{error}")))?;
         let top = fields(
             &value,
-            &["schema", "inputs", "bindings", "virtues"],
+            &[
+                "schema",
+                "inputs",
+                "bindings",
+                "virtues",
+                "departures",
+                "native_targets",
+                "bibliography",
+            ],
             "assembly-json",
         )?;
         if top[0] != &JsonValue::Integer("2".into()) {
@@ -385,10 +458,68 @@ impl CheckedPaperLookup {
         if virtues.is_empty() {
             return Err(protocol("virtues", "virtue roster is empty"));
         }
+        let mut departures = BTreeMap::new();
+        for row in array(top[4], "departures", 4096)? {
+            let values = fields(row, &["slug", "target", "handle", "sites"], "departures")?;
+            let slug = string(values[0], "departures.slug")?;
+            let target = string(values[1], "departures.target")?;
+            let handle = string(values[2], "departures.handle")?;
+            if slug.is_empty()
+                || target.is_empty()
+                || handle != format!("d:{slug}")
+                || departures
+                    .insert(slug.to_owned(), target.to_owned())
+                    .is_some()
+                || array(values[3], "departures.sites", 4096)?.is_empty()
+            {
+                return Err(protocol(slug, "departure evidence differs"));
+            }
+            for site in array(values[3], "departures.sites", 4096)? {
+                evidence(site, "departures.sites")?;
+            }
+        }
+        let mut native_targets = BTreeMap::new();
+        for row in array(top[5], "native_targets", 4096)? {
+            let values = fields(row, &["key", "unit", "site"], "native_targets")?;
+            let key = string(values[0], "native_targets.key")?;
+            let unit = string(values[1], "native_targets.unit")?;
+            let site = evidence(values[2], "native_targets.site")?;
+            if key.is_empty()
+                || unit.is_empty()
+                || native_targets
+                    .insert(key.into(), (unit.into(), site))
+                    .is_some()
+            {
+                return Err(protocol(key, "native target evidence differs"));
+            }
+        }
+        let bibliography = fields(
+            top[6],
+            &["source", "stock_sha256", "derived_sha256", "derived_utf8"],
+            "bibliography",
+        )?;
+        let source = string(bibliography[0], "bibliography.source")?;
+        if source != "documents/paper/references.bib" {
+            return Err(protocol(source, "bibliography source differs"));
+        }
+        let stock = inputs
+            .get(source)
+            .ok_or_else(|| protocol(source, "bibliography input absent"))?;
+        let stock_digest = string(bibliography[1], "bibliography.stock_sha256")?;
+        let derived_digest = string(bibliography[2], "bibliography.derived_sha256")?;
+        let derived_bibliography = string(bibliography[3], "bibliography.derived_utf8")?;
+        if crate::hex(&Sha256::digest(stock)) != stock_digest
+            || crate::hex(&Sha256::digest(derived_bibliography.as_bytes())) != derived_digest
+        {
+            return Err(protocol(source, "bibliography digest differs"));
+        }
         Ok(Self {
             entries,
             virtues,
             inputs,
+            departures,
+            native_targets,
+            derived_bibliography: derived_bibliography.into(),
         })
     }
 }

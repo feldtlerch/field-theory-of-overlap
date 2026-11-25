@@ -91,6 +91,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         quotation: false,
         paragraph: true,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("one—-two".into())],
     };
@@ -222,6 +223,7 @@ fn paper_paragraph_refuses_object_bound_mathematics_at_its_use() {
         quotation: false,
         paragraph: true,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Math {
             definition_site: site.clone(),
@@ -261,6 +263,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
             quotation: false,
             paragraph: true,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![plan::Inline::Math {
                 definition_site: site.clone(),
@@ -284,6 +287,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
                     quotation: false,
                     paragraph: false,
                     equation: false,
+                    econ: None,
                     site: site.clone(),
                     runs: vec![plan::Inline::Text("Heading".into())],
                 },
@@ -1161,6 +1165,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                             match child {
                                 ftoo_manifest::SkeletonChild::Unit(unit)
                                 | ftoo_manifest::SkeletonChild::Paragraph(unit)
+                                | ftoo_manifest::SkeletonChild::Econ(unit)
                                 | ftoo_manifest::SkeletonChild::Equation(unit)
                                 | ftoo_manifest::SkeletonChild::Quotation(unit) => {
                                     paths.push(format!(
@@ -1525,6 +1530,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: input::site("units/statements/fixture.toml"),
             runs: vec![
                 plan::Inline::Text("Before ".into()),
@@ -1612,6 +1618,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 quotation: false,
                 paragraph: false,
                 equation: false,
+                econ: None,
                 site: input::site(&format!("units/statements/{name}.toml")),
                 runs: vec![plan::Inline::Text(name.to_uppercase())],
             })
@@ -1737,6 +1744,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: input::site("units/statements/fixture.toml"),
             runs: ["first", "second", "first"]
                 .into_iter()
@@ -1785,6 +1793,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![
                 plan::Inline::Tag {
@@ -2132,6 +2141,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     quotation: false,
                     paragraph: false,
                     equation: false,
+                    econ: None,
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
@@ -2149,6 +2159,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     quotation: false,
                     paragraph: false,
                     equation: false,
+                    econ: None,
                     site: origin.clone(),
                     runs: std::mem::take(&mut plan.blocks[0].runs),
                     displays: BTreeMap::new(),
@@ -2161,6 +2172,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     quotation: false,
                     paragraph: false,
                     equation: false,
+                    econ: None,
                     site: input::site("units/displays/fixture.toml"),
                     runs: vec![plan::Inline::Text("Cell.".into())],
                     displays: BTreeMap::new(),

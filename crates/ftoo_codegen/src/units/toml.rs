@@ -1,7 +1,8 @@
 use super::UnitSource;
 use ftoo_manifest::{
-    DocumentDraft, DocumentEntryDraft, DocumentOutput, LocatedEntryDraft, LocatedString, PathPart,
-    RuleId, ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitFault, UnitSite, UnitStage,
+    DocumentDraft, DocumentEntryDraft, DocumentOutput, EconDraft, LocatedEntryDraft, LocatedString,
+    PathPart, RuleId, ShapeKind, SourceAnchor, UnitDiagnostic, UnitDraft, UnitFault, UnitSite,
+    UnitStage,
 };
 use std::{collections::BTreeMap, ops::Range};
 use toml_edit::{Document, Item, TableLike, Value};
@@ -294,6 +295,32 @@ fn entries(node: &Node) -> Result<BTreeMap<String, LocatedEntryDraft>, Box<UnitD
         })
         .collect()
 }
+fn econ(node: &Node) -> Result<EconDraft, Box<UnitDiagnostic>> {
+    let fields = fixed(
+        node,
+        &[
+            "target",
+            "reference",
+            "citations",
+            "departure",
+            "title",
+            "stops-at",
+        ],
+    )?;
+    let citations = typed(fields[2], ShapeKind::Array)?
+        .elements
+        .iter()
+        .map(string)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(EconDraft {
+        target: string(fields[0])?,
+        reference: string(fields[1])?,
+        citations,
+        departure: string(fields[3])?,
+        title: entries(fields[4])?,
+        stops_at: entries(fields[5])?,
+    })
+}
 fn targets(table: &Node) -> Result<Vec<DocumentOutput>, Box<UnitDiagnostic>> {
     let field = table
         .fields
@@ -491,13 +518,17 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
             documents,
         }))
     } else {
-        let mut allowed = vec!["id", "document", "math", "texts"];
-        if root[1]
+        let has_econ = root[1].fields.iter().any(|(key, _, _)| key == "econ");
+        let has_documentary_targets = root[1]
             .fields
             .iter()
-            .any(|(key, _, _)| key == "documentary-targets")
-        {
+            .any(|(key, _, _)| key == "documentary-targets");
+        let mut allowed = vec!["id", "document", "math", "texts"];
+        if has_documentary_targets {
             allowed.push("documentary-targets");
+        }
+        if has_econ {
+            allowed.push("econ");
         }
         let fields = fixed(root[1], &allowed)?;
         Ok(Draft::Unit(Box::new(UnitDraft {
@@ -506,11 +537,18 @@ fn shape_inner(tree: &Node, text: &str, declarations: bool) -> Result<Draft, Box
             table_site: root[1].site.clone(),
             math_site: fields[2].site.clone(),
             texts_site: fields[3].site.clone(),
-            documentary_targets: fields
-                .get(4)
-                .map_or(Ok(BTreeMap::new()), |field| entries(field))?,
+            documentary_targets: if has_documentary_targets {
+                entries(fields[4])?
+            } else {
+                BTreeMap::new()
+            },
             math: entries(fields[2])?,
             texts: entries(fields[3])?,
+            econ: if has_econ {
+                Some(econ(fields[4 + usize::from(has_documentary_targets)])?)
+            } else {
+                None
+            },
         })))
     }
 }

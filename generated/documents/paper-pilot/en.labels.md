@@ -48,6 +48,19 @@ The audit bottoms out here, for the framework’s own reasons &#40;<a href="../p
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:coda:flourishing-pole document paper-pilot language en -->
+<table>
+<tr>
+<td>
+<p><a id="the-flourishing-pole"></a><strong>Economics 22.1. The flourishing pole</strong> (on op:vmoral<!-- label sem:operator:moral-baseline -->)</p><!-- econ sec:coda:flourishing-pole e:capability -->
+<p>The flourishing pole is Sen’s capability approach (<a href="#bibliography-sen-1999">A. Sen 1999</a>)<!-- bibcite a:sencapability -->: wellbeing as freedom to achieve functionings, not utility and not the record. Virtue&#45;as&#45;enlargement is enlarged freedom&#45;to&#45;achieve, relational and unscalarizable — exactly the information welfarism discards. The genealogy reads as one shape: economics builds outward from the funded interior and stops, each time, at a different face of one wall — the input it cannot move, the aggregate that does not exist, the score that is a value&#45;theory, the judge that is built not detached, the testimony it cannot de&#45;colour, the cycle that rotates only when coupling is directed, the standing less aggregable than price, the edge that is a rate, the restraint priced only at the menu, the payroll it cannot total, the flourishing that is the history&#45;metric.</p>
+<p align="right">e:capability<!-- label sem:membrane:capability --> · d:annex<!-- label sem:departure:annex --></p>
+</td>
+</tr>
+</table>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:coda:eight-words document paper-pilot language en -->
 What the document welded, gathered — each word standing on the bone it was welded to: <a href="../paper-pilot/en.md#virtue-wonder"><strong><em>wonder</em></strong></a><!-- virtue v:wonder --> and <a href="../paper-pilot/en.md#virtue-beauty"><strong><em>beauty</em></strong></a><!-- virtue v:beauty -->, the will that crosses before the reward exists and what it finds on the far side; <a href="../paper-pilot/en.md#virtue-goodness"><strong><em>goodness</em></strong></a><!-- virtue v:goodness --> and <a href="../paper-pilot/en.md#virtue-kindness"><strong><em>kindness</em></strong></a><!-- virtue v:kindness -->, the enlargement that raises real overlap, the second its quiet form at the modest good; <a href="../paper-pilot/en.md#virtue-love"><strong><em>love</em></strong></a><!-- virtue v:love -->, the overlap drawing the self&#45;boundary along held edges, the only rule that funds the grenade; <a href="../paper-pilot/en.md#virtue-wisdom"><strong><em>wisdom</em></strong></a><!-- virtue v:wisdom -->, the guard of the whole orthant boundary, refusing self&#45;erasure on one wall and exploitation on the other; <a href="../paper-pilot/en.md#virtue-truth"><strong><em>truth</em></strong></a><!-- virtue v:truth -->, anchored legibility built against the toll&#45;keeper; and <a href="../paper-pilot/en.md#virtue-health"><strong><em>health</em></strong></a><!-- virtue v:health -->, the self&#45;floor, the boundary self&#45;deception is defined as crossing.
 
@@ -88,5 +101,7 @@ Not yet converted: later material is omitted from this excerpt.
 <a id="virtue-health"></a>health. Not yet available in this rendering.
 
 ## References
+
+<a id="bibliography-sen-1999"></a>Sen, Amartya, 1999. Development as Freedom. Oxford: Oxford University Press.<!-- bibentry a:sencapability -->
 
 <a id="bibliography-andreoni-1990"></a>Andreoni, James, 1990. Impure Altruism and Donations to Public Goods: A Theory of Warm&#45;Glow Giving. The Economic Journal 100&#40;401&#41;, 464–477. DOI: 10.2307&#47;2234133.<!-- bibentry a:andreoni -->

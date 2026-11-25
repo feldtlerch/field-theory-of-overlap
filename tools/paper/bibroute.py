@@ -15,12 +15,11 @@ STOCK_BIB = '280fcfc82c0b4c49c152542b18d1cfd430b1bdbadda6207ffb3ee37f3021f003'
 DERIVED_BIB = '8e4f8f413998e962b4d78c38e4c639d3b22e8abdd5236c9a678ef8b01be38cfa'
 
 
-def derive(bib_path, output):
+def derive_bytes(stock_bib):
     # The style is the bundle's stock biblatex.bst, checked against the support lock
     # by preparation. The retirement command's integer probe checks that the pinned
     # engine still accepts the entry-local integer assignment during ITERATE that this
     # style relies on; derivation does not run it.
-    stock_bib = bib_path.read_bytes()
     require(digest(stock_bib) == STOCK_BIB, 'Published bibliography hash differs')
     # Tectonic 0.17.0, embedded BibTeX 0.99d, crates/engine_bibtex/src/exec.rs:
     # text.length$ counts this nested accent group as 12 characters where
@@ -43,9 +42,16 @@ def derive(bib_path, output):
     require(bib.count('Multi-Dimensioned') == 1, 'Title compound occurrence differs')
     bib = bib.replace('Multi-Dimensioned', r'Multi-Dimen\-sioned')
     require(digest(bib.encode('utf-8')) == DERIVED_BIB, 'Derived bibliography hash differs')
+    return bib.encode('utf-8')
+
+
+def derive(bib_path, output):
+    stock_bib = bib_path.read_bytes()
+    derived = derive_bytes(stock_bib)
     output.mkdir(parents=True, exist_ok=True)
-    (output/'references.bib').write_bytes(bib.encode('utf-8'))
+    (output/'references.bib').write_bytes(derived)
     before = stock_bib.decode('utf-8')
+    bib = derived.decode('utf-8')
     write(output/'bibliography.diff', ''.join(difflib.unified_diff(before.splitlines(True),bib.splitlines(True),fromfile='stock/bibliography',tofile='derived/bibliography')))
     record = dict(stock_bibliography=STOCK_BIB, derived_bibliography=DERIVED_BIB)
     write(output/'derivation.json', json.dumps(record,indent=2)+'\n')

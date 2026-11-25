@@ -13,7 +13,8 @@ import tomllib
 import unicodedata
 
 from identities import (CHECK_INPUTS, INPUTS as BINDING_INPUTS,
-                        CapturedInputs, bindings, input_paths, virtue_roster)
+                        CapturedInputs, bindings, input_paths, native_target_requests,
+                        virtue_roster)
 from inputs import inventory
 from meson_adapter import pdf_libraries
 from pdf_text import Pdf
@@ -734,8 +735,13 @@ def input_paths_from_parent(repo, commit):
         sources = git(repo, 'show', commit + ':' + source_list).decode('utf-8').splitlines()
     except UnicodeError as error:
         raise Fault('SourceInvalid', 'parent source list is not UTF-8', 'snapshot') from error
+    unit_files = git(repo, 'ls-tree', '-r', '--name-only', commit,
+                     'units/statements').decode('utf-8').splitlines()
+    native = native_target_requests(
+        unit_files, lambda file: git(repo, 'show', commit + ':' + file).decode('utf-8'))
     # These are validation reads of the current binding owner, not paper byte inputs.
-    return set(sources) | set(BINDING_INPUTS + CHECK_INPUTS + [source_list])
+    return (set(sources) | set(BINDING_INPUTS + CHECK_INPUTS + [source_list]) |
+            {file for file, _, _ in native.values()})
 
 
 def parent_fragments(snapshot):

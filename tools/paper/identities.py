@@ -6,6 +6,7 @@ import pathlib
 import re
 import sys
 import tomllib
+import bibroute
 from common import read, require, timed, write
 
 INPUTS = ['tools/paper/identities.py', 'documents/paper-build/paper-tags.tsv',
@@ -48,7 +49,27 @@ def input_paths(repo, captured=None):
     """Enumerate every declared validity read without adding PDF byte inputs."""
     read_text = captured.read if captured else read
     sources = read_text(repo/'documents/paper-build/sources.tsv').splitlines()
-    return sorted(set(INPUTS + CHECK_INPUTS + sources))
+    native = native_target_requests(
+        (path.relative_to(repo).as_posix()
+         for path in (repo/'units/statements').glob('*.toml')),
+        lambda file: read_text(repo/file))
+    return sorted(set(INPUTS + CHECK_INPUTS + bibroute.INPUTS + sources) |
+                  {file for file, _, _ in native.values()})
+
+
+def native_target_requests(files, read_text):
+    """Select only the unit sources that request documentary native targets."""
+    targets = {}
+    for file in sorted(files):
+        unit = tomllib.loads(read_text(file))['unit']
+        if 'econ' not in unit:
+            continue
+        selector = unit['econ']['target']
+        key = unit.get('documentary-targets', {}).get(selector)
+        require(key is not None, 'M063: native target selector absent: '+selector)
+        require(key not in targets, 'M063: native target has two unit owners: '+key)
+        targets[key] = (file, unit['id'], selector)
+    return targets
 
 
 def label_mints(repo, read_text=read):
@@ -264,10 +285,56 @@ def assembly_json(repo):
         wire.append({'key': key, 'spelling': spelling, 'status': status, 'target': target,
                      'target_kind': kind, 'lookup_site': lookup, 'alias_site': alias,
                      'declaration_sites': evidence})
+    manifest = captured.read(repo/source_file)
+    class_rows = re.findall(r'\\prop_gput:Nnn \\g_ftoo_id_to_class_prop \{ ([^{}]+) \} \{ ([^{}]+) \}', manifest)
+    slug_rows = re.findall(r'\\prop_gput:Nnn \\g_ftoo_id_to_slug_prop \{ ([^{}]+) \} \{ ([^{}]+) \}', manifest)
+    require(len(class_rows) == len({key for key, _ in class_rows}) and
+            len(slug_rows) == len({key for key, _ in slug_rows}),
+            'M063: duplicate departure source property')
+    class_by_id = dict(class_rows)
+    slug_by_id = dict(slug_rows)
+    departure_rows = []
+    for key, row in sorted(rows.items()):
+        if not key.startswith('d:') or row['source_status'] != 'paper': continue
+        target = row['target']
+        require(class_by_id.get(target) == 'departure', 'M063: departure class differs: '+key)
+        slug = slug_by_id.get(target)
+        require(slug and key == 'd:'+slug, 'M063: departure slug differs: '+key)
+        departure_rows.append({'slug': slug, 'target': target, 'handle': key,
+                               'sites': sorted(declarations[key], key=lambda site: (site['file'], site['line']))})
+    departure_rows.sort(key=lambda row: row['slug'])
+    require(len({row['slug'] for row in departure_rows}) == len(departure_rows),
+            'M063: duplicate departure slug')
+    targets = []
+    all_econ = native_target_requests(
+        (path.relative_to(repo).as_posix()
+         for path in (repo/'units/statements').glob('*.toml')),
+        lambda file: captured.read(repo/file))
+    for key, (file, unit_id, selector) in all_econ.items():
+        require(rows.get(key, {}).get('source_status') == 'paper' and
+                rows[key]['target'] not in (None, key),
+                'M063: native target binding differs: '+key)
+        source_lines = captured.read(repo/file).splitlines()
+        sites = [number for number, line in enumerate(source_lines, 1)
+                 if re.fullmatch(re.escape(selector)+r'\s*=\s*"'+re.escape(key)+r'"', line)]
+        require(len(sites) == 1, 'M063: native target site differs: '+key)
+        targets.append({'key': key, 'unit': unit_id, 'site': _site(file, sites[0])})
+    targets.sort(key=lambda row: row['key'])
+    require({row['key'] for row in targets} == set(all_econ),
+            'M063: native target inventory differs')
+    stock = captured.read_bytes(repo/'documents/paper/references.bib')
+    derived = bibroute.derive_bytes(stock)
     result = {'schema': 2,
               'inputs': [{'path': path, 'sha256': hashlib.sha256(captured.bytes[path]).hexdigest()}
                          for path in paths],
-              'bindings': wire, 'virtues': virtues}
+              'bindings': wire,
+              'virtues': virtues,
+              'departures': departure_rows,
+              'native_targets': targets,
+              'bibliography': {'source': 'documents/paper/references.bib',
+                               'stock_sha256': hashlib.sha256(stock).hexdigest(),
+                               'derived_sha256': hashlib.sha256(derived).hexdigest(),
+                               'derived_utf8': derived.decode('utf-8')}}
     captured.verify()
     return json.dumps(result, ensure_ascii=False, separators=(',', ':'))+'\n'
 

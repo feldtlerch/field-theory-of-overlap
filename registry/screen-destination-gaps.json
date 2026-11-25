@@ -113,7 +113,7 @@
       "position": 6
     },
     {
-      "after-unit": "sec:coda:eight-words",
+      "after-unit": "sec:coda:flourishing-pole",
       "before-unit": "sec:coda:audit-bottoms",
       "document": "paper-pilot",
       "language": "en",
@@ -121,12 +121,20 @@
       "position": 7
     },
     {
+      "after-unit": "sec:coda:eight-words",
+      "before-unit": "sec:coda:flourishing-pole",
+      "document": "paper-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 8
+    },
+    {
       "after-unit": "sec:coda:whole-field",
       "before-unit": "sec:coda:eight-words",
       "document": "paper-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 8
+      "position": 9
     },
     {
       "after-unit": "sec:log:andreoni-joint",
@@ -134,7 +142,7 @@
       "document": "paper-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 10
+      "position": 11
     },
     {
       "after-unit": null,
@@ -142,7 +150,7 @@
       "document": "paper-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 11
+      "position": 12
     }
   ],
   "entries": [

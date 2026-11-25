@@ -47,6 +47,17 @@ pub struct UnitDraft {
     pub documentary_targets: BTreeMap<String, LocatedEntryDraft>,
     pub math: BTreeMap<String, LocatedEntryDraft>,
     pub texts: BTreeMap<String, LocatedEntryDraft>,
+    pub econ: Option<EconDraft>,
+}
+/// Located economics metadata admitted with its owning prose unit.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EconDraft {
+    pub target: LocatedString,
+    pub reference: LocatedString,
+    pub citations: Vec<LocatedString>,
+    pub departure: LocatedString,
+    pub title: BTreeMap<String, LocatedEntryDraft>,
+    pub stops_at: BTreeMap<String, LocatedEntryDraft>,
 }
 /// An editorial label, not a theory identity.
 /// ```compile_fail,E0277
@@ -223,6 +234,7 @@ pub struct CheckedUnit {
     math: BTreeMap<String, LocatedString>,
     documentary_targets: BTreeMap<String, LocatedString>,
     texts: BTreeMap<String, CheckedText>,
+    econ: Option<EconDraft>,
 }
 impl CheckedUnit {
     #[must_use]
@@ -244,6 +256,10 @@ impl CheckedUnit {
     #[must_use]
     pub fn texts(&self) -> &BTreeMap<String, CheckedText> {
         &self.texts
+    }
+    #[must_use]
+    pub fn econ(&self) -> Option<&EconDraft> {
+        self.econ.as_ref()
     }
 }
 /// Immutable admission of structurally typed drafts through metadata and content.
@@ -551,9 +567,9 @@ pub fn admit_unit_drafts(
     })
 }
 
-#[allow(clippy::too_many_lines)] // Admission reports metadata and text faults in their authored order.
+#[allow(clippy::too_many_lines)] // Validate the unit and its optional econ fields at one metadata boundary.
 fn check_unit(
-    unit: UnitDraft,
+    mut unit: UnitDraft,
     required: &[LocatedString],
     errors: &mut Vec<UnitDiagnostic>,
 ) -> CheckedUnit {
@@ -574,6 +590,171 @@ fn check_unit(
         }
     }
     let (texts, used, scanner_failed) = check_texts(&unit, &required_names, errors);
+    if let Some(econ) = &unit.econ {
+        if unit.document.value != "paper-pilot"
+            || required_names != BTreeSet::from(["en".to_owned()])
+        {
+            errors.push(diagnostic(
+                RuleId::M039,
+                UnitStage::Metadata,
+                Some(&unit.id.value),
+                None,
+                &unit.table_site.child("econ"),
+                UnitFault::UnknownToken {
+                    value: unit.document.value.clone(),
+                    expected: vec!["English paper economics context".into()],
+                },
+            ));
+        }
+        if !local_name(&econ.target.value) {
+            errors.push(diagnostic(
+                RuleId::M039,
+                UnitStage::Metadata,
+                Some(&unit.id.value),
+                None,
+                &econ.target.site,
+                UnitFault::UnknownToken {
+                    value: econ.target.value.clone(),
+                    expected: vec!["declared documentary target selector".into()],
+                },
+            ));
+        }
+        {
+            let (name, value) = ("reference", &econ.reference);
+            if value.value.is_empty()
+                || value
+                    .value
+                    .chars()
+                    .any(|c| !c.is_ascii_alphanumeric() && !matches!(c, ':' | '-' | '_'))
+                || !value.value.contains(':')
+            {
+                errors.push(diagnostic(
+                    RuleId::M039,
+                    UnitStage::Metadata,
+                    Some(&unit.id.value),
+                    None,
+                    &value.site,
+                    UnitFault::UnknownToken {
+                        value: value.value.clone(),
+                        expected: vec![format!("checked paper {name} key")],
+                    },
+                ));
+            }
+        }
+        if !local_name(&econ.departure.value) {
+            errors.push(diagnostic(
+                RuleId::M039,
+                UnitStage::Metadata,
+                Some(&unit.id.value),
+                None,
+                &econ.departure.site,
+                UnitFault::UnknownToken {
+                    value: econ.departure.value.clone(),
+                    expected: vec!["checked departure slug".into()],
+                },
+            ));
+        }
+        for (field, values) in [("title", &econ.title), ("stops-at", &econ.stops_at)] {
+            for language in &required_names {
+                if !values.contains_key(language) {
+                    errors.push(diagnostic(
+                        RuleId::M040,
+                        UnitStage::Language,
+                        Some(&unit.id.value),
+                        Some(language),
+                        &unit.table_site.child("econ").child(field).child(language),
+                        UnitFault::MissingLanguage {
+                            document: unit.document.value.clone(),
+                            required_at: unit.document.site.clone(),
+                        },
+                    ));
+                }
+            }
+            for (language, entry) in values {
+                if !required_names.contains(language) {
+                    errors.push(diagnostic(
+                        RuleId::M040,
+                        UnitStage::Language,
+                        Some(&unit.id.value),
+                        Some(language),
+                        &entry.key_site,
+                        UnitFault::UndeclaredLanguage {
+                            document: unit.document.value.clone(),
+                            required: required_names.iter().cloned().collect(),
+                        },
+                    ));
+                }
+                let text = &entry.value.value;
+                let plain = content::scan(&entry.value).is_ok_and(|scanned| {
+                    scanned.prose
+                        && scanned.math.is_empty()
+                        && scanned.tags.is_empty()
+                        && scanned.references.is_empty()
+                        && scanned.bibliography_citations.is_empty()
+                        && scanned.styles.is_empty()
+                });
+                if !plain
+                    || text.trim().is_empty()
+                    || text.len() > if field == "title" { 4096 } else { 16384 }
+                    || text.chars().any(|scalar| {
+                        matches!(
+                            scalar,
+                            '{' | '}'
+                                | '['
+                                | ']'
+                                | '\\'
+                                | '%'
+                                | '#'
+                                | '<'
+                                | '>'
+                                | '&'
+                                | '@'
+                                | '\n'
+                                | '\r'
+                        )
+                    })
+                {
+                    errors.push(diagnostic(
+                        RuleId::M039,
+                        UnitStage::Metadata,
+                        Some(&unit.id.value),
+                        Some(language),
+                        &entry.value.site,
+                        UnitFault::UnknownToken {
+                            value: text.clone(),
+                            expected: vec!["plain nonblank bounded econ text".into()],
+                        },
+                    ));
+                }
+            }
+        }
+        if econ.citations.is_empty()
+            || econ.citations.len() > 64
+            || econ
+                .citations
+                .iter()
+                .any(|key| !key.value.starts_with("a:") || key.value.len() <= 2)
+            || econ
+                .citations
+                .iter()
+                .map(|key| &key.value)
+                .collect::<BTreeSet<_>>()
+                .len()
+                != econ.citations.len()
+        {
+            errors.push(diagnostic(
+                RuleId::M039,
+                UnitStage::Metadata,
+                Some(&unit.id.value),
+                None,
+                &unit.table_site.child("econ").child("citations"),
+                UnitFault::UnknownToken {
+                    value: "citations".into(),
+                    expected: vec!["ordered nonempty distinct bibliography keys".into()],
+                },
+            ));
+        }
+    }
     let mut placed = BTreeMap::<String, usize>::new();
     for (selector, entry) in &unit.documentary_targets {
         if !local_name(selector)
@@ -642,6 +823,33 @@ fn check_unit(
             }
         }
     }
+    if let Some(econ) = unit.econ.as_mut() {
+        let selector = econ.target.value.clone();
+        if let Some(target) = unit.documentary_targets.get(&selector) {
+            let count = placed.entry(selector.clone()).or_default();
+            *count += 1;
+            if *count > 1 {
+                errors.push(diagnostic(
+                    RuleId::M041,
+                    UnitStage::Content,
+                    Some(&unit.id.value),
+                    Some("en"),
+                    &econ.target.site,
+                    UnitFault::RepeatedHandle { selector },
+                ));
+            }
+            econ.target.value.clone_from(&target.value.value);
+        } else {
+            errors.push(diagnostic(
+                RuleId::M041,
+                UnitStage::Content,
+                Some(&unit.id.value),
+                Some("en"),
+                &econ.target.site,
+                UnitFault::UnknownHandle { selector },
+            ));
+        }
+    }
     for (selector, entry) in &unit.documentary_targets {
         if !placed.contains_key(selector) {
             errors.push(diagnostic(
@@ -700,6 +908,7 @@ fn check_unit(
             .map(|(k, v)| (k, v.value))
             .collect(),
         texts,
+        econ: unit.econ,
     }
 }
 type TextChecks = (BTreeMap<String, CheckedText>, BTreeSet<String>, bool);

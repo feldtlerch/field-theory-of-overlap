@@ -52,6 +52,7 @@ fn native_paper_origin_evidences_documentary_target_without_strict_citation() {
                     value: located("The @handle{boundary} boundary."),
                 },
             )]),
+            econ: None,
         }],
     )
     .unwrap();
@@ -396,6 +397,7 @@ fn corpus_text(text: &str) -> LanguageCheckedUnits {
             )]),
         },
         vec![UnitDraft {
+            econ: None,
             id: located("sec:fixture:unit"),
             document: located("main"),
             table_site: site.clone(),

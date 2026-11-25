@@ -1,8 +1,10 @@
 """Refusal controls for finite bindings and rendered-label leakage."""
 import pathlib
+import hashlib
 import json
 import collections
 import shutil
+import subprocess
 import tempfile
 import unittest
 import re
@@ -515,6 +517,115 @@ class Identities(unittest.TestCase):
                 authored_before, authored_after, args.unit)
         self.assertFalse(changed['available'])
         self.assertIn('inclusion line differs: sec:say:direction', changed['reasons'])
+
+    def test_real_conversion_adds_unit_and_scope_without_changing_residual_inputs(self):
+        source = pathlib.Path(__file__).resolve().parents[2]
+        repo = self.root/'real-conversion'
+        subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(source), str(repo)],
+                       check=True)
+        published = compare_words.git(repo, 'rev-parse', '873125c^{commit}').decode().strip()
+        parent = compare_words.git(repo, 'rev-parse', published+'^').decode().strip()
+        subprocess.run(['git', '-C', str(repo), 'checkout', '--quiet', '--detach', parent],
+                       check=True)
+        for name in ('documents/paper/explainer/explainer.tex',
+                     'units/statements/plain-intro.toml',
+                     'units/scopes/explainer.toml',
+                     'units/skeletons/explainer-pilot.toml',
+                     'generated/documents/explainer-pilot/sec-reading-plain-intro.tex',
+                     'generated/documents/inclusions.tsv',
+                     'generated/paper/inputs.json'):
+            path = repo/name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(compare_words.git(repo, 'show', published+':'+name))
+        acceptance = repo/'documents/paper-build/self-description.json'
+        record = json.loads(acceptance.read_text())
+        for passage in record['passages']:
+            source_bytes = (repo/passage['file']).read_bytes()
+            anchor = passage['anchor'].encode()
+            self.assertEqual(source_bytes.count(anchor), 1)
+            start = source_bytes.index(anchor)
+            width = passage['end'] - passage['start']
+            self.assertEqual(compare_words.digest(source_bytes[start:start+width]),
+                             passage['sha256'])
+            passage['start'], passage['end'] = start, start+width
+        acceptance.write_text(json.dumps(record, indent=2)+'\n')
+        subprocess.run(['git', '-C', str(repo), 'add', '-A'], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet',
+                        '-m', 'plain paragraph conversion'], check=True)
+        candidate = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+        unit = 'sec:reading:plain-intro'
+        source_name = 'documents/paper/explainer/explainer.tex'
+        old = compare_words.git(repo, 'show', parent+':'+source_name)
+        first, last, _ = compare_words.derived_replacement(
+            old, (repo/source_name).read_bytes(), unit)
+        assignment = dict(schema=3, parent=parent, candidate=candidate,
+                          source=source_name, first=first, last=last, unit=unit,
+                          **{'source-blob': compare_words.git(
+                              repo, 'rev-parse', parent+':'+source_name).decode().strip(),
+                             'unit-path': 'units/statements/plain-intro.toml'})
+        assignment_path = self.root/'real-assignment.json'
+        assignment_path.write_text(json.dumps(assignment))
+        before = {}
+        for document in ('paper', 'explainer'):
+            path = self.root/(document+'-real-before.pdf')
+            path.write_bytes(compare_words.git(
+                repo, 'show', parent+':generated/paper/'+document+'.pdf'))
+            before[document] = path
+        args = argparse.Namespace(repository=repo,
+                                  before_paper=before['paper'],
+                                  before_explainer=before['explainer'],
+                                  after_paper=repo/'generated/paper/paper.pdf',
+                                  after_explainer=repo/'generated/paper/explainer.pdf',
+                                  before_source=(parent+':'+source_name+':'+
+                                                 str(first)+'-'+str(last)),
+                                  before_revision=None, unit=unit,
+                                  assignment=assignment_path,
+                                  output=self.root/'real-comparison')
+        status = compare_words.compare(args)
+        result = json.loads((args.output/'comparison.json').read_text())
+        self.assertEqual((status, result['verdict']), (0, 'equal'), result['faults'])
+        self.assertEqual(result['scope_admissibility']['verdict'], 'scope-admissible')
+        changed = set(compare_words.git(repo, 'diff', '--name-only', parent, candidate,
+                                        '--', 'units/statements', 'units/scopes').decode().splitlines())
+        self.assertEqual(changed, {'units/statements/plain-intro.toml',
+                                   'units/scopes/explainer.toml'})
+
+    def test_native_target_unit_change_is_a_residual_input_change(self):
+        source = pathlib.Path(__file__).resolve().parents[2]
+        unit_path = 'units/statements/coda-flourishing-pole.toml'
+        bridge = json.loads(assembly_json(source))
+        self.assertEqual([row['path'] for row in bridge['inputs']
+                          if row['path'].startswith('units/')], [unit_path])
+        repo = self.root/'native-target-change'
+        subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(source), str(repo)],
+                       check=True)
+        parent_revision = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+        unit = repo/unit_path
+        original = unit.read_text()
+        self.assertIn('The flourishing pole', original)
+        unit.write_text(original.replace('The flourishing pole', 'A changed flourishing pole', 1))
+        subprocess.run(['git', '-C', str(repo), 'add', unit_path], check=True)
+        subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet',
+                        '-m', 'changed native target source'], check=True)
+        parent_dir = self.root/'native-target-parent'
+        candidate_dir = self.root/'native-target-candidate'
+        parent = compare_words.parent_snapshot(repo, parent_revision, parent_dir)
+        held = CapturedInputs(repo)
+        inputs = compare_words.snapshot_inputs(repo, candidate_dir, held)
+        self.assertEqual([row['path'] for row in parent['inputs']
+                          if row['path'].startswith('units/')], [unit_path])
+        self.assertEqual([row['path'] for row in inputs
+                          if row['path'].startswith('units/')], [unit_path])
+        args = argparse.Namespace(unit='sec:coda:whole-field', before_source=None,
+                                  before_revision=parent_revision)
+        before, after = compare_words.selected_sources(repo, args, parent,
+                                                        parent_dir, candidate_dir)
+        envelope = compare_words.source_envelope(parent, parent_dir, candidate_dir,
+                                                 inputs, before, after, args.unit)
+        self.assertFalse(envelope['available'])
+        self.assertEqual(envelope['reasons'], ['paper input differs: '+unit_path])
 
     def test_assigned_shadow_scope_refusals(self):
         source = pathlib.Path(__file__).resolve().parents[2]
@@ -2084,7 +2195,9 @@ class Identities(unittest.TestCase):
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
         shutil.copytree(source/'documents/paper',self.root/'documents/paper')
-        for name in ('tools/paper/identities.py', 'tools/paper/common.py'):
+        shutil.copytree(source/'units',self.root/'units')
+        for name in ('tools/paper/identities.py', 'tools/paper/common.py',
+                     'tools/paper/bibroute.py', 'documents/paper-build/fontconfig.conf'):
             target=self.root/name; target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(source/name,target)
 
@@ -2096,8 +2209,11 @@ class Identities(unittest.TestCase):
 
     def test_assembly_json_evidence_and_refusals(self):
         value=json.loads(assembly_json(self.root))
-        self.assertEqual(list(value), ['schema','inputs','bindings','virtues'])
+        self.assertEqual(list(value), ['schema','inputs','bindings','virtues','departures','native_targets','bibliography'])
         self.assertEqual(value['schema'], 2)
+        self.assertEqual(value['bibliography']['source'], 'documents/paper/references.bib')
+        self.assertEqual(value['bibliography']['stock_sha256'], hashlib.sha256(
+            (self.root/'documents/paper/references.bib').read_bytes()).hexdigest())
         self.assertEqual([row['word'] for row in value['virtues']],
                          sorted(row['word'] for row in value['virtues']))
         self.assertEqual([entry['path'] for entry in value['inputs']],
@@ -2216,6 +2332,17 @@ sites = ["fixture"]
         self.assertEqual(str(caught.exception),
                          'M063: paper tag source has conflicting targets: J:broker')
 
+    def test_econ_reference_uses_the_retained_definition_binding(self):
+        unit = tomllib.loads(read(self.root/'units/statements/coda-flourishing-pole.toml'))['unit']
+        self.assertEqual(unit['econ']['reference'], 'op:vmoral')
+        rows = read(self.root/'documents/paper-build/label-mints.tsv').splitlines()
+        self.assertEqual([row for row in rows if row.startswith('op:vmoral\t')],
+                         ['op:vmoral\tdocuments/paper/parts/partC.tex'])
+        definition = r'\begin{definition}[\hdr{op:vmoral}]\grade{nec}'
+        self.assertEqual(read(self.root/'documents/paper/parts/partC.tex').splitlines().count(
+            definition), 1)
+        self.assertEqual(bindings(self.root)['op:vmoral']['status'], 'paper')
+
     def test_label_mint_file_evidence_survives_line_moves(self):
         baseline=bindings(self.root)
         path=self.root/'documents/paper-build/label-mints.tsv'
@@ -2237,6 +2364,13 @@ sites = ["fixture"]
         with self.assertRaises(ValueError) as caught:bindings(self.root)
         self.assertEqual(str(caught.exception),'M063: label mint file is absent: documents/paper/parts/missing.tex')
         write(path,original)
+
+        missing_unit = 'units/statements/missing.toml'
+        rows[index] = '\t'.join([key, missing_unit])
+        write(path, '\n'.join(rows) + '\n')
+        with self.assertRaises(ValueError) as caught: bindings(self.root)
+        self.assertEqual(str(caught.exception), 'M063: malformed label mint row ' + str(index + 1))
+        write(path, original)
 
         unlisted='documents/paper/parts/unlisted.tex'
         write(self.root/unlisted,'\\label{c:q}\n')

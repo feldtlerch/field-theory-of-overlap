@@ -1,12 +1,14 @@
 """Materialize the closed English source pair into an empty disposable directory."""
 import argparse
 import hashlib
+import json
 import pathlib
 import re
 import shutil
 import tomllib
 from bibroute import derive
-from identities import CapturedInputs, bindings, emit, label_mints, virtue_roster
+from identities import (CapturedInputs, assembly_json, bindings, emit, label_mints,
+                        virtue_roster)
 from common import require, read, write, timed, runtime
 
 INPUTS = ["tools/paper/prepare.py", "tools/paper/bibroute.py", "tools/paper/identities.py", "tools/paper/common.py", "documents/paper-build/sources.tsv", "documents/paper-build/compat.tex", "documents/paper-build/fontconfig.conf", "documents/paper-build/templates.toml", "documents/paper-build/runtime.toml", "generated/documents/inclusions.tsv"]
@@ -22,7 +24,7 @@ def scope_fragments(repository):
                 'M079: Inclusion row differs: '+str(number))
         source, unit, fragment, role, line = fields
         require(source.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(source).parts
-                and role in ('refrain', 'paragraph', 'quotation', 'equation') and int(line) > 0,
+                and role in ('refrain', 'paragraph', 'quotation', 'equation', 'econ') and int(line) > 0,
                 'M079: Inclusion row differs: '+str(number))
         rows.append((source, unit, fragment, role, int(line)))
     require(rows, 'M079: Checked inclusions absent')
@@ -58,9 +60,12 @@ def declared_fragments(repository, rows):
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
+    econ_bodies = []
     auxiliary_keys = set()
     equation_bodies = []
     fragments = scope_fragments(repository)
+    bridge = json.loads(assembly_json(repository))
+    native_targets = {row['unit']: row['key'] for row in bridge['native_targets']}
     declared = {(source, unit) for source, unit, _, _, _ in fragments}
     require(len(declared) == len(fragments), 'Duplicate fragment slot')
     for source, unit, fragment, role, line in fragments:
@@ -70,6 +75,31 @@ def declared_fragments(repository, rows):
         positions = [number for number, content in enumerate(lines, 1) if content == marker]
         require(positions == [line], 'M055: Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
+        if role == 'econ':
+            require(data.count(b'\n') == 1 and data.endswith(b'\\end{econ}\n'),
+                    'M055: Econ fragment body differs: '+fragment)
+            unit_paths = list((repository/'units/statements').glob('*.toml'))
+            matches = [tomllib.loads(read(path))['unit'] for path in unit_paths
+                       if tomllib.loads(read(path))['unit']['id'] == unit]
+            require(len(matches) == 1, 'M055: Econ target ownership differs: '+fragment)
+            owner = matches[0]
+            econ = owner['econ']
+            target = owner['documentary-targets'].get(econ['target'])
+            require(target == native_targets.get(unit),
+                    'M055: Econ target ownership differs: '+fragment)
+            options = (b'label={'+target.encode()+b'},title={'+econ['title']['en'].encode()+
+                       b'},ref={'+econ['reference'].encode()+b'},cites={'+
+                       ','.join(econ['citations']).encode()+b'},departs={'+econ['departure'].encode()+
+                       b'},stopsat={'+econ['stops-at']['en'].encode()+b'}]')
+            prefix = b'\\begin{econ}['+options
+            require(data.startswith(prefix), 'M055: Econ options differ: '+fragment)
+            body = data[len(prefix):-len(b'\\end{econ}\n')]
+            require(body and re.fullmatch(rb'(?:[^{}\\]|\\parencite\{a:[A-Za-z0-9-]+\})+', body),
+                    'M055: Econ body differs: '+fragment)
+            econ_bodies.append(b' '.join(body.split()))
+            replacements[(source, positions[0])] = data
+            marker_at[(source, positions[0])] = marker.rstrip(b'\n')
+            continue
         expected_macro = {'quotation': b'paperrefrain', 'refrain': b'refrain',
                           'paragraph': b'PaperNativeParagraph',
                           'equation': b'PaperNativeEquation'}[role]
@@ -145,10 +175,18 @@ def declared_fragments(repository, rows):
         for _, unit, _, _, _ in fragments:
             require(not re.search(rb'\\label\{'+re.escape(unit.encode())+rb'\}', data),
                     'Authored mint duplicates a declared fragment: '+source)
+        for _, unit, fragment, role, _ in fragments:
+            if role == 'econ':
+                key = native_targets[unit].encode()
+                require(not re.search(rb'\\begin\{econ\}\[[^\]]*label\s*=\s*\{?'+re.escape(key)+rb'(?:\}|[,\]])', data),
+                        'M055: Authored econ duplicates a declared fragment: '+source)
         normalized = b' '.join(data.split())
         for paragraph_body in paragraph_bodies:
             require(paragraph_body not in normalized,
                     'M055: Authored paragraph duplicates a declared fragment: '+source)
+        for econ_body in econ_bodies:
+            require(econ_body not in normalized,
+                    'M055: Authored econ body duplicates a declared fragment: '+source)
         for equation_body in equation_bodies:
             require(equation_body not in equation_tokens(data),
                     'M055: Authored equation duplicates a declared fragment: '+source)

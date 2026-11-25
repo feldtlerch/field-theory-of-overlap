@@ -997,6 +997,7 @@ fn declared_positions(section: &ftoo_manifest::SkeletonSection, out: &mut Vec<(S
         match child {
             ftoo_manifest::SkeletonChild::Unit(unit)
             | ftoo_manifest::SkeletonChild::Paragraph(unit)
+            | ftoo_manifest::SkeletonChild::Econ(unit)
             | ftoo_manifest::SkeletonChild::Equation(unit) => {
                 out.push((unit.value.clone(), false));
             }
@@ -1071,6 +1072,7 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
                     quotation: position.quotation(),
                     paragraph: position.paragraph(),
                     equation: position.equation(),
+                    econ: None,
                     site: position.site().clone(),
                     runs: vec![plan::Inline::Text(unit.texts()[language].text().into())],
                 };
@@ -1225,6 +1227,7 @@ fn typography_apostrophe_contexts() {
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text(text.into())],
     };
@@ -1344,6 +1347,7 @@ fn fragment_macro_follows_planned_quotation() {
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: input::site("units/statements/fixture.toml"),
         runs: vec![plan::Inline::Text("Refrain.".into())],
     };
@@ -1561,6 +1565,7 @@ skeleton={document='main',sections=[{heading='sec:fixture:first',children=[{kind
                 expected: vec![
                     "unit".into(),
                     "paragraph".into(),
+                    "econ".into(),
                     "equation".into(),
                     "quotation".into(),
                     "section".into(),
@@ -2342,6 +2347,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Coefficient ".into()),
@@ -3484,6 +3490,7 @@ fn reader_fixture_corpus(text: &str) -> ftoo_manifest::LanguageCheckedUnits {
                 .collect(),
         },
         vec![UnitDraft {
+            econ: None,
             id: value("sec:fixture:citation"),
             document: value("fixture"),
             table_site: site.clone(),
@@ -3689,6 +3696,7 @@ fn screen_excerpt_equation_recovery_rejects_attachment_swap() {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![plan::Inline::Text("A reading".into())],
         },
@@ -4253,6 +4261,7 @@ fn markdown_style_screen_paragraph_is_observed() {
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Screen".into())],
     };

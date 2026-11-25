@@ -18,6 +18,9 @@ pub enum AssemblyFault {
     UnsupportedParagraphBody {
         reason: String,
     },
+    Econ {
+        reason: EconReason,
+    },
     UnsupportedMarkdownMath {
         context: String,
         reason: MarkdownMathReason,
@@ -258,6 +261,22 @@ pub enum AssemblyFault {
         diff: String,
     },
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EconReason {
+    MissingPaperEvidence,
+    HandleOutsidePaper { key: String },
+    MissingBinding { key: String },
+    MissingDeparture,
+    DepartureMismatch,
+    MissingTarget,
+    TargetOwnerMismatch,
+    PaperTitle { detail: String },
+    TitleMismatch,
+    CounterContext { detail: String },
+    UnsupportedInline,
+    CitationMismatch,
+    InvalidPublicFragment,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MarkdownMathReason {
@@ -297,7 +316,7 @@ impl AssemblyFault {
     fn rank(&self) -> u8 {
         match self {
             Self::InheritedSupport { .. } | Self::ReferenceDestination { .. } => 50,
-            Self::UnsupportedParagraphBody { .. } => 48,
+            Self::UnsupportedParagraphBody { .. } | Self::Econ { .. } => 48,
             Self::UnsupportedMarkdownMath { .. } => 47,
             Self::UnsupportedMarkdownStyle { .. } => 49,
             Self::UnsupportedPublicHandle { .. } => 36,

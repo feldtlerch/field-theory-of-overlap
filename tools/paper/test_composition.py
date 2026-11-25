@@ -8,16 +8,19 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 from prepare import scope_fragments, declared_fragments
+from identities import input_paths
 import meson_adapter
 
 FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
 
 
 def checked_fragments(root, rows):
-    from identities import CapturedInputs, bindings as real_bindings, virtue_roster
+    from identities import CapturedInputs, assembly_json, bindings as real_bindings, virtue_roster
     repository = pathlib.Path(__file__).resolve().parents[2]
     roster = virtue_roster(repository, real_bindings(repository), CapturedInputs(repository))
+    bridge = assembly_json(repository)
     with (patch('identities.bindings') as bindings,
+          patch('prepare.assembly_json', return_value=bridge),
           patch('prepare.bindings') as fragment_bindings,
           patch('prepare.virtue_roster', return_value=roster)):
         bindings.return_value.get.side_effect = lambda name: {
@@ -118,6 +121,7 @@ class Composition(unittest.TestCase):
                      'documents/paper-build/label-mints.tsv',
                      'documents/paper-build/sources.tsv'}
             rows = (repository/'documents/paper-build/sources.tsv').read_text().splitlines()
+            files.update(input_paths(repository))
             files.update(rows)
             files.update(source for source, _, _, _ in FRAGMENTS)
             files.update(fragment for _, _, fragment, _ in FRAGMENTS)

@@ -1,6 +1,6 @@
 use super::diagnostics::{
-    AssemblyDiagnostic, AssemblyErrors, AssemblyFault, DocumentError, EmissionKind, EmissionRecord,
-    GapPosition, RefrainRole,
+    AssemblyDiagnostic, AssemblyErrors, AssemblyFault, DocumentError, EconReason, EmissionKind,
+    EmissionRecord, GapPosition, RefrainRole,
 };
 use crate::RenderableNotation;
 use ftoo_manifest::{
@@ -14,6 +14,122 @@ pub(super) enum StyleKind {
     Strong,
     Smallcaps,
     Regular,
+}
+
+#[cfg(test)]
+mod econ_controls {
+    use super::*;
+    use std::{fs, path::Path};
+
+    #[test]
+    #[allow(clippy::too_many_lines)] // Each mutation shares the same checked unit and source evidence.
+    fn real_econ_unit_refuses_changed_title_owner_and_body_forms() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let declaration = crate::UnitSource {
+            file: "units/documents.toml".into(),
+            bytes: fs::read(root.join("units/documents.toml")).unwrap(),
+        };
+        let source = "units/statements/coda-flourishing-pole.toml";
+        let original = fs::read_to_string(root.join(source)).unwrap();
+        let load = |text: &str| {
+            crate::load_unit_sources(
+                declaration.clone(),
+                vec![crate::UnitSource {
+                    file: source.into(),
+                    bytes: text.as_bytes().to_vec(),
+                }],
+            )
+            .unwrap()
+            .units()[0]
+                .clone()
+        };
+        let unit = load(&original);
+        let graph = ftoo_manifest::seed().unwrap();
+        let book = ftoo_manifest::addressing(&graph).unwrap();
+        let lookup = super::super::registry::CheckedPaperLookup::check(&root).unwrap();
+        let mut inputs = BTreeMap::new();
+        for path in [
+            "documents/paper-build/sources.tsv",
+            "documents/paper/econ_membrane.tex",
+            "documents/paper/data/ftoo_manifest.tex",
+        ] {
+            inputs.insert(path.into(), fs::read(root.join(path)).unwrap());
+        }
+        for path in fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
+            .unwrap()
+            .lines()
+        {
+            inputs.insert(path.into(), fs::read(root.join(path)).unwrap());
+        }
+        let site = unit.econ().unwrap().citations[0].site.clone();
+        let entry = super::super::bibliography::Entry {
+            key: "a:sencapability".into(),
+            author: "Sen, Amartya".into(),
+            year: "1999".into(),
+            title: "Development as Freedom".into(),
+            details: super::super::bibliography::Details::Book {
+                publisher: "Oxford University Press".into(),
+                address: "Oxford".into(),
+            },
+            raw: String::new(),
+            label: "A. Sen 1999".into(),
+            anchor: "bibliography-sen-1999".into(),
+        };
+        let citation = || Inline::BibliographyCitation {
+            kind: ftoo_manifest::BibliographyCitationKind::Parenthetical,
+            entries: vec![entry.clone()],
+            label: "(A. Sen 1999)".into(),
+            site: site.clone(),
+        };
+        let runs = vec![Inline::Text("The flourishing pole is ".into()), citation()];
+        econ_plan(&unit, "en", &runs, &book, Some(&lookup), &inputs).unwrap();
+        let changed_title = load(&original.replace(
+            "title = { en = \"The flourishing pole\" }",
+            "title = { en = \"Another title\" }",
+        ));
+        assert!(
+            format!(
+                "{:?}",
+                econ_plan(&changed_title, "en", &runs, &book, Some(&lookup), &inputs).unwrap_err()
+            )
+            .contains("TitleMismatch")
+        );
+        let changed_owner = load(&original.replace(
+            "id = \"sec:coda:flourishing-pole\"",
+            "id = \"sec:coda:another-pole\"",
+        ));
+        assert!(
+            format!(
+                "{:?}",
+                econ_plan(&changed_owner, "en", &runs, &book, Some(&lookup), &inputs).unwrap_err()
+            )
+            .contains("TargetOwnerMismatch")
+        );
+        let unsupported = vec![
+            Inline::Tag {
+                handle: "op:vmoral".into(),
+                label: "op:vmoral".into(),
+                token: "u0-t0".into(),
+                site: site.clone(),
+            },
+            citation(),
+        ];
+        assert!(
+            format!(
+                "{:?}",
+                econ_plan(&unit, "en", &unsupported, &book, Some(&lookup), &inputs).unwrap_err()
+            )
+            .contains("UnsupportedInline")
+        );
+        let twice = vec![citation(), citation()];
+        assert!(
+            format!(
+                "{:?}",
+                econ_plan(&unit, "en", &twice, &book, Some(&lookup), &inputs).unwrap_err()
+            )
+            .contains("CitationMismatch")
+        );
+    }
 }
 impl StyleKind {
     fn from_checked(value: &str) -> Self {
@@ -113,7 +229,7 @@ pub(super) enum Inline {
     },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Recovered {
     Text(String),
     Tag {
@@ -1071,6 +1187,28 @@ fn excerpt_paragraph(source: &str, block: &Block) -> Option<String> {
     (actual == expected_runs(block, DocumentTarget::Markdown))
         .then(|| block.runs.iter().map(canonical_run).collect())
 }
+fn excerpt_econ(source: &str, block: &Block, econ: &EconPlan) -> Option<Vec<Recovered>> {
+    let header = format!(
+        "<table>\n<tr>\n<td>\n<p><a id=\"{}\"></a><strong>Economics {}. {}</strong> (on {}<!-- label {} -->)</p><!-- econ {} {} -->\n<p>",
+        econ.fragment,
+        econ.number,
+        super::markdown::text(&econ.title),
+        super::markdown::text(&econ.reference),
+        econ.reference_identity,
+        block.unit,
+        econ.target
+    );
+    let footer = format!(
+        "</p>\n<p align=\"right\">{}<!-- label {} --> · d:{}<!-- label {} --></p>\n</td>\n</tr>\n</table>",
+        super::markdown::text(&econ.target),
+        econ.target_identity,
+        super::markdown::text(&econ.departure),
+        econ.departure_identity
+    );
+    let body = source.strip_prefix(&header)?.strip_suffix(&footer)?;
+    let actual = recover_markdown(body, block.runs.iter().flat_map(inline_handles))?;
+    (actual == expected_runs(block, DocumentTarget::Markdown)).then_some(actual)
+}
 fn excerpt_unit(source: &str) -> Option<(&str, &str, &str, &str)> {
     let (metadata, body) = source.split_once('\n')?;
     let fields = metadata.strip_prefix("<!-- unit ")?.strip_suffix(" -->")?;
@@ -1222,8 +1360,16 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 } else {
                     EmissionKind::Paragraph
                 };
+                let econ_recovered = block
+                    .econ
+                    .as_ref()
+                    .and_then(|econ| excerpt_econ(body, block, econ));
                 let text = if index == 0 {
                     body.strip_prefix("# ").and_then(excerpt_text)
+                } else if block.econ.is_some() {
+                    econ_recovered
+                        .as_ref()
+                        .map(|_| block.runs.iter().map(canonical_run).collect())
                 } else if block.paragraph {
                     excerpt_paragraph(body, block)
                 } else if block.equation {
@@ -1243,7 +1389,9 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 });
                 if index > 0 {
                     if block.paragraph || block.equation {
-                        if let Some(found) = if block.equation {
+                        if let Some(found) = if block.econ.is_some() {
+                            econ_recovered.clone()
+                        } else if block.equation {
                             recover_block(body, block, DocumentTarget::Markdown)
                         } else {
                             recover_markdown(body, block.runs.iter().flat_map(inline_handles))
@@ -1558,8 +1706,23 @@ pub(super) struct Block {
     pub quotation: bool,
     pub paragraph: bool,
     pub equation: bool,
+    pub econ: Option<EconPlan>,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
+}
+#[derive(Clone, Debug)]
+pub(super) struct EconPlan {
+    pub target: String,
+    pub target_identity: String,
+    pub title: String,
+    pub number: String,
+    pub reference: String,
+    pub reference_identity: String,
+    pub departure: String,
+    pub departure_identity: String,
+    pub stops_at: String,
+    pub citations: Vec<String>,
+    pub fragment: String,
 }
 impl Block {
     pub(super) fn equation_pair(&self) -> Option<(&str, &str)> {
@@ -1842,6 +2005,7 @@ impl Coverage {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: self.site.clone(),
             runs: self.runs.clone(),
         }
@@ -2228,6 +2392,17 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
                 &refrain.site,
                 AssemblyFault::DuplicatePublicAnchor {
                     fragment: refrain.fragment.clone(),
+                },
+            ));
+        }
+    }
+    for econ in plan.blocks.iter().filter_map(|block| block.econ.as_ref()) {
+        if !seen.insert(econ.fragment.clone()) {
+            return Err(screen_failure(
+                plan,
+                &plan.blocks[0].site,
+                AssemblyFault::DuplicatePublicAnchor {
+                    fragment: econ.fragment.clone(),
                 },
             ));
         }
@@ -2884,6 +3059,21 @@ pub(super) fn plan_screens(
             ));
         }
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            if let Some(econ) = &block.econ
+                && !anchors.insert((
+                    plan.document.clone(),
+                    plan.language.clone(),
+                    econ.fragment.clone(),
+                ))
+            {
+                return Err(screen_failure(
+                    plan,
+                    &block.site,
+                    AssemblyFault::DuplicatePublicAnchor {
+                        fragment: econ.fragment.clone(),
+                    },
+                ));
+            }
             if block.quotation || block.paragraph || block.equation {
                 continue;
             }
@@ -3516,6 +3706,7 @@ pub(super) fn build(
     displays: &ftoo_manifest::CheckedDisplays<'_>,
     bibliography: &str,
     paper_lookup: Option<&super::registry::CheckedPaperLookup>,
+    inputs: &BTreeMap<String, Vec<u8>>,
     paper_documents: &BTreeSet<String>,
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
     let corpus = skeletons.corpus();
@@ -3582,6 +3773,18 @@ pub(super) fn build(
                     bibliography,
                     paper_lookup,
                 )?;
+                let econ = if position.econ() {
+                    Some(econ_plan(
+                        unit,
+                        language,
+                        &runs,
+                        book,
+                        paper_lookup,
+                        inputs,
+                    )?)
+                } else {
+                    None
+                };
                 let bodies = display_plans(index, unit, language, welded, &equations, displays);
                 let mut block = Block {
                     pending_names: BTreeMap::new(),
@@ -3591,6 +3794,7 @@ pub(super) fn build(
                     quotation: position.quotation(),
                     paragraph: position.paragraph(),
                     equation: position.equation(),
+                    econ,
                     site: if position.paragraph() || position.equation() {
                         unit.texts()[language].site().clone()
                     } else {
@@ -3626,6 +3830,160 @@ pub(super) fn build(
         return Err(DocumentError::Assembly(errors));
     }
     Ok(plans)
+}
+
+#[allow(clippy::too_many_lines)] // Bind each econ field and refusal to its source site in one plan boundary.
+fn econ_plan(
+    unit: &ftoo_manifest::CheckedUnit,
+    language: &str,
+    runs: &[Inline],
+    book: &ftoo_manifest::AddressBook<'_>,
+    lookup: Option<&super::registry::CheckedPaperLookup>,
+    inputs: &BTreeMap<String, Vec<u8>>,
+) -> Result<EconPlan, DocumentError> {
+    let metadata = unit.econ().expect("econ role requires metadata");
+    let site = &metadata.target.site;
+    let refuse = |site: &UnitSite, reason: EconReason| {
+        super::failure(
+            RuleId::M055,
+            AssemblyStage::Ownership,
+            AssemblySite::Source(site.clone()),
+            AssemblyFault::Econ { reason },
+        )
+    };
+    let lookup = lookup.ok_or_else(|| refuse(site, EconReason::MissingPaperEvidence))?;
+    let value = |key: &str, field_site: &UnitSite| {
+        match book.resolve(key) {
+            Err(ftoo_manifest::TagResolutionFault::UnknownTag { .. }) => {}
+            _ => {
+                return Err(refuse(
+                    field_site,
+                    EconReason::HandleOutsidePaper { key: key.into() },
+                ));
+            }
+        }
+        match lookup.resolve(key) {
+            Some(ftoo_manifest::PaperResolution::Available(value)) => Ok(value.target),
+            _ => Err(refuse(
+                field_site,
+                EconReason::MissingBinding { key: key.into() },
+            )),
+        }
+    };
+    let target_identity = value(&metadata.target.value, &metadata.target.site)?;
+    let reference_identity = value(&metadata.reference.value, &metadata.reference.site)?;
+    let departure_handle = format!("d:{}", metadata.departure.value);
+    let checked_departure = value(&departure_handle, &metadata.departure.site)?;
+    let departure_identity = lookup
+        .departure(&metadata.departure.value)
+        .ok_or_else(|| refuse(&metadata.departure.site, EconReason::MissingDeparture))?
+        .to_owned();
+    if departure_identity != checked_departure {
+        return Err(refuse(
+            &metadata.departure.site,
+            EconReason::DepartureMismatch,
+        ));
+    }
+    let (owner, origin) = lookup
+        .native_target(&metadata.target.value)
+        .ok_or_else(|| refuse(site, EconReason::MissingTarget))?;
+    if owner != unit.label().as_str() || origin.file != metadata.target.site.file {
+        return Err(refuse(site, EconReason::TargetOwnerMismatch));
+    }
+    let title = metadata.title[language].value.value.clone();
+    let inherited_title =
+        super::destinations::economics_title(&target_identity, inputs).map_err(|error| {
+            refuse(
+                &metadata.title[language].value.site,
+                EconReason::PaperTitle {
+                    detail: format!("{error:?}"),
+                },
+            )
+        })?;
+    if title != inherited_title {
+        return Err(refuse(
+            &metadata.title[language].value.site,
+            EconReason::TitleMismatch,
+        ));
+    }
+    let number =
+        super::destinations::economics_number(unit.label().as_str(), inputs).map_err(|error| {
+            refuse(
+                site,
+                EconReason::CounterContext {
+                    detail: format!("{error:?}"),
+                },
+            )
+        })?;
+    let mut citations = Vec::new();
+    let mut citation_sites = Vec::new();
+    for run in runs {
+        match run {
+            Inline::Text(_) => {}
+            Inline::BibliographyCitation {
+                kind: ftoo_manifest::BibliographyCitationKind::Parenthetical,
+                entries,
+                site: citation_site,
+                ..
+            } => {
+                citations.push(
+                    entries
+                        .iter()
+                        .map(|entry| entry.key.clone())
+                        .collect::<Vec<_>>(),
+                );
+                citation_sites.push(citation_site);
+            }
+            _ => {
+                let source = match run {
+                    Inline::Tag { site, .. }
+                    | Inline::PaperTag { site, .. }
+                    | Inline::See { site, .. }
+                    | Inline::Math { site, .. }
+                    | Inline::Citation { site, .. }
+                    | Inline::Virtue { site, .. }
+                    | Inline::BibliographyCitation { site, .. }
+                    | Inline::Mention { site, .. }
+                    | Inline::Styled { site, .. } => site,
+                    Inline::Text(_) => unreachable!("admitted econ text"),
+                };
+                return Err(refuse(source, EconReason::UnsupportedInline));
+            }
+        }
+    }
+    let option_citations = metadata
+        .citations
+        .iter()
+        .map(|entry| entry.value.clone())
+        .collect::<Vec<_>>();
+    if citation_sites.len() > 1 {
+        return Err(refuse(citation_sites[1], EconReason::CitationMismatch));
+    }
+    if citations.len() != 1 || citations[0] != option_citations {
+        return Err(refuse(
+            &metadata.citations[0].site,
+            EconReason::CitationMismatch,
+        ));
+    }
+    let fragment = super::destinations::econ_fragment(&title).ok_or_else(|| {
+        refuse(
+            &metadata.title[language].value.site,
+            EconReason::InvalidPublicFragment,
+        )
+    })?;
+    Ok(EconPlan {
+        target: metadata.target.value.clone(),
+        target_identity,
+        title,
+        number,
+        reference: metadata.reference.value.clone(),
+        reference_identity,
+        departure: metadata.departure.value.clone(),
+        departure_identity,
+        stops_at: metadata.stops_at[language].value.value.clone(),
+        citations: option_citations,
+        fragment,
+    })
 }
 type Equations = BTreeMap<(String, String), (String, String, Vec<crate::PendingEntry>)>;
 pub(super) fn check_equation_mode(
@@ -4009,10 +4367,22 @@ fn runs(
         ));
     }
     for occurrence in text.bibliography_citations() {
+        let derived_bibliography = paper_lookup.map_or(
+            "",
+            super::registry::CheckedPaperLookup::derived_bibliography,
+        );
         let entries = occurrence
             .keys()
             .iter()
-            .map(|key| super::bibliography::resolve(bibliography, key, occurrence.site()))
+            .map(|key| {
+                super::bibliography::resolve_with_derived(
+                    bibliography,
+                    derived_bibliography,
+                    key,
+                    occurrence.site(),
+                    occurrence.kind(),
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let label = super::bibliography::citation_label(occurrence.kind(), &entries);
         replacements.push((
@@ -4803,6 +5173,7 @@ pub(super) fn display_plans(
                 quotation: false,
                 paragraph: false,
                 equation: false,
+                econ: None,
                 site: region.site(&region.source().site),
                 runs,
                 displays: BTreeMap::new(),
@@ -5562,6 +5933,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),

@@ -1,0 +1,21 @@
+schema = 1
+
+[unit]
+id = "sec:coda:flourishing-pole"
+document = "paper-pilot"
+
+[unit.math]
+
+[unit.documentary-targets]
+box = "e:capability"
+
+[unit.texts]
+en = "The flourishing pole is Sen’s capability approach @parencite{a:sencapability}: wellbeing as freedom to achieve functionings, not utility and not the record. Virtue-as-enlargement is enlarged freedom-to-achieve, relational and unscalarizable — exactly the information welfarism discards. The genealogy reads as one shape: economics builds outward from the funded interior and stops, each time, at a different face of one wall — the input it cannot move, the aggregate that does not exist, the score that is a value-theory, the judge that is built not detached, the testimony it cannot de-colour, the cycle that rotates only when coupling is directed, the standing less aggregable than price, the edge that is a rate, the restraint priced only at the menu, the payroll it cannot total, the flourishing that is the history-metric."
+
+[unit.econ]
+target = "box"
+reference = "op:vmoral"
+citations = ["a:sencapability"]
+departure = "annex"
+title = { en = "The flourishing pole" }
+stops-at = { en = "capability is wellbeing as freedom-to-achieve, a state; virtue-as-enlargement is the rate that moves it, the information welfarism discards" }

@@ -125,7 +125,6 @@ e:artifact	documents/paper/parts/partG.tex
 e:balance	documents/paper/parts/partA.tex
 e:baseline	documents/paper/parts/partC.tex
 e:bistab	documents/paper/parts/partB.tex
-e:capability	documents/paper/parts/coda.tex
 e:capital	documents/paper/parts/partA.tex
 e:carework	documents/paper/parts/partB.tex
 e:cartel	documents/paper/parts/gateways.tex
@@ -396,7 +395,7 @@ op:null	documents/paper/parts/partA.tex
 op:read	documents/paper/parts/partB.tex
 op:recess	documents/paper/parts/partF.tex
 op:vel	documents/paper/parts/partA.tex
-op:vmoral	documents/paper/parts/coda.tex
+op:vmoral	documents/paper/parts/partC.tex
 part:gw:anchor	documents/paper/parts/gateways.tex
 part:gw:hip	documents/paper/parts/gateways.tex
 pr:agg	documents/paper/parts/partD.tex

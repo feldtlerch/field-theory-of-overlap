@@ -408,6 +408,41 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
                 block.unit, plan.document, plan.language
             )
             .expect("string write");
+            if let Some(econ) = &block.econ {
+                output.push_str("<table>\n<tr>\n<td>\n");
+                let header_start = output.len();
+                writeln!(output, "<p><a id=\"{}\"></a><strong>Economics {}. {}</strong> (on {}<!-- label {} -->)</p><!-- econ {} {} -->", econ.fragment, econ.number, text(&econ.title), text(&econ.reference), econ.reference_identity, block.unit, econ.target).expect("string write");
+                let reference_at = output[header_start..]
+                    .find(&text(&econ.reference))
+                    .expect("checked econ reference")
+                    + header_start;
+                paper_spans.push((
+                    reference_at..reference_at + text(&econ.reference).len(),
+                    econ.reference.clone(),
+                ));
+                output.push_str("<p>");
+                inline(&mut output, &block.runs);
+                output.push_str("</p>\n");
+                let footer_start = output.len();
+                writeln!(
+                    output,
+                    "<p align=\"right\">{}<!-- label {} --> · d:{}<!-- label {} --></p>",
+                    text(&econ.target),
+                    econ.target_identity,
+                    text(&econ.departure),
+                    econ.departure_identity
+                )
+                .expect("string write");
+                for key in [&econ.target, &format!("d:{}", econ.departure)] {
+                    let at = output[footer_start..]
+                        .find(&text(key))
+                        .expect("checked econ footer")
+                        + footer_start;
+                    paper_spans.push((at..at + text(key).len(), key.clone()));
+                }
+                output.push_str("</td>\n</tr>\n</table>\n\n");
+                continue;
+            }
             if block.paragraph {
                 for run in &block.runs {
                     if let Inline::PaperTag { value, .. } = run {
@@ -611,6 +646,7 @@ pub(super) fn erase_annotations(source: &str) -> Result<String, usize> {
             "<!-- virtue ",
             "<!-- bibcite ",
             "<!-- bibentry ",
+            "<!-- econ ",
         ]
         .iter()
         .any(|prefix| comment.starts_with(prefix))
@@ -782,6 +818,24 @@ pub(super) fn check_reader(
                 .as_ref()
                 .is_some_and(|screen| screen.index.iter().any(|entry| entry.fragment == fragment))
             {
+                continue;
+            }
+            if plan.blocks.iter().any(|block| {
+                block
+                    .econ
+                    .as_ref()
+                    .is_some_and(|econ| econ.fragment == fragment)
+            }) {
+                if reader.matches(&format!("id=\"{fragment}\"")).count() != 1 {
+                    return Err(role_failure(
+                        plan,
+                        false,
+                        start..end,
+                        AssemblyFault::InvalidPublicAnchor {
+                            fragment: fragment.into(),
+                        },
+                    ));
+                }
                 continue;
             }
             let Some(handle) = super::plan::inverse_fragment(fragment) else {

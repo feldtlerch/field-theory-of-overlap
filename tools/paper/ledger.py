@@ -166,6 +166,23 @@ def check_screen_references(repo, paper_auxiliary, paper_pdf):
             check_destination('main',label,target['anchor'],int(target['page']),paper_pdf.destination(target['anchor']))
 
 
+def check_screen_economics(repo, paper_auxiliary, paper_pdf):
+    screen = read(repo/'generated/documents/paper-pilot/en.labels.md')
+    pattern = re.compile(r'<p><a id="([a-z0-9-]+)"></a><strong>Economics ([0-9]+\.[0-9]+)\. ([^<]+)</strong> \(on [^<]+<!-- label [^ ]+ -->\)</p><!-- econ ([a-z0-9:-]+) ([a-z0-9:-]+) -->')
+    found = list(pattern.finditer(screen))
+    require(len(found) == screen.count('<!-- econ '), 'M055: malformed generated economics header')
+    targets = {}
+    for match in found:
+        fragment, number, title, unit, key = match.groups()
+        require(key not in targets and unit and fragment, 'M055: repeated economics target: '+key)
+        targets[key] = unit
+        target = paper_auxiliary.get(key)
+        require(target is not None and target['default'] and target['page'] and target['anchor'],
+                'M055: paper economics target absent: '+key)
+        require(number == target['default'] and title == target['title'].replace('~', ' '),
+                'M055: screen/PDF economics number or title differs: '+key)
+        check_destination('main', key, target['anchor'], int(target['page']), paper_pdf.destination(target['anchor']))
+    return targets
 def check_paragraph_tag_modes(repo, rows):
     """Bind converted tags and handle placements to their authored source and shipped mode."""
     for row in (repo/'generated/documents/inclusions.tsv').read_text(encoding='utf-8').splitlines():
@@ -241,6 +258,7 @@ def check(repo, work):
     check_auxiliary_destinations(auxiliary_keys, aux['main'], docs['main'])
     check_companion_mints(aux['main_explainer'], virtues)
     check_screen_references(repo,aux['main'],docs['main'])
+    check_screen_economics(repo,aux['main'],docs['main'])
     rows=[]; issues=[]; observed=collections.Counter()
     known={v['spelling'].casefold() for v in lookup.values()}
     for job,pdf in docs.items():

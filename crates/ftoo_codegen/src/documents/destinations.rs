@@ -101,6 +101,10 @@ fn title_fragment(title: &str) -> Option<String> {
     valid_fragment(&fragment).then_some(fragment)
 }
 
+pub(super) fn econ_fragment(title: &str) -> Option<String> {
+    title_fragment(title)
+}
+
 #[derive(Clone, Copy)]
 enum HeadingNumber {
     Section(i32),
@@ -598,6 +602,151 @@ fn master_sources<'a>(
     Ok(result)
 }
 
+/// Count the inherited economics events in paper order, including a converted marker.
+#[allow(clippy::too_many_lines)] // Counter events and their source-order refusals form one bounded reader.
+pub(super) fn economics_number(
+    unit: &str,
+    inputs: &BTreeMap<String, Vec<u8>>,
+) -> Result<String, DestinationError> {
+    let support = inputs
+        .get("documents/paper/econ_membrane.tex")
+        .ok_or_else(|| {
+            DestinationError::MissingSource("documents/paper/econ_membrane.tex".into())
+        })?;
+    let support = std::str::from_utf8(support)
+        .map_err(|_| DestinationError::UnsupportedOutline(unit.into()))?;
+    if support
+        .lines()
+        .filter(|line| line.trim() == "\\newcounter{economics}[section]")
+        .count()
+        != 1
+        || support
+            .lines()
+            .filter(|line| {
+                line.trim() == "\\renewcommand{\\theeconomics}{\\thesection.\\arabic{economics}}"
+            })
+            .count()
+            != 1
+    {
+        return Err(DestinationError::UnsupportedOutline(
+            "economics counter definition".into(),
+        ));
+    }
+    let mut section = -1_i32;
+    let mut economics = 0_u32;
+    let mut found = None;
+    let mut open = false;
+    for (file, source) in master_sources(unit, inputs)? {
+        let mut body = false;
+        for (index, raw) in source.lines().enumerate() {
+            if body && raw.trim() == format!("% generated: {unit}") {
+                if open || found.is_some() || section < 0 {
+                    return Err(DestinationError::UnsupportedOutline(format!(
+                        "{file}:{}",
+                        index + 1
+                    )));
+                }
+                economics += 1;
+                found = Some(format!("{section}.{economics}"));
+                continue;
+            }
+            let line = without_comment(raw).trim();
+            if line == "\\begin{document}" {
+                body = true;
+                continue;
+            }
+            if line == "\\end{document}" {
+                body = false;
+                continue;
+            }
+            if !body {
+                continue;
+            }
+            if line.starts_with("\\section{") {
+                argument(line, "\\section")
+                    .filter(|(_, tail)| tail.is_empty())
+                    .ok_or_else(|| {
+                        DestinationError::UnsupportedOutline(format!("{file}:{}", index + 1))
+                    })?;
+                section += 1;
+                economics = 0;
+            } else if line.starts_with("\\begin{econ}") {
+                if open || section < 0 {
+                    return Err(DestinationError::UnsupportedOutline(format!(
+                        "{file}:{}",
+                        index + 1
+                    )));
+                }
+                economics += 1;
+                open = true;
+            } else if line == "\\end{econ}"
+                || line
+                    .strip_prefix("\\PaperBoxEnding{")
+                    .is_some_and(|rest| rest.contains('}') && rest.ends_with("\\end{econ}"))
+            {
+                if !open {
+                    return Err(DestinationError::UnsupportedOutline(format!(
+                        "{file}:{}",
+                        index + 1
+                    )));
+                }
+                open = false;
+            } else if [
+                "\\setcounter{section}",
+                "\\setcounter{economics}",
+                "\\stepcounter{section}",
+                "\\stepcounter{economics}",
+                "\\addtocounter{section}",
+                "\\addtocounter{economics}",
+            ]
+            .iter()
+            .any(|word| line.contains(word))
+            {
+                return Err(DestinationError::UnsupportedOutline(format!(
+                    "{file}:{}",
+                    index + 1
+                )));
+            }
+        }
+    }
+    if open {
+        return Err(DestinationError::UnsupportedOutline(
+            "unclosed economics environment".into(),
+        ));
+    }
+    found.ok_or_else(|| DestinationError::MissingSource(unit.into()))
+}
+
+/// Decode only the literal heading spelling carried by the checked paper manifest.
+pub(super) fn economics_title(
+    target: &str,
+    inputs: &BTreeMap<String, Vec<u8>>,
+) -> Result<String, DestinationError> {
+    let source = inputs
+        .get("documents/paper/data/ftoo_manifest.tex")
+        .ok_or_else(|| {
+            DestinationError::MissingSource("documents/paper/data/ftoo_manifest.tex".into())
+        })?;
+    let source = std::str::from_utf8(source)
+        .map_err(|_| DestinationError::UnsupportedOutline(target.into()))?;
+    let prefix = format!("\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop {{ {target} }} {{ ");
+    let found: Vec<_> = source
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix(&prefix)
+                .and_then(|tail| tail.strip_suffix(" }"))
+        })
+        .collect();
+    if found.len() != 1
+        || found[0]
+            .chars()
+            .any(|c| !c.is_ascii_alphabetic() && c != '~' && c != ' ')
+    {
+        return Err(DestinationError::MissingHeading(target.into()));
+    }
+    Ok(found[0].replace('~', " "))
+}
+
 pub(super) fn target_from_inputs(
     label: &str,
     mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
@@ -825,6 +974,55 @@ mod tests {
         let current = String::from_utf8(inputs[path].clone()).unwrap();
         assert!(current.contains(old), "{path}: {old}");
         inputs.insert(path.into(), current.replacen(old, new, 1).into_bytes());
+    }
+
+    #[test]
+    fn economics_number_and_title_follow_the_bound_paper_sources() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut inputs = real_outline_inputs();
+        for path in [
+            "documents/paper/econ_membrane.tex",
+            "documents/paper/data/ftoo_manifest.tex",
+        ] {
+            inputs.insert(path.into(), std::fs::read(root.join(path)).unwrap());
+        }
+        let unit = "sec:coda:flourishing-pole";
+        assert_eq!(economics_number(unit, &inputs).unwrap(), "22.1");
+        assert_eq!(
+            economics_title("sem:membrane:capability", &inputs).unwrap(),
+            "The flourishing pole"
+        );
+        let marker = "% generated: sec:coda:flourishing-pole";
+        let mut earlier = inputs.clone();
+        replace_input(
+            &mut earlier,
+            "documents/paper/parts/coda.tex",
+            marker,
+            &format!("\\begin{{econ}}[label=other]\n\\end{{econ}}\n{marker}"),
+        );
+        assert_eq!(economics_number(unit, &earlier).unwrap(), "22.2");
+        let mut unsupported = inputs.clone();
+        replace_input(
+            &mut unsupported,
+            "documents/paper/parts/coda.tex",
+            marker,
+            &format!("\\setcounter{{economics}}{{0}}\n{marker}"),
+        );
+        assert!(matches!(
+            economics_number(unit, &unsupported),
+            Err(DestinationError::UnsupportedOutline(site)) if site.contains("coda.tex")
+        ));
+        let mut changed_title = inputs;
+        replace_input(
+            &mut changed_title,
+            "documents/paper/data/ftoo_manifest.tex",
+            "\\g_ftoo_id_to_heading_prop { sem:membrane:capability } { The~flourishing~pole }",
+            "\\g_ftoo_id_to_heading_prop { sem:membrane:capability } { Another~flourishing~pole }",
+        );
+        assert_eq!(
+            economics_title("sem:membrane:capability", &changed_title).unwrap(),
+            "Another flourishing pole"
+        );
     }
 
     #[test]

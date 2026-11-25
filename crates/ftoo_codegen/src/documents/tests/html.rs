@@ -196,6 +196,7 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![plan::Inline::Text("A reading".into())],
         },
@@ -279,6 +280,88 @@ fn math(site: UnitSite) -> plan::Inline {
         pending: vec![],
         site,
     }
+}
+
+#[test]
+fn support_required_real_econ_box_recovery_refuses_changed_html_and_markdown_title() {
+    let source: toml_edit::DocumentMut =
+        include_str!("../../../../../units/statements/coda-flourishing-pole.toml")
+            .parse()
+            .unwrap();
+    let unit = &source["unit"];
+    let econ = &unit["econ"];
+    let title = econ["title"]["en"].as_str().unwrap();
+    let body = unit["texts"]["en"].as_str().unwrap();
+    let (before, after) = body.split_once("@parencite{a:sencapability}").unwrap();
+    assert!(!after.contains("@parencite{"));
+    let entry = super::super::bibliography::Entry {
+        key: "a:sencapability".into(),
+        author: "Sen, Amartya".into(),
+        year: "1999".into(),
+        title: "Development as Freedom".into(),
+        details: super::super::bibliography::Details::Book {
+            publisher: "Oxford University Press".into(),
+            address: "Oxford".into(),
+        },
+        raw: String::new(),
+        label: "A. Sen 1999".into(),
+        anchor: "bibliography-sen-1999".into(),
+    };
+    let mut plan = prose_plan("Words.");
+    plan.document = "paper-pilot".into();
+    let block = &mut plan.blocks[1];
+    block.unit = unit["id"].as_str().unwrap().into();
+    block.site = input::site("units/statements/coda-flourishing-pole.toml");
+    block.paragraph = true;
+    block.econ = Some(plan::EconPlan {
+        target: unit["documentary-targets"]["box"].as_str().unwrap().into(),
+        target_identity: "sem:membrane:capability".into(),
+        title: title.into(),
+        number: "22.1".into(),
+        reference: econ["reference"].as_str().unwrap().into(),
+        reference_identity: "sem:operator:moral-baseline".into(),
+        departure: econ["departure"].as_str().unwrap().into(),
+        departure_identity: "sem:departure:annex".into(),
+        stops_at: econ["stops-at"]["en"].as_str().unwrap().into(),
+        citations: vec!["a:sencapability".into()],
+        fragment: super::super::destinations::econ_fragment(title).unwrap(),
+    });
+    block.runs = vec![
+        plan::Inline::Text(before.into()),
+        plan::Inline::BibliographyCitation {
+            kind: ftoo_manifest::BibliographyCitationKind::Parenthetical,
+            entries: vec![entry.clone()],
+            label: "(A. Sen 1999)".into(),
+            site: block.site.clone(),
+        },
+        plan::Inline::Text(after.into()),
+    ];
+    plan.screen
+        .as_mut()
+        .unwrap()
+        .end_matter
+        .push(plan::ScreenEndMatter::References(vec![entry]));
+    let support = support();
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let html = super::super::html::render(&plan, &support, &[], None).unwrap();
+    html_recovery::check(&plan, &fonts, &[], &[], &html).unwrap();
+    let heading = format!("Economics 22.1. {title}");
+    assert!(html.contains(&heading));
+    let changed = html.replacen(&heading, "Economics 22.1. Changed title", 1);
+    assert!(
+        format!(
+            "{:?}",
+            html_recovery::check(&plan, &fonts, &[], &[], &changed).unwrap_err()
+        )
+        .contains("HTML econ number and title")
+    );
+    let markdown = super::super::markdown::render(&plan);
+    plan::check_emission(&plan, &markdown, ftoo_manifest::DocumentTarget::Markdown).unwrap();
+    let changed = markdown.replacen(&heading, "Economics 22.1. Changed title", 1);
+    assert_ne!(changed, markdown);
+    assert!(
+        plan::check_emission(&plan, &changed, ftoo_manifest::DocumentTarget::Markdown).is_err()
+    );
 }
 
 #[test]
@@ -603,6 +686,7 @@ fn support_required_html_swapped_notice_and_block_refuses() {
         quotation: false,
         paragraph: true,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Second words.".into())],
     });
@@ -846,6 +930,7 @@ fn support_required_html_nested_styles_and_quotation_destination() {
         quotation: true,
         paragraph: false,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Closing words.".into())],
     });

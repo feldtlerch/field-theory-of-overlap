@@ -44,6 +44,7 @@ fn fixture(citation: bool, depth: Option<usize>, suffix: &str) -> plan::Document
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site(),
             runs: vec![
                 insertion(citation),

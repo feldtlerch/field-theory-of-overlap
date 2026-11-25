@@ -38,6 +38,7 @@ fn corpus_labels(labels: &[&str]) -> LanguageCheckedUnits {
         labels
             .iter()
             .map(|label| UnitDraft {
+                econ: None,
                 id: located(label),
                 document: located("main"),
                 table_site: site.clone(),
@@ -108,6 +109,7 @@ fn paper_corpus_with_target_text(target: &str, text: &str) -> LanguageCheckedUni
                     value: located(text),
                 },
             )]),
+            econ: None,
         }],
     )
     .unwrap()

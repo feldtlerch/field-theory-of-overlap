@@ -443,6 +443,11 @@ pub(crate) fn prepare_context(
         Some(registry::CheckedPaperLookup::check(root).map_err(DocumentError::PaperLookup)?)
     };
     if let Some(lookup) = &paper_lookup {
+        lookup
+            .validate_econ(&corpus)
+            .map_err(DocumentError::PaperLookup)?;
+    }
+    if let Some(lookup) = &paper_lookup {
         for (path, bytes) in lookup.inputs() {
             merge_checked_input(&mut inputs, path.clone(), bytes.clone())?;
         }
@@ -605,6 +610,7 @@ pub(crate) fn prepare_context(
             &displays,
             bibliography,
             paper_lookup.as_ref(),
+            &inputs,
             &paper_documents,
         )?;
         plan::plan_screens(
@@ -795,6 +801,9 @@ fn metadata(
             .any(|(key, _, _)| key == "documentary-targets")
         {
             allowed.push("documentary-targets");
+        }
+        if fields[1].fields.iter().any(|(key, _, _)| key == "econ") {
+            allowed.push("econ");
         }
         let unit = crate::units::toml::fixed(fields[1], &allowed).expect("admitted fields");
         let id = crate::units::toml::string(unit[0]).expect("admitted id");
@@ -1091,6 +1100,9 @@ fn fragment_macro(block: &plan::Block) -> &'static str {
 }
 
 fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
+    if let Some(econ) = &block.econ {
+        return econ_fragment_line(block, econ);
+    }
     if block.equation {
         let (_, source) = block.equation_pair().ok_or_else(|| {
             failure(
@@ -1117,6 +1129,80 @@ fn fragment_line(block: &plan::Block) -> Result<String, DocumentError> {
         "\\{macro_name}{{{}}}{{{}}}\n",
         block.unit,
         latex::prose_text(text)
+    ))
+}
+
+fn econ_fragment_line(block: &plan::Block, econ: &plan::EconPlan) -> Result<String, DocumentError> {
+    use std::fmt::Write;
+    let refuse = |site: &ftoo_manifest::UnitSite, reason: &str| {
+        failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(site.clone()),
+            AssemblyFault::UnsupportedParagraphBody {
+                reason: reason.into(),
+            },
+        )
+    };
+    let mut body = String::new();
+    for run in &block.runs {
+        match run {
+            plan::Inline::Text(value) => {
+                if adjacent_dash_marks(value) {
+                    return Err(refuse(&block.site, "adjacent dash marks in econ body"));
+                }
+                let emitted = latex::prose_text(value).replace('—', "---");
+                if emitted
+                    .chars()
+                    .any(|c| matches!(c, '{' | '}' | '\\' | '\n' | '\r'))
+                {
+                    return Err(refuse(
+                        &block.site,
+                        "econ body requires unsupported TeX escape",
+                    ));
+                }
+                body.push_str(&emitted);
+            }
+            plan::Inline::BibliographyCitation {
+                kind: ftoo_manifest::BibliographyCitationKind::Parenthetical,
+                entries,
+                site,
+                ..
+            } => {
+                if entries.len() != 1 {
+                    return Err(refuse(site, "econ citation arity"));
+                }
+                write!(body, "\\parencite{{{}}}", entries[0].key).expect("string write");
+            }
+            _ => return Err(refuse(&block.site, "unsupported econ body run")),
+        }
+    }
+    let options = [
+        &econ.target,
+        &econ.title,
+        &econ.reference,
+        &econ.departure,
+        &econ.stops_at,
+    ];
+    if options.iter().any(|value| {
+        value
+            .chars()
+            .any(|c| matches!(c, '{' | '}' | '[' | ']' | '\\' | '%' | '#' | '\n' | '\r'))
+    }) {
+        return Err(refuse(
+            &block.site,
+            "econ option requires unsupported TeX syntax",
+        ));
+    }
+    Ok(format!(
+        "\\begin{{econ}}[label={{{}}},title={{{}}},ref={{{}}},cites={{{}}},departs={{{}}},stopsat={{{}}}]{}\\end{{econ}}\n",
+        econ.target,
+        econ.title,
+        econ.reference,
+        econ.citations.join(","),
+        econ.departure,
+        econ.stops_at,
+        body
     ))
 }
 

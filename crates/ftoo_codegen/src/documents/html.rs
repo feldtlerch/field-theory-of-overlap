@@ -374,7 +374,15 @@ fn css(plan: &DocumentPlan, fonts: &Fonts) -> String {
         )
         .expect("string write");
     }
-    result.push_str("body{font-family:'Pagella',serif;max-width:46rem;margin:auto;padding:0 1rem;line-height:1.5}h1{font-weight:700}a:focus-visible,summary:focus-visible{outline:3px solid #a34500;outline-offset:3px}.refrain{text-align:center;font-style:italic}.attribution{text-align:right;font-size:smaller}.gap{color:#444}.licenses pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:'Pagella',serif}\n");
+    result.push_str("body{font-family:'Pagella',serif;max-width:46rem;margin:auto;padding:0 1rem;line-height:1.5}h1{font-weight:700}a:focus-visible,summary:focus-visible{outline:3px solid #a34500;outline-offset:3px}.refrain{text-align:center;font-style:italic}.attribution{text-align:right;font-size:smaller}.gap{color:#444}");
+    if plan.blocks.iter().any(|block| block.econ.is_some()) {
+        result.push_str(
+            ".econ{background:#f7f6f3;padding:1rem;margin:1rem 0}.econ footer{text-align:right}",
+        );
+    }
+    result.push_str(
+        ".licenses pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:'Pagella',serif}\n",
+    );
     if fonts.0.iter().any(|(face, _)| face.file == MONO.file) {
         result.push_str(
             "code{font-family:'Inconsolata',monospace;font-weight:400;font-style:normal}\n",
@@ -912,6 +920,52 @@ pub(super) fn model(
                 "p",
                 &[("class", "gap")],
                 vec![Node::Text(gap.message.clone())],
+            ));
+            continue;
+        }
+        if let Some(econ) = &block.econ {
+            let header_id = format!("{}-header", econ.fragment);
+            main.push(element(
+                "section",
+                &[
+                    ("class", "econ"),
+                    ("id", &econ.fragment),
+                    ("aria-labelledby", &header_id),
+                ],
+                vec![
+                    element(
+                        "header",
+                        &[],
+                        vec![element(
+                            "p",
+                            &[("id", &header_id)],
+                            vec![
+                                element(
+                                    "strong",
+                                    &[],
+                                    vec![Node::Text(format!(
+                                        "Economics {}. {}",
+                                        econ.number, econ.title
+                                    ))],
+                                ),
+                                Node::Text(format!(" (on {})", econ.reference)),
+                            ],
+                        )],
+                    ),
+                    element("p", &[], inline(&block.runs, prepared, index)),
+                    element(
+                        "footer",
+                        &[],
+                        vec![element(
+                            "p",
+                            &[],
+                            vec![Node::Text(format!(
+                                "{} · d:{}",
+                                econ.target, econ.departure
+                            ))],
+                        )],
+                    ),
+                ],
             ));
             continue;
         }

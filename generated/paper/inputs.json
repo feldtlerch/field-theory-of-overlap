@@ -24,7 +24,7 @@
     "documents/paper/main_explainer.tex.in": "66ce30759e2b22873ae7d2dca68d2b04e4bc20083977b2feb99b385cca089daa",
     "documents/paper/paper_xref.tex.in": "d7d2d60b6aa72b86982a6ddec6ad27373fb69bc016ab42f62aba282bd781a84d",
     "documents/paper/parts/appendices.tex": "88efaf10e58a9dee87bace65e6cb4ec25387feeefd04aaf8c2a3b59b9969d807",
-    "documents/paper/parts/coda.tex": "d57b9ca81b5a39308dfc6490311c34608dcd83a139403bd3b6d675d21393f683",
+    "documents/paper/parts/coda.tex": "4524ff3a3f962ed8be42243f66f13a664806017aea639acebd22ffcc92704f6a",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
     "documents/paper/parts/partA.tex": "1d7d04332608aa4a129d23df889ac769dd7cdfe599c6a4dcab500dc7c88d0ebf",
@@ -41,10 +41,11 @@
     "generated/documents/explainer-pilot/sec-reading-plain-intro.tex": "bff5ce6a32209e04390233e3e51ffe40038e9e3a9ce32b4c5a846111ec19c690",
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
-    "generated/documents/inclusions.tsv": "82e0ed9f3678e5e378fc826616ba5da39d21a7bad425625a39e5ac7384363e29",
+    "generated/documents/inclusions.tsv": "9b60781416ef28434ca882bb4b0f91857de5bab171b4210a5c58ab45ba6673f7",
     "generated/documents/paper-pilot/sec-boundary-ratio-rate.tex": "857219fcb015bf0e79527423e2d9aed58789f1d7b0f934de44af94d43ed1446b",
     "generated/documents/paper-pilot/sec-coda-audit-bottoms.tex": "33de11f3485b7ad8798e7024f1e35aaa79939728cd7d9dba4b7ac8d825a5c227",
     "generated/documents/paper-pilot/sec-coda-eight-words.tex": "8efb958bf0175b8b7dcea8fd47dd598dacb1d8055143148d74ec9bc6d5c61fb9",
+    "generated/documents/paper-pilot/sec-coda-flourishing-pole.tex": "bbe4842cf7cd8aee8a840da15bca5df625421a567aa41648b0e6da41a67417f2",
     "generated/documents/paper-pilot/sec-coda-record-limit.tex": "5ef0afd8c91d085aaa545b7790d6ddbf4b1776e52f72d189566bc75cdbc1dc22",
     "generated/documents/paper-pilot/sec-coda-whole-field.tex": "1903ea4bc8e2a7a131fecf5d370fcc515fd483fc077e0d1ff858e62113ac221c",
     "generated/documents/paper-pilot/sec-log-andreoni-joint.tex": "2624ce840185938b678b7a4c08dd046b0b9612744636f38e74c5c33e7a5c3a7e",
@@ -54,10 +55,10 @@
     "generated/documents/paper-pilot/sec-say-harm-enlargement.tex": "c9981cfb492c326bc78d8c9e434251017b9ac8e34ea697ec50efc427f5d327fe",
     "generated/documents/paper-pilot/sec-say-wonder-beauty.tex": "75cea6bf7d490a332e24a6c57b6993c48241c497cda50b49909652a10fca5cfd",
     "tools/assembly/native-lock.toml": "4d483a627b55c1d8eabefbcdbd8c5422bffa4344787ed9e772f9c4c46190f284",
-    "tools/paper/bibroute.py": "a03ef25a64174d95d584e8827c80e803a400441890b0f551badbe8794cd01c2d",
+    "tools/paper/bibroute.py": "d79c3596628dec7b6e4bb41308aace8c8bcc65f32cf03e7441a7e8063631506b",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
-    "tools/paper/identities.py": "1b9646c6d1560e3512ed3d908c4060bc3263d086dc7cd6e4c97f2690061d2e6c",
+    "tools/paper/identities.py": "f4fc2b08f0e85d963634a83c2552dd402f944351dce38b239fda936cf3d5eeb3",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "3c8e85a468e40182f7cdd36973970cbc53d673cebb415527de9867e1a5bbfe9e"
+    "tools/paper/prepare.py": "a6c70cd83e026f9584766043d6dc2fc97b69748d1bec513c31a632a786f76b76"
   }
 }

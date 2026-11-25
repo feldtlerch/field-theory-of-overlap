@@ -749,6 +749,7 @@ fn units(id: &str) -> crate::LanguageCheckedUnits {
             .into(),
         },
         vec![crate::UnitDraft {
+            econ: None,
             id: located(id),
             document: located("main"),
             table_site: site(vec![]),

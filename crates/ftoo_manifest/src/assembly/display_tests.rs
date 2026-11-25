@@ -491,6 +491,7 @@ fn corpus() -> LanguageCheckedUnits {
         )]),
     };
     let units = ["heading", "caption"].map(|name| UnitDraft {
+        econ: None,
         id: located(&format!("sec:fixture:{name}")),
         document: located("main"),
         table_site: site.clone(),
@@ -1568,6 +1569,7 @@ fn display_three_languages_resolve_each_site_and_use_the_smallest_reference_lang
         ("caption", "explainer", vec!["de", "en", "fr"]),
     ]
     .map(|(name, document, languages)| UnitDraft {
+        econ: None,
         id: located(&format!("sec:fixture:{name}")),
         document: located(document),
         table_site: at.clone(),
@@ -1757,6 +1759,7 @@ fn display_cross_unit_body_swaps_cannot_cancel_each_owners_mismatch() {
         )]),
     };
     let units = ["heading", "first", "second"].map(|name| UnitDraft {
+        econ: None,
         id: located(&format!("sec:fixture:{name}")),
         document: located("main"),
         table_site: site(),

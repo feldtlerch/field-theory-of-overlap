@@ -46,6 +46,7 @@ fn drafts(texts: &[(&str, &str)]) -> (DocumentDraft, UnitDraft) {
             ]),
         },
         UnitDraft {
+            econ: None,
             id: located(UNIT),
             document: located("explainer"),
             table_site: location.clone(),

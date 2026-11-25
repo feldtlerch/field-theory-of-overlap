@@ -43,10 +43,15 @@ fn bibliography_article_shape_and_derived_keys_refuse() {
             "{altered}"
         );
     }
-    for key in super::super::bibliography::DERIVED_KEYS {
+    for key in super::super::bibliography::DERIVED_KEYS
+        .into_iter()
+        .filter(|key| *key != "a:sencapability")
+    {
         let error = super::super::bibliography::resolve(ANDREONI, key, &site).unwrap_err();
         assert!(format!("{error:?}").contains("entry changed by bibliography derivation"));
     }
+    let book = super::super::bibliography::resolve(ANDREONI, "a:sencapability", &site).unwrap_err();
+    assert!(format!("{book:?}").contains("one bibliography entry of the admitted kind"));
     let error = super::super::bibliography::resolve(ANDREONI, "a:VMF", &site).unwrap_err();
     assert!(format!("{error:?}").contains("entry changed by bibliography derivation"));
     let collision =
@@ -103,6 +108,7 @@ fn bibliography_main_document_requires_screen_at_citation_site() {
             quotation: false,
             paragraph: true,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![Inline::BibliographyCitation {
                 kind: BibliographyCitationKind::Parenthetical,
@@ -188,6 +194,7 @@ fn bibliography_paragraph_emphasis_refuses_doubled_dash() {
         quotation: false,
         paragraph: true,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![Inline::Styled {
             kind: StyleKind::Emphasis,
@@ -287,6 +294,7 @@ fn bibliography_latex_document_recovers_the_source_command_and_entry() {
             quotation: false,
             paragraph: true,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("See ".into()),
@@ -365,6 +373,7 @@ fn support_required_bibliography_latex_context_typesets() -> Result<(), Box<dyn 
             quotation: false,
             paragraph: true,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("See ".into()),
@@ -457,6 +466,7 @@ fn context_graph(
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: runs(0, unit, "en", &welded, &BTreeMap::new(), "", None).unwrap(),
     };
@@ -482,6 +492,7 @@ fn literal_corpus(text: &str, math: BTreeMap<String, LocatedEntryDraft>) -> Lang
             )]),
         },
         vec![UnitDraft {
+            econ: None,
             id: value(UNIT),
             document: value("main"),
             table_site: site.clone(),
@@ -801,6 +812,7 @@ pub(in crate::documents) fn support_required_literal_build_controls(
                     &displays,
                     "",
                     None,
+                    &BTreeMap::new(),
                     &BTreeSet::new(),
                 )
                 .err()
@@ -817,6 +829,7 @@ pub(in crate::documents) fn support_required_literal_build_controls(
                     &displays,
                     "",
                     None,
+                    &BTreeMap::new(),
                     &BTreeSet::new(),
                 )
                 .unwrap();
@@ -1870,6 +1883,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
         ["sec:fixture:heading", UNIT]
             .into_iter()
             .map(|id| UnitDraft {
+                econ: None,
                 id: located(id),
                 document: located("fixture"),
                 table_site: site.clone(),
@@ -1880,6 +1894,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
                 texts: languages(),
             })
             .chain(std::iter::once(UnitDraft {
+                econ: None,
                 id: located("sec:main:heading"),
                 document: located("main"),
                 table_site: site.clone(),
@@ -2011,6 +2026,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: site.clone(),
             runs: vec![Inline::Text("Caption.".into())],
             pending_names: BTreeMap::new(),
@@ -2133,5 +2149,93 @@ fn literal_checker_protects_admitted_citation_tag_and_math_ranges() {
             check_reader_literals(unit, "en", &displays, &mut errors);
             assert_eq!(errors, vec![]);
         },
+    );
+}
+#[test]
+fn sen_book_uses_only_the_compared_parenthetical_derivation() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let stock = std::fs::read_to_string(root.join("documents/paper/references.bib")).unwrap();
+    let header = "@book{a:sencapability,\n";
+    assert_eq!(stock.matches(header).count(), 1);
+    let derived = stock.replacen(
+        header,
+        "@book{a:sencapability,\n  shortauthor = {{A. Sen}},\n",
+        1,
+    );
+    let site = ftoo_manifest::UnitSite {
+        file: "units/statements/coda-flourishing-pole.toml".into(),
+        path: vec![
+            ftoo_manifest::PathPart::Key("unit".into()),
+            ftoo_manifest::PathPart::Key("texts".into()),
+            ftoo_manifest::PathPart::Key("en".into()),
+        ],
+        anchor: ftoo_manifest::SourceAnchor::Unavailable,
+        decoded: None,
+        occurrence: None,
+    };
+    let parenthetical = ftoo_manifest::BibliographyCitationKind::Parenthetical;
+    let entry = super::super::bibliography::resolve_with_derived(
+        &stock,
+        &derived,
+        "a:sencapability",
+        &site,
+        parenthetical,
+    )
+    .unwrap();
+    assert_eq!(entry.label, "A. Sen 1999");
+    assert_eq!(
+        super::super::bibliography::screen_text(&entry),
+        "Sen, Amartya, 1999. Development as Freedom. Oxford: Oxford University Press."
+    );
+    for (changed, fault) in [
+        (
+            derived.replacen("year = {1999}", "year = {2000}", 1),
+            "derived book row differs",
+        ),
+        (
+            derived.replacen("{{A. Sen}}", "{{a. Sen}}", 1),
+            "derived shortauthor shape",
+        ),
+        (
+            derived.replacen("{{A. Sen}}", "{{A. Other}}", 1),
+            "derived shortauthor shape",
+        ),
+    ] {
+        assert!(
+            super::super::bibliography::resolve_with_derived(
+                &stock,
+                &changed,
+                "a:sencapability",
+                &site,
+                parenthetical
+            )
+            .unwrap_err()
+            .to_string()
+            .contains(fault)
+        );
+    }
+    assert!(
+        super::super::bibliography::resolve_with_derived(
+            &stock,
+            &derived,
+            "a:sencapability",
+            &site,
+            ftoo_manifest::BibliographyCitationKind::Textual
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("textual book citation")
+    );
+    assert!(
+        super::super::bibliography::resolve_with_derived(
+            &stock,
+            &derived,
+            "a:senidentity",
+            &site,
+            parenthetical
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("entry changed by bibliography derivation")
     );
 }

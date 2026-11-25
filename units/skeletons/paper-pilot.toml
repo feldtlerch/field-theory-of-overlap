@@ -13,6 +13,7 @@ children = [
   { kind = "unit", unit = "sec:say:enemy-to-none" },
   { kind = "paragraph", unit = "sec:boundary:ratio-rate" },
   { kind = "paragraph", unit = "sec:coda:audit-bottoms" },
+  { kind = "econ", unit = "sec:coda:flourishing-pole" },
   { kind = "paragraph", unit = "sec:coda:eight-words" },
   { kind = "paragraph", unit = "sec:coda:whole-field" },
   { kind = "unit", unit = "sec:coda:record-limit" },

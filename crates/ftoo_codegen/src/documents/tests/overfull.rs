@@ -437,6 +437,7 @@ pub(super) fn support_required_overfull_boxes_refuse_complete_frames_and_restore
             quotation: false,
             paragraph: false,
             equation: false,
+            econ: None,
             site: input::site("units/box.toml"),
             runs: vec![plan::Inline::Text("BOUNDARY".into())],
         }],
@@ -596,6 +597,7 @@ fn exact_sweep_explanation_is_refused_in_a_reader_pending_paragraph() {
         quotation: false,
         paragraph: false,
         equation: false,
+        econ: None,
         site: site.clone(),
         runs: vec![plan::Inline::Math {
             definition_site: site.clone(),

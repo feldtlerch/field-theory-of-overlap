@@ -4,6 +4,7 @@ import shutil
 import tempfile
 
 import identities
+import prepare
 from ledger import auxiliary as paper_auxiliary, check_auxiliary_destinations, check_paragraph_tag_modes
 from ledger import screen_references
 from prepare import declared_fragments
@@ -184,8 +185,10 @@ def selftest():
             source+'\tsec:fixture\tgenerated/documents/fixture.tex\tparagraph\t1\n',
             encoding='utf-8')
         original_bindings = identities.bindings
+        original_assembly_json = prepare.assembly_json
         identities.bindings = lambda unused: {
             'bd:rep': {'source_status': 'paper', 'spelling': 'bd:rep'}}
+        prepare.assembly_json = lambda unused: '{"native_targets":[]}'
         try:
             for suffix, reason in [
                 ('\\ftag{bd:rep}\n', None),
@@ -230,6 +233,7 @@ def selftest():
                 raise AssertionError('Duplicate auxiliary handle')
         finally:
             identities.bindings = original_bindings
+            prepare.assembly_json = original_assembly_json
 
 
 if __name__ == '__main__':

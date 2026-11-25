@@ -116,7 +116,7 @@ fn scope(source: &UnitSource) -> Result<ScopeRecord, DocumentError> {
             let role = string_value(fields[1])?;
             if !matches!(
                 role.as_str(),
-                "refrain" | "paragraph" | "quotation" | "equation"
+                "refrain" | "paragraph" | "quotation" | "equation" | "econ"
             ) || (role == "equation") != (fields.len() == 3)
                 || (role == "equation" && string_value(fields[2])? != "none")
             {
@@ -300,6 +300,9 @@ fn check_projection(
                     }
                     SkeletonChild::Paragraph(value) => {
                         inclusion.role == "paragraph" && value.value == inclusion.unit
+                    }
+                    SkeletonChild::Econ(value) => {
+                        inclusion.role == "econ" && value.value == inclusion.unit
                     }
                     SkeletonChild::Equation(value) => {
                         inclusion.role == "equation" && value.value == inclusion.unit
@@ -564,6 +567,10 @@ fn section(
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Paragraph(position(fields[1], count)?))
                 }
+                "econ" => {
+                    let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
+                    Ok(SkeletonChild::Econ(position(fields[1], count)?))
+                }
                 "equation" => {
                     let fields =
                         toml::fixed(child, &["kind", "unit", "numbering"]).map_err(boundary)?;
@@ -589,6 +596,7 @@ fn section(
                             expected: vec![
                                 "unit".into(),
                                 "paragraph".into(),
+                                "econ".into(),
                                 "equation".into(),
                                 "quotation".into(),
                                 "section".into(),
@@ -674,6 +682,7 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
         if let Some(kind) = &kind {
             if kind.value != "unit"
                 && kind.value != "paragraph"
+                && kind.value != "econ"
                 && kind.value != "equation"
                 && kind.value != "quotation"
                 && kind.value != "section"
@@ -685,7 +694,7 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
             }
             if matches!(
                 kind.value.as_str(),
-                "unit" | "paragraph" | "quotation" | "equation"
+                "unit" | "paragraph" | "econ" | "quotation" | "equation"
             ) {
                 let fields = if kind.value == "equation" {
                     toml::fixed(node, &["kind", "unit", "numbering"])?
@@ -817,6 +826,7 @@ fn unknown_kind(value: LocatedString) -> super::AssemblyDiagnostic {
             expected: vec![
                 "unit".into(),
                 "paragraph".into(),
+                "econ".into(),
                 "equation".into(),
                 "quotation".into(),
                 "section".into(),

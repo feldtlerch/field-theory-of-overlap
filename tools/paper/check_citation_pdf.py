@@ -9,7 +9,10 @@ from common import require
 from pdf_text import Pdf
 
 
-REGISTERED = {('paper-pilot/en.labels.md', 'a:andreoni', 'parenthetical'): 'warm-glow giving '}
+REGISTERED = {
+    ('paper-pilot/en.labels.md', 'a:andreoni', 'parenthetical'): 'warm-glow giving ',
+    ('paper-pilot/en.labels.md', 'a:sencapability', 'parenthetical'): 'The flourishing pole is Sen’s capability approach ',
+}
 COMMENT = re.compile(r'<!-- bibcite ([^<>]+) -->')
 LINK = r'<a href="#bibliography-[^"]+">([^<]+)</a>'
 
@@ -59,7 +62,9 @@ def selftest():
         primary = labels / 'paper-pilot/en.labels.md'
         primary.parent.mkdir()
         primary.write_text('(<a href="#bibliography-andreoni-1990">Andreoni 1990</a>)'
-                           '<!-- bibcite a:andreoni -->\n', encoding='utf-8')
+                           '<!-- bibcite a:andreoni -->\n'
+                           '(<a href="#bibliography-sen-1999">A. Sen 1999</a>)'
+                           '<!-- bibcite a:sencapability -->\n', encoding='utf-8')
         require_registered(inventory(labels))
         secondary = labels / 'other/en.labels.md'
         secondary.parent.mkdir()

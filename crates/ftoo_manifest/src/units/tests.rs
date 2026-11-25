@@ -537,6 +537,7 @@ fn fixtures() -> (DocumentDraft, Vec<UnitDraft>) {
             documents: BTreeMap::from([("main".to_owned(), document)]),
         },
         vec![UnitDraft {
+            econ: None,
             id: located("sec:coefficients:first-value", &["unit", "id"]),
             document: located("main", &["unit", "document"]),
             table_site: site("statement.toml", &["unit"]),
@@ -1144,18 +1145,18 @@ fn register_final_unit_statements() {
     let expected = [
         (
             RuleId::M039,
-            "Unit metadata carries a well-formed primary label unique within the admitted unit corpus and references a declared document language contract; document names obey the admitted grammar. Auxiliary paper-mint metadata declares distinct local names and canonical paper keys; unknown fields, aliases, duplicate declarations and use outside an owning English paper paragraph refuse.",
+            "Unit metadata carries a well-formed primary label unique within the admitted unit corpus and references a declared document language contract; document names obey the admitted grammar. Auxiliary paper-mint metadata declares distinct local names and canonical paper keys; unknown fields, aliases, duplicate declarations and use outside an owning English paper paragraph or econ box refuse. Optional econ metadata selects one declared auxiliary paper target and has a reference, ordered nonempty distinct citation keys, one departure and nonblank title and stopping text for every required language; it admits no authored counter, arbitrary option or target-specific body.",
             "Statement-unit metadata and document declaration names in one corpus admission.",
         ),
         (
             RuleId::M040,
             "Documents declare nonempty distinct language sets, a main document is declared and requires English alone, and each unit has exactly one nonblank authored text per required language and no text for an undeclared language; language tokens obey the admitted grammar. A document's optional targets list is a nonempty set of distinct values from fragment, markdown, latex and html, and defaults to markdown and latex. A document's optional paper-context is exactly paper; omission supplies no paper-scoped resolver.",
-            "Document language, target and paper-context declarations and all associated statement-unit texts.",
+            "Document language, target and paper-context declarations and all associated statement-unit texts, including econ titles and stopping texts.",
         ),
         (
             RuleId::M041,
-            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics. Each auxiliary paper mint is declared once in metadata and has exactly one visible local-selector placement in its owning English paper paragraph; unknown, unused, repeated or nested selectors and placements in other roles refuse. A virtue insertion names one literal roster word, retains its site, and is admitted only as a top-level insertion in an English paragraph of a paper-context document or of the explainer reading, which uses the companion form; a nested, unknown or nonliteral word refuses.",
-            "Every authored statement text, shared math entry and local math insertion.",
+            "Statement texts use the admitted insertion syntax and reference only their unit's shared nonblank TeX math entries, each of which is used; ordinary prose and math entries use only the admitted characters and fragment syntax, and math names obey the local-name grammar. Bibliography citation insertions retain their parenthetical or textual form and an ordered nonempty list of distinct keys in the grammar a:[A-Za-z0-9-]+; a citation inside a style refuses. Inline styles use the four semantic insertion kinds, retain located child identities, and refuse nesting, empty bodies, boundary whitespace, adjacent same-kind runs, a run containing its own closer, and styled mathematics. Each auxiliary paper mint is declared once in metadata and has exactly one local-selector placement: a visible @handle in its owning English paper paragraph, or the generated label option of its owning English econ environment. Unknown, unused, repeated or nested selectors and placements in other roles refuse; an econ target selector placed inline also refuses. A virtue insertion names one literal roster word, retains its site, and is admitted only as a top-level insertion in an English paragraph of a paper-context document or of the explainer reading, which uses the companion form; a nested, unknown or nonliteral word refuses.",
+            "Every authored statement text, shared math entry, local math insertion and econ metadata selector placement and virtue insertion.",
         ),
     ];
     assert_eq!(
@@ -2138,11 +2139,11 @@ fn register_m042_literal_statement_scope_and_state() {
     assert_eq!(rule.number, RuleId::M042);
     assert_eq!(
         rule.statement,
-        "Every tag-facing statement-text occurrence first resolves through the supplied AddressBook's live resolver. Only an unknown permanent spelling in a document declaring paper context may fall back to the checked paper-scoped lookup; retired and out-of-slice refusals and documentary-target refusals are terminal. The fallback accepts only paper or alias rows of kind node or evidence; admitted and candidate rows refuse. Resolution preserves the target domain, printed spelling, source key and evidence without permanent admission, or refuses with its unit, language and site."
+        "Every tag-facing statement-text occurrence and each econ reference and derived departure-handle occurrence first resolves through the supplied AddressBook's live resolver. Only an unknown permanent spelling in a document declaring paper context may fall back to the checked paper-scoped lookup; retired and out-of-slice refusals and documentary-target refusals are terminal. The fallback accepts only paper or alias rows of kind node or evidence; admitted and candidate rows refuse. Resolution preserves the target domain, printed spelling, source key and evidence without permanent admission, or refuses with its unit, language and site."
     );
     assert_eq!(
         rule.scope,
-        "All tag insertions in every admitted language text."
+        "All tag insertions in every admitted language text and the reference and derived departure-handle occurrences of econ metadata."
     );
     assert_eq!(rule.state, crate::RuleState::Enforced);
     assert_eq!(rule.deferred_reason, None);

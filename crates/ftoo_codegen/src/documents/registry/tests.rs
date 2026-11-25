@@ -38,10 +38,14 @@ fn paper_protocol_is_bound() {
     let root = &directory.0;
     std::fs::create_dir_all(root.join("tools/paper")).unwrap();
     std::fs::create_dir_all(root.join("fixtures")).unwrap();
+    std::fs::create_dir_all(root.join("documents/paper")).unwrap();
+    std::fs::write(root.join("documents/paper/references.bib"), b"stock").unwrap();
     std::fs::write(root.join("fixtures/input.txt"), b"checked input").unwrap();
     let digest = crate::hex(&sha2::Sha256::digest(b"checked input"));
+    let stock = crate::hex(&sha2::Sha256::digest(b"stock"));
+    let derived = crate::hex(&sha2::Sha256::digest(b"derived"));
     let baseline = format!(
-        r#"{{"schema":2,"inputs":[{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}},{{"key":"v:wonder","spelling":"v:wonder","status":"paper","target":"sem:weld:wonder","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":2}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper/data/ftoo_manifest.tex","line":3}}]}}],"virtues":[{{"word":"wonder","key":"v:wonder","target":"sem:weld:wonder","class_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":1}},"slug_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":2}}}}]}}"#
+        r#"{{"schema":2,"inputs":[{{"path":"documents/paper/references.bib","sha256":"{stock}"}},{{"path":"fixtures/input.txt","sha256":"{digest}"}}],"bindings":[{{"key":"src:nd","spelling":"src:nd","status":"paper","target":"node","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":1}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper-build/paper-tags.tsv","line":1}}]}},{{"key":"v:wonder","spelling":"v:wonder","status":"paper","target":"sem:weld:wonder","target_kind":"node","lookup_site":{{"file":"documents/paper-build/paper-tags.tsv","line":2}},"alias_site":null,"declaration_sites":[{{"file":"documents/paper/data/ftoo_manifest.tex","line":3}}]}}],"virtues":[{{"word":"wonder","key":"v:wonder","target":"sem:weld:wonder","class_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":1}},"slug_site":{{"file":"documents/paper/data/ftoo_manifest.tex","line":2}}}}],"departures":[],"native_targets":[],"bibliography":{{"source":"documents/paper/references.bib","stock_sha256":"{stock}","derived_sha256":"{derived}","derived_utf8":"derived"}}}}"#
     );
     let without_declaration_sites = baseline.replace(
         r#""declaration_sites":[{"file":"documents/paper-build/paper-tags.tsv","line":1}]"#,
@@ -117,7 +121,7 @@ fn paper_protocol_is_bound() {
             "assembly-json",
         ),
         (
-            baseline.replacen("\"inputs\":", "\"schema\":1,\"inputs\":", 1),
+            baseline.replacen("\"inputs\":", "\"schema\":2,\"inputs\":", 1),
             "assembly-json",
         ),
         (
@@ -236,7 +240,8 @@ fn paper_protocol_is_bound() {
     for (response, site, reason) in [
         (
             baseline.replacen(
-                &baseline[baseline.find("\"virtues\":[").unwrap()..baseline.len() - 1],
+                &baseline[baseline.find("\"virtues\":[").unwrap()
+                    ..baseline.find(",\"departures\":").unwrap()],
                 "\"virtues\":[]",
                 1,
             ),
