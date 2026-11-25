@@ -1,6 +1,7 @@
+use super::containers::decode_result;
 use super::{
     AccountOwner, AccountPiece, BlockDraft, BlockFields, BlockKind, BlockStatus, EventDraft,
-    ImportFault, MathDraft, Refusal, Run, Site, SourceDraft, TableCell, TargetDraft,
+    ImportFault, MathDraft, Refusal, ResultKind, Run, Site, SourceDraft, TableCell, TargetDraft,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -8,6 +9,7 @@ pub(super) enum Production {
     Begin,
     End,
     Heading,
+    Header,
     Appendix,
     Wrapper,
     Layout,
@@ -40,6 +42,8 @@ pub(super) const COMMANDS: &[(&str, Production)] = &[
     ("\\PaperDisplayParagraph", Production::Layout),
     ("\\secgrade", Production::Checking),
     ("\\grade", Production::Checking),
+    ("\\hdr", Production::Header),
+    ("\\PaperGradeGap", Production::Layout),
     ("\\spend", Production::Checking),
     ("\\grant", Production::Checking),
     ("\\DeclareQuantity", Production::Checking),
@@ -149,7 +153,7 @@ impl<'a> Walker<'a> {
     }
 }
 
-fn site(path: &str, text: &str, start: usize, end: usize) -> Site {
+pub(super) fn site(path: &str, text: &str, start: usize, end: usize) -> Site {
     let last_line = if end > 0 && text.as_bytes()[end - 1] == b'\n' {
         &text[..end - 1]
     } else {
@@ -164,7 +168,7 @@ fn site(path: &str, text: &str, start: usize, end: usize) -> Site {
     }
 }
 
-fn braced(text: &str, start: usize) -> Option<(&str, usize)> {
+pub(super) fn braced(text: &str, start: usize) -> Option<(&str, usize)> {
     let mut walker = Walker::new(text, start);
     if !matches!(walker.next(), Some((_, _, Lexeme::Open))) {
         return None;
@@ -181,7 +185,7 @@ fn braced(text: &str, start: usize) -> Option<(&str, usize)> {
     None
 }
 
-fn command_at(text: &str, start: usize) -> (&str, usize) {
+pub(super) fn command_at(text: &str, start: usize) -> (&str, usize) {
     let mut walker = Walker::new(text, start);
     let (_, end, Lexeme::Command(command)) =
         walker.next().expect("command starts at a source boundary")
@@ -527,13 +531,18 @@ fn child_hook_end(text: &str, start: usize, line_end: usize) -> Option<usize> {
 }
 
 #[allow(clippy::collapsible_if, clippy::too_many_lines)] // Each nested boundary has a distinct failure condition.
-fn container_children(path: &str, text: &str, start: usize, end: usize) -> Vec<BlockDraft> {
+pub(super) fn container_children(
+    path: &str,
+    text: &str,
+    start: usize,
+    end: usize,
+) -> (Vec<BlockDraft>, Vec<TargetDraft>) {
     let (command, command_end) = command_at(text, start);
     if production(command) != Some(Production::Begin) {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let Some((_, mut body_start)) = braced(text, command_end) else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     if text.as_bytes().get(body_start) == Some(&b'[') {
         let mut walker = Walker::new(text, body_start + 1);
@@ -551,7 +560,7 @@ fn container_children(path: &str, text: &str, start: usize, end: usize) -> Vec<B
             }
         }
         let Some(next) = found else {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         };
         body_start = next;
     }
@@ -559,9 +568,10 @@ fn container_children(path: &str, text: &str, start: usize, end: usize) -> Vec<B
         .rfind("\\end{")
         .map(|offset| body_start + offset)
     else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let mut children = Vec::new();
+    let mut targets = Vec::new();
     let mut cursor = body_start;
     let mut after_display = false;
     while cursor < close_line {
@@ -622,11 +632,14 @@ fn container_children(path: &str, text: &str, start: usize, end: usize) -> Vec<B
         }
         let fragment = text[begin..paragraph_end].trim_end();
         let fields = match inline(path, text, fragment, begin) {
-            Ok((runs, _)) => BlockFields::Paragraph {
-                continuation: after_display,
-                layout: Vec::new(),
-                runs,
-            },
+            Ok((runs, child_targets)) => {
+                targets.extend(child_targets);
+                BlockFields::Paragraph {
+                    continuation: after_display,
+                    layout: Vec::new(),
+                    runs,
+                }
+            }
             Err(_) => BlockFields::Unresolved {
                 production: "paragraph".into(),
             },
@@ -648,7 +661,7 @@ fn container_children(path: &str, text: &str, start: usize, end: usize) -> Vec<B
         after_display = false;
         cursor = paragraph_end;
     }
-    children
+    (children, targets)
 }
 
 fn heading(text: &str) -> Option<(&str, bool, &str, usize)> {
@@ -865,7 +878,7 @@ impl Importer<'_> {
                 | BlockKind::EconomicsBox
                 | BlockKind::EpistemologyBox
         ) {
-            container_children(self.path, self.text, start, end)
+            container_children(self.path, self.text, start, end).0
         } else {
             Vec::new()
         };
@@ -894,6 +907,13 @@ impl Importer<'_> {
         let mut walker = Walker::new(&text[..end], start);
         while let Some((at, next, token)) = walker.next() {
             let fault = match token {
+                Lexeme::Comment
+                    if at == start
+                        && *kind == BlockKind::ExistingNativeInclusion
+                        && text[start..end].starts_with("% generated: ") =>
+                {
+                    None
+                }
                 Lexeme::Comment => {
                     Some((at, at + 1, "comment in content".to_owned(), "%".to_owned()))
                 }
@@ -935,10 +955,13 @@ impl Importer<'_> {
                                     if closed <= end {
                                         let code = "unresolved mathematics";
                                         self.math_fault(at, closed);
-                                        if !self.draft.refusals.iter().any(|item| {
-                                            item.outer_block_index == block_index
-                                                && item.site.start_byte == at
-                                        }) {
+                                        if at != start
+                                            && !self.draft.refusals.iter().any(|item| {
+                                                item.outer_block_index == block_index
+                                                    && item.site.start_byte == at
+                                                    && item.code == code
+                                            })
+                                        {
                                             self.draft.refusals.push(Refusal {
                                                 outer_block_index: block_index,
                                                 is_primary: false,
@@ -953,7 +976,7 @@ impl Importer<'_> {
                                     }
                                 }
                             }
-                            (command == "\\begin").then(|| {
+                            (command == "\\begin" && at != start).then(|| {
                                 (
                                     at,
                                     after,
@@ -1029,7 +1052,9 @@ impl Importer<'_> {
                 self.math_fault(fault_start, fault_end);
             }
             if self.draft.refusals.iter().any(|item| {
-                item.outer_block_index == block_index && item.site.start_byte == fault_start
+                item.outer_block_index == block_index
+                    && item.site.start_byte == fault_start
+                    && (item.code == code || !item.is_primary)
             }) {
                 continue;
             }
@@ -1276,7 +1301,7 @@ impl Importer<'_> {
 /// # Errors
 /// Refuses invalid UTF-8 or an invalid independent accounting partition.
 /// # Panics
-/// Panics only if a line found to contain an environment opener loses that same opener before indexing, which supplied bytes cannot arrange.
+/// Panics only if a line loses an opener already found in it or a block just inserted cannot be accessed; supplied bytes cannot arrange either condition.
 #[allow(clippy::too_many_lines, clippy::single_match_else)] // The source-order pass closes each block before accounting it.
 pub fn import_source(
     path: &str,
@@ -1395,6 +1420,34 @@ pub fn import_source(
                                 &name,
                                 &format!("unsupported environment {name}"),
                             );
+                        }
+                    } else if let Some(result_kind) = ResultKind::from_name(&name) {
+                        match decode_result(path, text, begin, closed, end, result_kind) {
+                            Ok((fields, children, targets)) => {
+                                importer.targets(targets);
+                                importer.block(
+                                    begin,
+                                    end,
+                                    BlockKind::TheoremContainer,
+                                    fields,
+                                    false,
+                                );
+                                importer
+                                    .draft
+                                    .blocks
+                                    .last_mut()
+                                    .expect("block just inserted")
+                                    .children = children;
+                            }
+                            Err((fault_start, fault_end, reason)) => importer.refuse(
+                                begin,
+                                end,
+                                fault_start,
+                                fault_end,
+                                &BlockKind::TheoremContainer,
+                                &name,
+                                &reason,
+                            ),
                         }
                     } else {
                         importer.refuse(

@@ -46,6 +46,10 @@ fn declared_corpus_is_accounted_and_repeatable() {
     assert_eq!(a["source_count"], 12);
     assert_eq!(a["accounted_bytes"], a["source_bytes"]);
     assert_eq!(a["transfer_ready"], false);
+    for name in ["insight", "remark", "definition"] {
+        let code = format!("unsupported environment {name}");
+        assert!(a["all_faults"].get(code.as_str()).is_none());
+    }
     let declared_native = fs::read_to_string(root.join("generated/documents/inclusions.tsv"))
         .unwrap()
         .lines()
@@ -92,6 +96,76 @@ fn all_fault_rows_count_occurrences_blocks_and_solo_clears() {
         display_rows["unsupported environment equation"]["sole_kind_blocks"],
         1
     );
+    let nested_source = "\\begin{theorem}\nA.\n\\begin{equation}x\\end{equation}\n\\end{theorem}\n";
+    let nested = import_source(path, nested_source.as_bytes(), "digest".into(), &[]).unwrap();
+    let nested_bytes = BTreeMap::from([(path.to_owned(), nested_source.as_bytes().to_vec())]);
+    let nested_rows = all_fault_rows(&[nested], &nested_bytes);
+    assert_eq!(nested_rows["unresolved mathematics"]["blocks"], 1);
+    assert!(
+        nested_rows
+            .get("unsupported environment equation")
+            .is_none()
+    );
+}
+
+#[test]
+fn live_result_child_faults_enter_the_all_faults_table() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut drafts = Vec::new();
+    let mut bytes = BTreeMap::new();
+    for part in ["front.tex", "partB.tex"] {
+        let path = format!("documents/paper/parts/{part}");
+        let source = fs::read(root.join(&path)).unwrap();
+        drafts.push(import_source(&path, &source, "digest".into(), &[]).unwrap());
+        bytes.insert(path, source);
+    }
+    for (part, key, code) in [
+        ("front.tex", "gen:goods", "unresolved mathematics"),
+        (
+            "partB.tex",
+            "dyn:polar",
+            "unsupported command \\DisplayClass",
+        ),
+        ("partB.tex", "dyn:jac", "unsupported command \\DisplayClass"),
+    ] {
+        let draft = drafts
+            .iter()
+            .find(|draft| draft.path.ends_with(part))
+            .unwrap();
+        let text = std::str::from_utf8(&bytes[&draft.path]).unwrap();
+        let opener = format!("\\hdr{{{key}}}");
+        let line = 1 + text[..text.find(&opener).unwrap()].matches('\n').count();
+        let block = draft
+            .blocks
+            .iter()
+            .find(|block| block.site.start_line == line)
+            .unwrap();
+        assert!(
+            draft
+                .refusals
+                .iter()
+                .any(|fault| fault.outer_block_index == block.local_index
+                    && fault.code == code
+                    && !fault.is_primary)
+        );
+        let mut one = draft.clone();
+        one.refusals
+            .retain(|fault| fault.outer_block_index == block.local_index);
+        let single = all_fault_rows(&[one], &bytes);
+        assert_eq!(single[code]["blocks"], 1);
+    }
+    let rows = all_fault_rows(&drafts, &bytes);
+    assert!(rows["unresolved mathematics"]["blocks"].as_u64().unwrap() > 0);
+    assert!(
+        rows["unsupported command \\DisplayClass"]["blocks"]
+            .as_u64()
+            .unwrap()
+            >= 2
+    );
+    for name in ["insight", "remark", "definition"] {
+        let code = format!("unsupported environment {name}");
+        assert!(rows.get(code.as_str()).is_none());
+    }
 }
 
 #[test]

@@ -1,3 +1,4 @@
+use super::containers::validate_result_parts;
 use super::import::{COMMANDS, Production, production};
 use super::*;
 
@@ -9,6 +10,293 @@ fn draft(text: &str) -> SourceDraft {
         &[],
     )
     .unwrap()
+}
+
+#[test]
+fn registered_results_decode_real_plain_children() {
+    for (part, key, kind, grade) in [
+        (
+            "partA.tex",
+            "f:pool",
+            ResultKind::Insight,
+            ResultGradeCode::ContAnch,
+        ),
+        (
+            "partC.tex",
+            "nrm:modest",
+            ResultKind::Definition,
+            ResultGradeCode::Nec,
+        ),
+    ] {
+        let path = format!("documents/paper/parts/{part}");
+        let source = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../")
+                .join(&path),
+        )
+        .unwrap();
+        let imported = import_source(&path, source.as_bytes(), "digest".into(), &[]).unwrap();
+        let opener = format!("\\begin{{{}}}[\\hdr{{{key}}}]", kind.name());
+        let expected_line = 1 + source[..source.find(&opener).unwrap()]
+            .matches('\n')
+            .count();
+        let result = imported
+            .blocks
+            .iter()
+            .find(|block| block.site.start_line == expected_line)
+            .unwrap();
+        assert_eq!(result.kind, BlockKind::TheoremContainer);
+        assert_eq!(result.status, BlockStatus::Decoded);
+        let BlockFields::Result {
+            result_kind: actual,
+            header,
+            grade: actual_grade,
+            parts,
+        } = &result.fields
+        else {
+            panic!("result fields")
+        };
+        assert_eq!(actual, &kind);
+        assert!(matches!(header, ResultHeader::Registered { key: actual, .. } if actual == key));
+        assert_eq!(actual_grade.as_ref().unwrap().code, grade);
+        let body = &source[result.site.start_byte..result.site.end_byte];
+        let body_start = body.find('\n').unwrap() + 1;
+        let body_end = body.rfind("\\end{").unwrap();
+        let expected_children = body[body_start..body_end]
+            .split("\n\n")
+            .filter(|paragraph| !paragraph.trim().is_empty())
+            .count();
+        assert_eq!(result.children.len(), expected_children);
+        assert_eq!(result.children[0].status, BlockStatus::Decoded);
+        if key == "nrm:modest" {
+            assert!(
+                parts
+                    .iter()
+                    .any(|part| part.kind == ResultPartKind::GradeGap
+                        && &source[part.site.start_byte..part.site.end_byte]
+                            == "\\PaperGradeGap{-2pt}")
+            );
+        }
+        assert!(
+            !imported
+                .refusals
+                .iter()
+                .any(|fault| fault.outer_block_index == result.local_index)
+        );
+    }
+}
+
+#[test]
+fn result_draft_preserves_key_grade_and_ordered_children() {
+    let source = "\\begin{remark}[\\hdr{f:pool}]\nFirst.\n\nSecond.\n\\end{remark}\n";
+    let original = draft(source);
+    let result = &original.blocks[0];
+    assert_eq!(result.status, BlockStatus::Decoded);
+    assert_eq!(result.children.len(), 2);
+    assert!(matches!(
+        &result.fields,
+        BlockFields::Result { grade: None, .. }
+    ));
+    let changed_key = draft(&source.replace("f:pool", "f:poor"));
+    let BlockFields::Result {
+        header: ResultHeader::Registered { key, .. },
+        ..
+    } = &changed_key.blocks[0].fields
+    else {
+        panic!("changed key")
+    };
+    assert_eq!(key, "f:poor");
+    let changed_grade = draft(&source.replace("]\n", "]\\grade{nec}\n"));
+    let BlockFields::Result {
+        grade: Some(grade), ..
+    } = &changed_grade.blocks[0].fields
+    else {
+        panic!("added grade")
+    };
+    assert_eq!(grade.code, ResultGradeCode::Nec);
+    let mut missing_child = result.children.clone();
+    missing_child.pop();
+    assert_eq!(
+        validate_result_parts(&result.fields, &missing_child, &result.site, source),
+        Err("missing result child")
+    );
+    let mut reordered = result.children.clone();
+    reordered.swap(0, 1);
+    assert_eq!(
+        validate_result_parts(&result.fields, &reordered, &result.site, source),
+        Err("reordered result child")
+    );
+    let mut unaccounted = result.fields.clone();
+    if let BlockFields::Result { parts, .. } = &mut unaccounted {
+        parts[0].site.end_byte -= 1;
+    }
+    assert_eq!(
+        validate_result_parts(&unaccounted, &result.children, &result.site, source),
+        Err("unaccounted result byte")
+    );
+    let mut wrong_child = result.children.clone();
+    wrong_child[0].status = BlockStatus::Unresolved;
+    assert_eq!(
+        validate_result_parts(&result.fields, &wrong_child, &result.site, source),
+        Err("unsupported result child")
+    );
+    let mut wrong_part = result.fields.clone();
+    if let BlockFields::Result { parts, .. } = &mut wrong_part {
+        parts[1].kind = ResultPartKind::Closing;
+    }
+    assert_eq!(
+        validate_result_parts(&wrong_part, &result.children, &result.site, source),
+        Err("result boundary order")
+    );
+    let mut wrong_trivia = result.fields.clone();
+    if let BlockFields::Result { parts, .. } = &mut wrong_trivia {
+        let child = parts
+            .iter_mut()
+            .find(|part| part.kind == ResultPartKind::Child)
+            .unwrap();
+        child.kind = ResultPartKind::Trivia;
+    }
+    assert_eq!(
+        validate_result_parts(&wrong_trivia, &result.children, &result.site, source),
+        Err("unaccounted result byte")
+    );
+    let graded_source =
+        "\\begin{insight}[\\hdr{x}]\\grade{nec}\\PaperGradeGap{-2pt}\nText.\n\\end{insight}\n";
+    let graded = draft(graded_source);
+    let mut wrong_grade = graded.blocks[0].fields.clone();
+    if let BlockFields::Result {
+        grade: Some(grade), ..
+    } = &mut wrong_grade
+    {
+        grade.code = ResultGradeCode::Feas;
+    }
+    assert_eq!(
+        validate_result_parts(
+            &wrong_grade,
+            &graded.blocks[0].children,
+            &graded.blocks[0].site,
+            graded_source
+        ),
+        Err("result grade mismatch")
+    );
+}
+
+#[test]
+fn result_header_and_grade_gap_mutations_refuse() {
+    let source = "\\begin{remark}[\\hdr{f:pool}]\nText.\n\\end{remark}\n";
+    let result = draft(source);
+    let mut wrong_header = result.blocks[0].fields.clone();
+    if let BlockFields::Result {
+        header: ResultHeader::Registered { key, .. },
+        ..
+    } = &mut wrong_header
+    {
+        *key = "f:poor".into();
+    }
+    assert_eq!(
+        validate_result_parts(
+            &wrong_header,
+            &result.blocks[0].children,
+            &result.blocks[0].site,
+            source
+        ),
+        Err("result header mismatch")
+    );
+    let graded_source =
+        "\\begin{insight}[\\hdr{x}]\\grade{nec}\\PaperGradeGap{-2pt}\nText.\n\\end{insight}\n";
+    let graded = draft(graded_source);
+    let changed_gap = graded_source.replace("\\PaperGradeGap{-2pt}", "\\PaperGradeGap{-3pt}");
+    assert_eq!(
+        validate_result_parts(
+            &graded.blocks[0].fields,
+            &graded.blocks[0].children,
+            &graded.blocks[0].site,
+            &changed_gap
+        ),
+        Err("result grade-gap mismatch")
+    );
+}
+
+#[test]
+fn result_header_and_child_faults_remain_located() {
+    let stray_header = draft("\\hdr{f:pool}\n");
+    assert_eq!(stray_header.refusals[0].code, "unsupported command \\hdr");
+    let wrong_header = draft("\\begin{insight}[Other]A.\n\\end{insight}\n");
+    assert_eq!(wrong_header.refusals[0].code, "unsupported result header");
+    let wrong_child = draft("\\begin{insight}[\\hdr{f:pool}]\nA $x$.\n\\end{insight}\n");
+    assert_eq!(wrong_child.refusals[0].code, "unsupported result child");
+    assert_eq!(wrong_child.refusals[0].site.start_line, 2);
+    assert!(
+        !wrong_child
+            .refusals
+            .iter()
+            .any(|fault| fault.code == "unsupported environment insight")
+    );
+    assert!(
+        wrong_child
+            .refusals
+            .iter()
+            .any(|fault| fault.code == "unresolved mathematics")
+    );
+    let unaccounted =
+        draft("\\begin{remark}[\\hdr{x}]\nFirst.\n\\label{y}\nSecond.\n\\end{remark}\n");
+    assert_eq!(unaccounted.refusals[0].code, "unaccounted result byte");
+    assert_eq!(unaccounted.refusals[0].site.start_line, 3);
+    let non_ascii_gap =
+        draft("\\begin{remark}[\\hdr{x}]\nFirst.\n\u{a0}\nSecond.\n\\end{remark}\n");
+    assert_eq!(non_ascii_gap.refusals[0].code, "unaccounted result byte");
+    let bad_grade = draft("\\begin{insight}[\\hdr{x}]\\grade{bad}\nText.\n\\end{insight}\n");
+    assert_eq!(bad_grade.refusals[0].code, "unsupported result grade");
+    let no_grade =
+        draft("\\begin{definition}[\\hdr{x}]\\PaperGradeGap{-2pt}\nText.\n\\end{definition}\n");
+    assert_eq!(no_grade.refusals[0].code, "unsupported result layout");
+    let long_grade = draft("\\begin{insight}[\\hdr{x}]\\gradeword{nec}\nText.\n\\end{insight}\n");
+    assert_ne!(long_grade.refusals[0].code, "unsupported result grade");
+    let long_header = draft("\\begin{insight}[\\hdrunbacked{x}{y}]\nText.\n\\end{insight}\n");
+    assert_eq!(long_header.refusals[0].code, "unsupported result header");
+}
+
+#[test]
+fn live_unadmitted_header_forms_and_child_targets_are_retained() {
+    for (part, form) in [
+        ("partA.tex", "\\hdrtitleonly"),
+        ("partA.tex", "\\hdrunbacked"),
+        ("partE.tex", "\\hdrunbacked"),
+    ] {
+        let path = format!("documents/paper/parts/{part}");
+        let source = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../")
+                .join(&path),
+        )
+        .unwrap();
+        let expected_line = 1 + source[..source.find(form).unwrap()].matches('\n').count();
+        let imported = import_source(&path, source.as_bytes(), "digest".into(), &[]).unwrap();
+        assert!(imported.refusals.iter().any(|fault| fault.is_primary
+            && fault.code == "unsupported result header"
+            && fault.site.start_line == expected_line));
+    }
+    let path = "documents/paper/parts/partB.tex";
+    let source = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../")
+            .join(path),
+    )
+    .unwrap();
+    let imported = import_source(path, source.as_bytes(), "digest".into(), &[]).unwrap();
+    let result = imported.blocks.iter().find(|block| {
+        matches!(&block.fields, BlockFields::Result { header: ResultHeader::Registered { key, .. }, .. } if key == "src:nd")
+    }).unwrap();
+    let keys: Vec<_> = imported
+        .metadata_targets
+        .iter()
+        .filter(|target| {
+            target.site.start_byte >= result.site.start_byte
+                && target.site.end_byte <= result.site.end_byte
+        })
+        .map(|target| target.exact_key.as_str())
+        .collect();
+    assert_eq!(keys, ["epist:duhem", "op:recess"]);
 }
 
 #[test]
@@ -236,7 +524,7 @@ fn balanced_container_is_located_residue() {
     let result = draft(source);
     assert_eq!(result.blocks.len(), 1);
     assert_eq!(result.blocks[0].kind, BlockKind::TheoremContainer);
-    assert_eq!(result.refusals[0].reason, "unsupported environment remark");
+    assert_eq!(result.refusals[0].reason, "unsupported result header");
     assert_eq!(result.blocks[0].children.len(), 2);
     assert_eq!(result.blocks[0].children[0].kind, BlockKind::Display);
     assert!(matches!(
@@ -308,7 +596,11 @@ fn environment_names_and_trailing_table_bytes_refuse() {
         assert_eq!(result.blocks[0].kind, kind);
         assert_eq!(
             result.refusals[0].code,
-            format!("unsupported environment {name}")
+            if matches!(name, "definition" | "insight") {
+                "unsupported result header".to_owned()
+            } else {
+                format!("unsupported environment {name}")
+            }
         );
     }
     let table = draft("\\begin{tabular}{c}a\\\\\\end{tabular}trailing\n");
@@ -402,6 +694,7 @@ fn known_marker_is_not_copied_as_prose() {
     ));
     let unowned = draft(source);
     assert_eq!(unowned.refusals[0].reason, "unowned generated marker");
+    assert_eq!(unowned.refusals.len(), 1);
     assert!(matches!(
         unowned.accounting[0].owner,
         AccountOwner::Refusal(0)

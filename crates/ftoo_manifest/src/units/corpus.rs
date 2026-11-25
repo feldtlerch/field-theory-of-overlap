@@ -1,5 +1,6 @@
 //! Diagnostic drafts from declared document source bytes.
 //! These values are not admitted units or renderable document plans.
+mod containers;
 mod import;
 #[cfg(test)]
 mod tests;
@@ -106,9 +107,104 @@ pub enum BlockFields {
         unit: String,
         role: String,
     },
+    Result {
+        result_kind: ResultKind,
+        header: ResultHeader,
+        grade: Option<ResultGrade>,
+        parts: Vec<ResultPart>,
+    },
     Unresolved {
         production: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ResultKind {
+    Insight,
+    Remark,
+    Definition,
+}
+
+impl ResultKind {
+    pub(super) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "insight" => Some(Self::Insight),
+            "remark" => Some(Self::Remark),
+            "definition" => Some(Self::Definition),
+            _ => None,
+        }
+    }
+
+    pub(super) fn name(self) -> &'static str {
+        match self {
+            Self::Insight => "insight",
+            Self::Remark => "remark",
+            Self::Definition => "definition",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "form", rename_all = "kebab-case")]
+pub enum ResultHeader {
+    Registered { key: String, site: Site },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ResultGrade {
+    pub code: ResultGradeCode,
+    pub site: Site,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ResultGradeCode {
+    Nec,
+    ContAnch,
+    Feas,
+    ContComm,
+    Cont,
+}
+
+impl ResultGradeCode {
+    pub(super) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "nec" => Some(Self::Nec),
+            "cont-anch" => Some(Self::ContAnch),
+            "feas" => Some(Self::Feas),
+            "cont-comm" => Some(Self::ContComm),
+            "cont" => Some(Self::Cont),
+            _ => None,
+        }
+    }
+
+    pub(super) fn name(self) -> &'static str {
+        match self {
+            Self::Nec => "nec",
+            Self::ContAnch => "cont-anch",
+            Self::Feas => "feas",
+            Self::ContComm => "cont-comm",
+            Self::Cont => "cont",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ResultPartKind {
+    Opening,
+    Grade,
+    GradeGap,
+    Trivia,
+    Child,
+    Closing,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ResultPart {
+    pub kind: ResultPartKind,
+    pub site: Site,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
