@@ -45,6 +45,10 @@ fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         fs::copy(source.join(file), root.0.join(file))?;
     }
     let path = root.0.join("documents/paper/explainer/explainer.tex");
+    fs::copy(
+        source.join("units/fixtures/explainer-prefix-source.tex"),
+        &path,
+    )?;
     let original = fs::read_to_string(&path)?;
     let lines: Vec<_> = original.split_inclusive('\n').collect();
     assert!(lines[43].starts_with(r"\section{The Whole Idea, in Plain Words}"));
@@ -58,6 +62,10 @@ fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         ),
     )?;
     let path = root.0.join("units/scopes/explainer.toml");
+    fs::copy(
+        source.join("units/fixtures/explainer-prefix-scope.toml"),
+        &path,
+    )?;
     let original = fs::read_to_string(&path)?;
     let old = "unit = \"sec:reading:plain-intro\"\nrole = \"paragraph\"";
     assert_eq!(original.matches(old).count(), 1);

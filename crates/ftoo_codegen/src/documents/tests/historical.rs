@@ -42,9 +42,16 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     let (drafts, display_drafts) = input::assembly_sources(&sources, &displays)?;
     let (metadata, owners) = super::super::metadata(&statements);
     let document_sites = super::super::document_sites(&corpus);
-    let skeletons =
-        ftoo_manifest::check_skeletons(&corpus, &drafts, &metadata, &owners, &document_sites)
-            .unwrap();
+    let (slots, _) = super::super::corpus::load(&root, &corpus)?;
+    let skeletons = ftoo_manifest::check_skeletons_with_slots(
+        &corpus,
+        &drafts,
+        &metadata,
+        &owners,
+        &document_sites,
+        &slots,
+    )
+    .unwrap();
     let displays = ftoo_manifest::check_displays(&display_drafts, &skeletons, &welded).unwrap();
     let catalogue = ftoo_manifest::notation(&book).unwrap();
     let bibliography = fs::read_to_string(root.join("documents/paper/references.bib"))?;
@@ -58,8 +65,9 @@ fn support_required_literal_historical_body_under_current_contracts_and_pending_
     crate::notation::with_preparation(None, &catalogue, |notation| -> Result<(), DocumentError> {
         plan::citation_tests::support_required_literal_build_controls(notation);
         super::pending::support_required_pending_paragraphs_are_complete_label_neutral_and_independently_consumed(&book, notation)?;
-        let plans = plan::build(
+        let plans = plan::build_with_slots(
             &skeletons,
+            &slots,
             &welded,
             notation,
             &metadata,

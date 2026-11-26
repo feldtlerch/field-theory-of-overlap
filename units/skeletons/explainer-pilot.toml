@@ -6,7 +6,7 @@ document = "explainer-pilot"
 [[skeleton.sections]]
 heading = "sec:pilot:explainer-excerpt"
 children = [
-  { kind = "paragraph", unit = "sec:reading:plain-intro" },
+  { kind = "corpus-slot", unit = "sec:explainer:plain" },
   { kind = "quotation", unit = "sec:say:direction" },
   { kind = "equation", unit = "eq:explainer:overlap-flow", numbering = "none" },
   { kind = "quotation", unit = "sec:say:enemy-to-none" },

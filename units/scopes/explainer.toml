@@ -5,8 +5,8 @@ document = "explainer-pilot"
 source = "documents/paper/explainer/explainer.tex"
 
 [[scope.occurrences]]
-unit = "sec:reading:plain-intro"
-role = "paragraph"
+unit = "sec:explainer:plain"
+role = "corpus-slot"
 
 [[scope.occurrences]]
 unit = "sec:say:direction"

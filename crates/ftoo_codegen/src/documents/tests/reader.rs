@@ -1635,9 +1635,16 @@ fn screen_planning_derives_gaps_and_requires_language_templates() {
         .collect();
     let (metadata, owners) = super::super::metadata(&statements);
     let document_sites = super::super::document_sites(&corpus);
-    let skeletons =
-        ftoo_manifest::check_skeletons(&corpus, &drafts, &metadata, &owners, &document_sites)
-            .unwrap();
+    let (slots, _) = super::super::corpus::load(&root, &corpus).unwrap();
+    let skeletons = ftoo_manifest::check_skeletons_with_slots(
+        &corpus,
+        &drafts,
+        &metadata,
+        &owners,
+        &document_sites,
+        &slots,
+    )
+    .unwrap();
     let selected = BTreeMap::from([(
         "paper-pilot".into(),
         vec![

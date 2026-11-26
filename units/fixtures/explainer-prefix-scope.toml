@@ -1,0 +1,30 @@
+schema = 1
+
+[scope]
+document = "explainer-pilot"
+source = "documents/paper/explainer/explainer.tex"
+
+[[scope.occurrences]]
+unit = "sec:reading:plain-intro"
+role = "paragraph"
+
+[[scope.occurrences]]
+unit = "sec:say:direction"
+role = "quotation"
+
+[[scope.occurrences]]
+unit = "eq:explainer:overlap-flow"
+role = "equation"
+numbering = "none"
+
+[[scope.occurrences]]
+unit = "sec:say:enemy-to-none"
+role = "quotation"
+
+[[scope.occurrences]]
+unit = "sec:explainer:eight-words"
+role = "paragraph"
+
+[[scope.occurrences]]
+unit = "sec:coda:record-limit"
+role = "quotation"

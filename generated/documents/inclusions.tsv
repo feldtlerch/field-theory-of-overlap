@@ -10,9 +10,9 @@ documents/paper/parts/coda.tex	sec:coda:eight-words	generated/documents/paper-pi
 documents/paper/parts/coda.tex	sec:coda:whole-field	generated/documents/paper-pilot/sec-coda-whole-field.tex	paragraph	77
 documents/paper/parts/coda.tex	sec:coda:record-limit	generated/documents/paper-pilot/sec-coda-record-limit.tex	refrain	79
 documents/paper/parts/appendices.tex	sec:log:andreoni-joint	generated/documents/paper-pilot/sec-log-andreoni-joint.tex	paragraph	424
-documents/paper/explainer/explainer.tex	sec:reading:plain-intro	generated/documents/explainer-pilot/sec-reading-plain-intro.tex	paragraph	47
-documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	316
-documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	407
-documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	679
-documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	947
-documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	955
+documents/paper/explainer/explainer.tex	sec:explainer:plain	generated/documents/explainer-pilot/sec-explainer-plain.tex	corpus-slot	44
+documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	262
+documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	353
+documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	625
+documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	893
+documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	901

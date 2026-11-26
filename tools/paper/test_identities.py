@@ -795,7 +795,7 @@ class Identities(unittest.TestCase):
                          ('SyntaxUnsupported',
                           '<source>:2: unsupported source scalar U+005C'))
         layout_line = (repo/'documents/paper/explainer/explainer.tex').read_text(
-            encoding='utf-8').splitlines()[374]
+            encoding='utf-8').splitlines()[320]
         self.assertTrue(layout_line.startswith('\\PaperParagraph{lastline}'))
         with self.assertRaises(compare_words.Fault) as raised:
             compare_words.decode_located(layout_line, {})
@@ -1072,8 +1072,8 @@ class Identities(unittest.TestCase):
         revision = compare_words.git(source, 'rev-parse', 'HEAD').decode().strip()
         shadow = ('documents/paper/parts/front.tex', 'sec:reading:shadow',
                   'units/statements/reading-shadow.toml')
-        intro = ('documents/paper/explainer/explainer.tex', 'sec:reading:plain-intro',
-                 'units/statements/plain-intro.toml')
+        intro = ('documents/paper/explainer/explainer.tex', 'sec:explainer:eight-words',
+                 'units/statements/explainer-eight-words.toml')
         rows = {key: line for path, key, _, role, line in scope_fragments(source)
                 if role == 'paragraph' for selected in (shadow, intro)
                 if (path, key) == selected[:2]}
@@ -1092,16 +1092,17 @@ class Identities(unittest.TestCase):
                              ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')})
         assigned_path = self.root/'two-paragraph-assignment.json'
         assigned_path.write_text(json.dumps(assignment))
-        fragment = read(source/'generated/documents/explainer-pilot/sec-reading-plain-intro.tex')
+        fragment = read(source/'generated/documents/explainer-pilot/sec-explainer-eight-words.tex')
         body = fragment.split('}{', 1)[1].removesuffix('}\n')
-        rendered, _, _ = compare_words.decode_paragraph(body, bindings(source))
+        rendered, _, _ = compare_words.decode_paragraph(
+            body.split('\\papervirtue', 1)[0].rstrip(), bindings(source))
 
         def explainer(path, document, side, value):
             if document != 'explainer':
                 return
             value['stream'] = rendered + ' Companion text'
             if side == 'after':
-                value['stream'] = value['stream'].replace('ordinary words', 'ordinary terms')
+                value['stream'] = value['stream'].replace('discipline', 'practice')
             value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
         def unchanged(path, document, side, value):
@@ -1110,20 +1111,28 @@ class Identities(unittest.TestCase):
             value['stream'] = rendered + ' Companion text'
             value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
-        with mock.patch.object(compare_words, 'assigned_plain_scope',
+        original = compare_words.selected_sources
+        def plain_selection(*arguments, **options):
+            old, new = original(*arguments, **options)
+            if arguments[1].unit == intro[1]:
+                old = dict(old, body=old['body'].split(b'\\papervirtue', 1)[0].rstrip())
+                new = dict(new, body=new['body'].split(b'\\papervirtue', 1)[0].rstrip())
+            return old, new
+
+        with mock.patch.object(compare_words, 'selected_sources', side_effect=plain_selection), \
+                mock.patch.object(compare_words, 'assigned_plain_scope',
                                return_value={'verdict': 'scope-admissible'}):
             exit_code, result = self.conversion_run(unchanged,
                                                     dict(assignment=assigned_path))
         self.assertEqual((exit_code, result['verdict']), (0, 'equal'))
         self.assertEqual(result['coverage']['decoded_units'], [shadow[1], intro[1]])
 
-        original = compare_words.selected_sources
         def changed_second(*arguments, **options):
-            old, new = original(*arguments, **options)
+            old, new = plain_selection(*arguments, **options)
             if arguments[1].unit == intro[1]:
-                new = dict(new, body=new['body'].replace(b'ordinary words', b'ordinary terms', 1),
+                new = dict(new, body=new['body'].replace(b'discipline', b'practice', 1),
                            blob_bytes=new['blob_bytes'].replace(
-                               b'ordinary words', b'ordinary terms', 1))
+                               b'discipline', b'practice', 1))
             return old, new
 
         with mock.patch.object(compare_words, 'selected_sources', side_effect=changed_second), \
@@ -1137,7 +1146,7 @@ class Identities(unittest.TestCase):
         stream = next(row for row in result['differences'] if
                       row.get('document') == 'explainer' and row['part'] == 'stream')
         self.assertEqual(stream['location']['after']['raw'][0][1],
-                         result['documents']['explainer']['after']['stream'].index('terms'))
+                         result['documents']['explainer']['after']['stream'].index('practice'))
         with mock.patch.object(compare_words, 'selected_sources', side_effect=changed_second), \
                 mock.patch.object(compare_words, 'assigned_plain_scope', side_effect=
                                   compare_words.Fault('ComparisonIncomplete',
@@ -1151,16 +1160,16 @@ class Identities(unittest.TestCase):
 
     def test_single_explainer_paragraph_locates_changed_word(self):
         source = pathlib.Path(__file__).resolve().parents[2]
-        fragment = read(source/'generated/documents/explainer-pilot/sec-reading-plain-intro.tex')
+        fragment = read(source/'generated/documents/explainer-pilot/sec-explainer-eight-words.tex')
         body = fragment.split('}{', 1)[1].removesuffix('}\n')
-        rendered, _, _ = compare_words.decode_paragraph(body, bindings(source))
+        rendered, _, _ = compare_words.decode_paragraph(
+            body.split('\\papervirtue', 1)[0].rstrip(), bindings(source))
 
         def changed(path, document, side, value):
             if document == 'explainer':
                 value['stream'] = rendered + ' Companion text'
                 if side == 'after':
-                    value['stream'] = value['stream'].replace('ordinary words',
-                                                              'ordinary terms')
+                    value['stream'] = value['stream'].replace('discipline', 'practice')
                 value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
         def unchanged(path, document, side, value):
@@ -1172,16 +1181,17 @@ class Identities(unittest.TestCase):
 
         def changed_source(*arguments, **options):
             old, new = original(*arguments, **options)
-            new = dict(new, body=new['body'].replace(b'ordinary words',
-                                                    b'ordinary terms', 1),
+            old = dict(old, body=old['body'].split(b'\\papervirtue', 1)[0].rstrip())
+            new = dict(new, body=new['body'].split(b'\\papervirtue', 1)[0].rstrip())
+            new = dict(new, body=new['body'].replace(b'discipline', b'practice', 1),
                        blob_bytes=new['blob_bytes'].replace(
-                           b'ordinary words', b'ordinary terms', 1))
+                           b'discipline', b'practice', 1))
             return old, new
 
         with mock.patch.object(compare_words, 'selected_sources',
                                side_effect=changed_source):
             exit_code, record = self.conversion_run(changed, dict(
-                unit='sec:reading:plain-intro', before_revision='HEAD'))
+                unit='sec:explainer:eight-words', before_revision='HEAD'))
         self.assertEqual((exit_code, record['verdict']), (1, 'different'))
         self.assertTrue(any(row['part'] == 'stream' and
                             row['document'] == 'explainer'
@@ -1189,7 +1199,7 @@ class Identities(unittest.TestCase):
         with mock.patch.object(compare_words, 'selected_sources',
                                side_effect=changed_source):
             exit_code, record = self.conversion_run(unchanged, dict(
-                unit='sec:reading:plain-intro', before_revision='HEAD'))
+                unit='sec:explainer:eight-words', before_revision='HEAD'))
         self.assertEqual((exit_code, record['verdict']), (2, 'refused'))
         self.assertEqual(record['faults'][0]['code'], 'CorrespondenceInvalid')
 

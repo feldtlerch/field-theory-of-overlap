@@ -11,6 +11,10 @@ fn fixture() -> String {
     fs::read_to_string(root().join("units/fixtures/explainer-plain.toml")).unwrap()
 }
 
+fn inherited_source() -> Vec<u8> {
+    fs::read(root().join("units/fixtures/explainer-prefix-source.tex")).unwrap()
+}
+
 fn parsed(text: &str) -> Result<ftoo_manifest::corpus::SlotDraft, String> {
     parse_slot(&UnitSource {
         file: "units/fixtures/explainer-plain.toml".into(),
@@ -32,11 +36,14 @@ fn checked(text: &str) -> Result<ftoo_manifest::corpus::CheckedSlot, SlotFault> 
 
 fn imported(bytes: &[u8]) -> ftoo_manifest::corpus::SourceDraft {
     let path = "documents/paper/explainer/explainer.tex";
-    let markers = crate::documents::input::import_inclusions(&root())
+    let markers = fs::read_to_string(root().join("units/fixtures/explainer-prefix-inclusions.tsv"))
         .unwrap()
-        .into_iter()
-        .filter(|entry| entry.source == path)
-        .map(|entry| (entry.unit, entry.role))
+        .lines()
+        .filter_map(|line| {
+            let fields: Vec<_> = line.split('\t').collect();
+            (fields.first().copied() == Some(path))
+                .then(|| (fields[1].to_owned(), fields[3].to_owned()))
+        })
         .collect::<Vec<_>>();
     import_source(path, bytes, digest(bytes), &markers).unwrap()
 }
@@ -44,7 +51,7 @@ fn imported(bytes: &[u8]) -> ftoo_manifest::corpus::SourceDraft {
 #[test]
 fn real_prefix_admits_exact_six_children_and_all_source_pieces() {
     let slot = checked(&fixture()).unwrap();
-    let bytes = fs::read(root().join("documents/paper/explainer/explainer.tex")).unwrap();
+    let bytes = inherited_source();
     let draft = imported(&bytes);
     check_transfer(&slot, &draft, &bytes, 44, 98).unwrap();
     assert_eq!(slot.blocks().len(), 6);
@@ -73,7 +80,7 @@ fn unknown_fields_styles_events_and_children_refuse() {
 #[test]
 fn reordered_or_changed_prose_refuses_against_the_imported_source() {
     let source = fixture();
-    let bytes = fs::read(root().join("documents/paper/explainer/explainer.tex")).unwrap();
+    let bytes = inherited_source();
     let imported = imported(&bytes);
     let mut swapped = parsed(&source).unwrap();
     swapped.blocks.swap(4, 5);
@@ -92,8 +99,7 @@ fn reordered_or_changed_prose_refuses_against_the_imported_source() {
 #[test]
 fn duplicate_heading_mint_and_unrelated_event_refuse_at_transfer() {
     let slot = checked(&fixture()).unwrap();
-    let source =
-        fs::read_to_string(root().join("documents/paper/explainer/explainer.tex")).unwrap();
+    let source = String::from_utf8(inherited_source()).unwrap();
     let duplicated = source.replacen(
         "\\label{sec:explainer:plain}",
         "\\label{sec:explainer:plain}\\label{sec:explainer:plain}",
@@ -137,7 +143,7 @@ fn duplicate_child_use_refuses_without_a_second_source_marker() {
 
 #[test]
 fn changed_named_spacing_refuses_source_correspondence() {
-    let bytes = fs::read(root().join("documents/paper/explainer/explainer.tex")).unwrap();
+    let bytes = inherited_source();
     let mut draft = parsed(&fixture()).unwrap();
     let ftoo_manifest::corpus::SlotBlock::Paragraph { runs } = &mut draft.blocks[2] else {
         unreachable!();

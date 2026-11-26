@@ -1085,12 +1085,14 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
     let mut drafts = input::skeletons(&skeleton_sources)?;
     let (unit_sites, owner_sites) = super::metadata(&statements);
     let document_sites = super::document_sites(&corpus);
-    let checked = ftoo_manifest::check_skeletons(
+    let (slots, _) = super::corpus::load(&root, &corpus)?;
+    let checked = ftoo_manifest::check_skeletons_with_slots(
         &corpus,
         &drafts,
         &unit_sites,
         &owner_sites,
         &document_sites,
+        &slots,
     )
     .map_err(|errors| format!("{errors:?}"))?;
     for draft in &drafts {
@@ -1115,7 +1117,10 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         }
         for language in &corpus.documents()[document] {
             for position in positions.iter().filter(|position| {
-                position.depth().is_none() && !position.paragraph() && !position.equation()
+                position.depth().is_none()
+                    && !position.paragraph()
+                    && !position.equation()
+                    && !position.corpus_slot()
             }) {
                 let unit = corpus
                     .units()
@@ -1212,12 +1217,13 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         },
         multilingual_statements,
     )?;
-    let language_errors = ftoo_manifest::check_skeletons(
+    let language_errors = ftoo_manifest::check_skeletons_with_slots(
         &multilingual,
         &drafts,
         &unit_sites,
         &owner_sites,
         &document_sites,
+        &slots,
     )
     .unwrap_err();
     assert!(language_errors.iter().any(|error| matches!(
@@ -1236,12 +1242,13 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         panic!("quotation fixture")
     };
     quoted.value = "sec:missing:quotation".into();
-    let errors = ftoo_manifest::check_skeletons(
+    let errors = ftoo_manifest::check_skeletons_with_slots(
         &corpus,
         &drafts,
         &unit_sites,
         &owner_sites,
         &document_sites,
+        &slots,
     )
     .unwrap_err();
     assert_eq!(errors.len(), 1);
@@ -1260,12 +1267,13 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
         panic!("quotation fixture")
     };
     quoted.value = "sec:pilot:explainer-excerpt".into();
-    let errors = ftoo_manifest::check_skeletons(
+    let errors = ftoo_manifest::check_skeletons_with_slots(
         &corpus,
         &drafts,
         &unit_sites,
         &owner_sites,
         &document_sites,
+        &slots,
     )
     .unwrap_err();
     assert_eq!(errors.len(), 1);

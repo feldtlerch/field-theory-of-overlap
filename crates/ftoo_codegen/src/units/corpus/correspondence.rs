@@ -694,7 +694,7 @@ mod tests {
         fs::create_dir_all(root.join("units/corpus")).unwrap();
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         for (from, to) in [
-            (SOURCE, SOURCE),
+            ("units/fixtures/explainer-prefix-source.tex", SOURCE),
             (INTRO, INTRO),
             ("units/fixtures/explainer-plain.toml", SLOT),
         ] {
