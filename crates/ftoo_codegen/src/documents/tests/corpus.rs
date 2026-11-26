@@ -1,13 +1,5 @@
 use super::*;
 use sha2::Digest as _;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-struct Fixture(std::path::PathBuf);
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
 
 fn copy_tree(source: &Path, target: &Path) -> std::io::Result<()> {
     fs::create_dir_all(target)?;
@@ -23,12 +15,10 @@ fn copy_tree(source: &Path, target: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
+fn prefix_fixture() -> Result<NativeFixture, Box<dyn std::error::Error>> {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let root = Fixture(
-        std::env::temp_dir().join(format!("ftoo-corpus-slot-{}-{nonce}", std::process::id())),
-    );
+    let fixture = native_fixture();
+    let root = &fixture.directory.0;
     for directory in [
         "crates",
         "docs",
@@ -39,12 +29,12 @@ fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         "tools",
         "units",
     ] {
-        copy_tree(&source.join(directory), &root.0.join(directory))?;
+        copy_tree(&source.join(directory), &root.join(directory))?;
     }
     for file in ["Cargo.lock", "Cargo.toml", "README.md"] {
-        fs::copy(source.join(file), root.0.join(file))?;
+        fs::copy(source.join(file), root.join(file))?;
     }
-    let path = root.0.join("documents/paper/explainer/explainer.tex");
+    let path = root.join("documents/paper/explainer/explainer.tex");
     fs::copy(
         source.join("units/fixtures/explainer-prefix-source.tex"),
         &path,
@@ -61,7 +51,7 @@ fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
             lines[98..].concat()
         ),
     )?;
-    let path = root.0.join("units/scopes/explainer.toml");
+    let path = root.join("units/scopes/explainer.toml");
     fs::copy(
         source.join("units/fixtures/explainer-prefix-scope.toml"),
         &path,
@@ -76,21 +66,43 @@ fn prefix_fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
             "unit = \"sec:explainer:plain\"\nrole = \"corpus-slot\"",
         ),
     )?;
-    fs::create_dir_all(root.0.join("units/corpus"))?;
+    fs::create_dir_all(root.join("units/corpus"))?;
     fs::copy(
         source.join("units/fixtures/explainer-plain.toml"),
-        root.0.join("units/corpus/explainer-plain.toml"),
+        root.join("units/corpus/explainer-plain.toml"),
     )?;
-    Ok(root)
+    Ok(fixture)
 }
 
 #[test]
 fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
 -> Result<(), Box<dyn std::error::Error>> {
+    const CHILD: &str = "FTOO_CORPUS_SLOT_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        // A child holds the exclusive fixture lock, so its holder shares no
+        // process cache with the sibling tests that wait on that lock.
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args([
+                "--exact",
+                "documents::tests::corpus::support_required_corpus_slot_renders_and_recovers_the_real_prefix",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("test result: ok. 1 passed;"),
+            "child status: {:?}\n{}{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Ok(());
+    }
     let fixture = prefix_fixture()?;
-    let support =
-        NativeSupport::from_environment(&fixture.0).map_err(|error| format!("{error:?}"))?;
-    let prepared = generate_documents(&fixture.0, &support)?;
+    let root = &fixture.directory.0;
+    let support = NativeSupport::from_environment(root).map_err(|error| format!("{error:?}"))?;
+    let prepared = generate_documents(root, &support)?;
     let path = "generated/documents/explainer-pilot/sec-explainer-plain.tex";
     let artifact = prepared
         .artifacts()
@@ -137,7 +149,7 @@ fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
     assert!(!text.contains("  "));
     for export in [&markdown, &html] {
         let path = export["rendering"]["path"].as_str().unwrap();
-        let bytes = fs::read(fixture.0.join(path))?;
+        let bytes = fs::read(root.join(path))?;
         let digest = crate::hex(&sha2::Sha256::digest(&bytes));
         assert_eq!(export["rendering"]["sha256"], digest);
     }
@@ -158,8 +170,8 @@ fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
         .position(|bytes| bytes == b"Ties.")
         .unwrap();
     changed[position] = b'L';
-    fs::write(fixture.0.join(path), changed)?;
-    let error = artifacts::verify(&fixture.0, &prepared).unwrap_err();
+    fs::write(root.join(path), changed)?;
+    let error = artifacts::verify(root, &prepared).unwrap_err();
     assert!(format!("{error:?}").contains(path));
     Ok(())
 }

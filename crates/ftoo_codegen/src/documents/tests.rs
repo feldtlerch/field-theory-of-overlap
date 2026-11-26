@@ -2591,7 +2591,14 @@ fn native_fixture() -> NativeFixture {
     let target = std::env::var_os("CARGO_TARGET_DIR")
         .map_or_else(|| repository.join("target"), PathBuf::from);
     fs::create_dir_all(&target).unwrap();
-    let root = target.canonicalize().unwrap().join("ftoo-native-fixtures");
+    let target = target.canonicalize().unwrap();
+    let temp = std::env::temp_dir().canonicalize().unwrap();
+    // Brackets observe every ancestor of a fixture, including temporary roots.
+    assert!(
+        !target.starts_with(&temp),
+        "native fixture target {target:?} is beneath process temporary directory {temp:?}; set CARGO_TARGET_DIR outside TMPDIR"
+    );
+    let root = target.join("ftoo-native-fixtures");
     fs::create_dir_all(&root).unwrap();
     let lock = fs::OpenOptions::new()
         .read(true)
@@ -2602,7 +2609,7 @@ fn native_fixture() -> NativeFixture {
         .unwrap();
     lock.lock().unwrap();
     // Brackets observe every ancestor through the target and this stable root.
-    // Both controls hold this per-checkout lock while changing its case entry;
+    // Each fixture user holds this per-checkout lock while changing its case entry;
     // the directory drops before the lock, including in the isolated child.
     let path = root.join("case");
     if path.exists() {
