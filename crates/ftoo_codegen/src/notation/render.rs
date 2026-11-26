@@ -71,12 +71,14 @@ pub(super) enum SpellingMode {
 fn parts(operation: PrimitiveOperation, target: RenderTarget, spelling: SpellingMode) -> Vec<Part> {
     use Part::{Argument as A, Fixed as F};
     use PrimitiveOperation::{
-        Add, Alpha, Beta, Calligraphic, Dimension, Dot, Equal, Fraction, Gamma, Juxtapose,
-        Multiply, Negate, Omega, Parentheses, Sigma, Subscript, Subtract, Superscript, TightJoin,
-        Times, Underbrace, UprightNet, UprightS, UprightVir,
+        Add, Alpha, Beta, Calligraphic, CapitalOmega, CapitalXi, Chi, Dimension, Dot, Equal, Eta,
+        Fraction, Gamma, Juxtapose, Lambda, Mu, Multiply, Negate, Omega, Parentheses, Phi, Sigma,
+        Subscript, Subtract, Superscript, Tau, Theta, TightJoin, Times, Underbrace, UprightNet,
+        UprightS, UprightVir, VariantEpsilon, Zeta,
     };
     match operation {
-        Alpha | Beta | Omega => {
+        Alpha | Beta | Omega | CapitalOmega | CapitalXi | Chi | Eta | Lambda | Mu | Phi | Tau
+        | Theta | VariantEpsilon | Zeta => {
             if target == RenderTarget::Macro {
                 vec![F(operation.host_tokens()[0]), F("{}")]
             } else {

@@ -2,7 +2,8 @@ use super::{
     AssemblyInputFault as Fault, AssemblyResource as Resource, MathSyntaxReason as Reason,
 };
 use crate::{
-    Callee, CheckedNotation, DefinitionId, DefinitionKind, ExprDraft, PrimitiveId, TextRun,
+    Callee, CheckedNotation, DefinitionId, DefinitionKind, DefinitionSpec, ExprDraft, PrimitiveId,
+    PrimitiveSpec, TextRun,
 };
 use std::ops::Range;
 
@@ -58,8 +59,54 @@ struct Node {
     bytes: Range<usize>,
     index: usize,
 }
+enum Vocabulary<'a, 'b, 'g> {
+    Checked(&'a CheckedNotation<'b, 'g>),
+    Construction(&'a [PrimitiveSpec], &'a [DefinitionSpec]),
+}
+impl Vocabulary<'_, '_, '_> {
+    fn primitives(&self) -> &[PrimitiveSpec] {
+        match self {
+            Self::Checked(catalogue) => catalogue.primitives(),
+            Self::Construction(primitives, _) => primitives,
+        }
+    }
+    fn definition(&self, token: &str) -> Option<(DefinitionId, u8, bool)> {
+        match self {
+            Self::Checked(catalogue) => catalogue.definitions().iter().find_map(|entry| {
+                (entry.command() == token).then(|| {
+                    let spec = entry.spec();
+                    (
+                        spec.id(),
+                        spec.signature().arity,
+                        matches!(spec.kind(), DefinitionKind::Inherited { .. }),
+                    )
+                })
+            }),
+            Self::Construction(_, definitions) => definitions.iter().find_map(|spec| {
+                (spec.command() == token).then(|| {
+                    (
+                        spec.id(),
+                        spec.signature().arity,
+                        matches!(spec.kind(), DefinitionKind::Inherited { .. }),
+                    )
+                })
+            }),
+        }
+    }
+    fn inherited(&self, id: DefinitionId) -> bool {
+        match self {
+            Self::Checked(catalogue) => matches!(
+                catalogue.definition(id).spec().kind(),
+                DefinitionKind::Inherited { .. }
+            ),
+            Self::Construction(_, definitions) => definitions.iter().any(|spec| {
+                spec.id() == id && matches!(spec.kind(), DefinitionKind::Inherited { .. })
+            }),
+        }
+    }
+}
 struct Parser<'a, 'b, 'g> {
-    catalogue: &'a CheckedNotation<'b, 'g>,
+    vocabulary: Vocabulary<'a, 'b, 'g>,
     tokens: Vec<Token>,
     at: usize,
     eof: usize,
@@ -335,7 +382,7 @@ impl Parser<'_, '_, '_> {
     }
     fn infix(&self) -> Option<PrimitiveId> {
         let text = self.token().text;
-        self.catalogue
+        self.vocabulary
             .primitives()
             .iter()
             .find(|p| {
@@ -529,34 +576,16 @@ impl Parser<'_, '_, '_> {
             let bytes = token.bytes.start..annotation.bytes.end;
             return self.primitive(PrimitiveId::Underbrace, vec![base, annotation], bytes);
         }
-        let primitive = self.catalogue.primitives().iter().find(|p| {
-            matches!(
-                p.id(),
-                PrimitiveId::Alpha
-                    | PrimitiveId::Beta
-                    | PrimitiveId::Fraction
-                    | PrimitiveId::Omega
-                    | PrimitiveId::Sigma
-                    | PrimitiveId::Gamma
-                    | PrimitiveId::Dot
-            ) && (p.operation().host_tokens().contains(&token.text.as_str())
-                || p.operation().unicode_scalar() == Some(token.text.as_str()))
+        let primitive = self.vocabulary.primitives().iter().find(|p| {
+            (p.operation().is_symbol()
+                || matches!(p.id(), PrimitiveId::Fraction | PrimitiveId::Dot))
+                && (p.operation().host_tokens().contains(&token.text.as_str())
+                    || p.operation().unicode_scalar() == Some(token.text.as_str()))
         });
-        let definition = self
-            .catalogue
-            .definitions()
-            .iter()
-            .find(|d| d.command() == token.text);
+        let definition = self.vocabulary.definition(&token.text);
         let signature = primitive
             .map(|p| (Callee::Primitive(p.id()), p.signature().arity))
-            .or_else(|| {
-                definition.map(|d| {
-                    (
-                        Callee::Definition(d.spec().id()),
-                        d.spec().signature().arity,
-                    )
-                })
-            });
+            .or_else(|| definition.map(|(id, arity, _)| (Callee::Definition(id), arity)));
         if let Some((callee, arity)) = signature {
             return self.command(token, callee, arity);
         }
@@ -565,10 +594,7 @@ impl Parser<'_, '_, '_> {
     fn command(&mut self, token: Token, callee: Callee, arity: u8) -> Result<Node> {
         self.take();
         if let Callee::Definition(id) = callee
-            && matches!(
-                self.catalogue.definition(id).spec().kind(),
-                DefinitionKind::Inherited { .. }
-            )
+            && self.vocabulary.inherited(id)
             && arity == 0
             && self.is("{")
             && self
@@ -621,7 +647,7 @@ impl Parser<'_, '_, '_> {
     }
     fn literal(&mut self, token: Token) -> Result<Node> {
         if self
-            .catalogue
+            .vocabulary
             .primitives()
             .iter()
             .any(|p| p.operation().host_tokens().contains(&token.text.as_str()))
@@ -672,7 +698,7 @@ pub fn parse_assembly_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
 ) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
-    parse_inner(catalogue, source, false).map_err(|failure| *failure)
+    parse_inner(Vocabulary::Checked(catalogue), source, false).map_err(|failure| *failure)
 }
 /// Parse a mathematical display with its explicit thick-space boundaries.
 /// # Errors
@@ -681,18 +707,31 @@ pub fn parse_assembly_display_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
 ) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
-    parse_inner(catalogue, source, true).map_err(|failure| *failure)
+    parse_inner(Vocabulary::Checked(catalogue), source, true).map_err(|failure| *failure)
+}
+/// Parse an inherited declaration body with the same grammar and bounds as document mathematics.
+pub(crate) fn parse_catalogue_body(
+    primitives: &[PrimitiveSpec],
+    definitions: &[DefinitionSpec],
+    source: &str,
+) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
+    parse_inner(
+        Vocabulary::Construction(primitives, definitions),
+        source,
+        false,
+    )
+    .map_err(|failure| *failure)
 }
 /// Parse the complete authored entry without evaluating any TeX.
 /// # Errors
 /// Returns the first decisive decoded range and complete parser fault.
 fn parse_inner(
-    catalogue: &CheckedNotation<'_, '_>,
+    vocabulary: Vocabulary<'_, '_, '_>,
     source: &str,
     display: bool,
 ) -> Result<ParsedAssemblyMath> {
     let mut parser = Parser {
-        catalogue,
+        vocabulary,
         tokens: lex(source)?,
         at: 0,
         eof: source.len(),

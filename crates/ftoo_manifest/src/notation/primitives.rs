@@ -27,8 +27,42 @@ pub enum PrimitiveOperation {
     TightJoin,
     Underbrace,
     UprightNet,
+    CapitalOmega,
+    CapitalXi,
+    Chi,
+    Eta,
+    Lambda,
+    Mu,
+    Phi,
+    Tau,
+    Theta,
+    VariantEpsilon,
+    Zeta,
 }
 impl PrimitiveOperation {
+    /// Operations whose nullary spelling is an independent mathematical symbol.
+    #[must_use]
+    pub const fn is_symbol(self) -> bool {
+        matches!(
+            self,
+            Self::Alpha
+                | Self::Beta
+                | Self::Omega
+                | Self::Sigma
+                | Self::Gamma
+                | Self::CapitalOmega
+                | Self::CapitalXi
+                | Self::Chi
+                | Self::Eta
+                | Self::Lambda
+                | Self::Mu
+                | Self::Phi
+                | Self::Tau
+                | Self::Theta
+                | Self::VariantEpsilon
+                | Self::Zeta
+        )
+    }
     /// Closed host control tokens used by the renderer and the future shared
     /// mathematics lexer. Grouping punctuation is supplied by the typed writer.
     #[must_use]
@@ -44,6 +78,17 @@ impl PrimitiveOperation {
             Self::Gamma => &["\\gamma"],
             Self::Times => &["\\times"],
             Self::Underbrace => &["\\underbrace"],
+            Self::CapitalOmega => &["\\Omega"],
+            Self::CapitalXi => &["\\Xi"],
+            Self::Chi => &["\\chi"],
+            Self::Eta => &["\\eta"],
+            Self::Lambda => &["\\lambda"],
+            Self::Mu => &["\\mu"],
+            Self::Phi => &["\\phi"],
+            Self::Tau => &["\\tau"],
+            Self::Theta => &["\\theta"],
+            Self::VariantEpsilon => &["\\varepsilon"],
+            Self::Zeta => &["\\zeta"],
             Self::Fraction => &["\\frac"],
             Self::Multiply => &["\\cdot"],
             Self::Juxtapose => &["\\,"],
@@ -70,6 +115,17 @@ impl PrimitiveOperation {
             Self::Sigma => Some("σ"),
             Self::Gamma => Some("γ"),
             Self::Times => Some("×"),
+            Self::CapitalOmega => Some("Ω"),
+            Self::CapitalXi => Some("Ξ"),
+            Self::Chi => Some("χ"),
+            Self::Eta => Some("η"),
+            Self::Lambda => Some("λ"),
+            Self::Mu => Some("μ"),
+            Self::Phi => Some("ϕ"),
+            Self::Tau => Some("τ"),
+            Self::Theta => Some("θ"),
+            Self::VariantEpsilon => Some("ε"),
+            Self::Zeta => Some("ζ"),
             Self::Fraction
             | Self::Calligraphic
             | Self::UprightVir
@@ -98,7 +154,18 @@ impl PrimitiveOperation {
             | Self::UprightS
             | Self::Sigma
             | Self::Gamma
-            | Self::UprightNet => 0,
+            | Self::UprightNet
+            | Self::CapitalOmega
+            | Self::CapitalXi
+            | Self::Chi
+            | Self::Eta
+            | Self::Lambda
+            | Self::Mu
+            | Self::Phi
+            | Self::Tau
+            | Self::Theta
+            | Self::VariantEpsilon
+            | Self::Zeta => 0,
             Self::Calligraphic | Self::Negate | Self::Parentheses | Self::Dimension | Self::Dot => {
                 1
             }
@@ -150,9 +217,20 @@ pub enum PrimitiveId {
     TightJoin,
     Underbrace,
     UprightNet,
+    CapitalOmega,
+    CapitalXi,
+    Chi,
+    Eta,
+    Lambda,
+    Mu,
+    Phi,
+    Tau,
+    Theta,
+    VariantEpsilon,
+    Zeta,
 }
 impl PrimitiveId {
-    pub const ALL: [Self; 24] = [
+    pub const ALL: [Self; 35] = [
         Self::Alpha,
         Self::Beta,
         Self::Fraction,
@@ -177,6 +255,17 @@ impl PrimitiveId {
         Self::TightJoin,
         Self::Underbrace,
         Self::UprightNet,
+        Self::CapitalOmega,
+        Self::CapitalXi,
+        Self::Chi,
+        Self::Eta,
+        Self::Lambda,
+        Self::Mu,
+        Self::Phi,
+        Self::Tau,
+        Self::Theta,
+        Self::VariantEpsilon,
+        Self::Zeta,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -205,6 +294,17 @@ impl PrimitiveId {
             Self::TightJoin => "tight-join",
             Self::Underbrace => "underbrace",
             Self::UprightNet => "upright-net",
+            Self::CapitalOmega => "capital-omega",
+            Self::CapitalXi => "capital-xi",
+            Self::Chi => "chi",
+            Self::Eta => "eta",
+            Self::Lambda => "lambda",
+            Self::Mu => "mu",
+            Self::Phi => "phi",
+            Self::Tau => "tau",
+            Self::Theta => "theta",
+            Self::VariantEpsilon => "variant-epsilon",
+            Self::Zeta => "zeta",
         }
     }
     #[must_use]
@@ -234,6 +334,17 @@ impl PrimitiveId {
             Self::TightJoin => PrimitiveOperation::TightJoin,
             Self::Underbrace => PrimitiveOperation::Underbrace,
             Self::UprightNet => PrimitiveOperation::UprightNet,
+            Self::CapitalOmega => PrimitiveOperation::CapitalOmega,
+            Self::CapitalXi => PrimitiveOperation::CapitalXi,
+            Self::Chi => PrimitiveOperation::Chi,
+            Self::Eta => PrimitiveOperation::Eta,
+            Self::Lambda => PrimitiveOperation::Lambda,
+            Self::Mu => PrimitiveOperation::Mu,
+            Self::Phi => PrimitiveOperation::Phi,
+            Self::Tau => PrimitiveOperation::Tau,
+            Self::Theta => PrimitiveOperation::Theta,
+            Self::VariantEpsilon => PrimitiveOperation::VariantEpsilon,
+            Self::Zeta => PrimitiveOperation::Zeta,
         }
     }
 }

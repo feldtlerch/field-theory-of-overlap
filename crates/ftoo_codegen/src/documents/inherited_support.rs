@@ -1,7 +1,7 @@
 //! Native support from the source declarations admitted under M078.
 use ftoo_manifest::{
     CheckedNotation, INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES,
-    INHERITED_VARIANCE_DECLARATION,
+    INHERITED_VARIANCE_DECLARATION, inherited_decoded_declarations,
 };
 
 const TYPED_TOOLS: &str = include_str!("../../../../documents/paper/ftoo_typed_tools.tex");
@@ -62,6 +62,9 @@ pub(super) fn generate(
     for (_, declaration) in INHERITED_SOURCE_DECLARATIONS {
         output.push_str(declaration);
     }
+    for (_, declaration) in inherited_decoded_declarations() {
+        output.push_str(&declaration);
+    }
     output.push_str(INHERITED_VARIANCE_DECLARATION);
     output.push_str("\\ExplSyntaxOff\n");
     Ok(output)
@@ -87,25 +90,31 @@ mod tests {
         let book = ftoo_manifest::addressing(&graph).unwrap();
         let notation = ftoo_manifest::notation(&book).unwrap();
         let output = generate(&notation, sources()).unwrap();
-        assert_eq!(
-            output,
-            concat!(
-                "\\ExplSyntaxOn\n",
-                "\\NewDocumentCommand{\\grade}{m}\n  { {\\normalfont\\footnotesize\\textsc{#1}}\\quad }\n",
-                "\\NewCommandCopy{\\secgrade}{\\grade}\n",
-                "\\NewDocumentCommand{\\gradeword}{m}{ \\textsc{#1} }\n",
-                "\\input{ftoo_typed_tools.tex}\n",
-                "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
-                "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
-                "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
-                "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
-                "\\NewDocumentCommand\n  { \\alignrate }\n  {  }\n  {\n    \\ensuremath{\\dot{\\sigma}}\n  }\n",
-                "\\NewDocumentCommand\n  { \\willnet }\n  {  }\n  {\n    \\ensuremath{\\omega\\sb{\\mathrm{net}}}\n  }\n",
-                "\\NewDocumentCommand\n  { \\willdecay }\n  {  }\n  {\n    \\ensuremath{\\gamma\\sigma}\n  }\n",
-                "\\RegisterVariance{\\comovfield}{operator}\n",
-                "\\ExplSyntaxOff\n"
-            )
-        );
+        let mut expected = String::from(concat!(
+            "\\ExplSyntaxOn\n",
+            "\\NewDocumentCommand{\\grade}{m}\n  { {\\normalfont\\footnotesize\\textsc{#1}}\\quad }\n",
+            "\\NewCommandCopy{\\secgrade}{\\grade}\n",
+            "\\NewDocumentCommand{\\gradeword}{m}{ \\textsc{#1} }\n",
+            "\\input{ftoo_typed_tools.tex}\n",
+            "\\NewDocumentCommand\n  { \\comovfield }\n  {  }\n  {\n    \\ensuremath{S}\n  }\n",
+            "\\NewDocumentCommand\n  { \\readout }\n  {  }\n  {\n    \\ensuremath{\\symcal{M}}\n  }\n",
+            "\\NewDocumentCommand\n  { \\willvirtue }\n  {  }\n  {\n    \\ensuremath{\\omega\\sp{\\mathrm{vir}}}\n  }\n",
+            "\\DeclareQuantity{\\gensym}{0}{ dim={\\Time[-1]}, variance=operator, spends={} }\n  { A\\sb{\\mathrm S} }\n",
+            "\\NewDocumentCommand\n  { \\alignrate }\n  {  }\n  {\n    \\ensuremath{\\dot{\\sigma}}\n  }\n",
+            "\\NewDocumentCommand\n  { \\willnet }\n  {  }\n  {\n    \\ensuremath{\\omega\\sb{\\mathrm{net}}}\n  }\n",
+            "\\NewDocumentCommand\n  { \\willdecay }\n  {  }\n  {\n    \\ensuremath{\\gamma\\sigma}\n  }\n",
+            "\\RegisterVariance{\\comovfield}{operator}\n",
+            "\\ExplSyntaxOff\n"
+        ));
+        let decoded = inherited_decoded_declarations();
+        let ending = "\\RegisterVariance{\\comovfield}{operator}\n\\ExplSyntaxOff\n";
+        let position = expected.find(ending).expect("fixed ending");
+        let additional = decoded
+            .iter()
+            .map(|(_, source)| source.as_str())
+            .collect::<String>();
+        expected.insert_str(position, &additional);
+        assert_eq!(output, expected);
     }
 
     #[test]

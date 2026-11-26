@@ -3,6 +3,7 @@
 mod ast;
 mod catalogue;
 mod diagnostics;
+mod inherited;
 mod primitives;
 #[cfg(test)]
 mod tests;
@@ -16,6 +17,7 @@ pub use ast::{
 pub use catalogue::{
     DefinitionCategory, DefinitionId, DefinitionKind, DefinitionSpec,
     INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES, INHERITED_VARIANCE_DECLARATION,
+    inherited_decoded_declarations,
 };
 pub use diagnostics::{
     AliasTargetReason, DefinitionShapeReason, LiteralReason, NotationDiagnostic, NotationErrors,
@@ -158,7 +160,7 @@ impl CheckedNotation<'_, '_> {
 pub fn notation<'book, 'graph>(
     book: &'book AddressBook<'graph>,
 ) -> Result<CheckedNotation<'book, 'graph>, NotationErrors> {
-    construct(book, primitives::catalogue(), catalogue::catalogue())
+    construct(book, primitives::catalogue(), catalogue::try_catalogue()?)
 }
 fn construct<'book, 'graph>(
     book: &'book AddressBook<'graph>,

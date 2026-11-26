@@ -542,6 +542,13 @@ fn parser_refusals_retain_full_first_decisive_tokens() -> Result<(), Box<dyn std
             "+",
             vec!["letter", "digits", "command", "{", "(", "["],
         ),
+        (
+            r"\mathrm{S}",
+            0..7,
+            MathSyntaxReason::ExpectedAtom,
+            r"\mathrm",
+            vec!["letter", "digits", "command", "{", "(", "["],
+        ),
     ] {
         assert_eq!(
             parse_assembly_math(&catalogue, source).unwrap_err(),
@@ -555,6 +562,18 @@ fn parser_refusals_retain_full_first_decisive_tokens() -> Result<(), Box<dyn std
             )
         );
     }
+    assert_eq!(
+        parse_assembly_math(&catalogue, "xω").unwrap_err(),
+        (
+            1..3,
+            AssemblyInputFault::MathSyntax {
+                reason: MathSyntaxReason::UnexpectedToken,
+                token: "ω".into(),
+                expected: vec!["end of expression".into()],
+            }
+        )
+    );
+    assert!(parse_assembly_math(&catalogue, "ω").is_ok());
     assert_eq!(
         parse_assembly_math(&catalogue, r"\frac{1}x").unwrap_err(),
         (

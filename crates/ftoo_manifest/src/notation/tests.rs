@@ -22,6 +22,7 @@ fn registry_site(id: DefinitionId, index: usize, fields: &[&str]) -> NotationSit
             .iter()
             .map(|s| NotationPathPart::Field((*s).into()))
             .collect(),
+        source_range: None,
     }
 }
 fn primitive_site(id: PrimitiveId, index: usize, fields: &[&str]) -> NotationSite {
@@ -33,6 +34,7 @@ fn primitive_site(id: PrimitiveId, index: usize, fields: &[&str]) -> NotationSit
             .iter()
             .map(|s| NotationPathPart::Field((*s).into()))
             .collect(),
+        source_range: None,
     }
 }
 fn diag(
@@ -466,6 +468,623 @@ fn inherited_source_bytes_and_declaration_sites_refuse_changes() {
 }
 
 #[test]
+fn decoded_single_symbol_declarations_use_the_document_grammar() {
+    let definitions = catalogue::catalogue();
+    let primitives = primitives::catalogue();
+    let rows = catalogue::inherited_decoded_declarations();
+    assert_eq!(rows.len(), 33);
+    for (id, source) in &rows {
+        assert!(source.contains(&format!("\\{}", id.token())));
+        assert!(
+            definitions.iter().any(|entry| entry.id() == *id
+                && matches!(entry.kind(), DefinitionKind::Inherited { .. }))
+        );
+    }
+    let source = include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
+    let (_, body) = inherited::decode(source, "will", &primitives, &definitions).unwrap();
+    assert_eq!(body, primitive(PrimitiveId::Omega, vec![]));
+    let graph = seed().unwrap();
+    let book = addressing(&graph).unwrap();
+    let checked = notation(&book).unwrap();
+    let document = crate::assembly::parse_assembly_math(&checked, r"\omega").unwrap();
+    let construction =
+        crate::assembly::parse_catalogue_body(&primitives, &definitions, r"\omega").unwrap();
+    assert_eq!(document.draft(), construction.draft());
+    assert_eq!(document.ranges(), construction.ranges());
+    assert_eq!(
+        crate::assembly::parse_catalogue_body(&primitives, &definitions, r"\unknown")
+            .unwrap_err()
+            .0,
+        0..8
+    );
+    let front = include_str!("../../../../documents/paper/parts/front.tex");
+    let context = "an edge between them: a rate $\\will$ opposing the reward gradient";
+    assert!(front.contains(context));
+    let source = context.split('$').nth(1).unwrap();
+    assert_eq!(
+        crate::assembly::parse_assembly_math(&checked, source)
+            .unwrap()
+            .draft(),
+        &call(DefinitionId::Will, vec![])
+    );
+}
+
+#[test]
+fn decoded_symbol_wrapper_signature_and_body_refuse_independently() {
+    let source = include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
+    let primitives = primitives::catalogue();
+    let definitions = catalogue::catalogue();
+    for (changed, fault) in [
+        (
+            source.replacen("{ \\will }\n  {  }", "{ \\will }\n  { m }", 1),
+            inherited::DecodeFault::Signature,
+        ),
+        (
+            source.replacen(
+                "\\ensuremath{\\omega}\n  }",
+                "\\ensuremath{\\omega+}\n  }",
+                1,
+            ),
+            inherited::DecodeFault::Body,
+        ),
+        (
+            source.replacen(
+                "\\ensuremath{\\omega}\n  }",
+                "\\ensuremath{\\unknown}\n  }",
+                1,
+            ),
+            inherited::DecodeFault::Body,
+        ),
+    ] {
+        assert_ne!(changed, source);
+        assert_eq!(
+            inherited::decode(&changed, "will", &primitives, &definitions),
+            Err(fault)
+        );
+        let sources = catalogue::InheritedSources {
+            symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+            historical: &changed,
+            registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+        };
+        let expected = inherited::declaration_range(&changed, "will").unwrap();
+        let errors = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+        assert!(errors.diagnostics().iter().any(|diagnostic| {
+            diagnostic.rule == RuleId::M078
+                && matches!(
+                    &diagnostic.site,
+                    NotationSite::Registry {
+                        file,
+                        source_range: Some(range),
+                        ..
+                    } if file == "documents/paper/data/ftoo_symbols_historical.tex" && range == &expected
+                )
+        }));
+    }
+    let changed = source.replacen("\\ensuremath{\\omega}\n  }", "\\ensuremath{A}\n  }", 1);
+    assert_eq!(
+        inherited::decode(&changed, "will", &primitives, &definitions)
+            .unwrap()
+            .1,
+        literal("A")
+    );
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: &changed,
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let errors = catalogue::inherited_source(&definitions, &sources).unwrap_err();
+    assert!(errors.diagnostics().iter().any(|d| d.rule == RuleId::M078
+        && matches!(
+            d.fault,
+            NotationFault::SourceMismatch {
+                definition: DefinitionId::Will
+            }
+        )));
+}
+
+#[test]
+fn later_declarations_and_property_effects_refuse_at_m078() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    for (path, input, id) in [
+        (
+            "ftoo_typed_tools.tex",
+            r"\prop_gput:Nen \g__ftoo_qty_var_prop { \tl_to_str:n {\will} } { scalar }",
+            DefinitionId::Will,
+        ),
+        (
+            "ftoo_typed_tools.tex",
+            r"\prop_gput:Nnn \g__ftoo_qty_var_prop { \tl_to_str:n {\will} } { scalar }",
+            DefinitionId::Will,
+        ),
+        (
+            "econ_membrane.tex",
+            r"\RenewDocumentCommand{\horizon}{}{X}",
+            DefinitionId::Horizon,
+        ),
+        (
+            "reader-hooks.tex",
+            r"\cs_set:Npx \will {X}",
+            DefinitionId::Will,
+        ),
+        ("front.tex", r"\cs_undefine:N \will", DefinitionId::Will),
+        (
+            "front.tex",
+            r"\RenewDocumentCommand{\phi}{}{X}",
+            DefinitionId::Bendfn,
+        ),
+        (
+            "front.tex",
+            r"\prop_gput:Nne \g__ftoo_qty_var_prop {#1} {scalar}",
+            DefinitionId::Will,
+        ),
+        ("front.tex", r"\input{later-symbols}", DefinitionId::Will),
+    ] {
+        let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+        let index = inputs.iter().position(|(file, _)| *file == path).unwrap();
+        let changed = format!("{}\n{input}\n", inputs[index].1);
+        let at = inputs[index].1.len() + 1;
+        inputs[index].1 = &changed;
+        let errors =
+            catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+        assert!(errors.diagnostics().iter().any(|d| d.rule == RuleId::M078
+            && matches!(d.fault, NotationFault::SourceMismatch { definition } if definition == id)
+            && (if input.starts_with("\\input") {
+                matches!(&d.site, NotationSite::Registry { file, .. }
+                    if file == catalogue::FILE)
+            } else {
+                matches!(&d.site, NotationSite::Registry { file, source_range: Some(range), .. }
+                    if file == path && range.start == at)
+            })), "{path}: {input}: {:?}", errors.diagnostics());
+    }
+    let reordered = include_str!("../../../../documents/paper/main.tex").replace(
+        "\\input{data/ftoo_symbols.tex}\n\\input{data/ftoo_symbols_historical.tex}",
+        "\\input{data/ftoo_symbols_historical.tex}\n\\input{data/ftoo_symbols.tex}",
+    );
+    assert_ne!(
+        reordered,
+        include_str!("../../../../documents/paper/main.tex")
+    );
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let main_index = inputs
+        .iter()
+        .position(|(file, _)| *file == "main.tex")
+        .unwrap();
+    inputs[main_index].1 = &reordered;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(errors.diagnostics().iter().any(|d| d.rule == RuleId::M078
+        && matches!(
+            d.fault,
+            NotationFault::SourceMismatch {
+                definition: DefinitionId::Will
+            }
+        )));
+    let omitted = include_str!("../../../../documents/paper/main.tex")
+        .replace("\\input{data/ftoo_symbols_historical.tex}\n", "");
+    inputs[main_index].1 = &omitted;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(errors.diagnostics().iter().any(|d| d.rule == RuleId::M078
+        && matches!(
+            d.fault,
+            NotationFault::SourceMismatch {
+                definition: DefinitionId::Will
+            }
+        )));
+    let appended = format!(
+        "{}\n\\input{{later-symbols}}\n",
+        include_str!("../../../../documents/paper/main.tex")
+    );
+    inputs[main_index].1 = &appended;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(errors.diagnostics().iter().any(|d| d.rule == RuleId::M078
+        && matches!(
+            d.fault,
+            NotationFault::SourceMismatch {
+                definition: DefinitionId::Will
+            }
+        )));
+}
+
+#[test]
+fn a_paper_macro_may_use_defines_with_a_parameter() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "partB.tex")
+        .unwrap();
+    let changed = format!(
+        "{}\n\\newcommand\\dyndefines[1]{{\\defines{{#1}}\\DisplayClass{{dynamics}}}}\n",
+        inputs[index].1
+    );
+    inputs[index].1 = &changed;
+    catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap();
+}
+
+#[test]
+fn longer_registration_names_and_string_mentions_are_not_registrations() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "partB.tex")
+        .unwrap();
+    let changed = format!(
+        "{}\n\\newcommand\\RegisterVarianceTable[1]{{#1}}\n\\newcommand\\DeclareMetricPairs[1]{{#1}}\n\\string\\RegisterVariance\n\\string\\DeclareMetricPair\n",
+        inputs[index].1
+    );
+    inputs[index].1 = &changed;
+    catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap();
+}
+
+#[test]
+fn ordinary_expandafter_append_still_passes() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "partB.tex")
+        .unwrap();
+    let changed = format!(
+        "{}\n\\expandafter\\def\\expandafter\\foo\\expandafter{{X}}\n",
+        inputs[index].1
+    );
+    inputs[index].1 = &changed;
+    catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap();
+}
+
+fn named_source_effect_refuses(addition: &str, command: &str, located: bool) {
+    let definitions = catalogue::catalogue();
+    let symbols = include_str!("../../../../documents/paper/data/ftoo_symbols.tex");
+    let historical = include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex");
+    let original = include_str!("../../../../documents/paper/data/ftoo_registers.tex");
+    let changed = format!("{original}\n{addition}\n");
+    let at = original.len() + 1;
+    let sources = catalogue::InheritedSources {
+        symbols,
+        historical,
+        registers: &changed,
+    };
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, catalogue::OTHER_INPUTS)
+            .unwrap_err();
+    assert!(errors.diagnostics().iter().any(|diagnostic| {
+        diagnostic.rule == RuleId::M078
+            && matches!(diagnostic.fault, NotationFault::SourceMismatch { .. })
+            && (if located {
+                matches!(&diagnostic.site, NotationSite::Registry { file, source_range: Some(range), .. }
+                    if file == "ftoo_registers.tex" && range.start == at)
+            } else {
+                matches!(&diagnostic.site, NotationSite::Registry { file, .. }
+                    if file == catalogue::FILE)
+            })
+    }), "{command}: {:?}", errors.diagnostics());
+}
+
+#[test]
+fn named_source_dynamic_target_refuses() {
+    named_source_effect_refuses(r"\def#1{X}", r"\def", true);
+}
+
+#[test]
+fn named_source_store_operation_refuses() {
+    named_source_effect_refuses(
+        r"\prop_gclear:N \g__ftoo_qty_var_prop",
+        r"\prop_gclear:N",
+        true,
+    );
+}
+
+#[test]
+fn named_source_load_command_refuses() {
+    named_source_effect_refuses(r"\input{extra}", r"\input", false);
+}
+
+#[test]
+fn spaced_and_computed_definition_targets_refuse_at_their_commands() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    for (path, addition, command, id) in [
+        (
+            "reader-hooks.tex",
+            r"\cs_gset:cpn { will } {X}",
+            r"\cs_gset:cpn",
+            DefinitionId::Will,
+        ),
+        (
+            "macros_overlap.tex",
+            r"\cs_set_eq:cN { phi } \varphi",
+            r"\cs_set_eq:cN",
+            DefinitionId::Bendfn,
+        ),
+        (
+            "front.tex",
+            r"\RenewDocumentCommand { #1 }{}{X}",
+            r"\RenewDocumentCommand",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\RenewDocumentCommand*{#1}{}{X}",
+            r"\RenewDocumentCommand",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\expandafter\def\csname #1\endcsname{X}",
+            r"\def",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\cs_gset:cpn {wi#1}{X}",
+            r"\cs_gset:cpn",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\expandafter\def\csname wi#1\endcsname{X}",
+            r"\def",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\expandafter\def\csname wi\empty ll\endcsname{X}",
+            r"\def",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\cs_gset:cpn {wi\empty ll}{X}",
+            r"\cs_gset:cpn",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\expandafter\def\csname wi\csname empty\endcsname#1\endcsname{X}",
+            r"\def",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\expandafter\RegisterVariance\expandafter{\csname will\endcsname}{vector}",
+            r"\RegisterVariance",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\expandafter\renewcommand\expandafter{\csname will\endcsname}{X}",
+            r"\renewcommand",
+            DefinitionId::Will,
+        ),
+        (
+            "partB.tex",
+            r"\expandafter\def\expandafter\will\expandafter{\will\,}",
+            r"\def",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\exp_args:Nc \RenewDocumentCommand {will}{}{X}",
+            r"\RenewDocumentCommand",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\RegisterVariance{#1}{vector}",
+            r"\RegisterVariance",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\RegisterVariance{will#1}{vector}",
+            r"\RegisterVariance",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\exp_args:Nc \RegisterVariance {will}{vector}",
+            r"\RegisterVariance",
+            DefinitionId::Will,
+        ),
+        (
+            "front.tex",
+            r"\DeclareMetricPair{#1}",
+            r"\DeclareMetricPair",
+            DefinitionId::Will,
+        ),
+    ] {
+        let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+        let index = inputs.iter().position(|(file, _)| *file == path).unwrap();
+        let at = inputs[index].1.len() + 1 + addition.find(command).unwrap();
+        let changed = format!("{}\n{addition}\n", inputs[index].1);
+        inputs[index].1 = &changed;
+        let errors =
+            catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+        assert!(errors.diagnostics().iter().any(|diagnostic| {
+            diagnostic.rule == RuleId::M078
+                && matches!(diagnostic.fault, NotationFault::SourceMismatch { definition } if definition == id)
+                && matches!(&diagnostic.site, NotationSite::Registry { file, source_range: Some(range), .. }
+                    if file == path && range.start == at)
+        }), "{path}: {addition}: {:?}", errors.diagnostics());
+    }
+}
+
+#[test]
+fn prepared_hooks_and_quantity_operations_refuse_at_their_sites() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    for (path, addition, id) in [
+        (
+            "reader-hooks.tex",
+            "\n\\RenewDocumentCommand\\will{}{X}\n",
+            DefinitionId::Will,
+        ),
+        (
+            "macros_overlap.tex",
+            "\n\\cs_set_eq:NN \\phi \\varphi\n",
+            DefinitionId::Bendfn,
+        ),
+        (
+            "macros_overlap.tex",
+            "\n\\cs_gset:cpn {phi} {X}\n",
+            DefinitionId::Bendfn,
+        ),
+        (
+            "ftoo_typed_tools.tex",
+            "\n\\prop_gremove:Nn \\g__ftoo_qty_var_prop { \\tl_to_str:n {\\comovfield} }\n",
+            DefinitionId::Comovfield,
+        ),
+        (
+            "ftoo_typed_tools.tex",
+            "\n\\prop_gput:Nen \\g__ftoo_qty_var_prop { \\tl_to_str:n {\\will} } { scalar }\n",
+            DefinitionId::Will,
+        ),
+        (
+            "ftoo_typed_tools.tex",
+            "\n\\prop_gremove:Nn\\g__ftoo_qty_var_prop { \\tl_to_str:n {\\comovfield} }\n",
+            DefinitionId::Comovfield,
+        ),
+    ] {
+        let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+        let index = inputs.iter().position(|(file, _)| *file == path).unwrap();
+        let at = inputs[index].1.len() + 1;
+        let changed = format!("{}{}", inputs[index].1, addition);
+        inputs[index].1 = &changed;
+        let errors =
+            catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+        assert!(errors.diagnostics().iter().any(|diagnostic| {
+            diagnostic.rule == RuleId::M078
+                && matches!(diagnostic.fault, NotationFault::SourceMismatch { definition } if definition == id)
+                && matches!(&diagnostic.site, NotationSite::Registry { file, source_range: Some(range), .. }
+                    if file == path && range.start == at)
+        }), "{path}: {addition}");
+        if addition.starts_with("\n\\prop_gput") {
+            assert!(errors.diagnostics().iter().any(|diagnostic| {
+                diagnostic.rule == RuleId::M078
+                    && matches!(diagnostic.fault, NotationFault::SourceMismatch { definition: DefinitionId::Will })
+                    && matches!(&diagnostic.site, NotationSite::Registry { file, source_range: Some(_), .. }
+                        if file == "documents/paper/data/ftoo_symbols_historical.tex")
+            }), "{:?}", errors.diagnostics());
+        }
+    }
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "ftoo_typed_tools.tex")
+        .unwrap();
+    let removed = "    \\prop_gput:Nen \\g__ftoo_qty_var_prop { \\tl_to_str:n {#1} } {#2}\n";
+    let changed = inputs[index].1.replacen(removed, "", 1);
+    assert_ne!(changed, inputs[index].1);
+    inputs[index].1 = &changed;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(
+        errors.diagnostics().iter().any(|diagnostic| {
+            diagnostic.rule == RuleId::M078
+                && matches!(&diagnostic.site, NotationSite::Registry { file, .. }
+                if file == "ftoo_typed_tools.tex")
+        }),
+        "{:?}",
+        errors.diagnostics()
+    );
+}
+
+#[test]
+fn quantity_definition_template_is_compared_as_one_site() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "ftoo_typed_tools.tex")
+        .unwrap();
+    let changed = inputs[index].1.replacen(
+        "{ \\exp_not:V \\l__ftoo_q_log_tl \\exp_not:n {#3} }",
+        "{ \\exp_not:V \\l__ftoo_q_log_tl X }",
+        1,
+    );
+    assert_ne!(changed, inputs[index].1);
+    let at = changed
+        .find("\\exp_args:NNee \\NewDocumentCommand #1")
+        .unwrap();
+    inputs[index].1 = &changed;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(errors.diagnostics().iter().any(|diagnostic| {
+        diagnostic.rule == RuleId::M078
+            && matches!(&diagnostic.site, NotationSite::Registry { file, source_range: Some(range), .. }
+                if file == "ftoo_typed_tools.tex" && range.start == at)
+    }));
+}
+
+#[test]
+fn typed_redeclaration_keeps_its_checking_calls() {
+    let definitions = catalogue::catalogue();
+    let sources = catalogue::InheritedSources {
+        symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
+        historical: include_str!("../../../../documents/paper/data/ftoo_symbols_historical.tex"),
+        registers: include_str!("../../../../documents/paper/data/ftoo_registers.tex"),
+    };
+    let mut inputs = catalogue::OTHER_INPUTS.to_vec();
+    let index = inputs
+        .iter()
+        .position(|(file, _)| *file == "ftoo_typed_tools.tex")
+        .unwrap();
+    let original = "\\__ftoo_var_assert:nn {#1} {vector}";
+    let changed = inputs[index]
+        .1
+        .replacen(original, "\\__ftoo_var_assert:nn {#1} {scalar}", 1);
+    assert_ne!(changed, inputs[index].1);
+    inputs[index].1 = &changed;
+    let errors =
+        catalogue::inherited_source_with_inputs(&definitions, &sources, &inputs).unwrap_err();
+    assert!(
+        errors.diagnostics().iter().any(|diagnostic| {
+            diagnostic.rule == RuleId::M078
+                && matches!(&diagnostic.site, NotationSite::Registry { file, .. }
+                if file == "ftoo_typed_tools.tex")
+        }),
+        "{:?}",
+        errors.diagnostics()
+    );
+}
+
+#[test]
 fn inherited_source_rows_and_kinds_are_bijective() {
     let sources = catalogue::InheritedSources {
         symbols: include_str!("../../../../documents/paper/data/ftoo_symbols.tex"),
@@ -596,11 +1215,11 @@ fn inherited_source_rule_is_pinned() {
         .unwrap();
     assert_eq!(
         rule.statement,
-        "Each inherited source declaration has the admitted signature, decoded visual body and complete dependency closure, with named quantity, metric and registered-variance interfaces unchanged. Source syntax and its checked expression form a reviewed pairing, and each inherited definition has exactly one compared source declaration site among the recognised declaration and redefinition forms in the three named source files. Registered-variance declaration sites for each inherited name across those files equal its recorded count."
+        "Each inherited source declaration has the admitted signature, decoded visual body and complete dependency closure, with named quantity, metric and registered-variance interfaces unchanged. A source/expression pairing is reviewed individually or established by an admitted closed declaration decoder. Each inherited definition is compared at its effective declaration in the captured load order, with its complete source and dependency closure and every intervening definition, removal and redeclaration in a recognised definition form accounted for. A typed-tooling redeclaration is compared as an explicitly admitted source case, including its checking calls, or refuses; an earlier body alone cannot satisfy the comparison. Registered-variance declaration sites for each inherited name across that effective closure equal its recorded count."
     );
     assert_eq!(
         rule.scope,
-        "Every admitted inherited declaration in documents/paper/data/ftoo_symbols.tex, documents/paper/data/ftoo_symbols_historical.tex and documents/paper/data/ftoo_registers.tex, including its checked source bytes and declared checking interface; declaration sites in other files are outside this comparison."
+        "The three named source files and the explicitly admitted typed-tooling/predecessor inputs that determine an inherited name's effective declaration, bytes, signature, dependencies and checking interface. A dynamic-target definition site in a recognised form other than the admitted template, a quantity-store operation outside the admitted typed-tooling sites, and a changed sequence of recognised load commands refuse."
     );
 }
 
@@ -638,6 +1257,17 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         (TightJoin, "tight-join", 2),
         (Underbrace, "underbrace", 2),
         (UprightNet, "upright-net", 0),
+        (PrimitiveId::CapitalOmega, "capital-omega", 0),
+        (PrimitiveId::CapitalXi, "capital-xi", 0),
+        (PrimitiveId::Chi, "chi", 0),
+        (PrimitiveId::Eta, "eta", 0),
+        (PrimitiveId::Lambda, "lambda", 0),
+        (PrimitiveId::Mu, "mu", 0),
+        (PrimitiveId::Phi, "phi", 0),
+        (PrimitiveId::Tau, "tau", 0),
+        (PrimitiveId::Theta, "theta", 0),
+        (PrimitiveId::VariantEpsilon, "variant-epsilon", 0),
+        (PrimitiveId::Zeta, "zeta", 0),
     ];
     let n = notation(&book)?;
     assert_eq!(
@@ -688,7 +1318,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            primitive_site(Alpha, 23, &["id"]),
+            primitive_site(Alpha, 34, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
@@ -696,7 +1326,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 23, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 34, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
     );
     let mut p = primitives::catalogue();
     let mut duplicate = p[0].clone();
@@ -712,10 +1342,10 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 24],
+                positions: vec![0, 35],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 24] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 35] }\n",
     );
     let mut p = primitives::catalogue();
     p[1].token = "alpha";
@@ -1001,7 +1631,7 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            registry_site(CoefficientOne, 13, &["id"]),
+            registry_site(CoefficientOne, 46, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
@@ -1009,7 +1639,7 @@ fn n03_alias_targets_missing_entries_and_canonical_coverage() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 13, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 46, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 0, positions: [] }\n",
     );
     for (target, reason) in [
         (Dimension, AliasTargetReason::ConstructorTarget),
@@ -1978,10 +2608,10 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 entry: RegistryEntry::Definition(CoefficientOne),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 14],
+                positions: vec![0, 47],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 14] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/catalogue.rs\", entry: Definition(CoefficientOne), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Definition(CoefficientOne), expected: 1, actual: 2, positions: [0, 47] }\n",
     );
     let mut d = catalogue::catalogue();
     d[1].token = "coefficient-one";
@@ -2021,7 +2651,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
             diag(
                 RuleId::M047,
                 NotationStage::Catalogue,
-                primitive_site(PrimitiveId::Beta, 24, &["operation"]),
+                primitive_site(PrimitiveId::Beta, 35, &["operation"]),
                 NotationFault::CatalogMultiplicity {
                     entry: RegistryEntry::Primitive(PrimitiveId::Beta),
                     expected: 1,
@@ -2030,7 +2660,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 },
             ),
         ],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 24, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 35, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
     );
     notation(&book)?;
     Ok(())
@@ -2327,6 +2957,7 @@ fn n05_seed_exact_statuses_and_catalogue_bodies() -> TestResult {
                 d.spec().signature().arity,
                 d.spec().kind().clone()
             ))
+            .take(expected.len())
             .collect::<Vec<_>>(),
         expected
     );
@@ -2463,6 +3094,7 @@ fn n02_constructor_body_expansion_boundary() -> TestResult {
         entry: RegistryEntry::Definition(DefinitionId::Product),
         index: 6,
         path,
+        source_range: None,
     };
     let display_path = indices
         .iter()
@@ -2494,14 +3126,14 @@ fn complete_seed_consumer() {
     let graph = seed().unwrap();
     let book = addressing(&graph).unwrap();
     let n = notation(&book).unwrap();
-    assert_eq!(n.definitions().len(), 14);
-    assert_eq!(n.primitives().len(), 24);
+    assert_eq!(n.definitions().len(), 47);
+    assert_eq!(n.primitives().len(), 35);
     assert_eq!(
         n.definitions()
             .iter()
             .filter(|d| d.status().is_some())
             .count(),
-        12
+        45
     );
     for object in NodeId::ALL {
         assert_eq!(

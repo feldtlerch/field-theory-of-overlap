@@ -35,6 +35,7 @@ pub use notation::{
 };
 pub use notation::{
     INHERITED_SOURCE_DECLARATIONS, INHERITED_SOURCE_FILES, INHERITED_VARIANCE_DECLARATION,
+    inherited_decoded_declarations,
 };
 pub use notation::{RenderOwner, RenderTarget};
 mod labels;

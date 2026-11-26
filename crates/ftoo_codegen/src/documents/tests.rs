@@ -637,6 +637,39 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
         D::Alignrate,
         D::Willnet,
         D::Willdecay,
+        D::Accountability,
+        D::Anchorprior,
+        D::Attenuation,
+        D::Bendfn,
+        D::Biforce,
+        D::Colourcoordinate,
+        D::Colourgainfamily,
+        D::Colourspan,
+        D::Cyclicshift,
+        D::Decayrate,
+        D::Edgeload,
+        D::Fielddrift,
+        D::Frameloading,
+        D::Frameoffsets,
+        D::Heldweight,
+        D::HingeAlpha,
+        D::HingeBeta,
+        D::Horizon,
+        D::Idcov,
+        D::Jaccouple,
+        D::Jacgrowth,
+        D::Leanbare,
+        D::Moralvel,
+        D::Nonreprfrac,
+        D::Recoveryfact,
+        D::Reports,
+        D::Residuals,
+        D::Rewardfield,
+        D::Rewardpotential,
+        D::Rootofunity,
+        D::Will,
+        D::WoodburyJay,
+        D::Woodburyd,
     ] {
         rows.push(NativeCase::Sweep {
             owner: RenderOwner::Definition(id),
@@ -668,6 +701,17 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
         (P::TightJoin, 2),
         (P::Underbrace, 2),
         (P::UprightNet, 0),
+        (P::CapitalOmega, 0),
+        (P::CapitalXi, 0),
+        (P::Chi, 0),
+        (P::Eta, 0),
+        (P::Lambda, 0),
+        (P::Mu, 0),
+        (P::Phi, 0),
+        (P::Tau, 0),
+        (P::Theta, 0),
+        (P::VariantEpsilon, 0),
+        (P::Zeta, 0),
     ];
     for (id, arity) in primitives {
         rows.push(NativeCase::Sweep {
@@ -700,6 +744,17 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
                 "tight-join",
                 "underbrace",
                 "upright-net",
+                "capital-omega",
+                "capital-xi",
+                "chi",
+                "eta",
+                "lambda",
+                "mu",
+                "phi",
+                "tau",
+                "theta",
+                "variant-epsilon",
+                "zeta",
             ] {
                 rows.push(NativeCase::Sweep {
                     owner: RenderOwner::Primitive(id),
@@ -708,7 +763,8 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             }
         }
     }
-    assert_eq!(rows.len(), 699);
+    // 1,040 = 699 existing rows + 341 catalogue rows.
+    assert_eq!(rows.len(), 1_040);
     assert_eq!(native::sweep_inventory(&catalogue, &rows), Ok(()));
     let missing = NativeCase::Sweep {
         owner: RenderOwner::Definition(D::Dimension),

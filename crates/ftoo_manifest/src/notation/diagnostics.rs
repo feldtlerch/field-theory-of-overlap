@@ -50,7 +50,7 @@ pub enum NotationPathPart {
     Field(String),
     Argument(usize),
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum NotationSite {
     Catalogue {
         file: String,
@@ -60,6 +60,7 @@ pub enum NotationSite {
         entry: RegistryEntry,
         index: usize,
         path: Vec<NotationPathPart>,
+        source_range: Option<std::ops::Range<usize>>,
     },
     Expression {
         path: Vec<NotationPathPart>,
@@ -70,6 +71,50 @@ pub enum NotationSite {
         bytes: std::ops::Range<usize>,
         origins: Vec<NotationOrigin>,
     },
+}
+impl std::fmt::Debug for NotationSite {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Catalogue { file } => formatter
+                .debug_struct("Catalogue")
+                .field("file", file)
+                .finish(),
+            Self::Registry {
+                file,
+                entry,
+                index,
+                path,
+                source_range,
+            } => {
+                let mut value = formatter.debug_struct("Registry");
+                value
+                    .field("file", file)
+                    .field("entry", entry)
+                    .field("index", index)
+                    .field("path", path);
+                if let Some(range) = source_range {
+                    value.field("source_range", range);
+                }
+                value.finish()
+            }
+            Self::Expression { path } => formatter
+                .debug_struct("Expression")
+                .field("path", path)
+                .finish(),
+            Self::Rendered {
+                owner,
+                case,
+                bytes,
+                origins,
+            } => formatter
+                .debug_struct("Rendered")
+                .field("owner", owner)
+                .field("case", case)
+                .field("bytes", bytes)
+                .field("origins", origins)
+                .finish(),
+        }
+    }
 }
 impl NotationSite {
     pub(super) fn child(&self, part: NotationPathPart) -> Self {

@@ -176,6 +176,102 @@ fn support_required_math_text_display_spelling_and_layout() {
 }
 
 #[test]
+fn support_required_greek_spellings_have_the_same_visible_mathml_token() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let prepared = prepare_notation(&catalogue).unwrap();
+    for id in [
+        PrimitiveId::CapitalOmega,
+        PrimitiveId::CapitalXi,
+        PrimitiveId::Chi,
+        PrimitiveId::Eta,
+        PrimitiveId::Lambda,
+        PrimitiveId::Mu,
+        PrimitiveId::Phi,
+        PrimitiveId::Tau,
+        PrimitiveId::Theta,
+        PrimitiveId::VariantEpsilon,
+        PrimitiveId::Zeta,
+    ] {
+        let operation = id.operation();
+        let command = format!("{}{{}}", operation.host_tokens()[0]);
+        let unicode = operation.unicode_scalar().unwrap();
+        let visible = |source: &str| {
+            let rendered = katex::invoke_mathml(&prepared.support, source)
+                .unwrap()
+                .unwrap();
+            let before_annotation = rendered.split("<annotation").next().unwrap();
+            let start = before_annotation.find("<mi").expect("one symbol token");
+            let end = before_annotation[start..]
+                .find("</mi>")
+                .expect("closed symbol token")
+                + start
+                + 5;
+            before_annotation[start..end].to_string()
+        };
+        assert_eq!(visible(&command), visible(unicode), "{id:?}");
+    }
+}
+
+#[test]
+fn support_required_single_symbol_specimens_cover_the_decoded_class() {
+    use std::{collections::BTreeMap, fmt::Write as _};
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let _prepared = prepare_notation(&catalogue).unwrap();
+    let mut specimens = BTreeMap::<String, (String, Vec<DefinitionId>)>::new();
+    for id in std::iter::once(DefinitionId::Comovfield).chain(
+        ftoo_manifest::inherited_decoded_declarations()
+            .into_iter()
+            .map(|(id, _)| id),
+    ) {
+        let macro_body = render::pending_body(&catalogue, id, RenderTarget::Macro)
+            .unwrap()
+            .source;
+        let screen_body = render::pending_body(&catalogue, id, RenderTarget::Unicode)
+            .unwrap()
+            .source;
+        specimens
+            .entry(screen_body)
+            .or_insert_with(|| (macro_body, Vec::new()))
+            .1
+            .push(id);
+    }
+    assert_eq!(specimens.len(), 33);
+    assert!(
+        specimens
+            .values()
+            .any(|(_, names)| names.contains(&DefinitionId::Will))
+    );
+    let Ok(directory) = std::env::var("FTOO_CATALOGUE_GLYPH_DIR") else {
+        return;
+    };
+    let directory = std::path::Path::new(&directory);
+    std::fs::create_dir_all(directory).unwrap();
+    let mut markdown = String::from(
+        "# Inherited single-symbol mathematics\n\nEach paragraph gives the source names and their fully expanded mathematical glyph.\n\n",
+    );
+    let mut tex = String::from(
+        "\\documentclass[11pt,a4paper]{article}\n\\usepackage{fontspec}\n\\usepackage{unicode-math}\n\\setmainfont{TeX Gyre Pagella}[Numbers=OldStyle]\n\\setmathfont{texgyrepagella-math.otf}\n\\begin{document}\nInherited single-symbol mathematics\\par\n",
+    );
+    for (screen, (macro_body, names)) in &specimens {
+        let caption = names
+            .iter()
+            .map(|id| id.token())
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(markdown, "{caption}: $`{screen}`$\n").unwrap();
+        writeln!(tex, "\\texttt{{{caption}}}: \\({macro_body}\\)\\par").unwrap();
+    }
+    markdown.push_str("Paper context: a rate $`ω`$ opposing the reward gradient.\n\nLatin boundary: a $`S`$ b. Lowercase Greek boundary: a $`ω`$ b. Capital Greek boundary: a $`Ω`$ b.\n");
+    tex.push_str("\\end{document}\n");
+    std::fs::write(directory.join("math-catalogue-symbols.md"), markdown).unwrap();
+    std::fs::write(directory.join("math-catalogue-symbols.tex"), tex).unwrap();
+}
+
+#[test]
 fn support_required_inherited_sweep_status_and_mark_policy() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
@@ -185,7 +281,7 @@ fn support_required_inherited_sweep_status_and_mark_policy() {
     assert!(!prepared.declarations().contains(r"\gensym"));
     let artifact: serde_json::Value = serde_json::from_slice(&prepared.status_artifact()).unwrap();
     let inherited = artifact["inherited"].as_array().unwrap();
-    assert_eq!(inherited.len(), 7);
+    assert_eq!(inherited.len(), 40);
     for id in [
         DefinitionId::Comovfield,
         DefinitionId::Readout,
@@ -2551,7 +2647,7 @@ fn incomplete_and_output_boundaries_have_exact_sites() {
 
 // This oracle has no descriptor, declaration or writer reads. Its closed input
 // inventory and exact strings deliberately duplicate the reviewed specification.
-const PRIMITIVES: [(PrimitiveId, &str, usize); 24] = [
+const PRIMITIVES: [(PrimitiveId, &str, usize); 35] = [
     (PrimitiveId::Alpha, "alpha", 0),
     (PrimitiveId::Beta, "beta", 0),
     (PrimitiveId::Fraction, "fraction", 2),
@@ -2576,8 +2672,19 @@ const PRIMITIVES: [(PrimitiveId, &str, usize); 24] = [
     (PrimitiveId::TightJoin, "tight-join", 2),
     (PrimitiveId::Underbrace, "underbrace", 2),
     (PrimitiveId::UprightNet, "upright-net", 0),
+    (PrimitiveId::CapitalOmega, "capital-omega", 0),
+    (PrimitiveId::CapitalXi, "capital-xi", 0),
+    (PrimitiveId::Chi, "chi", 0),
+    (PrimitiveId::Eta, "eta", 0),
+    (PrimitiveId::Lambda, "lambda", 0),
+    (PrimitiveId::Mu, "mu", 0),
+    (PrimitiveId::Phi, "phi", 0),
+    (PrimitiveId::Tau, "tau", 0),
+    (PrimitiveId::Theta, "theta", 0),
+    (PrimitiveId::VariantEpsilon, "variant-epsilon", 0),
+    (PrimitiveId::Zeta, "zeta", 0),
 ];
-const DEFINITIONS: [(DefinitionId, &str, usize); 14] = [
+const DEFINITIONS: [(DefinitionId, &str, usize); 47] = [
     (DefinitionId::CoefficientOne, "coefficient-one", 0),
     (DefinitionId::CoefficientThree, "coefficient-three", 0),
     (
@@ -2600,6 +2707,39 @@ const DEFINITIONS: [(DefinitionId, &str, usize); 14] = [
     (DefinitionId::Alignrate, "alignrate", 0),
     (DefinitionId::Willnet, "willnet", 0),
     (DefinitionId::Willdecay, "willdecay", 0),
+    (DefinitionId::Decayrate, "decayrate", 0),
+    (DefinitionId::Moralvel, "moralvel", 0),
+    (DefinitionId::Fielddrift, "fielddrift", 0),
+    (DefinitionId::Leanbare, "leanbare", 0),
+    (DefinitionId::Will, "will", 0),
+    (DefinitionId::Bendfn, "bendfn", 0),
+    (DefinitionId::Frameloading, "frameloading", 0),
+    (DefinitionId::HingeAlpha, "hingeA", 0),
+    (DefinitionId::Accountability, "accountability", 0),
+    (DefinitionId::Idcov, "idcov", 0),
+    (DefinitionId::Rewardfield, "rewardfield", 0),
+    (DefinitionId::Heldweight, "heldweight", 0),
+    (DefinitionId::Rewardpotential, "rewardpotential", 0),
+    (DefinitionId::Attenuation, "attenuation", 0),
+    (DefinitionId::Biforce, "biforce", 0),
+    (DefinitionId::HingeBeta, "hingeB", 0),
+    (DefinitionId::Horizon, "horizon", 0),
+    (DefinitionId::Nonreprfrac, "nonreprfrac", 0),
+    (DefinitionId::Edgeload, "edgeload", 0),
+    (DefinitionId::Cyclicshift, "cyclicshift", 0),
+    (DefinitionId::Rootofunity, "rootofunity", 0),
+    (DefinitionId::Jacgrowth, "jacgrowth", 0),
+    (DefinitionId::Jaccouple, "jaccouple", 0),
+    (DefinitionId::Recoveryfact, "recoveryfact", 0),
+    (DefinitionId::Reports, "reports", 0),
+    (DefinitionId::Frameoffsets, "frameoffsets", 0),
+    (DefinitionId::Residuals, "residuals", 0),
+    (DefinitionId::Anchorprior, "anchorprior", 0),
+    (DefinitionId::WoodburyJay, "woodburyJ", 0),
+    (DefinitionId::Woodburyd, "woodburyd", 0),
+    (DefinitionId::Colourgainfamily, "colourgainfamily", 0),
+    (DefinitionId::Colourspan, "colourspan", 0),
+    (DefinitionId::Colourcoordinate, "colourcoordinate", 0),
 ];
 fn oracle(expr: &ExprDraft, unicode: bool) -> String {
     let ExprDraft::Call { callee, arguments } = expr else {
@@ -2614,6 +2754,17 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             PrimitiveId::Alpha => if unicode { "α" } else { r"\alpha{}" }.into(),
             PrimitiveId::Beta => if unicode { "β" } else { r"\beta{}" }.into(),
             PrimitiveId::Omega => if unicode { "ω" } else { r"\omega{}" }.into(),
+            PrimitiveId::CapitalOmega => if unicode { "Ω" } else { r"\Omega{}" }.into(),
+            PrimitiveId::CapitalXi => if unicode { "Ξ" } else { r"\Xi{}" }.into(),
+            PrimitiveId::Chi => if unicode { "χ" } else { r"\chi{}" }.into(),
+            PrimitiveId::Eta => if unicode { "η" } else { r"\eta{}" }.into(),
+            PrimitiveId::Lambda => if unicode { "λ" } else { r"\lambda{}" }.into(),
+            PrimitiveId::Mu => if unicode { "μ" } else { r"\mu{}" }.into(),
+            PrimitiveId::Phi => if unicode { "ϕ" } else { r"\phi{}" }.into(),
+            PrimitiveId::Tau => if unicode { "τ" } else { r"\tau{}" }.into(),
+            PrimitiveId::Theta => if unicode { "θ" } else { r"\theta{}" }.into(),
+            PrimitiveId::VariantEpsilon => if unicode { "ε" } else { r"\varepsilon{}" }.into(),
+            PrimitiveId::Zeta => if unicode { "ζ" } else { r"\zeta{}" }.into(),
             PrimitiveId::Calligraphic => format!("{}{{{}}}", r"\mathcal", a[0]),
             PrimitiveId::UprightVir => r"\mathrm{vir}".into(),
             PrimitiveId::UprightS => r"\mathrm{S}".into(),
@@ -2662,6 +2813,7 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
                 DefinitionId::Alignrate => r"\alignrate",
                 DefinitionId::Willnet => r"\willnet",
                 DefinitionId::Willdecay => r"\willdecay",
+                id => return format!("\\{}{{}}", id.token()),
             };
             format!(
                 "{command}{}",
@@ -2694,6 +2846,38 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             DefinitionId::Alignrate => r"\dot{σ}".into(),
             DefinitionId::Willnet => r"{ω}_{\mathrm{net}}".into(),
             DefinitionId::Willdecay => "γσ".into(),
+            DefinitionId::Decayrate => "γ".into(),
+            DefinitionId::Moralvel => "s".into(),
+            DefinitionId::Fielddrift => "F".into(),
+            DefinitionId::Leanbare => "σ".into(),
+            DefinitionId::Will => "ω".into(),
+            DefinitionId::Bendfn => "ϕ".into(),
+            DefinitionId::Frameloading => "Z".into(),
+            DefinitionId::HingeAlpha => "a".into(),
+            DefinitionId::Accountability => "A".into(),
+            DefinitionId::Idcov => "Ω".into(),
+            DefinitionId::Rewardfield => "R".into(),
+            DefinitionId::Heldweight => "λ".into(),
+            DefinitionId::Rewardpotential => "D".into(),
+            DefinitionId::Attenuation => "η".into(),
+            DefinitionId::Biforce | DefinitionId::Jaccouple => "β".into(),
+            DefinitionId::HingeBeta => "b".into(),
+            DefinitionId::Horizon => "τ".into(),
+            DefinitionId::Nonreprfrac => "V".into(),
+            DefinitionId::Edgeload => "I".into(),
+            DefinitionId::Cyclicshift => "P".into(),
+            DefinitionId::Rootofunity => "ζ".into(),
+            DefinitionId::Jacgrowth => "α".into(),
+            DefinitionId::Recoveryfact => "μ".into(),
+            DefinitionId::Reports => "x".into(),
+            DefinitionId::Frameoffsets => "θ".into(),
+            DefinitionId::Residuals => "ε".into(),
+            DefinitionId::Anchorprior => "B".into(),
+            DefinitionId::WoodburyJay => "J".into(),
+            DefinitionId::Woodburyd => "d".into(),
+            DefinitionId::Colourgainfamily => "g".into(),
+            DefinitionId::Colourspan => "Ξ".into(),
+            DefinitionId::Colourcoordinate => "χ".into(),
         },
     }
 }
@@ -2783,7 +2967,7 @@ fn complete_row_key_invocation_and_both_form_inventory() {
         })
         .collect();
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 700);
+    assert_eq!(actual.len(), 1041);
     for (owner, case, expr) in sweep::cases(&n) {
         let checked = ftoo_manifest::check_expression(&n, expr).unwrap();
         for target in [RenderTarget::Macro, RenderTarget::Unicode] {
@@ -3634,9 +3818,9 @@ fn retained_sweep_controls(support: &support::Support) {
                     .map(|row| row.source.as_str())
                     .collect::<String>()
             );
-            assert_eq!(pending.len(), 12);
+            assert_eq!(pending.len(), 45);
         } else {
-            assert_eq!(pending.len(), 7);
+            assert_eq!(pending.len(), 40);
             let expression = ftoo_manifest::check_expression(
                 &catalogue,
                 ftoo_manifest::ExprDraft::Call {
