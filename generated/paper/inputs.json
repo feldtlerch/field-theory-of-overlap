@@ -57,7 +57,7 @@
     "tools/assembly/native-lock.toml": "4d483a627b55c1d8eabefbcdbd8c5422bffa4344787ed9e772f9c4c46190f284",
     "tools/paper/bibroute.py": "d79c3596628dec7b6e4bb41308aace8c8bcc65f32cf03e7441a7e8063631506b",
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
-    "tools/paper/identities.py": "f4fc2b08f0e85d963634a83c2552dd402f944351dce38b239fda936cf3d5eeb3",
+    "tools/paper/identities.py": "1ccdd5d03def4cf4218b02174d94fba9df87846b687e53ea3659b462b905b7a2",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
     "tools/paper/prepare.py": "c3e9fefe022520d79a6fcf55704bf2c69f4dfd365f2ac75efdebf697a852d35d"
   }

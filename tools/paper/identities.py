@@ -17,11 +17,13 @@ CHECK_INPUTS = ['tools/paper/common.py', 'documents/paper-build/label-mints.tsv'
                 'registry/documentary-tags.toml']
 TAG = re.compile(r'[A-Za-z][A-Za-z0-9_-]*:[A-Za-z0-9][A-Za-z0-9_-]*\Z')
 KEY = re.compile(r'[A-Za-z][A-Za-z0-9_-]*(?::[A-Za-z0-9_-]+)+\Z')
+# A valid key is a whole token exactly when holds() would match it on a source line.
+LABEL_TOKEN = re.compile(r'[A-Za-z0-9_:-]+')
 
 
 def holds(line, key):
-    """A line holds a key when the key occurs there as a whole label, not as part of a longer one."""
-    return re.search(r'(?<![A-Za-z0-9_:-])'+re.escape(key)+r'(?![A-Za-z0-9_:-])', line) is not None
+    """A line holds a validated key when it occurs as one whole label token."""
+    return key in LABEL_TOKEN.findall(line)
 
 
 class CapturedInputs:
@@ -93,9 +95,8 @@ def label_mints(repo, read_text=read):
             path = repo/file
             require(path.is_file(), 'M063: label mint file is absent: '+file)
             require(file in declared, 'M063: label mint file is not declared: '+file)
-            sources[file] = read_text(path).split('\n')
-        lines = sources[file]
-        require(any(holds(line, key) for line in lines),
+            sources[file] = set(LABEL_TOKEN.findall(read_text(path)))
+        require(key in sources[file],
                 'M063: label mint file does not hold its key: '+key+' at '+file)
     return rows
 
