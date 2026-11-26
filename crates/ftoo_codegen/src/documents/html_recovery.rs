@@ -1016,6 +1016,20 @@ fn check_main(
             at += 1;
             continue;
         }
+        if block.depth == Some(2) {
+            let fragment = super::plan::public_fragment(plan, &block.site, &block.unit)?;
+            let heading = element(
+                plan,
+                known,
+                body,
+                "h2",
+                &[("id", &fragment)],
+                "HTML corpus heading",
+            )?;
+            runs(plan, known, &block.runs, heading, false, index, prepared)?;
+            at += 1;
+            continue;
+        }
         if let Some(econ) = &block.econ {
             let header_id = format!("{}-header", econ.fragment);
             let section = element(
@@ -1587,4 +1601,60 @@ pub(super) fn check(
     check_main(plan, known_labels, prepared, main)?;
     check_licences(plan, known_labels, fonts, licences, licences_label)?;
     Ok(())
+}
+
+fn slot_node_text(node: &Node) -> Option<String> {
+    match node {
+        Node::Text(value) => Some(value.clone()),
+        Node::Element { name, children, .. }
+            if matches!(name.as_str(), "strong" | "em" | "p" | "h2") =>
+        {
+            let mut text = String::new();
+            for child in children {
+                text.push_str(&slot_node_text(child)?);
+            }
+            Some(text)
+        }
+        Node::Element { .. } => None,
+    }
+}
+
+pub(super) fn slot_html_text(
+    plan: &DocumentPlan,
+    slot: &ftoo_manifest::corpus::CheckedSlot,
+    source: &str,
+) -> Result<String, DocumentError> {
+    let mut parser = Parser {
+        source,
+        at: 0,
+        nodes: 0,
+        library: false,
+    };
+    if !parser.consume("<!doctype html>") {
+        return Err(mismatch(plan, "HTML corpus recovery"));
+    }
+    let root = parser
+        .element(0)
+        .ok_or_else(|| mismatch(plan, "HTML corpus recovery"))?;
+    let Node::Element { children: root, .. } = root else {
+        return Err(mismatch(plan, "HTML corpus recovery"));
+    };
+    let Some(Node::Element { children: body, .. }) = root.get(1) else {
+        return Err(mismatch(plan, "HTML corpus recovery"));
+    };
+    let Some(Node::Element { children: main, .. }) = body.get(2) else {
+        return Err(mismatch(plan, "HTML corpus recovery"));
+    };
+    let fragment = super::plan::public_fragment(plan, &plan.blocks[0].site, slot.id())?;
+    let start = main.iter().position(|node| matches!(node,
+        Node::Element { name, attributes, .. } if name == "h2" && attributes == &[("id".into(), fragment.clone())]
+    )).ok_or_else(|| mismatch(plan, "HTML corpus heading"))?;
+    let mut parts = Vec::new();
+    for node in main
+        .get(start..start + slot.blocks().len())
+        .ok_or_else(|| mismatch(plan, "HTML corpus children"))?
+    {
+        parts.push(slot_node_text(node).ok_or_else(|| mismatch(plan, "HTML corpus child text"))?);
+    }
+    Ok(parts.join(" "))
 }

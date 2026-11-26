@@ -24,7 +24,8 @@ def scope_fragments(repository):
                 'M079: Inclusion row differs: '+str(number))
         source, unit, fragment, role, line = fields
         require(source.startswith(SOURCES) and '..' not in pathlib.PurePosixPath(source).parts
-                and role in ('refrain', 'paragraph', 'quotation', 'equation', 'econ') and int(line) > 0,
+                and role in ('refrain', 'paragraph', 'quotation', 'equation', 'econ',
+                             'corpus-slot') and int(line) > 0,
                 'M079: Inclusion row differs: '+str(number))
         rows.append((source, unit, fragment, role, int(line)))
     require(rows, 'M079: Checked inclusions absent')
@@ -54,6 +55,66 @@ def equation_tokens(body):
                     for index, piece in enumerate(pieces))
 
 
+def checked_paragraph_body(body, fragment, source, repository, auxiliary_keys):
+    """Apply the existing paragraph-role checks to a complete emitted body."""
+    checked_math = rb'\\\(\\(?:comovfield|willvirtue|gensym)\{\}\\\)'
+    allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|\\handle\{[A-Za-z][A-Za-z0-9_:-]*\}|\\(?:paper)?virtue\{[a-z]+\}|'
+               rb'\\see\{[A-Za-z][A-Za-z0-9_:-]*\}|\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
+               + checked_math + rb')+')
+    require(body and re.fullmatch(allowed, body),
+            'M055: Fragment body differs: '+fragment)
+    available = bindings(repository)
+    for key in re.findall(rb'\\ftag\{([^{}]+)\}', body):
+        row = available.get(key.decode('ascii'))
+        require(row is not None and row['source_status'] in ('paper', 'alias'),
+                'M055: Fragment tag binding differs: '+fragment)
+    for key in re.findall(rb'\\handle\{([^{}]+)\}', body):
+        name = key.decode('ascii')
+        row = available.get(name)
+        require(row is not None and row['source_status'] == 'paper' and row['spelling'] == name,
+                'M055: Fragment handle binding differs: '+fragment)
+        require(name not in auxiliary_keys, 'M055: Duplicate auxiliary handle: '+name)
+        auxiliary_keys.add(name)
+    for key in re.findall(rb'\\see\{([^{}]+)\}', body):
+        require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
+                'M055: Fragment reference binding differs: '+fragment)
+    virtue_calls = re.findall(rb'\\(papervirtue|virtue)\{([a-z]+)\}', body)
+    if virtue_calls:
+        captured = CapturedInputs(repository)
+        roster = {row['word'] for row in virtue_roster(repository,
+                  bindings(repository, captured=captured), captured)}
+        captured.verify()
+        expected = b'papervirtue' if source.startswith('documents/paper/explainer/') else b'virtue'
+        require(all(command == expected and word.decode('ascii') in roster
+                    for command, word in virtue_calls),
+                'M055: Fragment virtue binding differs: '+fragment)
+    return b' '.join(body.split())
+
+
+def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys):
+    """Check the bounded slot envelope and reuse paragraph checks for its child use."""
+    require(data.endswith(b'\n') and b'\r' not in data and b'\0' not in data,
+            'M055: Corpus slot body differs: '+fragment)
+    parts = data.rstrip(b'\n').split(b'\n\n')
+    require(len(parts) == 6 and re.fullmatch(
+        rb'\\section\{[^{}\\\n]+\}\n\\label\{'+re.escape(unit.encode())+rb'\}',
+        parts[0]) is not None,
+        'M055: Corpus slot heading differs: '+fragment)
+    child = parts[1]
+    match = re.fullmatch(rb'\\PaperNativeParagraph\{([A-Za-z][A-Za-z0-9_:-]*)\}\{(.+)\}',
+                         child)
+    require(match is not None and match[1] != unit.encode(),
+            'M055: Corpus slot child differs: '+fragment)
+    checked_paragraph_body(match[2], fragment, source, repository, auxiliary_keys)
+    bodies = []
+    for body in parts[2:]:
+        require(body and not re.search(rb'\\(?!textbf\b|emph\b|enspace\b)[A-Za-z]+', body)
+                and b'\\label{' not in body and b'% generated:' not in body,
+                'M055: Corpus slot paragraph differs: '+fragment)
+        bodies.append(b' '.join(body.split()))
+    return bodies
+
+
 def declared_fragments(repository, rows):
     """Validate unique source markers and return their replacement lines."""
     replacements = {}
@@ -75,6 +136,12 @@ def declared_fragments(repository, rows):
         positions = [number for number, content in enumerate(lines, 1) if content == marker]
         require(positions == [line], 'M055: Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
+        if role == 'corpus-slot':
+            paragraph_bodies.extend(corpus_slot_bodies(
+                data, unit, fragment, source, repository, auxiliary_keys))
+            replacements[(source, positions[0])] = data
+            marker_at[(source, positions[0])] = marker.rstrip(b'\n')
+            continue
         if role == 'econ':
             require(data.count(b'\n') == 1 and data.endswith(b'\\end{econ}\n'),
                     'M055: Econ fragment body differs: '+fragment)
@@ -112,39 +179,8 @@ def declared_fragments(repository, rows):
                  else 'Fragment label/declaration differs: ')+fragment)
         body = data[len(prefix):-2]
         if role == 'paragraph':
-            checked_math = rb'\\\(\\(?:comovfield|willvirtue|gensym)\{\}\\\)'
-            allowed = (rb'(?:[^{}\\]|\\ftag\{[A-Za-z][A-Za-z0-9_:-]*\}|\\handle\{[A-Za-z][A-Za-z0-9_:-]*\}|\\(?:paper)?virtue\{[a-z]+\}|'
-                       rb'\\see\{[A-Za-z][A-Za-z0-9_:-]*\}|\\emph\{[^{}\\]+\}|\\(?:paren|text)cite\{a:[A-Za-z0-9-]+(?:,a:[A-Za-z0-9-]+)*\}|'
-                       + checked_math + rb')+')
-            require(body and re.fullmatch(allowed, body),
-                    'M055: Fragment body differs: '+fragment)
-            from identities import bindings
-            available = bindings(repository)
-            for key in re.findall(rb'\\ftag\{([^{}]+)\}', body):
-                row = available.get(key.decode('ascii'))
-                require(row is not None and row['source_status'] in ('paper', 'alias'),
-                        'M055: Fragment tag binding differs: '+fragment)
-            for key in re.findall(rb'\\handle\{([^{}]+)\}', body):
-                name = key.decode('ascii')
-                row = available.get(name)
-                require(row is not None and row['source_status'] == 'paper' and row['spelling'] == name,
-                        'M055: Fragment handle binding differs: '+fragment)
-                require(name not in auxiliary_keys, 'M055: Duplicate auxiliary handle: '+name)
-                auxiliary_keys.add(name)
-            for key in re.findall(rb'\\see\{([^{}]+)\}', body):
-                require(key.decode('ascii') in {label for label, _ in label_mints(repository)},
-                        'M055: Fragment reference binding differs: '+fragment)
-            virtue_calls = re.findall(rb'\\(papervirtue|virtue)\{([a-z]+)\}', body)
-            if virtue_calls:
-                captured = CapturedInputs(repository)
-                roster = {row['word'] for row in virtue_roster(repository,
-                          bindings(repository, captured=captured), captured)}
-                captured.verify()
-                expected = b'papervirtue' if source.startswith('documents/paper/explainer/') else b'virtue'
-                require(all(command == expected and word.decode('ascii') in roster
-                            for command, word in virtue_calls),
-                        'M055: Fragment virtue binding differs: '+fragment)
-            paragraph_bodies.append(b' '.join(body.split()))
+            paragraph_bodies.append(checked_paragraph_body(
+                body, fragment, source, repository, auxiliary_keys))
         elif role == 'equation':
             require(body.startswith(b'\\[') and body.endswith(b'.\\]')
                     and body.count(b'\\[') == 1 and body.count(b'\\]') == 1,
@@ -209,6 +245,19 @@ def package_names(repository, rows):
     return packages
 
 
+def apply_fragment_replacements(work, fragments):
+    """Replace every marker against its source file's original line indices."""
+    by_source = {}
+    for (source, first), data in fragments.items():
+        by_source.setdefault(source, {})[first] = data
+    for source, replacements in by_source.items():
+        target = work/pathlib.Path(source).relative_to(SOURCES)
+        lines = target.read_bytes().splitlines(keepends=True)
+        for first, data in replacements.items():
+            lines[first-1] = data
+        target.write_bytes(b''.join(lines))
+
+
 def prepare(repository, support, work):
     root = repository/'documents/paper-build'
     require(not work.exists(), 'Work directory must not exist')
@@ -227,11 +276,7 @@ def prepare(repository, support, work):
         target = work/pathlib.Path(dest).relative_to(SOURCES)
         target.parent.mkdir(parents=True,exist_ok=True)
         shutil.copyfile(repository/dest,target)
-    for (source, first), data in fragments.items():
-        target = work/pathlib.Path(source).relative_to(SOURCES)
-        lines = target.read_bytes().splitlines(keepends=True)
-        lines[first-1] = data
-        target.write_bytes(b''.join(lines))
+    apply_fragment_replacements(work, fragments)
     shutil.copyfile(root/'compat.tex',work/'compat.tex')
     shutil.copyfile(root/'fontconfig.conf',work/'fontconfig.conf')
     emit(repository, work)

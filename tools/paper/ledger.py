@@ -77,16 +77,21 @@ def ledger_binding(lookup, kind, key, spelling, status):
 
 
 def native_virtue_plan(repo):
-    """Join checked inclusion positions to their generated command order."""
+    """Join checked inclusions to the prepared source's command positions."""
     native = {}
-    for row in read(repo/'generated/documents/inclusions.tsv').splitlines():
-        source, unit, fragment, role, line = row.split('\t')
+    shifts = collections.Counter()
+    rows = [row.split('\t') for row in read(repo/'generated/documents/inclusions.tsv').splitlines()]
+    for source, unit, fragment, role, line in sorted(rows, key=lambda row: (row[0], int(row[4]))):
+        body = read(repo/fragment)
+        if role == 'corpus-slot':
+            require(body.endswith('\n'), 'M055: Corpus slot body differs: '+fragment)
+            shifts[source] += body.count('\n') - 1
+            continue
         if role != 'paragraph':
             continue
-        body = read(repo/fragment)
         calls = re.findall(r'\\(papervirtue|virtue)\{([a-z]+)\}', body)
         if calls:
-            key = (pathlib.PurePosixPath(source).as_posix(), int(line))
+            key = (pathlib.PurePosixPath(source).as_posix(), int(line) + shifts[source])
             require(key not in native, 'M064: duplicate native virtue inclusion: '+unit)
             native[key] = (unit, calls)
     return native

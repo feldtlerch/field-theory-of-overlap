@@ -1165,6 +1165,7 @@ fn support_required_committed_documents_pass_native_mutation_byte_and_independen
                             match child {
                                 ftoo_manifest::SkeletonChild::Unit(unit)
                                 | ftoo_manifest::SkeletonChild::Paragraph(unit)
+                                | ftoo_manifest::SkeletonChild::CorpusSlot(unit)
                                 | ftoo_manifest::SkeletonChild::Econ(unit)
                                 | ftoo_manifest::SkeletonChild::Equation(unit)
                                 | ftoo_manifest::SkeletonChild::Quotation(unit) => {

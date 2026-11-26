@@ -225,6 +225,71 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
 }
 
 #[test]
+fn support_required_corpus_heading_and_styled_space_recover_at_their_positions() {
+    let support = support();
+    let mut plan = prose_plan("Ties. Start with two lives.");
+    let site = input::site("units/corpus/explainer-plain.toml");
+    plan.blocks.insert(
+        1,
+        plan::Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:explainer:plain".into(),
+            depth: Some(2),
+            quotation: false,
+            paragraph: false,
+            equation: false,
+            econ: None,
+            site: site.clone(),
+            runs: vec![plan::Inline::Text("The Whole Idea, in Plain Words".into())],
+        },
+    );
+    plan.blocks[2].runs = vec![
+        plan::Inline::Styled {
+            kind: plan::StyleKind::Strong,
+            children: vec![plan::Inline::Text("Ties.".into())],
+            child_sites: vec![site.clone()],
+            site: site.clone(),
+        },
+        plan::Inline::Text(" Start with two lives.".into()),
+    ];
+    plan.screen.as_mut().unwrap().gaps.insert(
+        1,
+        plan::ScreenGap {
+            position: GapPosition::Between,
+            message: String::new(),
+            site,
+            boundaries: vec![],
+        },
+    );
+    let fonts = super::super::html::load_fonts(&plan, &support).unwrap();
+    let rendered = super::super::html::render(&plan, &support, &[], None).unwrap();
+    assert!(rendered.contains("<h2 id=\"sec-cexplainer-cplain\">The Whole Idea, in Plain Words</h2><p><strong>Ties.</strong> Start with two lives.</p>"));
+    html_recovery::check(&plan, &fonts, &[], &[], &rendered).unwrap();
+    for (changed, aspect) in [
+        (
+            rendered.replacen(
+                "The Whole Idea, in Plain Words</h2>",
+                "The Whole Notion, in Plain Words</h2>",
+                1,
+            ),
+            "HTML inline text or identity",
+        ),
+        (
+            rendered.replacen(" Start with two lives.", " Begin with two lives.", 1),
+            "HTML inline text or identity",
+        ),
+        (
+            rendered.replacen("<strong>Ties.</strong> Start", "<em>Ties.</em> Start", 1),
+            "HTML style boundary",
+        ),
+    ] {
+        let error = html_recovery::check(&plan, &fonts, &[], &[], &changed).unwrap_err();
+        assert!(format!("{error:?}").contains(aspect), "{error:?}");
+    }
+}
+
+#[test]
 fn support_required_html_virtue_link_recovers_its_destination_style_and_word() {
     let support = support();
     let mut plan = prose_plan("Words.");

@@ -62,6 +62,16 @@ class Identities(unittest.TestCase):
             write(fragments/'inclusions.tsv', row + row)
             with self.assertRaisesRegex(ValueError, 'duplicate native virtue inclusion'):
                 native_virtue_plan(root)
+            write(fragments/'slot.tex', 'heading\nchild\nparagraph\n')
+            write(fragments/'inclusions.tsv',
+                  'documents/paper/parts/coda.tex\tsec:fixture:slot\t'
+                  'generated/documents/slot.tex\tcorpus-slot\t3\n' + row)
+            shifted = native_virtue_plan(root)
+            self.assertEqual(shifted,
+                             {('documents/paper/parts/coda.tex', 10):
+                              ('sec:coda:eight-words', [('virtue', 'wonder')])})
+            with self.assertRaisesRegex(ValueError, 'native virtue occurrence missing'):
+                check_virtue_inventory(shifted, seen, first, roster, paper_auxiliary)
 
     def test_virtue_site_and_native_mode_refuse_changed_occurrences(self):
         self.assertEqual(virtue_site('parts/coda.tex:86#virtue=0'),

@@ -760,3 +760,50 @@ fn crossing_group_is_located_residue_and_a_broken_group_claims_the_suffix() {
         broken.byte_length
     );
 }
+
+#[test]
+fn located_inline_keeps_contributing_bytes_and_named_spacing() {
+    let source = "A \\textbf{Ties.}\\enspace  Now --- “here”.\n";
+    let pieces = located_inline("source.tex", source, 0, source.len()).unwrap();
+    for piece in &pieces {
+        assert!(source.get(piece.start..piece.end).is_some());
+    }
+    let dash = pieces
+        .iter()
+        .find(|piece| piece.semantic == "—" && &source[piece.start..piece.end] == "---")
+        .unwrap();
+    assert_eq!(dash.end - dash.start, 3);
+    let quote = pieces.iter().find(|piece| piece.semantic == "“").unwrap();
+    assert_eq!(&source[quote.start..quote.end], "“");
+    assert_eq!(quote.end - quote.start, "“".len());
+    let spacing = pieces
+        .iter()
+        .find(|piece| piece.control == Some("en-space"))
+        .unwrap();
+    assert_eq!(&source[spacing.start..spacing.end], "\\enspace");
+    assert!(
+        pieces
+            .iter()
+            .any(|piece| piece.control == Some("strong-open"))
+    );
+    assert!(
+        pieces
+            .iter()
+            .any(|piece| piece.control == Some("strong-close"))
+    );
+}
+
+#[test]
+fn prose_apostrophe_has_one_located_typographic_contribution() {
+    let source = "That is the theory's claim.\n";
+    let imported = draft(source);
+    let BlockFields::Paragraph { runs, .. } = &imported.blocks[0].fields else {
+        panic!("paragraph fields")
+    };
+    assert!(matches!(runs.as_slice(), [Run::Text { decoded, .. }]
+        if decoded.trim_end() == "That is the theory’s claim."));
+    let pieces = located_inline("source.tex", source, 0, source.len()).unwrap();
+    let apostrophe = pieces.iter().find(|piece| piece.semantic == "’").unwrap();
+    assert_eq!(&source[apostrophe.start..apostrophe.end], "'");
+    assert_eq!(apostrophe.end - apostrophe.start, 1);
+}

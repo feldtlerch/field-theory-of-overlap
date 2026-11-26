@@ -1,11 +1,14 @@
 //! Diagnostic drafts from declared document source bytes.
 //! These values are not admitted units or renderable document plans.
+mod admission;
 mod containers;
 mod import;
 #[cfg(test)]
 mod tests;
 
 use serde::Serialize;
+
+pub use import::{LocatedPiece, located_inline};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Site {
@@ -333,4 +336,7 @@ impl std::fmt::Display for ImportFault {
 }
 impl std::error::Error for ImportFault {}
 
+pub use admission::{
+    CheckedSlot, SlotBlock, SlotDraft, SlotFault, SlotRun, SlotStyle, admit_slot, check_transfer,
+};
 pub use import::{ensure_unchanged, import_source, validate_accounting};

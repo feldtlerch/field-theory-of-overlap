@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
-from prepare import scope_fragments, declared_fragments
+from prepare import scope_fragments, declared_fragments, apply_fragment_replacements
 from identities import input_paths
 import meson_adapter
 
@@ -203,6 +203,70 @@ class Composition(unittest.TestCase):
                     checked_fragments(root, rows)
             virtue_fragment.write_bytes(virtue_intact)
             self.assertEqual(len(scope_fragments(root)), expected)
+
+
+class CorpusSlotPreparation(unittest.TestCase):
+    def test_multiline_slot_does_not_shift_later_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = pathlib.Path(directory)
+            source = 'documents/paper/explainer/slot.tex'
+            target = work / 'explainer/slot.tex'
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b'Before\n% first\nBetween\n% second\nAfter\n')
+            apply_fragment_replacements(work, {
+                (source, 2): b'First line\nSecond line\n',
+                (source, 4): b'Last fragment\n',
+            })
+            self.assertEqual(target.read_bytes(),
+                             b'Before\nFirst line\nSecond line\nBetween\nLast fragment\nAfter\n')
+
+    def test_slot_marker_child_and_authored_duplicates(self):
+        source = 'documents/paper/explainer/slot.tex'
+        unit = 'sec:explainer:plain'
+        fragment = 'generated/documents/explainer-pilot/sec-explainer-plain.tex'
+        body = (b'\\section{The Whole Idea}\n\\label{sec:explainer:plain}\n\n'
+                b'\\PaperNativeParagraph{sec:reading:plain-intro}{The intro.}\n\n'
+                b'\\textbf{Ties.}\\enspace First prose.\n\n'
+                b'Another paragraph.\n\n'
+                b'\\textbf{Work.}\\enspace More prose.\n\n'
+                b'Help and cost.\n')
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source_file = root / source
+            output_file = root / fragment
+            inclusion = root / 'generated/documents/inclusions.tsv'
+            for path in (source_file, output_file, inclusion):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            source_file.write_bytes(b'% generated: sec:explainer:plain\n')
+            output_file.write_bytes(body)
+            inclusion.write_text(f'{source}\t{unit}\t{fragment}\tcorpus-slot\t1\n')
+            with patch('prepare.assembly_json', return_value=b'{"native_targets":[]}'), \
+                    patch('prepare.bindings', return_value={}):
+                self.assertEqual(scope_fragments(root)[0][3], 'corpus-slot')
+                self.assertEqual(declared_fragments(root, [source])[(source, 1)], body)
+                changed = body.replace(b'The intro.', b'\\handle{missing}', 1)
+                output_file.write_bytes(changed)
+                with self.assertRaisesRegex(ValueError, 'Fragment handle binding differs'):
+                    declared_fragments(root, [source])
+                output_file.write_bytes(body)
+                source_file.write_bytes(source_file.read_bytes() +
+                                        b'\\textbf{Ties.}\\enspace First prose.\n')
+                with self.assertRaisesRegex(ValueError, 'Authored paragraph duplicates'):
+                    declared_fragments(root, [source])
+                source_file.write_bytes(b'% generated: sec:explainer:plain\n')
+                output_file.write_bytes(body.replace(
+                    b'Help and cost.',
+                    b'\\PaperNativeParagraph{sec:reading:plain-intro}{The intro.}'))
+                with self.assertRaisesRegex(ValueError, 'Corpus slot paragraph differs'):
+                    declared_fragments(root, [source])
+                output_file.write_bytes(body)
+                source_file.write_bytes(source_file.read_bytes() +
+                                        b'\\label{sec:explainer:plain}\n')
+                with self.assertRaisesRegex(ValueError, 'Authored mint duplicates'):
+                    declared_fragments(root, [source])
+                source_file.write_bytes(b'% generated: sec:explainer:plain\n' * 2)
+                with self.assertRaisesRegex(ValueError, 'Fragment marker/declaration differs'):
+                    declared_fragments(root, [source])
 
 
 if __name__ == '__main__':

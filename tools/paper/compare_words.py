@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 import tomllib
 import unicodedata
 
@@ -114,6 +115,18 @@ def decode_paragraph(body, lookup):
     return decoded['extracted'], decoded['semantic'], decoded['tags']
 
 
+def logical_source_gap(data, first, last, controls):
+    """Apply only the decoder's named source controls within one token gap."""
+    output = []
+    cursor = first
+    for begin, end, replacement in controls:
+        if first <= begin and end <= last:
+            output.extend((data[cursor:begin], replacement))
+            cursor = end
+    output.append(data[cursor:last])
+    return b''.join(output)
+
+
 def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     """Decode the admitted prose grammar with source byte ranges and separators."""
     data = body.encode('utf-8')
@@ -125,7 +138,9 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     tokens = []
     tags = []
     virtue_tokens = []
-    separator = None
+    controls = []
+    preceding_end = 0
+    strong_open = False
     i = 0
 
     def invalid(detail, offset):
@@ -135,11 +150,26 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     while i < len(body):
         start = i
         char = body[i]
+        if body.startswith('\\textbf{', i) and not strong_open:
+            i += len('\\textbf{')
+            controls.append((positions[start], positions[i], b''))
+            strong_open = True
+            continue
+        if char == '}' and strong_open:
+            i += 1
+            controls.append((positions[start], positions[i], b''))
+            strong_open = False
+            continue
+        if (body.startswith('\\enspace', i) and
+                (i + len('\\enspace') == len(body) or
+                 not body[i + len('\\enspace')].isascii() or
+                 not body[i + len('\\enspace')].isalpha())):
+            i += len('\\enspace')
+            controls.append((positions[start], positions[i], b' '))
+            continue
         if char in ' \t\n\r':
             if char == '\r' and (i + 1 == len(body) or body[i + 1] != '\n'):
                 invalid('isolated carriage return', i)
-            if separator is None:
-                separator = i
             i += 1
             continue
         tag = TAG.match(body, i)
@@ -208,17 +238,28 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
             invalid('unsupported source scalar U+%04X' % ord(char), i)
         if i < len(body) and body[i] in '-–—' and semantic in ('-', '–', '—'):
             invalid('adjacent mixed dash run', i)
-        separator_range = (None if separator is None else
-                           [base_offset + positions[separator], base_offset + positions[start]])
+        gap = logical_source_gap(data, positions[preceding_end], positions[start],
+                                 controls)
+        if gap and not gap.isspace():
+            invalid('unsupported source between tokens', preceding_end)
+        separator_before = bool(gap)
+        separator_range = ([base_offset + positions[preceding_end],
+                            base_offset + positions[start]] if gap else None)
         tokens.append(dict(kind=kind, semantic=semantic, extracted=extracted,
                            source_range=[base_offset + positions[start], base_offset + positions[i]],
                            source_spelling=body[start:i],
-                           separator_before=separator is not None,
+                           separator_before=separator_before,
                            separator_range=separator_range, tag=details))
         if len(tokens) > 16384:
             raise Fault('CorrespondenceLimit', 'source exceeds 16384 tokens: ' + path, 'snapshot')
-        separator = None
-    return dict(tokens=tokens, tags=tags, virtues=virtue_tokens, source_bytes=data, base_offset=base_offset,
+        preceding_end = i
+    if strong_open:
+        invalid('unclosed strong run', len(body) - 1)
+    tail = logical_source_gap(data, positions[preceding_end], len(data), controls)
+    if tail and not tail.isspace():
+        invalid('unsupported source after tokens', preceding_end)
+    return dict(tokens=tokens, tags=tags, virtues=virtue_tokens,
+                source_bytes=data, base_offset=base_offset, source_controls=controls,
                 extracted=''.join((' ' if row['separator_before'] and n else '') +
                                   row['extracted'] for n, row in enumerate(tokens)),
                 semantic=''.join((' ' if row['separator_before'] and n else '') +
@@ -268,6 +309,610 @@ def normalize(text, locations, join_break=True):
     if output and output[-1] == ' ':
         output.pop(); offsets.pop()
     return ''.join(output), offsets, events
+
+
+STREAM_SIDES = ('old_pdf', 'new_pdf', 'markdown', 'html')
+TRANSFORM_KINDS = {'tag', 'citation', 'heading-locator', 'equation-locator',
+                   'reference-locator', 'index-locator', 'formula'}
+CONTENT_TOKEN = re.compile(r"\w+(?:[’']\w+)*|[^\w\s]", re.UNICODE)
+SCREEN_MEDIA = {'markdown', 'html'}
+
+
+class _CheckedPdfStream(dict):
+    """A PDF stream constructed by located selection or resolved extraction."""
+
+
+def recovered_stream(data, rendering_bytes):
+    """Load a recovery owner's stream, never parse Markdown or HTML here.
+
+    Schema 1 has schema, medium, selection, excerpt coverage, rendering and text.
+    `selection` is {source, first, last, unit}; line bounds are inclusive.
+    `rendering` holds the emitted screen's path and SHA-256 digest. An excerpt
+    compares only with the PDF stretch selected by its declared source scope.
+    """
+    if (not isinstance(rendering_bytes, bytes) or len(data) > 1048576 or
+            data.startswith(b'\xef\xbb\xbf')):
+        raise Fault('StreamInvalid', 'recovered stream size or encoding differs',
+                    'correspondence')
+
+    def unique(rows):
+        value = {}
+        for key, item in rows:
+            if key in value:
+                raise Fault('StreamInvalid', 'duplicate recovered stream key: ' + key,
+                            'correspondence')
+            value[key] = item
+        return value
+
+    try:
+        row = json.loads(data.decode('utf-8'), object_pairs_hook=unique)
+    except (UnicodeError, ValueError) as error:
+        raise Fault('StreamInvalid', 'recovered stream is not UTF-8 JSON',
+                    'correspondence') from error
+    if not isinstance(row, dict) or set(row) != {
+            'schema', 'medium', 'selection', 'coverage', 'rendering', 'text'}:
+        raise Fault('StreamInvalid', 'recovered stream fields differ', 'correspondence')
+    scope = row['selection']
+    rendering = row['rendering']
+    if (type(row['schema']) is not int or row['schema'] != 1 or
+            not isinstance(row['medium'], str) or row['medium'] not in SCREEN_MEDIA or
+            row['coverage'] != 'excerpt' or
+            not isinstance(row['text'], str) or not row['text'] or
+            not isinstance(rendering, dict) or set(rendering) != {'path', 'sha256'} or
+            not isinstance(rendering['path'], str) or
+            not rendering['path'].startswith('generated/documents/') or
+            not rendering['path'].endswith('.md' if row['medium'] == 'markdown' else '.html') or
+            not isinstance(rendering['sha256'], str) or
+            re.fullmatch(r'[0-9a-f]{64}', rendering['sha256']) is None or
+            not isinstance(scope, dict) or set(scope) != {'source', 'first', 'last', 'unit'} or
+            not isinstance(scope['source'], str) or not scope['source'] or
+            not isinstance(scope['unit'], str) or not scope['unit'] or
+            type(scope['first']) is not int or type(scope['last']) is not int or
+            not 1 <= scope['first'] <= scope['last']):
+        raise Fault('StreamInvalid', 'recovered stream profile differs',
+                    'correspondence')
+    path = pathlib.PurePosixPath(rendering['path'])
+    if '..' in path.parts or digest(rendering_bytes) != rendering['sha256']:
+        raise Fault('StreamInvalid', 'recovered stream rendering digest differs',
+                    'correspondence')
+    return dict(text=row['text'], coverage=True, document_coverage=row['coverage'],
+                medium=row['medium'], scope=scope, rendering=rendering)
+
+
+def select_pdf_stretch(extracted, selection, decoded_blocks, document, side):
+    """Locate every declared source block in order; ambiguity is a refusal.
+
+    The assignment consumer binds decoded blocks to this declared source
+    scope. This function proves their unique PDF locations, order and lack
+    of intervening text; a recovery excerpt must supply the same scope.
+    """
+    if (not isinstance(selection, dict) or
+            set(selection) != {'source', 'first', 'last', 'unit'} or
+            not isinstance(decoded_blocks, (list, tuple)) or not decoded_blocks):
+        raise Fault('SelectionInvalid', 'PDF source scope is absent', 'correspondence')
+    matches = [align_located(block, extracted, document, side, all_matches=True)
+               for block in decoded_blocks]
+    sequences = [([], 0)]
+    for candidates in matches:
+        following = []
+        for chosen, end in sequences:
+            for candidate in candidates:
+                first = candidate['range'][0]
+                if first < end or (chosen and extracted['stream'][end:first].strip()):
+                    continue
+                following.append((chosen + [candidate], candidate['range'][1]))
+                if len(following) > 262144:
+                    raise Fault('CorrespondenceLimit',
+                                'complete PDF sequence exceeds 262144 states',
+                                'correspondence', document, side)
+        sequences = following
+    if not sequences:
+        raise Fault('CorrespondenceInvalid', 'complete PDF sequence has no match',
+                    'correspondence', document, side)
+    distinct = {tuple(tuple(proof['range']) for proof in sequence): sequence
+                for sequence, _ in sequences}
+    if len(distinct) != 1:
+        raise Fault('CorrespondenceInvalid', 'complete PDF sequence is ambiguous',
+                    'correspondence', document, side)
+    proofs = next(iter(distinct.values()))
+    events = residual_events(extracted, proofs, document, side)
+    if any(row.get('reason') or row['decision'] == 'unresolved'
+           for row in events if any(proof['range'][0] <= row['normalized_offset'] <
+                                    proof['range'][1] for proof in proofs)):
+        raise Fault('LineEndUnresolved', 'selected PDF block has an undecided mark',
+                    'correspondence', document, side)
+    aggregate = dict(range=[proofs[0]['range'][0], proofs[-1]['range'][1]],
+                     edits=[edit for proof in proofs for edit in proof['edits']],
+                     decisions=[decision for proof in proofs for decision in proof['decisions']])
+    return _CheckedPdfStream(text=' '.join(proof['canonical'] for proof in proofs),
+                             coverage=True, scope=selection,
+                             range=aggregate['range'], aggregate=aggregate,
+                             ranges=[proof['range'] for proof in proofs], proofs=proofs)
+
+
+def coarse_slot_assignment(row, source_bytes):
+    """Validate a bounded, ordered coarse-slot form against its parent blob.
+
+    This is a request shape only. The existing single-paragraph admission and
+    complete-check profile do not consume it.
+    """
+    if not isinstance(row, dict) or set(row) != {
+            'schema', 'form', 'parent', 'candidate', 'source', 'source-blob',
+            'first', 'last', 'unit', 'blocks'}:
+        raise Fault('AssignmentInvalid', 'coarse-slot fields differ', 'request')
+    if (type(row['schema']) is not int or row['schema'] != 4 or
+            row['form'] != 'coarse-slot' or
+            any(not isinstance(row[key], str) or
+                re.fullmatch(r'[0-9a-f]{40}', row[key]) is None
+                for key in ('parent', 'candidate', 'source-blob')) or
+            any(not isinstance(row[key], str) or not row[key]
+                for key in ('source', 'unit')) or
+            type(row['first']) is not int or type(row['last']) is not int or
+            not 1 <= row['first'] <= row['last'] or
+            not isinstance(row['blocks'], list) or not row['blocks']):
+        raise Fault('AssignmentInvalid', 'coarse-slot profile differs', 'request')
+    if not isinstance(source_bytes, bytes):
+        raise Fault('AssignmentInvalid', 'coarse-slot source bytes are absent', 'request')
+    blob = hashlib.sha1(b'blob ' + str(len(source_bytes)).encode() + b'\0' +
+                        source_bytes).hexdigest()
+    lines = source_bytes.splitlines()
+    if blob != row['source-blob'] or row['last'] > len(lines):
+        raise Fault('AssignmentInvalid', 'coarse-slot source blob differs', 'request')
+    preceding = row['first'] - 1
+    for block in row['blocks']:
+        if (not isinstance(block, dict) or set(block) != {'kind', 'first', 'last'} or
+                not isinstance(block['kind'], str) or not block['kind'] or
+                type(block['first']) is not int or type(block['last']) is not int or
+                not preceding < block['first'] <= block['last'] <= row['last'] or
+                (preceding >= row['first'] and
+                 any(line.strip() for line in lines[preceding:block['first'] - 1]))):
+            raise Fault('AssignmentInvalid', 'coarse-slot block order or bounds differ',
+                        'request')
+        preceding = block['last']
+    if row['blocks'][0]['first'] != row['first'] or preceding != row['last']:
+        raise Fault('AssignmentInvalid', 'coarse-slot interval is not fully accounted',
+                    'request')
+    return row
+
+
+SLOT_KINDS = ('heading', 'existing-native-inclusion', 'paragraph', 'paragraph',
+              'paragraph', 'paragraph')
+SLOT_CONTROLS = {
+    'section-open': (b'\\section{', b''),
+    'section-close': (b'}', b''),
+    'label-open': (b'\\label{', b''),
+    'label-value': (None, b''),
+    'label-close': (b'}', b''),
+    'strong-open': (b'\\textbf{', b''),
+    'strong-close': (b'}', b''),
+    'emphasis-open': (b'\\emph{', b''),
+    'emphasis-close': (b'}', b''),
+    'en-space': (b'\\enspace', b' '),
+}
+
+
+def _unique_json(data, code):
+    """Decode bounded UTF-8 JSON with no duplicate object fields."""
+    if not isinstance(data, bytes) or len(data) > 1048576 or data.startswith(b'\xef\xbb\xbf'):
+        raise Fault(code, 'correspondence size or encoding differs', 'snapshot')
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise Fault(code, 'duplicate correspondence field: ' + key, 'snapshot')
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(data.decode('utf-8'), object_pairs_hook=unique)
+    except (UnicodeError, ValueError) as error:
+        raise Fault(code, 'correspondence is not UTF-8 JSON', 'snapshot') from error
+
+
+def located_slot_export(data, captured, assignment, side, revision):
+    """Bind the importer's located blocks to this side's captured source bytes."""
+    row = _unique_json(data, 'CorrespondenceInvalid')
+    selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
+    if (not isinstance(row, dict) or set(row) != {
+            'schema', 'side', 'revision', 'selection', 'source-blob', 'source-sha256',
+            'blocks', 'accounting'} or type(row['schema']) is not int or row['schema'] != 1 or
+            row['side'] != side or row['revision'] != revision or
+            row['selection'] != selection or
+            not isinstance(row['blocks'], list) or
+            len(row['blocks']) != len(SLOT_KINDS)):
+        raise Fault('CorrespondenceInvalid', 'located slot identity or blocks differ',
+                    'snapshot')
+    inherited = captured.get(assignment['source'])
+    if (not isinstance(inherited, bytes) or
+            row['source-sha256'] != digest(inherited) or
+            row['source-blob'] != hashlib.sha1(
+                b'blob ' + str(len(inherited)).encode() + b'\0' + inherited).hexdigest() or
+            (side == 'before' and row['source-blob'] != assignment['source-blob'])):
+        raise Fault('CorrespondenceInvalid', 'located slot source identity differs',
+                    'snapshot')
+    decoded = []
+    lines = inherited.splitlines(keepends=True)
+    interval_start = sum(len(line) for line in lines[:assignment['first'] - 1])
+    interval_end = sum(len(line) for line in lines[:
+        assignment['last'] if side == 'before' else assignment['first']])
+    if (not isinstance(row['accounting'], list) or not row['accounting'] or
+            interval_end > len(inherited)):
+        raise Fault('CorrespondenceInvalid', 'located slot accounting is absent',
+                    'snapshot')
+    cursor = interval_start
+    for piece in row['accounting']:
+        if (not isinstance(piece, dict) or set(piece) != {'kind', 'range'} or
+                piece['kind'] not in ('block', 'separator', 'event') or
+                not isinstance(piece['range'], list) or len(piece['range']) != 2 or
+                any(type(value) is not int for value in piece['range']) or
+                piece['range'][0] != cursor or
+                not cursor < piece['range'][1] <= interval_end):
+            raise Fault('CorrespondenceInvalid', 'located slot accounting differs',
+                        'snapshot')
+        cursor = piece['range'][1]
+    if cursor != interval_end:
+        raise Fault('CorrespondenceInvalid', 'located slot accounting omits source bytes',
+                    'snapshot')
+    preceding_end = -1
+    for ordinal, (block, kind) in enumerate(zip(row['blocks'], SLOT_KINDS)):
+        if (not isinstance(block, dict) or set(block) != {
+                'kind', 'index', 'origin', 'tokens', 'controls'} or
+                block['kind'] != kind or type(block['index']) is not int or
+                block['index'] != ordinal or not isinstance(block['origin'], dict) or
+                set(block['origin']) != {'path', 'blob', 'sha256', 'range', 'field'} or
+                not isinstance(block['tokens'], list) or not block['tokens'] or
+                not isinstance(block['controls'], list)):
+            raise Fault('CorrespondenceInvalid', 'located slot child order differs',
+                        'snapshot')
+        origin = block['origin']
+        path = origin['path']
+        blob = captured.get(path) if isinstance(path, str) else None
+        span = origin['range']
+        if (not isinstance(blob, bytes) or not isinstance(span, list) or len(span) != 2 or
+                any(type(value) is not int for value in span) or
+                not 0 <= span[0] < span[1] <= len(blob) or
+                origin['sha256'] != digest(blob) or
+                origin['blob'] != hashlib.sha1(
+                    b'blob ' + str(len(blob)).encode() + b'\0' + blob).hexdigest() or
+                (origin['field'] is not None and
+                 (not isinstance(origin['field'], str) or not origin['field'])) or
+                (side == 'after' and origin['field'] is None)):
+            raise Fault('CorrespondenceInvalid', 'located slot child origin differs',
+                        'snapshot')
+        raw_field = blob[span[0]:span[1]]
+        expected_path = ('units/statements/plain-intro.toml' if ordinal == 1 else
+                         assignment['source'] if side == 'before' else
+                         'units/corpus/explainer-plain.toml')
+        if path != expected_path:
+            raise Fault('CorrespondenceInvalid', 'located slot child source differs',
+                        'snapshot')
+        if ordinal != 1:
+            if (side == 'before' and not interval_start <= span[0] < span[1] <= interval_end or
+                    span[0] < preceding_end):
+                raise Fault('CorrespondenceInvalid', 'located slot source order differs',
+                            'snapshot')
+            preceding_end = span[1]
+        if side == 'after' and b'\\' in raw_field:
+            raise Fault('SyntaxUnsupported', 'escaped native source field refuses',
+                        'snapshot')
+        source_bytes = raw_field
+        if side == 'after':
+            # The native owner binds this raw TOML span to its checked decoded
+            # runs. Its token offsets address the flattened decoded field, not
+            # the TOML spelling, which also contains run and style metadata.
+            if block['controls']:
+                raise Fault('CorrespondenceInvalid',
+                            'native slot has inherited source controls', 'snapshot')
+            flattened = bytearray()
+            for token in block['tokens']:
+                if (not isinstance(token, dict) or
+                        not isinstance(token.get('source_range'), list) or
+                        len(token['source_range']) != 2 or
+                        any(type(value) is not int for value in token['source_range']) or
+                        not isinstance(token.get('source_spelling'), str)):
+                    raise Fault('CorrespondenceInvalid',
+                                'native slot token range differs', 'snapshot')
+                first, last = token['source_range']
+                if first < len(flattened) or first >= last:
+                    raise Fault('CorrespondenceInvalid',
+                                'native slot token order differs', 'snapshot')
+                if first > len(flattened):
+                    if (token.get('separator_before') is not True or
+                            token.get('separator_range') != [len(flattened), first]):
+                        raise Fault('CorrespondenceInvalid',
+                                    'native slot separator differs', 'snapshot')
+                    flattened.extend(b' ' * (first - len(flattened)))
+                spelling = token['source_spelling'].encode('utf-8')
+                if len(spelling) != last - first:
+                    raise Fault('CorrespondenceInvalid',
+                                'native slot token spelling length differs', 'snapshot')
+                flattened.extend(spelling)
+            source_bytes = bytes(flattened)
+        base = span[0] if side == 'before' else 0
+        controls = []
+        for control in block['controls']:
+            if (not isinstance(control, dict) or set(control) != {'kind', 'range'} or
+                    control['kind'] not in SLOT_CONTROLS or
+                    not isinstance(control['range'], list) or len(control['range']) != 2 or
+                    any(type(value) is not int for value in control['range'])):
+                raise Fault('CorrespondenceInvalid', 'located slot control differs',
+                            'snapshot')
+            first, last = control['range']
+            first -= base
+            last -= base
+            expected, replacement = SLOT_CONTROLS[control['kind']]
+            if control['kind'] == 'label-value':
+                expected = assignment['unit'].encode()
+            if not 0 <= first < last <= len(source_bytes) or source_bytes[first:last] != expected:
+                raise Fault('CorrespondenceInvalid', 'located slot control source differs',
+                            'snapshot')
+            controls.append((first, last, replacement))
+        controls.sort()
+        if any(left[1] > right[0] for left, right in zip(controls, controls[1:])):
+            raise Fault('CorrespondenceInvalid', 'located slot controls overlap',
+                        'snapshot')
+        tokens = block['tokens']
+        for token in tokens:
+            if (not isinstance(token, dict) or set(token) != {
+                    'kind', 'source_range', 'source_spelling', 'semantic', 'extracted',
+                    'separator_before', 'separator_range', 'tag'} or
+                    not isinstance(token['kind'], str) or
+                    not isinstance(token['semantic'], str) or
+                    not isinstance(token['extracted'], str) or
+                    not isinstance(token['source_spelling'], str) or
+                    type(token['separator_before']) is not bool):
+                raise Fault('CorrespondenceInvalid', 'located slot token differs',
+                            'snapshot')
+            token_span = token['source_range']
+            if (not isinstance(token_span, list) or len(token_span) != 2 or
+                    any(type(value) is not int for value in token_span) or
+                    not base <= token_span[0] < token_span[1] <= base + len(source_bytes)):
+                raise Fault('CorrespondenceInvalid', 'located slot token range differs',
+                            'snapshot')
+            spelling = source_bytes[token_span[0] - base:token_span[1] - base]
+            try:
+                decoded_spelling = spelling.decode('utf-8')
+            except UnicodeError as error:
+                raise Fault('CorrespondenceInvalid', 'located slot token splits UTF-8',
+                            'snapshot') from error
+            if decoded_spelling != token['source_spelling']:
+                raise Fault('CorrespondenceInvalid', 'located slot token spelling differs',
+                            'snapshot')
+            if any(first < token_span[1] - base and token_span[0] - base < last
+                   for first, last, _ in controls):
+                raise Fault('CorrespondenceInvalid', 'located slot control overlaps token',
+                            'snapshot')
+        extracted = ''.join((' ' if token['separator_before'] and index else '') +
+                            token['extracted'] for index, token in enumerate(tokens))
+        semantic = ''.join((' ' if token['separator_before'] and index else '') +
+                           token['semantic'] for index, token in enumerate(tokens))
+        decoded.append(dict(tokens=tokens, source_bytes=source_bytes, base_offset=base,
+                            source_controls=controls, extracted=extracted, semantic=semantic,
+                            origin=origin, kind=kind))
+    return decoded
+
+
+def content_stream(text, structural, transforms=(), locations=None):
+    """Return ordered words and literal marks with only proved local substitutions.
+
+    `structural` is a result from the independent owner, not a claim inferred
+    from this text. A transform names one exact occurrence and a checked
+    identity; every other digit and mark remains in the stream.
+    """
+    if not isinstance(structural, dict) or structural.get('verdict') != 'checked':
+        raise Fault('StructureUnavailable', 'structural proof is absent or unconfirmed',
+                    'correspondence')
+    if locations is None:
+        locations = list(range(len(text)))
+    if len(locations) != len(text):
+        raise Fault('StreamInvalid', 'text and location lengths differ', 'correspondence')
+    normalized, offsets, events = normalize(text, locations)
+    if any(row['operation'] in ('HyphenUnconfirmed', 'LineEndPunctuation')
+           for row in events):
+        raise Fault('LineEndUnresolved', 'line-end mark lacks source decision',
+                    'correspondence')
+    checked = structural.get('identities', {})
+    if not isinstance(checked, dict):
+        raise Fault('TransformInvalid', 'checked identities differ', 'correspondence')
+    spans = []
+    used = set()
+    for row in transforms:
+        if not isinstance(row, dict) or set(row) != {
+                'kind', 'identity', 'start', 'end', 'spelling'}:
+            raise Fault('TransformInvalid', 'occurrence fields differ', 'correspondence')
+        kind, identity = row['kind'], row['identity']
+        first, last = row['start'], row['end']
+        if (kind not in TRANSFORM_KINDS or not isinstance(identity, str) or
+                not identity or type(first) is not int or
+                type(last) is not int or not 0 <= first < last <= len(normalized) or
+                normalized[first:last] != row['spelling'] or
+                checked.get((kind, identity)) != row['spelling'] or
+                (kind, identity) in used):
+            raise Fault('TransformInvalid', 'occurrence spelling or proof differs',
+                        'correspondence')
+        used.add((kind, identity))
+        spans.append((first, last, kind, identity))
+    spans.sort()
+    if any(left[1] > right[0] for left, right in zip(spans, spans[1:])):
+        raise Fault('TransformInvalid', 'occurrence ranges overlap', 'correspondence')
+    tokens = []
+    previous_end = 0
+
+    def append_token(kind, value, first, last):
+        nonlocal previous_end
+        if tokens and normalized[previous_end:first].isspace():
+            tokens.append(dict(kind='separator', value=' ',
+                               location=offsets[previous_end]))
+        tokens.append(dict(kind=kind, value=value, location=offsets[first]))
+        previous_end = last
+
+    def literal(first, last):
+        for match in CONTENT_TOKEN.finditer(normalized, first, last):
+            append_token('literal', match.group(), match.start(), match.end())
+
+    cursor = 0
+    for first, last, kind, identity in spans:
+        literal(cursor, first)
+        append_token(kind, identity, first, last)
+        cursor = last
+    literal(cursor, len(normalized))
+    return tokens
+
+
+def three_way_content(streams, structural, transforms=None, selection=None):
+    """Compare one fully selected occurrence across both PDFs and two screens.
+
+    This reports evidence only; it neither grants retention nor extends M077.
+    """
+    if set(streams) != set(STREAM_SIDES) or set(structural) != set(STREAM_SIDES):
+        return dict(verdict='refused', reason='four stream or structural sides differ')
+    transforms = transforms or {}
+    if set(transforms) - set(STREAM_SIDES):
+        return dict(verdict='refused', reason='transform side is unknown')
+    try:
+        rows = {}
+        for side in STREAM_SIDES:
+            item = streams[side]
+            if not isinstance(item, dict):
+                raise Fault('StreamInvalid', 'stream side is not an object',
+                            'correspondence')
+            if side in ('old_pdf', 'new_pdf') and not isinstance(item, _CheckedPdfStream):
+                raise Fault('LineEndUnresolved',
+                            'PDF side lacks checked source selection or extraction',
+                            'correspondence')
+            if side in ('markdown', 'html') and item.get('medium') != side:
+                raise Fault('StreamInvalid', 'recovered medium differs from side',
+                            'correspondence')
+            if side in ('markdown', 'html') and item.get('document_coverage') == 'excerpt':
+                if selection is None or item.get('scope') != selection:
+                    raise Fault('SelectionInvalid', 'excerpt lacks matching PDF source scope',
+                                'correspondence')
+            if selection is not None and item.get('scope') != selection:
+                raise Fault('SelectionInvalid', 'stream source scopes differ',
+                            'correspondence')
+            if item.get('coverage') is not True:
+                return dict(verdict='refused', reason='screen or PDF coverage is incomplete',
+                            side=side, residue=item.get('residue', []))
+            rows[side] = content_stream(item['text'], structural[side],
+                                        transforms.get(side, ()), item.get('locations'))
+    except (Fault, KeyError, TypeError) as error:
+        return dict(verdict='refused', reason=(error.row['detail'] if isinstance(error, Fault)
+                                             else str(error)))
+    reference = [(row['kind'], row['value']) for row in rows['new_pdf']]
+    differences = []
+    for side in ('old_pdf', 'markdown', 'html'):
+        candidate = [(row['kind'], row['value']) for row in rows[side]]
+        if candidate != reference:
+            index = next((n for n, pair in enumerate(zip(candidate, reference))
+                          if pair[0] != pair[1]), min(len(candidate), len(reference)))
+            differences.append(dict(side=side, token=index,
+                                    observed=rows[side][index] if index < len(candidate) else None,
+                                    pdf=rows['new_pdf'][index] if index < len(reference) else None))
+    return dict(verdict='different' if differences else 'equal',
+                differences=differences,
+                token_counts={side: len(rows[side]) for side in STREAM_SIDES})
+
+
+def checked_pdf_extraction(extracted, proofs, document, side):
+    """Expose a complete PDF side only after every mark has a source decision."""
+    rows = residual_events(extracted, proofs, document, side)
+    if any(row.get('reason') or row['decision'] == 'unresolved' for row in rows):
+        raise Fault('LineEndUnresolved', 'complete PDF has undecided line-end marks',
+                    'correspondence', document, side)
+    text, offsets = canonicalize(extracted, list(proofs))
+    return _CheckedPdfStream(text=text, locations=offsets, coverage=True)
+
+
+def compare_pdf_streams(before, after, before_proofs=(), after_proofs=(),
+                        envelope=None, document='document'):
+    """Compare whole extracted PDF streams with independently decided line ends.
+
+    The PDFs are extracted by `extract`; proofs are the side's own located
+    source alignments. A raw match with unresolved line ends is still refused.
+    """
+    before_rows = residual_events(before, before_proofs, document, 'old_pdf')
+    after_rows = residual_events(after, after_proofs, document, 'new_pdf')
+    if envelope is not None:
+        residual_proof(before, after, before_rows, after_rows, envelope,
+                       before_proofs or None, after_proofs or None)
+    unresolved = {
+        'old_pdf': [row for row in before_rows
+                    if row.get('reason') or row['decision'] == 'unresolved'],
+        'new_pdf': [row for row in after_rows
+                    if row.get('reason') or row['decision'] == 'unresolved']}
+    old_text, old_offsets = canonicalize(
+        before, [before_proofs] if isinstance(before_proofs, dict) else list(before_proofs))
+    new_text, new_offsets = canonicalize(
+        after, [after_proofs] if isinstance(after_proofs, dict) else list(after_proofs))
+    old_tokens = [(row['kind'], row['value']) for row in content_stream(
+        old_text, {'verdict': 'checked'}, locations=old_offsets)]
+    new_tokens = [(row['kind'], row['value']) for row in content_stream(
+        new_text, {'verdict': 'checked'}, locations=new_offsets)]
+    first = next((n for n, pair in enumerate(zip(old_tokens, new_tokens))
+                  if pair[0] != pair[1]), min(len(old_tokens), len(new_tokens)))
+    differs = old_tokens != new_tokens or before['titles'] != after['titles']
+    result = dict(verdict='different' if differs else 'equal',
+                  token_counts={'old_pdf': len(old_tokens), 'new_pdf': len(new_tokens)},
+                  first_difference=(first if old_tokens != new_tokens else None),
+                  bookmark_titles_equal=before['titles'] == after['titles'],
+                  unresolved={side: len(rows) for side, rows in unresolved.items()})
+    if any(unresolved.values()):
+        if before['titles'] != after['titles']:
+            result['verdict'] = 'different'
+            result['reason'] = 'ordered bookmark titles differ'
+        elif (negative_witness(old_text, old_offsets)['stream'] !=
+              negative_witness(new_text, new_offsets)['stream']):
+            result['verdict'] = 'different'
+            result['reason'] = 'symmetric deletion witness differs'
+        else:
+            result['verdict'] = 'refused'
+            result['reason'] = 'line-end marks lack side-specific source decisions'
+    return result
+
+
+def compare_slot_streams(assignment, before_blocks, after_blocks, pdfs,
+                         markdown, html, envelope):
+    """Compare a selected ordered slot and both complete PDF streams."""
+    selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
+    old = select_pdf_stretch(pdfs['explainer']['before'], selection, before_blocks,
+                             'explainer', 'before')
+    new = select_pdf_stretch(pdfs['explainer']['after'], selection, after_blocks,
+                             'explainer', 'after')
+    if markdown['scope'] != selection or html['scope'] != selection:
+        raise Fault('SelectionInvalid', 'screen source scope differs from slot',
+                    'correspondence')
+    # Located native exports and checked recovery exports are the structural
+    # results for this profile; it admits no locator or tag transformation.
+    screens = three_way_content(
+        dict(old_pdf=old, new_pdf=new, markdown=markdown, html=html),
+        {side: dict(verdict='checked', identities={}) for side in STREAM_SIDES},
+        selection=selection)
+    if screens['verdict'] == 'refused':
+        raise Fault('CorrespondenceInvalid', screens['reason'], 'correspondence')
+    full = {}
+    for document in ('paper', 'explainer'):
+        proofs_before = old['aggregate'] if document == 'explainer' else ()
+        proofs_after = new['aggregate'] if document == 'explainer' else ()
+        full[document] = compare_pdf_streams(
+            pdfs[document]['before'], pdfs[document]['after'],
+            proofs_before, proofs_after, envelope, document)
+    source_differences = [index for index, (left, right) in enumerate(
+        zip(before_blocks, after_blocks)) if left['semantic'] != right['semantic']]
+    if source_differences:
+        verdict = 'different'
+    elif any(row['verdict'] == 'different' for row in full.values()) or \
+            screens['verdict'] == 'different':
+        verdict = 'different'
+    elif not envelope['available'] or any(row['verdict'] == 'refused'
+                                          for row in full.values()):
+        verdict = 'refused'
+    else:
+        verdict = 'equal'
+    return dict(verdict=verdict, selected=dict(before=old['range'], after=new['range']),
+                child_ranges=dict(before=old['ranges'], after=new['ranges']),
+                source_differences=source_differences, screens=screens, documents=full,
+                envelope=envelope)
 
 
 def folio(page, number, document, side):
@@ -368,7 +1013,7 @@ def unique_proof(proofs, document, side):
     return next(iter(distinct.values()))
 
 
-def align_located(decoded, extracted, document, side):
+def align_located(decoded, extracted, document, side, all_matches=False):
     """Match one source paragraph while interpreting only its own line ends."""
     source_bytes = decoded['source_bytes']
     base_offset = decoded['base_offset']
@@ -378,7 +1023,8 @@ def align_located(decoded, extracted, document, side):
         if not preceding_end <= first < last <= len(source_bytes):
             raise Fault('CorrespondenceInvalid', 'source token range is invalid',
                         'correspondence', document, side)
-        separator = source_bytes[preceding_end:first]
+        separator = logical_source_gap(source_bytes, preceding_end, first,
+                                       decoded.get('source_controls', []))
         if (bool(separator) != token['separator_before'] or
                 (separator and (token['separator_range'] !=
                                 [base_offset + preceding_end, base_offset + first] or
@@ -394,7 +1040,9 @@ def align_located(decoded, extracted, document, side):
             raise Fault('CorrespondenceInvalid', 'source token range differs',
                         'correspondence', document, side)
         preceding_end = last
-    if preceding_end != len(source_bytes) and not source_bytes[preceding_end:].isspace():
+    tail = logical_source_gap(source_bytes, preceding_end, len(source_bytes),
+                              decoded.get('source_controls', []))
+    if tail and not tail.isspace():
         raise Fault('CorrespondenceInvalid', 'source token coverage differs',
                     'correspondence', document, side)
     expected = decoded['extracted']
@@ -478,6 +1126,10 @@ def align_located(decoded, extracted, document, side):
                                decisions=decisions, edits=edits,
                                start=extracted['offsets'][start],
                                end=extracted['offsets'][j - 1]))
+    if all_matches:
+        for proof in proofs:
+            proof['search'] = search_record()
+        return proofs
     try:
         result = unique_proof(proofs, document, side)
     except Fault as error:
@@ -722,6 +1374,20 @@ def parent_snapshot(repo, revision, destination):
             raise Fault('SourceInvalid', 'parent inclusion validation failed: ' + str(error),
                         'snapshot') from error
     return dict(commit=commit, receipt=receipt, inputs=rows, fragments=fragments)
+
+
+def unchanged_commit_envelope(repo, revision):
+    """Prove a checked-out committed input envelope is byte-identical to itself."""
+    with tempfile.TemporaryDirectory() as directory:
+        parent = parent_snapshot(repo, revision, pathlib.Path(directory))
+        for row in parent['inputs']:
+            target = repo / row['path']
+            if (target.is_symlink() or not target.is_file() or
+                    digest(target.read_bytes()) != row['sha256']):
+                raise Fault('InputChanged', 'committed input differs: ' + row['path'],
+                            'snapshot')
+        return dict(available=True, commit=parent['commit'],
+                    checked_inputs=len(parent['inputs']))
 
 
 def git_has(repo, commit, name):
@@ -1030,6 +1696,124 @@ def source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, before,
                 source_substitution=substitutions[0] if not additional else substitutions)
 
 
+def slot_source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, slot,
+                         native_paths=()):
+    """Check the one marker, nested use and receipt-row substitution of a slot."""
+    reasons = []
+    rows = []
+    source = slot['source']
+    first, last = slot['first'], slot['last']
+    marker = ('% generated: ' + slot['unit'] + '\n').encode()
+    old_path, new_path = parent_dir / source, candidate_dir / source
+    if (old_path.is_symlink() or new_path.is_symlink() or
+            not old_path.is_file() or not new_path.is_file()):
+        raise Fault('SourceInvalid', 'slot source is not an ordinary file', 'snapshot')
+    old_source, new_source = old_path.read_bytes(), new_path.read_bytes()
+    old_lines = old_source.splitlines(keepends=True)
+    new_lines = new_source.splitlines(keepends=True)
+    if (last > len(old_lines) or first > len(new_lines) or
+            new_lines[first - 1] != marker or
+            old_lines[:first - 1] + old_lines[last:] !=
+            new_lines[:first - 1] + new_lines[first:]):
+        reasons.append('slot source differs outside marker substitution')
+    shift = 1 - (last - first + 1)
+    old_rows = parent['fragments']
+    inclusion = candidate_dir / 'generated/documents/inclusions.tsv'
+    if inclusion.is_symlink() or not inclusion.is_file():
+        raise Fault('SourceInvalid', 'slot inclusion list is not an ordinary file',
+                    'snapshot')
+    new_rows = scope_fragments(candidate_dir)
+    nested = [row for row in old_rows if row[0] == source and first <= row[4] <= last]
+    if len(nested) != 1 or nested[0][3] != 'paragraph':
+        reasons.append('slot existing inclusion differs')
+        old_fragment = None
+        new_fragment = None
+    else:
+        old_fragment = nested[0][2]
+        slot_rows = [row for row in new_rows if row[0] == source and
+                     row[1] == slot['unit'] and row[3] == 'corpus-slot' and row[4] == first]
+        if len(slot_rows) != 1:
+            reasons.append('slot inclusion row is absent or repeated')
+            return dict(available=False, reasons=sorted(set(reasons)), rows=rows,
+                        inclusion_shift=shift, nested_use=nested[0][1])
+        new_fragment = slot_rows[0][2]
+        if any(not name.startswith('generated/documents/') or
+               '..' in pathlib.PurePosixPath(name).parts
+               for name in (old_fragment, new_fragment)):
+            reasons.append('slot fragment path differs')
+            return dict(available=False, reasons=sorted(set(reasons)), rows=rows,
+                        inclusion_shift=shift, nested_use=nested[0][1])
+        expected_rows = []
+        for row in old_rows:
+            if row == nested[0]:
+                expected_rows.append((source, slot['unit'], new_fragment,
+                                      'corpus-slot', first))
+            else:
+                path, key, fragment, role, line = row
+                expected_rows.append((path, key, fragment, role,
+                                      line + shift if path == source and line > last else line))
+        if list(new_rows) != expected_rows:
+            reasons.append('slot inclusion rows differ')
+        old_artifact = parent_dir / old_fragment
+        new_artifact = candidate_dir / new_fragment
+        if (old_artifact.is_symlink() or new_artifact.is_symlink() or
+                not old_artifact.is_file() or not new_artifact.is_file()):
+            reasons.append('slot fragment is not an ordinary file')
+            original = replacement = b''
+        else:
+            original = old_artifact.read_bytes()
+            replacement = new_artifact.read_bytes()
+        if not original or replacement.count(original) != 1:
+            reasons.append('slot child fragment is not unchanged exactly once')
+        rows.append(dict(path=old_fragment, selected=True,
+                         before_original=digest(original)))
+        rows.append(dict(path=new_fragment, selected=True,
+                         after_original=digest(replacement)))
+    old_receipt = parent['receipt']
+    new_receipt_bytes = (candidate_dir / 'generated/paper/inputs.json').read_bytes()
+    new_receipt = _unique_json(new_receipt_bytes, 'SourceInvalid')
+    if (new_receipt_bytes != json_bytes(new_receipt) or
+            (parent_dir / 'generated/paper/inputs.json').read_bytes() !=
+            json_bytes(old_receipt)):
+        reasons.append('slot receipt is not canonical JSON')
+    if ({key: value for key, value in old_receipt.items() if key != 'inputs'} !=
+            {key: value for key, value in new_receipt.items() if key != 'inputs'}):
+        reasons.append('slot receipt metadata differs')
+    before_names = set(old_receipt['inputs'])
+    after_names = set(new_receipt['inputs'])
+    selected = {source, 'generated/documents/inclusions.tsv',
+                'generated/paper/inputs.json'} | set(native_paths)
+    if old_fragment is not None:
+        selected.update((old_fragment, new_fragment))
+    if before_names - selected != after_names - selected:
+        reasons.append('slot receipt input membership differs')
+    captured_before = {row['path'] for row in parent['inputs']}
+    captured_after = {row['path'] for row in candidate_inputs
+                      if not row['path'].startswith('/')}
+    if captured_before - selected != captured_after - selected:
+        reasons.append('slot captured input membership differs')
+    for name in sorted(before_names | after_names | captured_before | captured_after):
+        old_file, new_file = parent_dir / name, candidate_dir / name
+        if old_file.is_symlink() or new_file.is_symlink():
+            reasons.append('slot input is not an ordinary file: ' + name)
+        left = old_file.read_bytes() if old_file.is_file() and not old_file.is_symlink() else None
+        right = new_file.read_bytes() if new_file.is_file() and not new_file.is_symlink() else None
+        if name in old_receipt['inputs'] and (left is None or
+                old_receipt['inputs'][name] != digest(left)):
+            reasons.append('parent receipt row differs: ' + name)
+        if name in new_receipt['inputs'] and (right is None or
+                new_receipt['inputs'][name] != digest(right)):
+            reasons.append('candidate receipt row differs: ' + name)
+        if name not in selected and left != right:
+            reasons.append('slot outside input differs: ' + name)
+        rows.append(dict(path=name, before_original=digest(left) if left else None,
+                         after_original=digest(right) if right else None,
+                         selected=name in selected))
+    return dict(available=not reasons, reasons=sorted(set(reasons)), rows=rows,
+                inclusion_shift=shift, nested_use=nested[0][1] if len(nested) == 1 else None,
+                source_substitution=dict(path=source, before=[first, last], after=[first, first]))
+
+
 def capture_assignment(repo, assignment_path):
     """Read one external scope request, rejecting ambiguous or changing bytes."""
     try:
@@ -1057,6 +1841,19 @@ def capture_assignment(repo, assignment_path):
         assignment = json.loads(data.decode('utf-8'), object_pairs_hook=unique)
     except (ValueError, UnicodeError) as error:
         raise Fault('AssignmentInvalid', error, 'request') from error
+    if isinstance(assignment, dict) and assignment.get('schema') == 4:
+        source = assignment.get('source')
+        parent = assignment.get('parent')
+        if (source != 'documents/paper/explainer/explainer.tex' or
+                not isinstance(parent, str) or
+                re.fullmatch(r'[0-9a-f]{40}', parent) is None):
+            raise Fault('AssignmentInvalid', 'coarse-slot source identity differs',
+                        'request')
+        source_bytes = git(repo, 'show', parent + ':' + source)
+        coarse_slot_assignment(assignment, source_bytes)
+        if tuple(block['kind'] for block in assignment['blocks']) != SLOT_KINDS:
+            raise Fault('AssignmentInvalid', 'coarse-slot child kinds differ', 'request')
+        return assignment, path, data
     fields = {'schema', 'parent', 'candidate', 'source', 'source-blob', 'first',
               'last', 'unit', 'unit-path'}
     if not isinstance(assignment, dict) or set(assignment) not in (
@@ -1356,6 +2153,232 @@ def assigned_plain_scope(repo, assignment, evidence, parent, before, after, enve
                                       interval=[row['first'], row['last']])
                                  for row in occurrences]
     return result
+
+
+def _slot_export(binary, repo, root, revision, request, side, output):
+    """Ask the native owner from a captured checkout at this side's commit."""
+    target = output / (side + '-correspondence')
+    checkout = output / (side + '-checkout')
+    for command in (
+            ['git', 'clone', '--quiet', '--shared', '--no-checkout', str(repo), str(checkout)],
+            ['git', '-C', str(checkout), 'checkout', '--quiet', '--detach', revision]):
+        try:
+            prepared = subprocess.run(command, capture_output=True, timeout=120, check=False)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise Fault('CorrespondenceInvalid', 'side checkout is unavailable: ' +
+                        str(error), 'snapshot') from error
+        if prepared.returncode != 0:
+            raise Fault('CorrespondenceInvalid', 'side checkout refuses: ' +
+                        prepared.stderr.decode('utf-8', errors='replace'), 'snapshot')
+    paths = ['documents/paper/explainer/explainer.tex',
+             'units/statements/plain-intro.toml']
+    if side == 'after':
+        paths.append('units/corpus/explainer-plain.toml')
+    for name in paths:
+        try:
+            equal = (checkout / name).read_bytes() == (root / name).read_bytes()
+        except OSError as error:
+            raise Fault('InputChanged', 'side input is unavailable: ' + name,
+                        'snapshot') from error
+        if not equal:
+            raise Fault('InputChanged', 'side checkout differs from captured input: ' +
+                        name, 'snapshot')
+    command = [str(binary), 'import-correspondence', '--repository', str(checkout),
+               '--assignment', str(request), '--side', side, '--output-dir', str(target)]
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=120, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise Fault('CorrespondenceInvalid', 'native correspondence is unavailable: ' +
+                    str(error), 'snapshot') from error
+    if result.returncode != 0:
+        raise Fault('CorrespondenceInvalid', 'native correspondence refuses: ' +
+                    result.stderr.decode('utf-8', errors='replace'), 'snapshot')
+    try:
+        return (target / 'correspondence.json').read_bytes()
+    except OSError as error:
+        raise Fault('CorrespondenceInvalid', 'native correspondence output is absent',
+                    'snapshot') from error
+
+
+def _slot_screen(repo, candidate, path, medium, selection):
+    """Read a checked recovery export and bind its rendering to candidate bytes."""
+    try:
+        data = path.read_bytes()
+        row = _unique_json(data, 'StreamInvalid')
+        rendering = row['rendering']['path']
+        name = pathlib.PurePosixPath(rendering)
+        if name.is_absolute() or '..' in name.parts:
+            raise Fault('StreamInvalid', 'recovered rendering path escapes candidate',
+                        'snapshot')
+        target = repo / rendering
+        if target.is_symlink() or not target.is_file():
+            raise Fault('StreamInvalid', 'recovered rendering is not an ordinary file',
+                        'snapshot')
+        rendered = target.read_bytes()
+    except (OSError, KeyError, TypeError) as error:
+        raise Fault('StreamInvalid', 'recovered screen input is unavailable',
+                    'snapshot') from error
+    if git(repo, 'show', candidate + ':' + rendering) != rendered:
+        raise Fault('InputChanged', 'recovered screen differs from candidate commit',
+                    'snapshot')
+    checked = recovered_stream(data, rendered)
+    if checked['medium'] != medium or checked['scope'] != selection:
+        raise Fault('StreamInvalid', 'recovered screen medium or scope differs',
+                    'snapshot')
+    return checked, data, rendered
+
+
+def _capture_slot_origins(repo, revision, root, export, inputs, side):
+    """Capture the export's unit origins from its side's committed blobs."""
+    row = _unique_json(export, 'CorrespondenceInvalid')
+    try:
+        paths = {block['origin']['path'] for block in row['blocks']}
+    except (KeyError, TypeError) as error:
+        raise Fault('CorrespondenceInvalid', 'slot origin list differs',
+                    'snapshot') from error
+    known = {item['path'] for item in inputs}
+    for name in sorted(paths - known):
+        if (not isinstance(name, str) or '..' in pathlib.PurePosixPath(name).parts or
+                not (name.startswith('units/statements/') or
+                     (side == 'after' and name.startswith('units/corpus/'))) or
+                not name.endswith('.toml')):
+            raise Fault('CorrespondenceInvalid', 'slot origin path is not admitted',
+                        'snapshot')
+        data = git(repo, 'show', revision + ':' + name)
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        if side == 'after' and (repo / name).read_bytes() != data:
+            raise Fault('InputChanged', 'slot origin differs from candidate: ' + name,
+                        'snapshot')
+        inputs.append(dict(path=name, sha256=digest(data)))
+    return {name for name in paths if name.startswith('units/corpus/')}
+
+
+def _seed_slot_sources(repo, revision, root, inputs, side):
+    """Supply the first slot's two declared native origins to its exporter."""
+    names = ['units/statements/plain-intro.toml']
+    if side == 'after':
+        names.append('units/corpus/explainer-plain.toml')
+    known = {item['path'] for item in inputs}
+    for name in names:
+        if name in known:
+            continue
+        data = git(repo, 'show', revision + ':' + name)
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        if side == 'after' and (repo / name).read_bytes() != data:
+            raise Fault('InputChanged', 'slot unit differs from candidate: ' + name,
+                        'snapshot')
+        inputs.append(dict(path=name, sha256=digest(data)))
+
+
+def compare_slot(args, captured_assignment):
+    """Use checked native projections for one ordered slot; retain whole PDF checks."""
+    repo = args.repository.resolve()
+    output = args.output
+    resolved_output = output.resolve()
+    if (not output.is_absolute() or output.exists() or not (repo / '.git').exists() or
+            resolved_output == repo or repo in resolved_output.parents or
+            args.paper_binary is None or args.markdown_recovery is None or
+            args.html_recovery is None):
+        raise Fault('InputInvalid', 'slot inputs or new evidence directory are absent')
+    assignment, request, request_bytes = captured_assignment
+    parent = assignment['parent']
+    candidate = assignment['candidate']
+    if (git(repo, 'rev-parse', 'HEAD').decode().strip() != candidate or
+            args.unit != assignment['unit'] or
+            getattr(args, 'before_revision', None) != parent or
+            getattr(args, 'before_source', None) is not None):
+        raise Fault('AssignmentInvalid', 'slot request differs from checked-out pair',
+                    'request')
+    output.mkdir(parents=True)
+    selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
+    captured_pdfs = {}
+    for document in ('paper', 'explainer'):
+        captured_pdfs[document] = {}
+        for side in ('before', 'after'):
+            path = getattr(args, side + '_' + document)
+            data = path.read_bytes()
+            committed = git(repo, 'show', (parent if side == 'before' else candidate) +
+                            ':generated/paper/' + document + '.pdf')
+            if data != committed:
+                raise Fault('InputInvalid', 'slot PDF differs from its committed side',
+                            'request', document, side)
+            copy = output / (document + '-' + side + '.pdf')
+            copy.write_bytes(data)
+            captured_pdfs[document][side] = (path, data, copy)
+    held = CapturedInputs(repo)
+    snapshot = output / 'snapshot'
+    candidate_inputs = snapshot_inputs(repo, snapshot, held)
+    parent_dir = output / 'parent-snapshot'
+    old = parent_snapshot(repo, parent, parent_dir)
+    _seed_slot_sources(repo, parent, parent_dir, old['inputs'], 'before')
+    _seed_slot_sources(repo, candidate, snapshot, candidate_inputs, 'after')
+    for item in candidate_inputs:
+        name = item['path']
+        if (snapshot / name).read_bytes() != git(repo, 'show', candidate + ':' + name):
+            raise Fault('InputChanged', 'slot candidate input differs from commit: ' + name,
+                        'snapshot')
+    if ((parent_dir / assignment['source']).read_bytes() !=
+            git(repo, 'show', parent + ':' + assignment['source'])):
+        raise Fault('InputChanged', 'slot parent source differs from commit', 'snapshot')
+    before_data = _slot_export(args.paper_binary, repo, parent_dir, parent, request,
+                               'before', output)
+    after_data = _slot_export(args.paper_binary, repo, snapshot, candidate, request,
+                              'after', output)
+    _capture_slot_origins(repo, parent, parent_dir, before_data, old['inputs'], 'before')
+    native_paths = _capture_slot_origins(
+        repo, candidate, snapshot, after_data, candidate_inputs, 'after')
+    old_paths = {item['path']: (parent_dir / item['path']).read_bytes()
+                 for item in old['inputs']}
+    new_paths = {item['path']: (snapshot / item['path']).read_bytes()
+                 for item in candidate_inputs}
+    before_blocks = located_slot_export(before_data, old_paths, assignment, 'before', parent)
+    after_blocks = located_slot_export(after_data, new_paths, assignment, 'after', candidate)
+    envelope = slot_source_envelope(old, parent_dir, snapshot, candidate_inputs,
+                                    assignment, native_paths)
+    declared_fragments(snapshot, (snapshot / 'documents/paper-build/sources.tsv').read_text().splitlines())
+    markdown, markdown_data, markdown_bytes = _slot_screen(
+        repo, candidate, args.markdown_recovery, 'markdown', selection)
+    html, html_data, html_bytes = _slot_screen(
+        repo, candidate, args.html_recovery, 'html', selection)
+    pdfs = {document: {side: extract(copy, document, side)
+                       for side, (_, _, copy) in sides.items()}
+            for document, sides in captured_pdfs.items()}
+    result = compare_slot_streams(assignment, before_blocks, after_blocks,
+                                  pdfs, markdown, html, envelope)
+    for document, sides in captured_pdfs.items():
+        for side, (path, data, copy) in sides.items():
+            if path.read_bytes() != data or copy.read_bytes() != data:
+                raise Fault('InputChanged', 'slot PDF changed after capture',
+                            'final', document, side)
+    if (request.read_bytes() != request_bytes or
+            args.markdown_recovery.read_bytes() != markdown_data or
+            args.html_recovery.read_bytes() != html_data or
+            (repo / markdown['rendering']['path']).read_bytes() != markdown_bytes or
+            (repo / html['rendering']['path']).read_bytes() != html_bytes or
+            (output / 'before-correspondence/correspondence.json').read_bytes() != before_data or
+            (output / 'after-correspondence/correspondence.json').read_bytes() != after_data):
+        raise Fault('InputChanged', 'slot request or screen changed after capture', 'final')
+    for item in candidate_inputs:
+        name = item['path']
+        if ((repo / name).read_bytes() != (snapshot / name).read_bytes() or
+                digest((snapshot / name).read_bytes()) != item['sha256']):
+            raise Fault('InputChanged', 'slot candidate input changed: ' + name, 'final')
+    for item in old['inputs']:
+        name = item['path']
+        if digest((parent_dir / name).read_bytes()) != item['sha256']:
+            raise Fault('InputChanged', 'slot parent input changed: ' + name, 'final')
+    held.verify()
+    result['schema'] = 2
+    result['selection'] = selection
+    result['parent'] = parent
+    result['candidate'] = candidate
+    result['inputs'] = sorted(candidate_inputs, key=lambda row: row['path'])
+    (output / 'comparison.json').write_bytes(json_bytes(result))
+    return {'equal': 0, 'different': 1, 'refused': 2}[result['verdict']]
 
 
 def compare(args, captured_assignment=None, paper_binary=None, support=None):
@@ -1819,14 +2842,28 @@ def main():
     comparison.add_argument('--before-revision')
     comparison.add_argument('--unit', required=True)
     comparison.add_argument('--assignment', type=pathlib.Path)
+    comparison.add_argument('--paper-binary', type=pathlib.Path)
+    comparison.add_argument('--markdown-recovery', type=pathlib.Path)
+    comparison.add_argument('--html-recovery', type=pathlib.Path)
     comparison.add_argument('--output', required=True, type=pathlib.Path)
     args = parser.parse_args()
     try:
         if args.action == 'compare':
-            return compare(args)
+            captured = (capture_assignment(args.repository.resolve(), args.assignment)
+                        if args.assignment is not None else None)
+            if captured is not None and captured[0]['schema'] == 4:
+                return compare_slot(args, captured)
+            return compare(args, captured_assignment=captured)
         pdf_libraries()
         pages = Pdf(args.pdf).raw_pages()
     except Fault as error:
+        if args.action == 'compare' and args.output.is_dir() and not (
+                args.output / 'comparison.json').exists():
+            try:
+                (args.output / 'comparison.json').write_bytes(json_bytes(
+                    dict(schema=2, verdict='refused', faults=[error.row])))
+            except OSError:
+                pass
         print('M077: ' + error.row['code'] + ': ' + str(error), file=sys.stderr)
         return 2
     except (OSError, RuntimeError, UnicodeError, ValueError, AttributeError) as error:

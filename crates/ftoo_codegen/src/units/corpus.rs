@@ -11,6 +11,10 @@ use std::{
     fs,
     path::Path,
 };
+mod correspondence;
+mod slot;
+pub use correspondence::export_correspondence;
+pub use slot::parse_slot;
 #[cfg(test)]
 mod tests;
 

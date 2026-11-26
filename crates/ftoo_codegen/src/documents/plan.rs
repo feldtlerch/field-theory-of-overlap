@@ -1182,6 +1182,112 @@ fn excerpt_text(source: &str) -> Option<String> {
     };
     Some(value.clone())
 }
+fn slot_recovered_text(runs: &[Recovered]) -> Option<String> {
+    let mut text = String::new();
+    for run in runs {
+        match run {
+            Recovered::Text(value) => text.push_str(value),
+            Recovered::Styled { children, .. } => text.push_str(&slot_recovered_text(children)?),
+            _ => return None,
+        }
+    }
+    Some(text)
+}
+
+pub(super) fn slot_markdown_text(
+    plan: &DocumentPlan,
+    slot: &ftoo_manifest::corpus::CheckedSlot,
+    source: &str,
+) -> Result<String, DocumentError> {
+    check_excerpt_emission(plan, source)?;
+    let start = plan
+        .blocks
+        .iter()
+        .position(|block| block.unit == slot.id())
+        .ok_or_else(|| {
+            emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: plan.records(DocumentTarget::Markdown),
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            )
+        })?;
+    let children = plan
+        .blocks
+        .get(start..start + slot.blocks().len())
+        .ok_or_else(|| {
+            emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: plan.records(DocumentTarget::Markdown),
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            )
+        })?;
+    let mut words = Vec::new();
+    for block in children {
+        let body = source
+            .split("\n\n")
+            .find_map(|chunk| {
+                let (unit, _, _, body) = excerpt_unit(chunk)?;
+                (unit == block.unit).then_some(body)
+            })
+            .ok_or_else(|| {
+                emission_failure(
+                    plan,
+                    DocumentTarget::Markdown,
+                    0..source.len(),
+                    AssemblyFault::EmissionMismatch {
+                        missing: plan.records(DocumentTarget::Markdown),
+                        unexpected: vec![],
+                        changed: vec![],
+                    },
+                )
+            })?;
+        let body = if let Some(depth) = block.depth {
+            body.strip_prefix(&format!("{} ", "#".repeat(depth)))
+        } else {
+            Some(body)
+        }
+        .ok_or_else(|| {
+            emission_failure(
+                plan,
+                DocumentTarget::Markdown,
+                0..source.len(),
+                AssemblyFault::EmissionMismatch {
+                    missing: plan.records(DocumentTarget::Markdown),
+                    unexpected: vec![],
+                    changed: vec![],
+                },
+            )
+        })?;
+        let recovered = recover_markdown(body, block.runs.iter().flat_map(inline_handles));
+        let text = recovered
+            .as_deref()
+            .and_then(slot_recovered_text)
+            .ok_or_else(|| {
+                emission_failure(
+                    plan,
+                    DocumentTarget::Markdown,
+                    0..source.len(),
+                    AssemblyFault::EmissionMismatch {
+                        missing: plan.records(DocumentTarget::Markdown),
+                        unexpected: vec![],
+                        changed: vec![],
+                    },
+                )
+            })?;
+        words.push(text);
+    }
+    Ok(words.join(" "))
+}
 fn excerpt_paragraph(source: &str, block: &Block) -> Option<String> {
     let actual = recover_markdown(source, block.runs.iter().flat_map(inline_handles))?;
     (actual == expected_runs(block, DocumentTarget::Markdown))
@@ -1355,7 +1461,7 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                 .enumerate()
                 .find(|(_, block)| block.unit == unit)
             {
-                let kind = if index == 0 {
+                let kind = if block.depth.is_some() {
                     EmissionKind::Heading
                 } else {
                     EmissionKind::Paragraph
@@ -1364,8 +1470,9 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     .econ
                     .as_ref()
                     .and_then(|econ| excerpt_econ(body, block, econ));
-                let text = if index == 0 {
-                    body.strip_prefix("# ").and_then(excerpt_text)
+                let text = if let Some(depth) = block.depth {
+                    body.strip_prefix(&format!("{} ", "#".repeat(depth)))
+                        .and_then(excerpt_text)
                 } else if block.econ.is_some() {
                     econ_recovered
                         .as_ref()
@@ -2342,12 +2449,16 @@ pub(super) fn end_matter(plan: &DocumentPlan) -> Vec<EndMatter<'_>> {
         .collect()
 }
 pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
-    (index > 0 && !blocks[index].paragraph && !blocks[index].equation).then(|| {
-        blocks[1..index]
-            .iter()
-            .filter(|block| !block.paragraph && !block.equation)
-            .count()
-    })
+    (index > 0
+        && blocks[index].depth.is_none()
+        && !blocks[index].paragraph
+        && !blocks[index].equation)
+        .then(|| {
+            blocks[1..index]
+                .iter()
+                .filter(|block| block.depth.is_none() && !block.paragraph && !block.equation)
+                .count()
+        })
 }
 #[derive(Clone, Debug)]
 pub(super) struct ScreenGap {
@@ -2493,6 +2604,10 @@ pub(super) fn check_excerpt_shape(
     let shape = plan.blocks.len() >= 2
         && plan.blocks[0].depth == Some(1)
         && plan.blocks[1..].iter().all(|block| {
+            if block.depth == Some(2) {
+                return block.unit == "sec:explainer:plain"
+                    && matches!(block.runs.as_slice(), [Inline::Text(_)]);
+            }
             block.depth.is_none()
                 && block.displays.is_empty()
                 && if block.equation {
@@ -2506,13 +2621,16 @@ pub(super) fn check_excerpt_shape(
                             | Inline::See { .. }
                             | Inline::Virtue { .. } => true,
                             Inline::Math { latex, .. } => native_paragraph_command(latex),
-                            Inline::Styled {
-                                kind: StyleKind::Emphasis,
-                                children,
-                                ..
-                            } => children
-                                .iter()
-                                .all(|child| matches!(child, Inline::Text(_))),
+                            Inline::Styled { kind, children, .. } => {
+                                (*kind == StyleKind::Emphasis
+                                    || (*kind == StyleKind::Strong
+                                        && block
+                                            .unit
+                                            .starts_with("sec:explainer:plain::paragraph:")))
+                                    && children
+                                        .iter()
+                                        .all(|child| matches!(child, Inline::Text(_)))
+                            }
                             _ => false,
                         })
                 } else {
@@ -3024,7 +3142,8 @@ fn resolve_see(
     }
     Ok((links, indexes))
 }
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // Both passes share checked ownership and destination identities.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)] // Test fixtures use the ordinary screen context.
 pub(super) fn plan_screens(
     plans: &mut [DocumentPlan],
     selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
@@ -3032,6 +3151,33 @@ pub(super) fn plan_screens(
     skeletons: &CheckedSkeletons<'_>,
     document_sites: &BTreeMap<String, UnitSite>,
     inclusions: &[super::input::Inclusion],
+    inputs: &BTreeMap<String, Vec<u8>>,
+    mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
+    lookup: Option<&super::registry::CheckedPaperLookup>,
+) -> Result<(), DocumentError> {
+    plan_screens_with_slots(
+        plans,
+        selected,
+        book,
+        skeletons,
+        document_sites,
+        inclusions,
+        &BTreeMap::new(),
+        inputs,
+        mints,
+        lookup,
+    )
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // Both passes share checked ownership and destination identities.
+pub(super) fn plan_screens_with_slots(
+    plans: &mut [DocumentPlan],
+    selected: &BTreeMap<String, Vec<ftoo_manifest::DocumentOutput>>,
+    book: &ftoo_manifest::AddressBook<'_>,
+    skeletons: &CheckedSkeletons<'_>,
+    document_sites: &BTreeMap<String, UnitSite>,
+    inclusions: &[super::input::Inclusion],
+    slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
     inputs: &BTreeMap<String, Vec<u8>>,
     mints: &BTreeMap<String, ftoo_manifest::MintOrigin>,
     lookup: Option<&super::registry::CheckedPaperLookup>,
@@ -3074,10 +3220,14 @@ pub(super) fn plan_screens(
                     },
                 ));
             }
-            if block.quotation || block.paragraph || block.equation {
+            if block.depth.is_some() || block.quotation || block.paragraph || block.equation {
                 continue;
             }
-            let site = positions[index].site();
+            let site = if slots.is_empty() {
+                positions[index].site()
+            } else {
+                &block.site
+            };
             let target = ftoo_manifest::AddressTarget::Documentary(block.unit.clone());
             let handle = book.reader_identity(target).map_err(|fault| {
                 screen_failure(
@@ -3174,8 +3324,12 @@ pub(super) fn plan_screens(
             };
             let mut gap = screen_gap(plan, positions[0].site(), position)?;
             if position == GapPosition::Between {
-                let fragment =
-                    |block: &Block| super::input::fragment_path(&plan.document, &block.unit);
+                let fragment = |block: &Block| {
+                    super::input::fragment_path(
+                        &plan.document,
+                        super::corpus::physical_owner(&block.unit, slots),
+                    )
+                };
                 let first = inclusions
                     .iter()
                     .find(|inclusion| inclusion.fragment == fragment(&plan.blocks[index]))
@@ -3189,18 +3343,31 @@ pub(super) fn plan_screens(
                 }
             }
             if index > 0 {
-                gap.boundaries.push(positions[index].site().clone());
+                gap.boundaries.push(if slots.is_empty() {
+                    positions[index].site().clone()
+                } else {
+                    plan.blocks[index].site.clone()
+                });
             }
-            if index + 1 < positions.len() {
-                gap.boundaries.push(positions[index + 1].site().clone());
+            if index + 1 < plan.blocks.len() {
+                gap.boundaries.push(if slots.is_empty() {
+                    positions[index + 1].site().clone()
+                } else {
+                    plan.blocks[index + 1].site.clone()
+                });
             }
             gaps.push(gap);
         }
         let mut refrains = Vec::new();
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            if block.paragraph || block.equation {
+            if block.depth.is_some() || block.paragraph || block.equation {
                 continue;
             }
+            let site = if slots.is_empty() {
+                positions[index].site()
+            } else {
+                &block.site
+            };
             let source_document = skeletons
                 .corpus()
                 .units()
@@ -3211,7 +3378,7 @@ pub(super) fn plan_screens(
             if !block.quotation && source_document != plan.document {
                 return Err(screen_failure(
                     plan,
-                    positions[index].site(),
+                    site,
                     AssemblyFault::ExcerptShape {
                         document: plan.document.clone(),
                         positions: plan.blocks.len(),
@@ -3225,7 +3392,7 @@ pub(super) fn plan_screens(
             {
                 return Err(missing_markdown_owner(
                     plan,
-                    positions[index].site(),
+                    site,
                     source_document,
                     &block.unit,
                     document_sites,
@@ -3234,7 +3401,7 @@ pub(super) fn plan_screens(
             let Some(destination) = owned.get(&(block.unit.clone(), plan.language.clone())) else {
                 return Err(missing_markdown_owner(
                     plan,
-                    positions[index].site(),
+                    site,
                     source_document,
                     &block.unit,
                     document_sites,
@@ -3243,7 +3410,7 @@ pub(super) fn plan_screens(
             if destination.document != source_document {
                 return Err(missing_markdown_owner(
                     plan,
-                    positions[index].site(),
+                    site,
                     source_document,
                     &block.unit,
                     document_sites,
@@ -3255,7 +3422,7 @@ pub(super) fn plan_screens(
                     format!("generated/documents/{source_document}/{}.md", plan.language);
                 let href = public_href(
                     plan,
-                    positions[index].site(),
+                    site,
                     source_document,
                     &plan.language,
                     &refrain.fragment,
@@ -3268,7 +3435,7 @@ pub(super) fn plan_screens(
                     href,
                     owner_site: destination.refrain.site.clone(),
                 });
-                refrain.site = positions[index].site().clone();
+                refrain.site = site.clone();
             }
             refrains.push(refrain);
         }
@@ -3698,8 +3865,151 @@ pub(super) fn check_handle_position(
 
 #[allow(clippy::too_many_lines)] // Document positions, recovery sites and screen inventories share one pass.
 #[allow(clippy::too_many_arguments)] // All checked document inputs remain explicit at this boundary.
+fn slot_inline(source: &[ftoo_manifest::corpus::SlotRun], site: &UnitSite) -> Vec<Inline> {
+    let mut output = Vec::new();
+    for run in source {
+        match run {
+            ftoo_manifest::corpus::SlotRun::Text(value) => {
+                if let Some(Inline::Text(previous)) = output.last_mut() {
+                    previous.push_str(value);
+                } else {
+                    output.push(Inline::Text(value.clone()));
+                }
+            }
+            ftoo_manifest::corpus::SlotRun::EnSpace => {
+                if let Some(Inline::Text(previous)) = output.last_mut() {
+                    previous.push(' ');
+                } else {
+                    output.push(Inline::Text(" ".into()));
+                }
+            }
+            ftoo_manifest::corpus::SlotRun::Style { kind, children } => {
+                let children = slot_inline(children, site);
+                output.push(Inline::Styled {
+                    kind: match kind {
+                        ftoo_manifest::corpus::SlotStyle::Strong => StyleKind::Strong,
+                        ftoo_manifest::corpus::SlotStyle::Emphasis => StyleKind::Emphasis,
+                    },
+                    child_sites: vec![site.clone(); children.len()],
+                    children,
+                    site: site.clone(),
+                });
+            }
+        }
+    }
+    output
+}
+
+#[allow(clippy::too_many_arguments)] // The checked child uses the ordinary plan's full owner context.
+fn slot_blocks(
+    slot: &ftoo_manifest::corpus::CheckedSlot,
+    corpus: &ftoo_manifest::LanguageCheckedUnits,
+    welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
+    equations: &Equations,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
+    bibliography: &str,
+    paper_lookup: Option<&super::registry::CheckedPaperLookup>,
+    book: &ftoo_manifest::AddressBook<'_>,
+    document: &str,
+    language: &str,
+    paper_documents: &BTreeSet<String>,
+    errors: &mut Vec<AssemblyDiagnostic>,
+) -> Result<Vec<Block>, DocumentError> {
+    let mut blocks = Vec::with_capacity(slot.blocks().len());
+    for (child_index, child) in slot.blocks().iter().enumerate() {
+        let site = super::input::site("units/corpus/explainer-plain.toml")
+            .child("unit")
+            .child("blocks")
+            .child(&child_index.to_string());
+        let (unit, depth, paragraph, runs) = match child {
+            ftoo_manifest::corpus::SlotBlock::Heading { title, .. } => (
+                slot.id().to_owned(),
+                Some(2),
+                false,
+                slot_inline(title, &site),
+            ),
+            ftoo_manifest::corpus::SlotBlock::Paragraph { runs } => (
+                format!("{}::paragraph:{child_index}", slot.id()),
+                None,
+                true,
+                slot_inline(runs, &site),
+            ),
+            ftoo_manifest::corpus::SlotBlock::Use { unit, .. } => {
+                let (index, checked) = corpus
+                    .units()
+                    .iter()
+                    .enumerate()
+                    .find(|(_, entry)| entry.label().as_str() == unit)
+                    .expect("checked skeleton child use");
+                check_reader_literals(checked, language, displays, errors);
+                check_handle_position(document, checked, language, true, paper_documents, errors);
+                (
+                    unit.clone(),
+                    None,
+                    true,
+                    runs(
+                        index,
+                        checked,
+                        language,
+                        welded,
+                        equations,
+                        bibliography,
+                        paper_lookup,
+                    )?,
+                )
+            }
+        };
+        let mut block = Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit,
+            depth,
+            quotation: false,
+            paragraph,
+            equation: false,
+            econ: None,
+            site,
+            runs,
+        };
+        if let Err(error) = block.map_citations(book, document, language) {
+            collect_reader_error(errors, error);
+        }
+        blocks.push(block);
+    }
+    Ok(blocks)
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)] // Existing fixtures exercise the ordinary document route.
 pub(super) fn build(
     skeletons: &CheckedSkeletons<'_>,
+    welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
+    notation: &RenderableNotation<'_, '_, '_>,
+    metadata: &BTreeMap<String, UnitSite>,
+    displays: &ftoo_manifest::CheckedDisplays<'_>,
+    bibliography: &str,
+    paper_lookup: Option<&super::registry::CheckedPaperLookup>,
+    inputs: &BTreeMap<String, Vec<u8>>,
+    paper_documents: &BTreeSet<String>,
+) -> Result<Vec<DocumentPlan>, DocumentError> {
+    build_with_slots(
+        skeletons,
+        &BTreeMap::new(),
+        welded,
+        notation,
+        metadata,
+        displays,
+        bibliography,
+        paper_lookup,
+        inputs,
+        paper_documents,
+    )
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // One traversal binds the checked positions to ordinary and coarse children.
+pub(super) fn build_with_slots(
+    skeletons: &CheckedSkeletons<'_>,
+    slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     notation: &RenderableNotation<'_, '_, '_>,
     metadata: &BTreeMap<String, UnitSite>,
@@ -3749,6 +4059,25 @@ pub(super) fn build(
             };
             let mut blocks = Vec::new();
             for position in positions {
+                if position.corpus_slot() {
+                    let slot = &slots[position.unit()];
+                    let children = slot_blocks(
+                        slot,
+                        corpus,
+                        welded,
+                        &equations,
+                        displays,
+                        bibliography,
+                        paper_lookup,
+                        book,
+                        document,
+                        language,
+                        paper_documents,
+                        &mut errors,
+                    )?;
+                    blocks.extend(children);
+                    continue;
+                }
                 let (index, unit) = corpus
                     .units()
                     .iter()

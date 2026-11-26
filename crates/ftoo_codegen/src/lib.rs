@@ -30,6 +30,7 @@ pub use labels::{
     LabelCheckSummary, LabelEntryFault, LabelFileError, LabelIoOperation, MarkdownEntryKind,
     check_label_files, load_markdown_files,
 };
+pub use units::corpus::parse_slot;
 pub use units::{
     EntryKind, UnitCheckSummary, UnitInputFault, UnitIoOperation, UnitLoadError, UnitSource,
     check_unit_files, load_unit_files, load_unit_sources,

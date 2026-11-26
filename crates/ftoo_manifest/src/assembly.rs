@@ -18,7 +18,7 @@ pub use math::{
 };
 pub use skeleton::{
     CheckedSkeletons, SkeletonChild, SkeletonDraft, SkeletonPosition, SkeletonSection,
-    check_skeletons,
+    check_skeletons, check_skeletons_with_slots,
 };
 
 /// Locate complete semantic-label tokens in decoded reader prose.

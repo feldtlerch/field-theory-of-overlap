@@ -224,6 +224,7 @@ pub(crate) fn recheck(root: &Path, prepared: &PreparedDocuments) -> Result<(), D
         "units/statements",
         "units/skeletons",
         "units/scopes",
+        "units/corpus",
         "units/displays",
     ] {
         let prefix = format!("{directory}/");

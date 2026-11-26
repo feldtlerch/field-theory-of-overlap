@@ -2,6 +2,7 @@
 #![allow(clippy::result_large_err)]
 pub(crate) mod artifacts;
 mod bibliography;
+mod corpus;
 mod destinations;
 mod diagnostics;
 mod display;
@@ -68,6 +69,7 @@ impl DocumentArtifact {
 ///     unavailable: Vec::new(),
 ///     html_gap_rows: Vec::new(),
 ///     screen_gap_rows: Vec::new(),
+///     slot_recovered: Default::default(),
 ///     snapshot: None,
 /// };
 /// ```
@@ -120,8 +122,45 @@ pub struct PreparedDocuments {
     observed_outputs: BTreeMap<String, Vec<u8>>,
     unavailable: Vec<destinations::IndexEntry>,
     screen_gap_rows: Vec<ScreenGapRow>,
+    slot_recovered: BTreeMap<(String, String), String>,
 }
 impl PreparedDocuments {
+    /// Return a checked excerpt recovery bound to the emitted screen bytes.
+    #[must_use]
+    pub fn corpus_slot_recovery_export(
+        &self,
+        medium: &str,
+        source: &str,
+        first: usize,
+        last: usize,
+        unit: &str,
+    ) -> Option<serde_json::Value> {
+        use sha2::{Digest as _, Sha256};
+        if source != "documents/paper/explainer/explainer.tex"
+            || first == 0
+            || last < first
+            || unit != "sec:explainer:plain"
+            || !matches!(medium, "markdown" | "html")
+        {
+            return None;
+        }
+        let text = self.slot_recovered.get(&(unit.into(), medium.into()))?;
+        let extension = if medium == "markdown" { "md" } else { "html" };
+        let path = format!("generated/documents/explainer-pilot/en.{extension}");
+        let artifact = self
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.path == path)?;
+        let sha256 = crate::hex(&Sha256::digest(&artifact.bytes));
+        Some(serde_json::json!({
+            "schema": 1,
+            "medium": medium,
+            "selection": {"source": source, "first": first, "last": last, "unit": unit},
+            "coverage": "excerpt",
+            "rendering": {"path": path, "sha256": sha256},
+            "text": text,
+        }))
+    }
     #[must_use]
     pub(crate) fn html_gap_rows(&self) -> &[HtmlGapRow] {
         &self.html_gap_rows
@@ -433,6 +472,10 @@ pub(crate) fn prepare_context(
     let statements = input::sources(root, &statement_files)?;
     let corpus = crate::load_unit_sources(declaration.clone(), statements.clone())
         .map_err(DocumentError::Units)?;
+    let (corpus_slots, corpus_sources) = corpus::load(root, &corpus)?;
+    for source in &corpus_sources {
+        merge_checked_input(&mut inputs, source.file.clone(), source.bytes.clone())?;
+    }
     let selected = crate::units::toml::selected_targets(&declaration)
         .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
     let paper_contexts = crate::units::toml::paper_contexts(&declaration)
@@ -505,7 +548,8 @@ pub(crate) fn prepare_context(
     let scope_sources = input::sources(root, &scope_files)?;
     let display_sources = input::sources(root, &display_files)?;
     let (drafts, display_drafts) = input::assembly_sources(&sources, &display_sources)?;
-    let inclusions = input::composition(root, &declaration, &scope_sources, &drafts)?;
+    let inclusions =
+        input::composition_with_slots(root, &declaration, &scope_sources, &drafts, &corpus_slots)?;
     let master_sources = input::read(root, "documents/paper-build/sources.tsv")?;
     let master_sources = std::str::from_utf8(&master_sources).map_err(|_| {
         DocumentError::Input(DocumentInputFault::InvalidSourceName {
@@ -531,14 +575,20 @@ pub(crate) fn prepare_context(
     }
     let (metadata, owner_sites) = metadata(&statements);
     let document_sites = document_sites(&corpus);
-    let skeletons =
-        ftoo_manifest::check_skeletons(&corpus, &drafts, &metadata, &owner_sites, &document_sites)
-            .map_err(|e| {
-                DocumentError::Assembly(
-                    AssemblyErrors::from_diagnostics(e.into_iter().map(Into::into).collect())
-                        .expect("nonempty errors"),
-                )
-            })?;
+    let skeletons = ftoo_manifest::check_skeletons_with_slots(
+        &corpus,
+        &drafts,
+        &metadata,
+        &owner_sites,
+        &document_sites,
+        &corpus_slots,
+    )
+    .map_err(|e| {
+        DocumentError::Assembly(
+            AssemblyErrors::from_diagnostics(e.into_iter().map(Into::into).collect())
+                .expect("nonempty errors"),
+        )
+    })?;
     let displays =
         ftoo_manifest::check_displays(&display_drafts, &skeletons, &welded).map_err(|e| {
             DocumentError::Assembly(
@@ -563,6 +613,7 @@ pub(crate) fn prepare_context(
         .chain(sources)
         .chain(scope_sources)
         .chain(display_sources)
+        .chain(corpus_sources)
         .collect();
     let snapshot = accepted
         .map(|_| {
@@ -602,8 +653,9 @@ pub(crate) fn prepare_context(
                     },
                 )
             })?;
-        let mut plans = plan::build(
+        let mut plans = plan::build_with_slots(
             &skeletons,
+            &corpus_slots,
             &welded,
             notation,
             &metadata,
@@ -613,29 +665,57 @@ pub(crate) fn prepare_context(
             &inputs,
             &paper_documents,
         )?;
-        plan::plan_screens(
+        plan::plan_screens_with_slots(
             &mut plans,
             &selected,
             &book,
             &skeletons,
             &document_sites,
             &inclusions,
+            &corpus_slots,
             &inputs,
             registry_joint.mints(),
             paper_lookup.as_ref(),
         )?;
         let gap_rows = html_gap_rows(&plans, &selected);
         let known_labels: Vec<_> = registry_joint.mints().keys().map(String::as_str).collect();
-        let mut artifacts = render_artifacts(
+        let mut artifacts = render_artifacts_with_slots(
             root,
             &support,
             &book,
             &selected,
             &plans,
+            &corpus_slots,
             notation,
             &inputs,
             &known_labels,
         )?;
+        let mut slot_recovered = BTreeMap::new();
+        for slot in corpus_slots.values() {
+            let plan = plans
+                .iter()
+                .find(|plan| plan.document == slot.document())
+                .expect("admitted corpus slot document");
+            for (medium, extension) in [("markdown", "labels.md"), ("html", "html")] {
+                let path = format!(
+                    "generated/documents/{}/{}.{}",
+                    slot.document(),
+                    slot.language(),
+                    extension
+                );
+                let artifact = artifacts
+                    .iter()
+                    .find(|artifact| artifact.path == path)
+                    .expect("selected corpus slot screen");
+                let source = std::str::from_utf8(&artifact.bytes).expect("checked screen UTF-8");
+                let text = if medium == "markdown" {
+                    plan::slot_markdown_text(plan, slot, source)?
+                } else {
+                    html_recovery::slot_html_text(plan, slot, source)?
+                };
+                slot_recovered.insert((slot.id().into(), medium.into()), text);
+            }
+        }
         let mut inclusion_text = String::new();
         {
             use std::fmt::Write as _;
@@ -704,6 +784,7 @@ pub(crate) fn prepare_context(
             })
             .collect();
         prepared.html_gap_rows = gap_rows;
+        prepared.slot_recovered = slot_recovered;
         if let Some(snapshot) = snapshot {
             snapshot
                 .recheck(root)
@@ -781,6 +862,7 @@ fn finish_snapshot(
         observed_outputs,
         unavailable: Vec::new(),
         screen_gap_rows: Vec::new(),
+        slot_recovered: BTreeMap::new(),
     })
 }
 
@@ -815,12 +897,38 @@ fn metadata(
 
 #[allow(clippy::too_many_lines)] // Selected outputs and shared support remain in one preparation scope.
 #[allow(clippy::too_many_arguments)] // Source snapshots are separate from document selection and rendered support.
+#[cfg(test)]
 fn render_artifacts(
     root: &Path,
     support: &NativeSupport,
     book: &ftoo_manifest::AddressBook<'_>,
     selected: &BTreeMap<String, Vec<DocumentOutput>>,
     plans: &[plan::DocumentPlan],
+    notation: &crate::RenderableNotation<'_, '_, '_>,
+    inputs: &BTreeMap<String, Vec<u8>>,
+    known_labels: &[&str],
+) -> Result<Vec<DocumentArtifact>, DocumentError> {
+    render_artifacts_with_slots(
+        root,
+        support,
+        book,
+        selected,
+        plans,
+        &BTreeMap::new(),
+        notation,
+        inputs,
+        known_labels,
+    )
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // The checked artifact route owns the complete source and target context.
+fn render_artifacts_with_slots(
+    root: &Path,
+    support: &NativeSupport,
+    book: &ftoo_manifest::AddressBook<'_>,
+    selected: &BTreeMap<String, Vec<DocumentOutput>>,
+    plans: &[plan::DocumentPlan],
+    slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
     notation: &crate::RenderableNotation<'_, '_, '_>,
     inputs: &BTreeMap<String, Vec<u8>>,
     known_labels: &[&str],
@@ -953,9 +1061,23 @@ fn render_artifacts(
                         });
                     }
                     DocumentOutput::Fragment => {
-                        for block in plan.blocks.iter().filter(|block| block.depth.is_none()) {
-                            let source = fragment_line(block)?;
-                            let path = input::fragment_path(&plan.document, &block.unit);
+                        let mut index = 0;
+                        while index < plan.blocks.len() {
+                            let block = &plan.blocks[index];
+                            let (source, unit, advance) = if let Some(slot) = slots.get(&block.unit)
+                            {
+                                (
+                                    corpus::fragment(slot, &plan.blocks[index + 1])?,
+                                    slot.id(),
+                                    slot.blocks().len(),
+                                )
+                            } else if block.depth.is_some() {
+                                index += 1;
+                                continue;
+                            } else {
+                                (fragment_line(block)?, block.unit.as_str(), 1)
+                            };
+                            let path = input::fragment_path(&plan.document, unit);
                             check_rendered_bytes(&path, source.as_bytes(), &[])?;
                             artifacts.push(DocumentArtifact {
                                 path,
@@ -964,6 +1086,7 @@ fn render_artifacts(
                                 emissions: Vec::new(),
                                 html_gap_sites: Vec::new(),
                             });
+                            index += advance;
                         }
                     }
                     DocumentOutput::Html => {

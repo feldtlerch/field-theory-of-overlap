@@ -116,7 +116,7 @@ fn scope(source: &UnitSource) -> Result<ScopeRecord, DocumentError> {
             let role = string_value(fields[1])?;
             if !matches!(
                 role.as_str(),
-                "refrain" | "paragraph" | "quotation" | "equation" | "econ"
+                "refrain" | "paragraph" | "quotation" | "equation" | "econ" | "corpus-slot"
             ) || (role == "equation") != (fields.len() == 3)
                 || (role == "equation" && string_value(fields[2])? != "none")
             {
@@ -144,6 +144,41 @@ pub(super) fn composition(
     skeletons: &[SkeletonDraft],
 ) -> Result<Vec<Inclusion>, DocumentError> {
     compose(root, declaration, scope_sources, Some(skeletons))
+}
+
+pub(super) fn composition_with_slots(
+    root: &Path,
+    declaration: &UnitSource,
+    scope_sources: &[UnitSource],
+    skeletons: &[SkeletonDraft],
+    slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
+) -> Result<Vec<Inclusion>, DocumentError> {
+    let inclusions = composition(root, declaration, scope_sources, skeletons)?;
+    for (id, slot) in slots {
+        let physical = inclusions
+            .iter()
+            .filter(|row| row.unit == *id && row.role == "corpus-slot")
+            .count();
+        if physical != 1 {
+            return Err(mismatch(
+                &site("units/corpus/explainer-plain.toml"),
+                id,
+                "physical occurrence",
+            ));
+        }
+        for child in slot.blocks() {
+            if let ftoo_manifest::corpus::SlotBlock::Use { unit, .. } = child
+                && inclusions.iter().any(|row| row.unit == *unit)
+            {
+                return Err(mismatch(
+                    &site("units/corpus/explainer-plain.toml"),
+                    id,
+                    "duplicate child occurrence",
+                ));
+            }
+        }
+    }
+    Ok(inclusions)
 }
 
 /// Check source-scope ownership for a diagnostic corpus read without selecting skeleton output.
@@ -300,6 +335,9 @@ fn check_projection(
                     }
                     SkeletonChild::Paragraph(value) => {
                         inclusion.role == "paragraph" && value.value == inclusion.unit
+                    }
+                    SkeletonChild::CorpusSlot(value) => {
+                        inclusion.role == "corpus-slot" && value.value == inclusion.unit
                     }
                     SkeletonChild::Econ(value) => {
                         inclusion.role == "econ" && value.value == inclusion.unit
@@ -504,6 +542,7 @@ pub(super) fn site(file: &str) -> UnitSite {
         occurrence: None,
     }
 }
+#[allow(clippy::too_many_lines)] // Closed child variants share the same source-site validation.
 fn section(
     node: &Node,
     nested: bool,
@@ -567,6 +606,10 @@ fn section(
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Paragraph(position(fields[1], count)?))
                 }
+                "corpus-slot" => {
+                    let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
+                    Ok(SkeletonChild::CorpusSlot(position(fields[1], count)?))
+                }
                 "econ" => {
                     let fields = toml::fixed(child, &["kind", "unit"]).map_err(boundary)?;
                     Ok(SkeletonChild::Econ(position(fields[1], count)?))
@@ -596,6 +639,7 @@ fn section(
                             expected: vec![
                                 "unit".into(),
                                 "paragraph".into(),
+                                "corpus-slot".into(),
                                 "econ".into(),
                                 "equation".into(),
                                 "quotation".into(),
@@ -682,6 +726,7 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
         if let Some(kind) = &kind {
             if kind.value != "unit"
                 && kind.value != "paragraph"
+                && kind.value != "corpus-slot"
                 && kind.value != "econ"
                 && kind.value != "equation"
                 && kind.value != "quotation"
@@ -694,7 +739,7 @@ fn shape(tree: &Node, text: &str) -> Result<Option<LocatedString>, Box<UnitDiagn
             }
             if matches!(
                 kind.value.as_str(),
-                "unit" | "paragraph" | "econ" | "quotation" | "equation"
+                "unit" | "paragraph" | "corpus-slot" | "econ" | "quotation" | "equation"
             ) {
                 let fields = if kind.value == "equation" {
                     toml::fixed(node, &["kind", "unit", "numbering"])?
@@ -826,6 +871,7 @@ fn unknown_kind(value: LocatedString) -> super::AssemblyDiagnostic {
             expected: vec![
                 "unit".into(),
                 "paragraph".into(),
+                "corpus-slot".into(),
                 "econ".into(),
                 "equation".into(),
                 "quotation".into(),

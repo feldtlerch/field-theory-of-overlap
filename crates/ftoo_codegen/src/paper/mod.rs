@@ -645,7 +645,7 @@ fn request(args: &[OsString]) -> Result<Request> {
     let mut iter = args.iter();
     let operation = iter
         .next()
-        .ok_or("Expected generate, check, documents or import-dry-run operation")?
+        .ok_or("Expected generate, check, documents, import-dry-run or import-correspondence operation")?
         .to_str()
         .ok_or("Non-UTF8 command")?
         .to_owned();
@@ -657,7 +657,9 @@ fn request(args: &[OsString]) -> Result<Request> {
         "publish",
         "documents-generate",
         "documents-check",
+        "documents-recovery",
         "import-dry-run",
+        "import-correspondence",
         "documents-check-gaps",
     ]
     .contains(&operation.as_str())
@@ -678,6 +680,8 @@ fn request(args: &[OsString]) -> Result<Request> {
             "--work",
             "--built",
             "--output-dir",
+            "--assignment",
+            "--side",
         ]
         .contains(&key)
         {
@@ -692,6 +696,11 @@ fn request(args: &[OsString]) -> Result<Request> {
         {
             return Err(format!("Duplicate option {key}").into());
         }
+    }
+    if operation != "import-correspondence"
+        && (values.contains_key("--assignment") || values.contains_key("--side"))
+    {
+        return Err("Assignment and side belong only to import-correspondence".into());
     }
     let root = values.get("--repository").map_or_else(
         || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
@@ -748,6 +757,34 @@ fn run_documents(req: &Request) -> Result<()> {
         let prepared = crate::check_documents(&req.root, &assembly)
             .map_err(|error| PaperFault::Input(error.to_string()))?;
         release::screen_parts(&req.root, &prepared, true)
+    } else if req.operation == "documents-recovery" {
+        let output = req
+            .values
+            .get("--output-dir")
+            .ok_or("Recovery output directory required")?;
+        let output = PathBuf::from(output);
+        if !output.is_absolute() || output.starts_with(&req.root) {
+            return Err("Recovery output must be absolute and outside the repository".into());
+        }
+        let prepared = crate::check_documents(&req.root, &assembly)
+            .map_err(|error| PaperFault::Input(error.to_string()))?;
+        fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+        for medium in ["markdown", "html"] {
+            let export = prepared
+                .corpus_slot_recovery_export(
+                    medium,
+                    "documents/paper/explainer/explainer.tex",
+                    44,
+                    98,
+                    "sec:explainer:plain",
+                )
+                .ok_or("Checked corpus-slot recovery unavailable")?;
+            let bytes =
+                serde_json::to_vec_pretty(&export).map_err(|e| PaperFault::Input(e.to_string()))?;
+            fs::write(output.join(format!("{medium}-recovery.json")), bytes)
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
     } else {
         crate::check_documents(&req.root, &assembly)
             .map(|_| ())
@@ -779,8 +816,8 @@ fn pair_support(req: &Request, release_support: Option<PathBuf>) -> Result<PathB
 /// Returns a located input, subprocess, fixed-point or byte-comparison failure.
 pub fn run(args: &[OsString]) -> Result<()> {
     let req = request(args)?;
-    if req.operation == "import-dry-run" {
-        return run_import(&req);
+    if let Some(result) = run_import_operation(&req) {
+        return result;
     }
     let built = req.values.contains_key("--built");
     if req.operation.starts_with("documents-") {
@@ -880,11 +917,21 @@ pub fn run(args: &[OsString]) -> Result<()> {
     }
 }
 
+fn run_import_operation(req: &Request) -> Option<Result<()>> {
+    match req.operation.as_str() {
+        "import-dry-run" => Some(run_import(req)),
+        "import-correspondence" => Some(run_correspondence(req)),
+        _ => None,
+    }
+}
+
 fn run_import(req: &Request) -> Result<()> {
     if req.release
         || req.values.contains_key("--support")
         || req.values.contains_key("--work")
         || req.values.contains_key("--built")
+        || req.values.contains_key("--assignment")
+        || req.values.contains_key("--side")
     {
         return Err("Import dry run takes only repository and output directory".into());
     }
@@ -896,6 +943,39 @@ fn run_import(req: &Request) -> Result<()> {
         crate::units::corpus::dry_run(&req.root, Path::new(output)).map_err(PaperFault::Input)?;
     eprintln!("import dry run: {}", report["fully_decoded_outer"]);
     Ok(())
+}
+
+fn run_correspondence(req: &Request) -> Result<()> {
+    if req.release
+        || req.values.keys().any(|key| {
+            !matches!(
+                key.as_str(),
+                "--repository" | "--assignment" | "--side" | "--output-dir"
+            )
+        })
+    {
+        return Err(
+            "Import correspondence takes only repository, assignment, side and output directory"
+                .into(),
+        );
+    }
+    let assignment = req
+        .values
+        .get("--assignment")
+        .ok_or("Assignment required")?;
+    let side = req.values.get("--side").ok_or("Side required")?;
+    let output = req
+        .values
+        .get("--output-dir")
+        .ok_or("Output directory required")?;
+    let side = side.to_str().ok_or("Non-UTF8 side")?;
+    crate::units::corpus::export_correspondence(
+        &req.root,
+        Path::new(assignment),
+        side,
+        Path::new(output),
+    )
+    .map_err(PaperFault::Input)
 }
 
 #[cfg(test)]

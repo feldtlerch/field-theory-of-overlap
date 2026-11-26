@@ -197,16 +197,55 @@ pub(super) fn command_at(text: &str, start: usize) -> (&str, usize) {
 
 type InlineResult = Result<(Vec<Run>, Vec<TargetDraft>), (usize, usize, String)>;
 
+/// One source contribution produced by the inline command walker.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocatedPiece {
+    pub start: usize,
+    pub end: usize,
+    pub semantic: String,
+    pub control: Option<&'static str>,
+}
+
+/// Decode an inline source slice and return its located contributions.
+/// # Errors
+/// Refuses the same unsupported inline syntax as the diagnostic importer.
+pub fn located_inline(
+    path: &str,
+    whole: &str,
+    start: usize,
+    end: usize,
+) -> Result<Vec<LocatedPiece>, String> {
+    let source = whole
+        .get(start..end)
+        .ok_or_else(|| "inline range is not a source boundary".to_owned())?;
+    let mut pieces = Vec::new();
+    inline_with_locations(path, whole, source, start, &mut pieces)
+        .map_err(|(at, _, reason)| format!("{path}:{at}: {reason}"))?;
+    Ok(pieces)
+}
+
 fn decoded_text(source: &str) -> String {
     source
         .replace("---", "—")
         .replace("--", "–")
         .replace("``", "“")
         .replace("''", "”")
+        .replace('\'', "’")
 }
 
 #[allow(clippy::too_many_lines)] // Closed inline cases retain each source boundary and refusal.
 fn inline(path: &str, whole: &str, source: &str, base: usize) -> InlineResult {
+    inline_with_locations(path, whole, source, base, &mut Vec::new())
+}
+
+#[allow(clippy::too_many_lines)] // The located projection follows the closed inline grammar.
+fn inline_with_locations(
+    path: &str,
+    whole: &str,
+    source: &str,
+    base: usize,
+    pieces: &mut Vec<LocatedPiece>,
+) -> InlineResult {
     let mut runs = Vec::new();
     let mut targets = Vec::new();
     let mut plain = String::new();
@@ -234,10 +273,40 @@ fn inline(path: &str, whole: &str, source: &str, base: usize) -> InlineResult {
                 return Err((base + cursor, base + end, "unresolved grouping".into()));
             }
             Lexeme::Other(ch) => {
+                let (width, semantic) = if source[cursor..].starts_with("---") {
+                    (3, "—".to_owned())
+                } else if source[cursor..].starts_with("--") {
+                    (2, "–".to_owned())
+                } else if source[cursor..].starts_with("``") {
+                    (2, "“".to_owned())
+                } else if source[cursor..].starts_with("''") {
+                    (2, "”".to_owned())
+                } else if ch == '\'' {
+                    (1, "’".to_owned())
+                } else {
+                    (ch.len_utf8(), ch.to_string())
+                };
+                pieces.push(LocatedPiece {
+                    start: base + cursor,
+                    end: base + cursor + width,
+                    semantic,
+                    control: None,
+                });
+                if width > ch.len_utf8() {
+                    walker.cursor = cursor + width;
+                    plain.push_str(&source[cursor..walker.cursor]);
+                    continue;
+                }
                 plain.push(ch);
                 continue;
             }
             Lexeme::Ampersand => {
+                pieces.push(LocatedPiece {
+                    start: base + cursor,
+                    end: base + end,
+                    semantic: "&".into(),
+                    control: None,
+                });
                 plain.push('&');
                 continue;
             }
@@ -251,10 +320,23 @@ fn inline(path: &str, whole: &str, source: &str, base: usize) -> InlineResult {
             ));
         };
         if kind == Production::Escape {
-            plain.push(command.chars().nth(1).expect("escaped command"));
+            let escaped = command.chars().nth(1).expect("escaped command");
+            pieces.push(LocatedPiece {
+                start: base + cursor,
+                end: base + end,
+                semantic: escaped.to_string(),
+                control: None,
+            });
+            plain.push(escaped);
             continue;
         }
         if kind == Production::Spacing {
+            pieces.push(LocatedPiece {
+                start: base + cursor,
+                end: base + end,
+                semantic: " ".into(),
+                control: Some("en-space"),
+            });
             if !plain.is_empty() {
                 runs.push(Run::Text {
                     decoded: decoded_text(&std::mem::take(&mut plain)),
@@ -281,6 +363,14 @@ fn inline(path: &str, whole: &str, source: &str, base: usize) -> InlineResult {
                 while matches!(source.as_bytes().get(walker.cursor), Some(b' ' | b'\t')) {
                     walker.cursor += 1;
                 }
+            }
+            if walker.cursor > end {
+                pieces.push(LocatedPiece {
+                    start: base + end,
+                    end: base + walker.cursor,
+                    semantic: " ".into(),
+                    control: None,
+                });
             }
             continue;
         }
@@ -330,7 +420,37 @@ fn inline(path: &str, whole: &str, source: &str, base: usize) -> InlineResult {
         };
         let run = match kind {
             Production::Style => {
-                let (children, nested) = inline(path, whole, argument, base + argument_start + 1)?;
+                pieces.push(LocatedPiece {
+                    start: base + cursor,
+                    end: base + argument_start + 1,
+                    semantic: String::new(),
+                    control: Some(if command == "\\textbf" {
+                        "strong-open"
+                    } else if command == "\\emph" {
+                        "emphasis-open"
+                    } else {
+                        "unsupported-style"
+                    }),
+                });
+                let (children, nested) = inline_with_locations(
+                    path,
+                    whole,
+                    argument,
+                    base + argument_start + 1,
+                    pieces,
+                )?;
+                pieces.push(LocatedPiece {
+                    start: base + next - 1,
+                    end: base + next,
+                    semantic: String::new(),
+                    control: Some(if command == "\\textbf" {
+                        "strong-close"
+                    } else if command == "\\emph" {
+                        "emphasis-close"
+                    } else {
+                        "unsupported-style"
+                    }),
+                });
                 targets.extend(nested);
                 Run::Style {
                     style: command[1..].into(),

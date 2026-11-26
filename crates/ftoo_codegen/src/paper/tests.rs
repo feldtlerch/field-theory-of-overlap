@@ -626,3 +626,43 @@ fn import_request_stays_outside_paper_production() {
             .contains("output overlaps the source tree")
     );
 }
+
+#[test]
+fn correspondence_command_refuses_wrong_side_and_unrelated_options() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let args = vec![
+        OsString::from("import-correspondence"),
+        OsString::from("--repository"),
+        root.clone().into_os_string(),
+        OsString::from("--assignment"),
+        root.join("unused-assignment.json").into_os_string(),
+        OsString::from("--side"),
+        OsString::from("other"),
+        OsString::from("--output-dir"),
+        root.join("generated/unused-correspondence")
+            .into_os_string(),
+    ];
+    assert!(
+        run(&args)
+            .unwrap_err()
+            .to_string()
+            .contains("side must be before or after")
+    );
+    let mut unsupported = args.clone();
+    unsupported.extend([OsString::from("--support"), OsString::from("unused")]);
+    assert!(
+        run(&unsupported)
+            .unwrap_err()
+            .to_string()
+            .contains("takes only repository")
+    );
+    let mut legacy = args;
+    legacy[0] = OsString::from("import-dry-run");
+    assert!(
+        request(&legacy)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("belong only")
+    );
+}

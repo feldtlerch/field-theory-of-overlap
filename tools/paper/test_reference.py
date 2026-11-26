@@ -185,9 +185,11 @@ def selftest():
             source+'\tsec:fixture\tgenerated/documents/fixture.tex\tparagraph\t1\n',
             encoding='utf-8')
         original_bindings = identities.bindings
+        original_prepare_bindings = prepare.bindings
         original_assembly_json = prepare.assembly_json
         identities.bindings = lambda unused: {
             'bd:rep': {'source_status': 'paper', 'spelling': 'bd:rep'}}
+        prepare.bindings = identities.bindings
         prepare.assembly_json = lambda unused: '{"native_targets":[]}'
         try:
             for suffix, reason in [
@@ -233,6 +235,7 @@ def selftest():
                 raise AssertionError('Duplicate auxiliary handle')
         finally:
             identities.bindings = original_bindings
+            prepare.bindings = original_prepare_bindings
             prepare.assembly_json = original_assembly_json
 
 

@@ -5,6 +5,7 @@ mod overfull;
 use super::*;
 mod acceptance;
 mod brackets;
+mod corpus;
 mod displays;
 mod historical;
 mod html;
@@ -1053,6 +1054,7 @@ fn declared_positions(section: &ftoo_manifest::SkeletonSection, out: &mut Vec<(S
         match child {
             ftoo_manifest::SkeletonChild::Unit(unit)
             | ftoo_manifest::SkeletonChild::Paragraph(unit)
+            | ftoo_manifest::SkeletonChild::CorpusSlot(unit)
             | ftoo_manifest::SkeletonChild::Econ(unit)
             | ftoo_manifest::SkeletonChild::Equation(unit) => {
                 out.push((unit.value.clone(), false));
@@ -1621,6 +1623,7 @@ skeleton={document='main',sections=[{heading='sec:fixture:first',children=[{kind
                 expected: vec![
                     "unit".into(),
                     "paragraph".into(),
+                    "corpus-slot".into(),
                     "econ".into(),
                     "equation".into(),
                     "quotation".into(),
@@ -2904,6 +2907,7 @@ fn publication_io_failures_retain_completed_paths_cleanup_and_restoration() {
         snapshot: None,
         html_gap_rows: Vec::new(),
         screen_gap_rows: Vec::new(),
+        slot_recovered: BTreeMap::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -3078,6 +3082,7 @@ fn artifact_byte_faults_pin_offsets_and_restore_every_role() {
         snapshot: None,
         html_gap_rows: Vec::new(),
         screen_gap_rows: Vec::new(),
+        slot_recovered: BTreeMap::new(),
         artifacts: paths
             .iter()
             .map(|path| DocumentArtifact {
@@ -4389,6 +4394,7 @@ fn release_destination_bridge_refuses_entries_and_gaps_independently() {
         artifacts: Vec::new(),
         html_gap_rows: Vec::new(),
         screen_gap_rows: Vec::new(),
+        slot_recovered: BTreeMap::new(),
         inputs: BTreeMap::new(),
         observed_outputs: BTreeMap::new(),
         unavailable: Vec::new(),

@@ -408,6 +408,12 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
                 block.unit, plan.document, plan.language
             )
             .expect("string write");
+            if block.depth == Some(2) {
+                output.push_str("## ");
+                inline(&mut output, &block.runs);
+                output.push_str("\n\n");
+                continue;
+            }
             if let Some(econ) = &block.econ {
                 output.push_str("<table>\n<tr>\n<td>\n");
                 let header_start = output.len();

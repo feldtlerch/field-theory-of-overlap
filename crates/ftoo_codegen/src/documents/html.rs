@@ -923,6 +923,15 @@ pub(super) fn model(
             ));
             continue;
         }
+        if block.depth == Some(2) {
+            let fragment = super::plan::public_fragment(plan, &block.site, &block.unit)?;
+            main.push(element(
+                "h2",
+                &[("id", &fragment)],
+                inline(&block.runs, prepared, index),
+            ));
+            continue;
+        }
         if let Some(econ) = &block.econ {
             let header_id = format!("{}-header", econ.fragment);
             main.push(element(
