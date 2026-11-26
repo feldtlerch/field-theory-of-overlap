@@ -38,7 +38,7 @@
     "generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex": "11359e1de3ee35ae570cb6b90262136a182d5cdaa02ffe4a743e529068e329ca",
     "generated/documents/explainer-pilot/sec-coda-record-limit.tex": "7092a8d2f9883853706207c05386ebd4938fb2cb5f9f518d1ab32a0e66dc5a86",
     "generated/documents/explainer-pilot/sec-explainer-eight-words.tex": "a06df4c396669f35c3a758a8a5b7809bcc26a54b26efa0bfbba32f2d95d4ffa7",
-    "generated/documents/explainer-pilot/sec-explainer-plain.tex": "3edd7af8aae719f05ab3653795746592049c667fe658f5a4b3c4b6ef773c28ff",
+    "generated/documents/explainer-pilot/sec-explainer-plain.tex": "dccd30e777b1a630e27e4e5dd7398dde12002c446bb7466bb0f1c8f27633d4ff",
     "generated/documents/explainer-pilot/sec-say-direction.tex": "308475862ed7b22302899822647770386f33f1012f554af4e81d304f8b989b19",
     "generated/documents/explainer-pilot/sec-say-enemy-to-none.tex": "b0bb907bce914790c13f887ed4e319c282f7a8fadb034a4fab53a38cb82e223d",
     "generated/documents/inclusions.tsv": "721f8539be20f5372c2e4cd456e2c023f606be5ed47651c984b9e50a32f9bef0",
@@ -59,6 +59,6 @@
     "tools/paper/common.py": "4d6530b6d264b599a97261fc698c1a57b23c4d120a5e875690a172cc02a7eac7",
     "tools/paper/identities.py": "f4fc2b08f0e85d963634a83c2552dd402f944351dce38b239fda936cf3d5eeb3",
     "tools/paper/inputs.py": "b84aae480a97de804f7e31e65289ba2e7e42a9e6fa132099b4e1bf0d5a614fd0",
-    "tools/paper/prepare.py": "8ba4a35a30bb3c9666e80d3f7cb15cb02f5fd3a4bc46c79402d097d93d36f8f8"
+    "tools/paper/prepare.py": "c3e9fefe022520d79a6fcf55704bf2c69f4dfd365f2ac75efdebf697a852d35d"
   }
 }

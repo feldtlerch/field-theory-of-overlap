@@ -140,7 +140,6 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     virtue_tokens = []
     controls = []
     preceding_end = 0
-    strong_open = False
     i = 0
 
     def invalid(detail, offset):
@@ -150,23 +149,6 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
     while i < len(body):
         start = i
         char = body[i]
-        if body.startswith('\\textbf{', i) and not strong_open:
-            i += len('\\textbf{')
-            controls.append((positions[start], positions[i], b''))
-            strong_open = True
-            continue
-        if char == '}' and strong_open:
-            i += 1
-            controls.append((positions[start], positions[i], b''))
-            strong_open = False
-            continue
-        if (body.startswith('\\enspace', i) and
-                (i + len('\\enspace') == len(body) or
-                 not body[i + len('\\enspace')].isascii() or
-                 not body[i + len('\\enspace')].isalpha())):
-            i += len('\\enspace')
-            controls.append((positions[start], positions[i], b' '))
-            continue
         if char in ' \t\n\r':
             if char == '\r' and (i + 1 == len(body) or body[i + 1] != '\n'):
                 invalid('isolated carriage return', i)
@@ -253,8 +235,6 @@ def decode_located(body, lookup, path='<source>', base_offset=0, virtues=None):
         if len(tokens) > 16384:
             raise Fault('CorrespondenceLimit', 'source exceeds 16384 tokens: ' + path, 'snapshot')
         preceding_end = i
-    if strong_open:
-        invalid('unclosed strong run', len(body) - 1)
     tail = logical_source_gap(data, positions[preceding_end], len(data), controls)
     if tail and not tail.isspace():
         invalid('unsupported source after tokens', preceding_end)

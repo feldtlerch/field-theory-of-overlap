@@ -1,14 +1,13 @@
 """A content-only explainer conversion for the complete plain-conversion check."""
 
 import argparse
+import difflib
 import hashlib
 import json
 import pathlib
-import re
 import subprocess
 import tempfile
 import time
-import tomllib
 import unittest
 from unittest import mock
 
@@ -672,21 +671,15 @@ class StreamComparisonControls(unittest.TestCase):
         self.assertEqual(result['verdict'], 'refused')
         self.assertIn('PDF side lacks checked', result['reason'])
 
-    def test_old_source_strong_run_and_en_space(self):
-        body = '\\textbf{Ties.}\\enspace Start with two lives.'
-        decoded = compare_words.decode_located(body, {})
-        self.assertEqual(decoded['extracted'], 'Ties. Start with two lives.')
-        text = 'Ties. Start with two lives.'
-        extracted = dict(stream=text, offsets=[[1, n] for n in range(len(text))],
-                         events=[], raw_pages=[dict(text=text)])
-        proof = compare_words.align_located(decoded, extracted, 'explainer', 'old_pdf')
-        self.assertEqual(proof['canonical'], text)
-        with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.decode_located('\\textbf{Unclosed', {})
-        self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
-        with self.assertRaises(compare_words.Fault) as raised:
-            compare_words.decode_located('\\enspaceword', {})
-        self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
+    def test_plain_decoder_refuses_slot_only_strong_and_en_space(self):
+        source = pathlib.Path(__file__).resolve().parents[2]
+        lines = (source/'units/fixtures/explainer-prefix-source.tex').read_text().splitlines()
+        body = ' '.join(lines[48:55])
+        self.assertIn('\\textbf{Ties.}\\enspace', body)
+        for selected in (body, '\\textbf{Unclosed', '\\enspaceword'):
+            with self.subTest(selected=selected), self.assertRaises(compare_words.Fault) as raised:
+                compare_words.decode_located(selected, {})
+            self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
 
 
 def command(*args, cwd=None):
@@ -1014,10 +1007,87 @@ def integration(repo, binary, support, work):
         finally:
             markdown.write_bytes(original)
 
-    pdf_evidence(repo)
+    pdf_evidence(repo, binary, work)
 
 
-def pdf_evidence(repo):
+def slot_pdf_evidence(repo, binary, work):
+    """Measure the transferred prefix through each side's located native export."""
+    unit_path = 'units/corpus/explainer-plain.toml'
+    additions = compare_words.git(repo, 'log', '--format=%H', '--diff-filter=A',
+                                  '--', unit_path).decode().splitlines()
+    if len(additions) != 1:
+        raise AssertionError('expected one commit admitting the transferred slot')
+    parent = compare_words.git(repo, 'rev-parse', additions[0] + '^').decode().strip()
+    candidate = compare_words.git(repo, 'rev-parse', 'HEAD').decode().strip()
+    source = 'documents/paper/explainer/explainer.tex'
+    before_lines = compare_words.git(repo, 'show', parent + ':' + source).splitlines(
+        keepends=True)
+    after_lines = compare_words.git(repo, 'show', additions[0] + ':' + source).splitlines(
+        keepends=True)
+    marker = b'% generated: sec:explainer:plain\n'
+    changes = [(i1, i2, j1, j2) for op, i1, i2, j1, j2 in
+               difflib.SequenceMatcher(None, before_lines, after_lines,
+                                       autojunk=False).get_opcodes() if op != 'equal']
+    if len(changes) != 1:
+        raise AssertionError('expected one source interval replaced by the slot marker')
+    i1, i2, j1, j2 = changes[0]
+    if after_lines[j1:j2] != [marker] or i2 - i1 != 55:
+        raise AssertionError('transfer source interval or marker differs')
+    first, last = i1 + 1, i2
+    assignment = dict(schema=4, form='coarse-slot', parent=parent, candidate=candidate,
+                      source=source,
+                      **{'source-blob': compare_words.git(
+                          repo, 'rev-parse', parent + ':' + source).decode().strip()},
+                      first=first, last=last, unit='sec:explainer:plain', blocks=[
+                          dict(kind=kind, first=first + start, last=first + end)
+                          for kind, start, end in (
+                              ('heading', 0, 2), ('existing-native-inclusion', 3, 4),
+                              ('paragraph', 5, 11), ('paragraph', 12, 24),
+                              ('paragraph', 25, 40), ('paragraph', 41, 54))])
+    selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
+    with tempfile.TemporaryDirectory(dir=work) as directory:
+        root = pathlib.Path(directory)
+        request = root / 'slot-assignment.json'
+        request.write_text(json.dumps(assignment), encoding='utf-8')
+        old_pdf = root / 'old-explainer.pdf'
+        old_pdf.write_bytes(compare_words.git(
+            repo, 'show', parent + ':generated/paper/explainer.pdf'))
+        result = {}
+        for side, revision, pdf_path in (
+                ('before', parent, old_pdf),
+                ('after', candidate, repo / 'generated/paper/explainer.pdf')):
+            side_root = root / (side + '-root')
+            command('git', 'clone', '--quiet', '--shared', '--no-checkout',
+                    str(repo), str(side_root))
+            command('git', '-C', str(side_root), 'checkout', '--quiet', '--detach', revision)
+            captured = {name: (side_root / name).read_bytes() for name in (
+                source, 'units/statements/plain-intro.toml')}
+            if side == 'after':
+                name = 'units/corpus/explainer-plain.toml'
+                captured[name] = (side_root / name).read_bytes()
+            output = root / (side + '-output')
+            output.mkdir()
+            data = compare_words._slot_export(
+                binary, repo, side_root, revision, request, side, output)
+            blocks = compare_words.located_slot_export(
+                data, captured, assignment, side, revision)
+            pdf_side = 'old_pdf' if side == 'before' else 'new_pdf'
+            extracted = compare_words.extract(pdf_path, 'explainer', pdf_side)
+            selected = compare_words.select_pdf_stretch(
+                extracted, selection, blocks, 'explainer', pdf_side)
+            events = compare_words.line_events(extracted, 'explainer', pdf_side)
+            decisions = {row['normalized_offset']
+                         for row in selected['aggregate']['decisions']}
+            inside = [row for row in events if selected['range'][0] <=
+                      row['normalized_offset'] < selected['range'][1]]
+            result[side] = dict(pdf_range=selected['range'], children=len(blocks),
+                                line_end_marks=len(inside),
+                                source_decided=sum(row['normalized_offset'] in decisions
+                                                   for row in inside))
+        return result
+
+
+def pdf_evidence(repo, binary, work):
     """Measure the whole delivered PDF leg and its source-decision residue."""
     started = time.monotonic()
     envelope = compare_words.unchanged_commit_envelope(repo, 'HEAD')
@@ -1035,72 +1105,7 @@ def pdf_evidence(repo):
         if pair['verdict'] != 'equal' or any(pair['unresolved'].values()):
             raise AssertionError('committed self-pair did not resolve residuals')
         if document == 'explainer':
-            unit = tomllib.loads((repo / 'units/statements/plain-intro.toml').read_text(
-                encoding='utf-8'))['unit']
-            scope = tomllib.loads((repo / 'units/scopes/explainer.toml').read_text(
-                encoding='utf-8'))['scope']
-            if (unit['id'] != scope['occurrences'][0]['unit'] or
-                    sum(row['unit'] == unit['id'] for row in scope['occurrences']) != 1):
-                raise AssertionError('native introduction occurrence is ambiguous')
-            source_text = compare_words.git(repo, 'show',
-                                            'HEAD:' + scope['source']).decode('utf-8')
-            lines = source_text.splitlines()
-            marker = '% generated: ' + unit['id']
-            if lines.count(marker) != 1:
-                raise AssertionError('native introduction marker is ambiguous')
-            first = lines.index(marker) + 1
-            selection = dict(source=scope['source'], first=first, last=first,
-                             unit=unit['id'])
-            decoded = compare_words.decode_located(unit['texts']['en'], {},
-                                                   'units/statements/plain-intro.toml')
-            selected = compare_words.select_pdf_stretch(
-                pdf, selection, [decoded], document, 'new_pdf')
-            result[document]['native_introduction'] = dict(
-                range=selected['ranges'][0], tokens=len(compare_words.content_stream(
-                    selected['text'], {'verdict': 'checked'})), selection=selection)
-            selected_pair = compare_words.compare_pdf_streams(
-                pdf, pdf, selected['proofs'], selected['proofs'], envelope, document)
-            if selected_pair['verdict'] != 'equal':
-                raise AssertionError('native introduction proof did not resolve its pair')
-            result[document]['native_introduction']['pair'] = selected_pair['verdict']
-            start_line = next(n for n, line in enumerate(lines, 1)
-                              if line.startswith('\\section{The Whole Idea, in Plain Words}'))
-            end_line = next(n for n, line in enumerate(lines, 1)
-                            if n > start_line and line.startswith('\\begin{table}'))
-            interval = '\n'.join(lines[start_line - 1:end_line - 1])
-            blocks = [block for block in re.split(r'\n\s*\n', interval) if block]
-            aligned = []
-            refused = []
-            for block in blocks:
-                try:
-                    if source_text.count(block) != 1:
-                        raise AssertionError('inherited block is not unique in its blob')
-                    start = source_text.index(block)
-                    decoded = compare_words.decode_located(
-                        block, {}, scope['source'],
-                        len(source_text[:start].encode('utf-8')))
-                    aligned.append(compare_words.align_located(
-                        decoded, pdf, document, 'old_pdf'))
-                except compare_words.Fault as error:
-                    refused.append(dict(code=error.row['code'],
-                                        prefix=block[:32]))
-            if len(aligned) != 1:
-                raise AssertionError('the first inherited paragraph did not align alone')
-            ending = 'boundary can be drawn at all.'
-            if pdf['stream'].count(ending) != 1:
-                raise AssertionError('inherited interval ending is ambiguous')
-            stretch_end = pdf['stream'].index(ending) + len(ending)
-            events = compare_words.line_events(pdf, document, 'old_pdf')
-            in_stretch = [row for row in events
-                          if aligned[0]['range'][0] <= row['normalized_offset'] < stretch_end]
-            decisions = {row['normalized_offset'] for row in aligned[0]['decisions']}
-            result[document]['old_interval'] = dict(
-                source_lines=[start_line, end_line - 1],
-                pdf_range=[aligned[0]['range'][0], stretch_end],
-                line_end_marks=len(in_stretch),
-                source_decided=sum(row['normalized_offset'] in decisions
-                                   for row in in_stretch),
-                undecodable_blocks=refused)
+            result[document]['transferred_slot'] = slot_pdf_evidence(repo, binary, work)
     print(json.dumps(dict(pdf_evidence=result,
                           screen_leg='recovered stream export required',
                           wall_seconds=round(time.monotonic() - started, 3)),

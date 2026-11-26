@@ -124,5 +124,6 @@ pub(super) fn fragment(
             output.push('\n');
         }
     }
+    output.push_str("\\par\n");
     Ok(output)
 }

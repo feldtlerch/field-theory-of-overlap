@@ -93,9 +93,9 @@ def checked_paragraph_body(body, fragment, source, repository, auxiliary_keys):
 
 def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys):
     """Check the bounded slot envelope and reuse paragraph checks for its child use."""
-    require(data.endswith(b'\n') and b'\r' not in data and b'\0' not in data,
+    require(data.endswith(b'\\par\n') and b'\r' not in data and b'\0' not in data,
             'M055: Corpus slot body differs: '+fragment)
-    parts = data.rstrip(b'\n').split(b'\n\n')
+    parts = data[:-len(b'\\par\n')].rstrip(b'\n').split(b'\n\n')
     require(len(parts) == 6 and re.fullmatch(
         rb'\\section\{[^{}\\\n]+\}\n\\label\{'+re.escape(unit.encode())+rb'\}',
         parts[0]) is not None,
@@ -105,14 +105,13 @@ def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys)
                          child)
     require(match is not None and match[1] != unit.encode(),
             'M055: Corpus slot child differs: '+fragment)
-    checked_paragraph_body(match[2], fragment, source, repository, auxiliary_keys)
-    bodies = []
+    bodies = [checked_paragraph_body(match[2], fragment, source, repository, auxiliary_keys)]
     for body in parts[2:]:
         require(body and not re.search(rb'\\(?!textbf\b|emph\b|enspace\b)[A-Za-z]+', body)
                 and b'\\label{' not in body and b'% generated:' not in body,
                 'M055: Corpus slot paragraph differs: '+fragment)
         bodies.append(b' '.join(body.split()))
-    return bodies
+    return bodies, match[1].decode('ascii')
 
 
 def declared_fragments(repository, rows):
@@ -121,6 +120,7 @@ def declared_fragments(repository, rows):
     marker_at = {}
     bodies = set()
     paragraph_bodies = []
+    child_use_labels = set()
     econ_bodies = []
     auxiliary_keys = set()
     equation_bodies = []
@@ -137,8 +137,10 @@ def declared_fragments(repository, rows):
         require(positions == [line], 'M055: Fragment marker/declaration differs: '+source+':'+unit)
         data = (repository/fragment).read_bytes()
         if role == 'corpus-slot':
-            paragraph_bodies.extend(corpus_slot_bodies(
-                data, unit, fragment, source, repository, auxiliary_keys))
+            slot_bodies, child_label = corpus_slot_bodies(
+                data, unit, fragment, source, repository, auxiliary_keys)
+            paragraph_bodies.extend(slot_bodies)
+            child_use_labels.add(child_label)
             replacements[(source, positions[0])] = data
             marker_at[(source, positions[0])] = marker.rstrip(b'\n')
             continue
@@ -208,7 +210,7 @@ def declared_fragments(repository, rows):
             require(label not in {unit.encode() for _, unit, _, _, _ in fragments}
                     and b' '.join(body.split()) not in bodies,
                     'Authored refrain duplicates a declared fragment: '+source)
-        for _, unit, _, _, _ in fragments:
+        for unit in sorted({unit for _, unit, _, _, _ in fragments} | child_use_labels):
             require(not re.search(rb'\\label\{'+re.escape(unit.encode())+rb'\}', data),
                     'Authored mint duplicates a declared fragment: '+source)
         for _, unit, fragment, role, _ in fragments:

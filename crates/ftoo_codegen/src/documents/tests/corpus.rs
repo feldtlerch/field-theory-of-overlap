@@ -98,6 +98,7 @@ fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
         .find(|artifact| artifact.path() == path)
         .unwrap();
     let fragment = std::str::from_utf8(artifact.bytes())?;
+    assert!(fragment.ends_with("\n\\par\n"));
     assert!(fragment.starts_with("\\section{The Whole Idea, in Plain Words}\n\\label{sec:explainer:plain}\n\n\\PaperNativeParagraph{sec:reading:plain-intro}"));
     assert_eq!(
         fragment

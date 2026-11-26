@@ -229,7 +229,7 @@ class CorpusSlotPreparation(unittest.TestCase):
                 b'\\textbf{Ties.}\\enspace First prose.\n\n'
                 b'Another paragraph.\n\n'
                 b'\\textbf{Work.}\\enspace More prose.\n\n'
-                b'Help and cost.\n')
+                b'Help and cost.\n\\par\n')
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             source_file = root / source
@@ -254,6 +254,10 @@ class CorpusSlotPreparation(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Authored paragraph duplicates'):
                     declared_fragments(root, [source])
                 source_file.write_bytes(b'% generated: sec:explainer:plain\n')
+                source_file.write_bytes(source_file.read_bytes() + b'The intro.\n')
+                with self.assertRaisesRegex(ValueError, 'Authored paragraph duplicates'):
+                    declared_fragments(root, [source])
+                source_file.write_bytes(b'% generated: sec:explainer:plain\n')
                 output_file.write_bytes(body.replace(
                     b'Help and cost.',
                     b'\\PaperNativeParagraph{sec:reading:plain-intro}{The intro.}'))
@@ -262,6 +266,10 @@ class CorpusSlotPreparation(unittest.TestCase):
                 output_file.write_bytes(body)
                 source_file.write_bytes(source_file.read_bytes() +
                                         b'\\label{sec:explainer:plain}\n')
+                with self.assertRaisesRegex(ValueError, 'Authored mint duplicates'):
+                    declared_fragments(root, [source])
+                source_file.write_bytes(b'% generated: sec:explainer:plain\n'
+                                        b'\\label{sec:reading:plain-intro}\n')
                 with self.assertRaisesRegex(ValueError, 'Authored mint duplicates'):
                     declared_fragments(root, [source])
                 source_file.write_bytes(b'% generated: sec:explainer:plain\n' * 2)

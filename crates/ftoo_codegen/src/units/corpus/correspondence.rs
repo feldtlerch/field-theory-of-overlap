@@ -4,7 +4,7 @@ use super::parse_slot;
 use crate::{units::UnitSource, units::toml};
 use ftoo_manifest::corpus::{
     AccountOwner, BlockKind, BlockStatus, LocatedPiece, SlotBlock, SlotRun, SourceDraft,
-    admit_slot, import_source, located_inline,
+    admit_slot, check_transfer, import_source, located_inline,
 };
 use ftoo_manifest::{ShapeKind, SourceAnchor};
 use serde::Deserialize;
@@ -74,16 +74,23 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
 fn captured(root: &Path, revision: &str, path: &str) -> Result<(Vec<u8>, String), String> {
     let blob = git(root, &["rev-parse", &format!("{revision}:{path}")])?;
     let bytes = fs::read(root.join(path)).map_err(|error| format!("{path}: {error}"))?;
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["cat-file", "blob", &blob])
-        .output()
-        .map_err(|error| error.to_string())?;
-    if !output.status.success() || output.stdout != bytes {
+    if blob_bytes(root, &blob)? != bytes {
         return Err(format!("{path}: captured input differs from {revision}"));
     }
     Ok((bytes, blob))
+}
+
+fn blob_bytes(root: &Path, blob: &str) -> Result<Vec<u8>, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["cat-file", "blob", blob])
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(format!("git cat-file blob {blob} refused"));
+    }
+    Ok(output.stdout)
 }
 
 fn line_start(bytes: &[u8], line: usize) -> Result<usize, String> {
@@ -523,7 +530,12 @@ fn append_native_runs(runs: &[SlotRun], out: &mut String) {
     }
 }
 
-fn after_blocks(root: &Path, revision: &str, request: &Assignment) -> Result<Vec<Value>, String> {
+fn after_blocks(
+    root: &Path,
+    revision: &str,
+    request: &Assignment,
+    parent_bytes: &[u8],
+) -> Result<Vec<Value>, String> {
     let (bytes, blob) = captured(root, revision, SLOT)?;
     let source = UnitSource {
         file: SLOT.into(),
@@ -535,6 +547,21 @@ fn after_blocks(root: &Path, revision: &str, request: &Assignment) -> Result<Vec
         unit == "sec:reading:plain-intro" && document == "explainer-pilot" && language == "en"
     })
     .map_err(|error| error.to_string())?;
+    let inherited = import_source(
+        SOURCE,
+        parent_bytes,
+        digest(parent_bytes),
+        &[("sec:reading:plain-intro".into(), "paragraph".into())],
+    )
+    .map_err(|error| error.to_string())?;
+    check_transfer(
+        &checked,
+        &inherited,
+        parent_bytes,
+        request.first,
+        request.last,
+    )
+    .map_err(|error| format!("parent interval transfer refuses: {error}"))?;
     if checked.id() != request.unit || checked.blocks().len() != 6 {
         return Err("native slot identity or order changed".into());
     }
@@ -632,7 +659,7 @@ pub fn export_correspondence(
             return Err("intro child source changed across transfer".into());
         }
         (
-            after_blocks(root, revision, &request)?,
+            after_blocks(root, revision, &request, &blob_bytes(root, &parent_blob)?)?,
             vec![json!({"kind":"block","range":[first,end]})],
         )
     };
@@ -913,5 +940,33 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
         fs::remove_dir_all(before_output).unwrap();
         fs::remove_dir_all(after_output).unwrap();
+    }
+
+    #[test]
+    fn after_export_refuses_an_unaccounted_parent_event() {
+        let root = repo();
+        let path = root.join(SOURCE);
+        let source = fs::read_to_string(&path).unwrap();
+        let changed = source.replacen(
+            "\\label{sec:explainer:plain}",
+            "\\label{sec:explainer:plain}\\vspace{1pt}",
+            1,
+        );
+        assert_ne!(changed, source);
+        fs::write(&path, changed).unwrap();
+        let parent = commit(&root);
+        candidate_source(&root);
+        let candidate = commit(&root);
+        let request = assignment(&root, &parent, &candidate);
+        let output = root.parent().unwrap().join(format!(
+            "{}-event",
+            root.file_name().unwrap().to_string_lossy()
+        ));
+        let error = export_correspondence(&root, &request, "after", &output).unwrap_err();
+        assert!(
+            error.contains("parent interval transfer refuses: SourceEvent"),
+            "{error}"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

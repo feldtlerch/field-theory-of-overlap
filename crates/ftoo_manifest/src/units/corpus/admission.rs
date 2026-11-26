@@ -100,13 +100,43 @@ impl std::fmt::Display for SlotFault {
 }
 impl std::error::Error for SlotFault {}
 
+fn merges_tex_text(text: &str) -> bool {
+    text.chars().zip(text.chars().skip(1)).any(|(left, right)| {
+        (matches!(left, '-' | '—') && matches!(right, '-' | '—'))
+            || (matches!(left, '\'' | '’') && matches!(right, '\'' | '’' | '”'))
+            || (left == '`' && matches!(right, '`' | '“'))
+            || (matches!(left, '!' | '?') && matches!(right, '`' | '“'))
+    })
+}
+
 fn valid_runs(runs: &[SlotRun], inside_style: bool) -> bool {
-    !runs.is_empty()
-        && runs.iter().all(|run| match run {
-            SlotRun::Text(text) => !text.is_empty() && !text.chars().any(char::is_control),
-            SlotRun::Style { children, .. } => !inside_style && valid_runs(children, true),
-            SlotRun::EnSpace => !inside_style,
-        })
+    if runs.is_empty() {
+        return false;
+    }
+    let mut adjacent_text = String::new();
+    for run in runs {
+        match run {
+            SlotRun::Text(text) => {
+                if text.is_empty() || text.chars().any(char::is_control) {
+                    return false;
+                }
+                adjacent_text.push_str(text);
+            }
+            SlotRun::Style { children, .. } => {
+                if merges_tex_text(&adjacent_text) || inside_style || !valid_runs(children, true) {
+                    return false;
+                }
+                adjacent_text.clear();
+            }
+            SlotRun::EnSpace => {
+                if merges_tex_text(&adjacent_text) || inside_style {
+                    return false;
+                }
+                adjacent_text.clear();
+            }
+        }
+    }
+    !merges_tex_text(&adjacent_text)
 }
 
 /// Admit the native grammar and resolve its one inherited child without reading old source bytes.

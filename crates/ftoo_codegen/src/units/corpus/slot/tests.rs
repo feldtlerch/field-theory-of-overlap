@@ -155,3 +155,38 @@ fn changed_named_spacing_refuses_source_correspondence() {
         SlotFault::SourceContent { index: 2 }
     );
 }
+
+#[test]
+fn tex_merging_sequences_refuse_slot_admission() {
+    use ftoo_manifest::corpus::{SlotBlock, SlotRun};
+    for text in [
+        "well--known",
+        "a''b",
+        "``word",
+        "well-—known",
+        "hand’’s",
+        "‘no’”",
+    ] {
+        let mut draft = parsed(&fixture()).unwrap();
+        let SlotBlock::Paragraph { runs } = &mut draft.blocks[2] else {
+            unreachable!();
+        };
+        *runs = vec![SlotRun::Text(text.into())];
+        assert_eq!(
+            admit_slot(draft, |_, _, _| true).unwrap_err(),
+            SlotFault::UnsupportedRun { index: 2 }
+        );
+    }
+    let mut draft = parsed(&fixture()).unwrap();
+    let SlotBlock::Paragraph { runs } = &mut draft.blocks[2] else {
+        unreachable!();
+    };
+    *runs = vec![
+        SlotRun::Text("well-".into()),
+        SlotRun::Text("-known".into()),
+    ];
+    assert_eq!(
+        admit_slot(draft, |_, _, _| true).unwrap_err(),
+        SlotFault::UnsupportedRun { index: 2 }
+    );
+}
