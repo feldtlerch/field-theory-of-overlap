@@ -38,6 +38,8 @@ pub enum PrimitiveOperation {
     Theta,
     VariantEpsilon,
     Zeta,
+    Nabla,
+    LessEqual,
 }
 impl PrimitiveOperation {
     /// Operations whose nullary spelling is an independent mathematical symbol.
@@ -61,6 +63,7 @@ impl PrimitiveOperation {
                 | Self::Theta
                 | Self::VariantEpsilon
                 | Self::Zeta
+                | Self::Nabla
         )
     }
     /// Closed host control tokens used by the renderer and the future shared
@@ -89,6 +92,8 @@ impl PrimitiveOperation {
             Self::Theta => &["\\theta"],
             Self::VariantEpsilon => &["\\varepsilon"],
             Self::Zeta => &["\\zeta"],
+            Self::Nabla => &["\\nabla"],
+            Self::LessEqual => &["\\le"],
             Self::Fraction => &["\\frac"],
             Self::Multiply => &["\\cdot"],
             Self::Juxtapose => &["\\,"],
@@ -126,6 +131,8 @@ impl PrimitiveOperation {
             Self::Theta => Some("θ"),
             Self::VariantEpsilon => Some("ε"),
             Self::Zeta => Some("ζ"),
+            Self::Nabla => Some("∇"),
+            Self::LessEqual => Some("≤"),
             Self::Fraction
             | Self::Calligraphic
             | Self::UprightVir
@@ -165,7 +172,8 @@ impl PrimitiveOperation {
             | Self::Tau
             | Self::Theta
             | Self::VariantEpsilon
-            | Self::Zeta => 0,
+            | Self::Zeta
+            | Self::Nabla => 0,
             Self::Calligraphic | Self::Negate | Self::Parentheses | Self::Dimension | Self::Dot => {
                 1
             }
@@ -179,7 +187,8 @@ impl PrimitiveOperation {
             | Self::Times
             | Self::Subtract
             | Self::TightJoin
-            | Self::Underbrace => 2,
+            | Self::Underbrace
+            | Self::LessEqual => 2,
         }
     }
 }
@@ -228,9 +237,11 @@ pub enum PrimitiveId {
     Theta,
     VariantEpsilon,
     Zeta,
+    Nabla,
+    LessEqual,
 }
 impl PrimitiveId {
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 37] = [
         Self::Alpha,
         Self::Beta,
         Self::Fraction,
@@ -266,6 +277,8 @@ impl PrimitiveId {
         Self::Theta,
         Self::VariantEpsilon,
         Self::Zeta,
+        Self::Nabla,
+        Self::LessEqual,
     ];
     #[must_use]
     pub const fn token(self) -> &'static str {
@@ -305,6 +318,8 @@ impl PrimitiveId {
             Self::Theta => "theta",
             Self::VariantEpsilon => "variant-epsilon",
             Self::Zeta => "zeta",
+            Self::Nabla => "nabla",
+            Self::LessEqual => "less-equal",
         }
     }
     #[must_use]
@@ -345,6 +360,8 @@ impl PrimitiveId {
             Self::Theta => PrimitiveOperation::Theta,
             Self::VariantEpsilon => PrimitiveOperation::VariantEpsilon,
             Self::Zeta => PrimitiveOperation::Zeta,
+            Self::Nabla => PrimitiveOperation::Nabla,
+            Self::LessEqual => PrimitiveOperation::LessEqual,
         }
     }
 }

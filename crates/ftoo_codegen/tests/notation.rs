@@ -31,10 +31,10 @@ fn support_required_complete_typesetter_consumer_requires_prepared_support()
     );
     let snapshot = ftoo_manifest::Snapshot::capture(book.graph());
     let prepared = prepare_notation(&n)?;
-    // 1,041 = 700 + 33 + 11 + 11 × 27 argument slots.
-    assert_eq!(prepared.sweep_rows().len(), 1_041);
-    // 2,132 = 1,417 + 2 × 341 + 33.
-    assert_eq!(prepared.typesetting_calls(), 2_132);
+    // 1,171 = 1,041 + 2 × 27 existing slots + 2 new bases + 2 × 37 new slots.
+    assert_eq!(prepared.sweep_rows().len(), 1_171);
+    // 2,392 = 2,132 + 2 target calls for each of the 130 new sweep rows.
+    assert_eq!(prepared.typesetting_calls(), 2_392);
     let expression = prepared.check_expression(ExprDraft::Call {
         callee: Callee::Definition(DefinitionId::Dimension),
         arguments: vec![ExprDraft::Literal { value: "x".into() }],

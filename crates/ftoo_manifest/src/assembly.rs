@@ -13,8 +13,8 @@ pub use diagnostics::*;
 pub use display::*;
 pub(crate) use math::parse_catalogue_body;
 pub use math::{
-    MathCommandUse, MathSourceRange, ParsedAssemblyMath, parse_assembly_display_math,
-    parse_assembly_math,
+    CheckedCorpusMath, MathCommandUse, MathSourceRange, MathSpacingIntent, MathSurfaceEvent,
+    ParsedAssemblyMath, ParsedCorpusMath, parse_assembly_display_math, parse_assembly_math,
 };
 pub use skeleton::{
     CheckedSkeletons, SkeletonChild, SkeletonDraft, SkeletonPosition, SkeletonSection,

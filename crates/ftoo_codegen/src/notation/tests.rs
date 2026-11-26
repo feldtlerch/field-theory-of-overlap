@@ -176,6 +176,42 @@ fn support_required_math_text_display_spelling_and_layout() {
 }
 
 #[test]
+fn support_required_corpus_gradient_product_keeps_both_gradient_operands() {
+    let graph = ftoo_manifest::seed().unwrap();
+    let book = ftoo_manifest::addressing(&graph).unwrap();
+    let catalogue = ftoo_manifest::notation(&book).unwrap();
+    let paper = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../documents/paper/parts/partA.tex"
+    ));
+    let source = paper
+        .lines()
+        .find(|line| line.contains(r"\nabla_{\comovfield}\rewardfield"))
+        .unwrap()
+        .trim();
+    let checked = ftoo_manifest::ParsedAssemblyMath::parse_corpus(&catalogue, source)
+        .unwrap()
+        .check_corpus()
+        .unwrap();
+    let renderable = prepare_notation(&catalogue).unwrap();
+    let expression = renderable
+        .check_document_expression(checked.expression().draft().clone())
+        .unwrap();
+    let rendered = expression.render_display(RenderTarget::Macro).unwrap();
+    assert_eq!(
+        rendered.source(),
+        r"({{{\nabla{}}_{\comovfield}}\,{\rewardfield}}\cdot{}{{{\nabla{}}_{\comovfield}}\,{\accountability}})\le{}0"
+    );
+    let screen = expression.render_display(RenderTarget::Unicode).unwrap();
+    let typeset = katex::invoke_display(&renderable.support, screen.source())
+        .unwrap()
+        .unwrap();
+    assert!(typeset.contains("katex-display"));
+    assert!(typeset.contains("∇"));
+    assert!(typeset.contains("≤"));
+}
+
+#[test]
 fn support_required_greek_spellings_have_the_same_visible_mathml_token() {
     let graph = ftoo_manifest::seed().unwrap();
     let book = ftoo_manifest::addressing(&graph).unwrap();
@@ -2647,7 +2683,7 @@ fn incomplete_and_output_boundaries_have_exact_sites() {
 
 // This oracle has no descriptor, declaration or writer reads. Its closed input
 // inventory and exact strings deliberately duplicate the reviewed specification.
-const PRIMITIVES: [(PrimitiveId, &str, usize); 35] = [
+const PRIMITIVES: [(PrimitiveId, &str, usize); 37] = [
     (PrimitiveId::Alpha, "alpha", 0),
     (PrimitiveId::Beta, "beta", 0),
     (PrimitiveId::Fraction, "fraction", 2),
@@ -2683,6 +2719,8 @@ const PRIMITIVES: [(PrimitiveId, &str, usize); 35] = [
     (PrimitiveId::Theta, "theta", 0),
     (PrimitiveId::VariantEpsilon, "variant-epsilon", 0),
     (PrimitiveId::Zeta, "zeta", 0),
+    (PrimitiveId::Nabla, "nabla", 0),
+    (PrimitiveId::LessEqual, "less-equal", 2),
 ];
 const DEFINITIONS: [(DefinitionId, &str, usize); 47] = [
     (DefinitionId::CoefficientOne, "coefficient-one", 0),
@@ -2765,6 +2803,10 @@ fn oracle(expr: &ExprDraft, unicode: bool) -> String {
             PrimitiveId::Theta => if unicode { "θ" } else { r"\theta{}" }.into(),
             PrimitiveId::VariantEpsilon => if unicode { "ε" } else { r"\varepsilon{}" }.into(),
             PrimitiveId::Zeta => if unicode { "ζ" } else { r"\zeta{}" }.into(),
+            PrimitiveId::Nabla => if unicode { "∇" } else { r"\nabla{}" }.into(),
+            PrimitiveId::LessEqual => {
+                format!("{}{}{}", a[0], if unicode { "≤" } else { r"\le{}" }, a[1])
+            }
             PrimitiveId::Calligraphic => format!("{}{{{}}}", r"\mathcal", a[0]),
             PrimitiveId::UprightVir => r"\mathrm{vir}".into(),
             PrimitiveId::UprightS => r"\mathrm{S}".into(),
@@ -2967,7 +3009,7 @@ fn complete_row_key_invocation_and_both_form_inventory() {
         })
         .collect();
     assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 1041);
+    assert_eq!(actual.len(), 1171);
     for (owner, case, expr) in sweep::cases(&n) {
         let checked = ftoo_manifest::check_expression(&n, expr).unwrap();
         for target in [RenderTarget::Macro, RenderTarget::Unicode] {

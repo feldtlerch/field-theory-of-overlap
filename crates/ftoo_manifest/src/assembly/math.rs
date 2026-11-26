@@ -2,8 +2,8 @@ use super::{
     AssemblyInputFault as Fault, AssemblyResource as Resource, MathSyntaxReason as Reason,
 };
 use crate::{
-    Callee, CheckedNotation, DefinitionId, DefinitionKind, DefinitionSpec, ExprDraft, PrimitiveId,
-    PrimitiveSpec, TextRun,
+    Callee, CheckedExpression, CheckedNotation, DefinitionId, DefinitionKind, DefinitionSpec,
+    ExprDraft, NotationErrors, PrimitiveId, PrimitiveSpec, TextRun, check_document_expression,
 };
 use std::ops::Range;
 
@@ -18,14 +18,116 @@ pub struct MathSourceRange {
     pub path: Vec<usize>,
     pub bytes: Range<usize>,
 }
+/// Source-level presentation that the expression tree cannot encode.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MathSpacingIntent {
+    Ordinary,
+    Thin,
+    Medium,
+    Thick,
+    Quad,
+    DoubleQuad,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MathSurfaceEvent {
+    Spacing {
+        intent: MathSpacingIntent,
+        bytes: Range<usize>,
+    },
+    Group {
+        opening: bool,
+        bytes: Range<usize>,
+    },
+    TerminalPunctuation {
+        mark: char,
+        bytes: Range<usize>,
+    },
+}
+/// A corpus expression checked against the effective notation catalogue.
+#[derive(Debug)]
+pub struct CheckedCorpusMath<'catalogue, 'book, 'graph> {
+    expression: CheckedExpression<'catalogue, 'book, 'graph>,
+    surface: Vec<MathSurfaceEvent>,
+    commands: Vec<MathCommandUse>,
+    ranges: Vec<MathSourceRange>,
+}
+impl CheckedCorpusMath<'_, '_, '_> {
+    #[must_use]
+    pub const fn expression(&self) -> &CheckedExpression<'_, '_, '_> {
+        &self.expression
+    }
+    /// Returns checked symbol occurrences, including repeats and transitive uses, sorted by definition token; constructors have no symbol use.
+    pub fn effective_dependencies(&self) -> impl Iterator<Item = DefinitionId> + '_ {
+        self.expression
+            .uses()
+            .iter()
+            .map(crate::SymbolUse::definition)
+    }
+    #[must_use]
+    pub fn surface(&self) -> &[MathSurfaceEvent] {
+        &self.surface
+    }
+    #[must_use]
+    pub fn commands(&self) -> &[MathCommandUse] {
+        &self.commands
+    }
+    #[must_use]
+    pub fn ranges(&self) -> &[MathSourceRange] {
+        &self.ranges
+    }
+}
 /// Parsed syntax still requires the existing notation expression checker.
 #[derive(Debug)]
 pub struct ParsedAssemblyMath {
     draft: ExprDraft,
     commands: Vec<MathCommandUse>,
     ranges: Vec<MathSourceRange>,
+    surface: Vec<MathSurfaceEvent>,
+}
+/// A corpus parse retains presentation boundaries until notation checking.
+#[derive(Debug)]
+pub struct ParsedCorpusMath<'catalogue, 'book, 'graph> {
+    parsed: ParsedAssemblyMath,
+    catalogue: &'catalogue CheckedNotation<'book, 'graph>,
+}
+impl<'catalogue, 'book, 'graph> ParsedCorpusMath<'catalogue, 'book, 'graph> {
+    #[must_use]
+    pub const fn draft(&self) -> &ExprDraft {
+        &self.parsed.draft
+    }
+    #[must_use]
+    pub fn surface(&self) -> &[MathSurfaceEvent] {
+        &self.parsed.surface
+    }
+    /// Check the corpus expression and retain its source presentation events.
+    /// # Errors
+    /// Returns notation diagnostics for an invalid checked expression.
+    pub fn check_corpus(
+        self,
+    ) -> std::result::Result<CheckedCorpusMath<'catalogue, 'book, 'graph>, NotationErrors> {
+        let parsed = self.parsed;
+        let expression = check_document_expression(self.catalogue, parsed.draft)?;
+        Ok(CheckedCorpusMath {
+            expression,
+            surface: parsed.surface,
+            commands: parsed.commands,
+            ranges: parsed.ranges,
+        })
+    }
 }
 impl ParsedAssemblyMath {
+    /// Parse one complete corpus expression, including its terminal punctuation.
+    /// # Errors
+    /// Returns the first decisive source range and parser fault.
+    pub fn parse_corpus<'catalogue, 'book, 'graph>(
+        catalogue: &'catalogue CheckedNotation<'book, 'graph>,
+        source: &str,
+    ) -> std::result::Result<ParsedCorpusMath<'catalogue, 'book, 'graph>, (Range<usize>, Fault)>
+    {
+        parse_inner(Vocabulary::Checked(catalogue), source, false, true)
+            .map(|parsed| ParsedCorpusMath { parsed, catalogue })
+            .map_err(|failure| *failure)
+    }
     /// Transfer the bounded syntax tree to the existing notation checker.
     #[must_use]
     pub fn into_draft(self) -> ExprDraft {
@@ -42,6 +144,10 @@ impl ParsedAssemblyMath {
     #[must_use]
     pub fn ranges(&self) -> &[MathSourceRange] {
         &self.ranges
+    }
+    #[must_use]
+    pub fn surface(&self) -> &[MathSurfaceEvent] {
+        &self.surface
     }
 }
 // Keep the larger assembly fault family off recursive parser stack frames.
@@ -105,6 +211,23 @@ impl Vocabulary<'_, '_, '_> {
         }
     }
 }
+fn corpus_admits(callee: Callee) -> bool {
+    match callee {
+        Callee::Primitive(id) => matches!(
+            id,
+            PrimitiveId::Nabla
+                | PrimitiveId::LessEqual
+                | PrimitiveId::Subscript
+                | PrimitiveId::Superscript
+                | PrimitiveId::Multiply
+                | PrimitiveId::Juxtapose
+        ),
+        Callee::Definition(id) => matches!(
+            id,
+            DefinitionId::Comovfield | DefinitionId::Rewardfield | DefinitionId::Accountability
+        ),
+    }
+}
 struct Parser<'a, 'b, 'g> {
     vocabulary: Vocabulary<'a, 'b, 'g>,
     tokens: Vec<Token>,
@@ -115,6 +238,7 @@ struct Parser<'a, 'b, 'g> {
     commands: Vec<MathCommandUse>,
     arena: Vec<(Range<usize>, Vec<usize>)>,
     display: bool,
+    corpus: bool,
 }
 fn limit(bytes: Range<usize>, resource: Resource, maximum: usize) -> Failure {
     Box::new((
@@ -269,6 +393,17 @@ impl Parser<'_, '_, '_> {
         ))
     }
     fn call(&mut self, callee: Callee, arguments: Vec<Node>, bytes: Range<usize>) -> Result<Node> {
+        // Backstop: every corpus path refuses earlier, at its source token.
+        if self.corpus && !corpus_admits(callee) {
+            return Err(Box::new((
+                bytes.clone(),
+                Fault::MathSyntax {
+                    reason: Reason::UnexpectedToken,
+                    token: format!("{callee:?}"),
+                    expected: vec!["admitted corpus operation or definition".into()],
+                },
+            )));
+        }
         if self.nodes == 4096 {
             return Err(limit(bytes, Resource::MathNodes, 4096));
         }
@@ -294,6 +429,15 @@ impl Parser<'_, '_, '_> {
     }
     fn equality_inner(&mut self) -> Result<Node> {
         let left = self.sum()?;
+        if self.corpus && self.is("\\le") {
+            if self.depth > 0 {
+                return Err(self.syntax(Reason::UnexpectedToken, &["top-level relation"]));
+            }
+            self.take();
+            let right = self.sum()?;
+            let bytes = left.bytes.start..right.bytes.end;
+            return self.primitive(PrimitiveId::LessEqual, vec![left, right], bytes);
+        }
         if self.display
             && self.is("\\;")
             && self.tokens.get(self.at + 1).is_some_and(|t| t.text == "=")
@@ -301,6 +445,9 @@ impl Parser<'_, '_, '_> {
             self.take();
         } else if self.display && self.is("=") {
             return Err(self.syntax(Reason::UnexpectedToken, &["\\;"]));
+        }
+        if self.corpus && self.is("=") {
+            return Err(self.syntax(Reason::UnexpectedToken, &["\\le"]));
         }
         if !self.is("=") {
             return Ok(left);
@@ -332,6 +479,9 @@ impl Parser<'_, '_, '_> {
     }
     fn sum(&mut self) -> Result<Node> {
         let mut left = self.product()?;
+        if self.corpus && (self.is("+") || self.minus()) {
+            return Err(self.syntax(Reason::UnexpectedToken, &["\\le", "\\cdot"]));
+        }
         while self.is("+")
             || self.minus()
             || (self.display
@@ -396,6 +546,9 @@ impl Parser<'_, '_, '_> {
     }
     fn atom_start(&self) -> bool {
         let token = self.token();
+        if self.corpus && token.text == "\\le" {
+            return false;
+        }
         token
             .text
             .as_bytes()
@@ -411,6 +564,9 @@ impl Parser<'_, '_, '_> {
                 break;
             }
             let id = if let Some(id) = self.infix() {
+                if self.corpus && !corpus_admits(Callee::Primitive(id)) {
+                    return Err(self.syntax(Reason::UnexpectedToken, &["\\cdot"]));
+                }
                 self.take();
                 id
             } else if self.atom_start() {
@@ -418,13 +574,29 @@ impl Parser<'_, '_, '_> {
             } else {
                 break;
             };
-            let right = self.unary()?;
+            let right = if self.corpus && id == PrimitiveId::Multiply {
+                self.corpus_implicit_run()?
+            } else {
+                self.unary()?
+            };
             let bytes = left.bytes.start..right.bytes.end;
             left = self.primitive(id, vec![left, right], bytes)?;
         }
         Ok(left)
     }
+    fn corpus_implicit_run(&mut self) -> Result<Node> {
+        let mut left = self.unary()?;
+        while self.atom_start() && self.infix().is_none() {
+            let right = self.unary()?;
+            let bytes = left.bytes.start..right.bytes.end;
+            left = self.primitive(PrimitiveId::Juxtapose, vec![left, right], bytes)?;
+        }
+        Ok(left)
+    }
     fn unary(&mut self) -> Result<Node> {
+        if self.corpus && self.minus() {
+            return Err(self.syntax(Reason::UnexpectedToken, &["corpus atom"]));
+        }
         let mut signs = Vec::new();
         while self.minus() {
             if signs.len() == 64 {
@@ -445,6 +617,9 @@ impl Parser<'_, '_, '_> {
         let mut sup = None;
         while self.is("_") || self.is("^") {
             let is_sub = self.is("_");
+            if self.corpus && (sub.is_some() || sup.is_some()) {
+                return Err(self.syntax(Reason::UnexpectedToken, &["one script per base"]));
+            }
             if (is_sub && sub.is_some()) || (!is_sub && sup.is_some()) {
                 return Err(self.syntax(
                     if is_sub {
@@ -456,6 +631,15 @@ impl Parser<'_, '_, '_> {
                 ));
             }
             self.take();
+            if self.corpus {
+                let argument = self.token();
+                if argument.text != "{"
+                    && !(argument.text.len() == 1
+                        && argument.text.as_bytes()[0].is_ascii_alphanumeric())
+                {
+                    return Err(self.syntax(Reason::UnexpectedToken, &["{...}", "one character"]));
+                }
+            }
             let argument = self.atom()?;
             if is_sub {
                 sub = Some(argument);
@@ -531,6 +715,9 @@ impl Parser<'_, '_, '_> {
         match token.text.as_str() {
             "{" => return self.group("}"),
             "(" | "[" => {
+                if self.corpus {
+                    return Err(self.syntax(Reason::UnexpectedToken, &["corpus atom"]));
+                }
                 let (closer, id) = if token.text == "(" {
                     (")", PrimitiveId::Parentheses)
                 } else {
@@ -592,6 +779,16 @@ impl Parser<'_, '_, '_> {
         self.literal(token)
     }
     fn command(&mut self, token: Token, callee: Callee, arity: u8) -> Result<Node> {
+        if self.corpus && !corpus_admits(callee) {
+            return Err(Box::new((
+                token.bytes,
+                Fault::MathSyntax {
+                    reason: Reason::UnexpectedToken,
+                    token: token.text,
+                    expected: vec!["admitted corpus operation or definition".into()],
+                },
+            )));
+        }
         self.take();
         if let Callee::Definition(id) = callee
             && self.vocabulary.inherited(id)
@@ -635,6 +832,9 @@ impl Parser<'_, '_, '_> {
         {
             self.take();
             end = self.take().bytes.end;
+            if self.corpus && (self.is("_") || self.is("^")) {
+                return Err(self.syntax(Reason::UnexpectedToken, &["script on the preceding atom"]));
+            }
         }
         if let Callee::Definition(definition) = callee {
             self.commands.push(MathCommandUse {
@@ -698,7 +898,7 @@ pub fn parse_assembly_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
 ) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
-    parse_inner(Vocabulary::Checked(catalogue), source, false).map_err(|failure| *failure)
+    parse_inner(Vocabulary::Checked(catalogue), source, false, false).map_err(|failure| *failure)
 }
 /// Parse a mathematical display with its explicit thick-space boundaries.
 /// # Errors
@@ -707,7 +907,7 @@ pub fn parse_assembly_display_math(
     catalogue: &CheckedNotation<'_, '_>,
     source: &str,
 ) -> std::result::Result<ParsedAssemblyMath, (Range<usize>, Fault)> {
-    parse_inner(Vocabulary::Checked(catalogue), source, true).map_err(|failure| *failure)
+    parse_inner(Vocabulary::Checked(catalogue), source, true, false).map_err(|failure| *failure)
 }
 /// Parse an inherited declaration body with the same grammar and bounds as document mathematics.
 pub(crate) fn parse_catalogue_body(
@@ -719,20 +919,86 @@ pub(crate) fn parse_catalogue_body(
         Vocabulary::Construction(primitives, definitions),
         source,
         false,
+        false,
     )
     .map_err(|failure| *failure)
 }
 /// Parse the complete authored entry without evaluating any TeX.
 /// # Errors
 /// Returns the first decisive decoded range and complete parser fault.
+#[allow(clippy::too_many_lines)] // Bounded surface extraction and parsing share the same source order.
 fn parse_inner(
     vocabulary: Vocabulary<'_, '_, '_>,
     source: &str,
     display: bool,
+    corpus: bool,
 ) -> Result<ParsedAssemblyMath> {
+    let mut tokens = lex(source)?;
+    let mut surface = Vec::new();
+    if corpus {
+        let mut retained = Vec::new();
+        let mut previous_end = 0;
+        for (index, token) in tokens.iter().cloned().enumerate() {
+            if previous_end < token.bytes.start {
+                surface.push(MathSurfaceEvent::Spacing {
+                    intent: MathSpacingIntent::Ordinary,
+                    bytes: previous_end..token.bytes.start,
+                });
+            }
+            previous_end = token.bytes.end;
+            let intent = match token.text.as_str() {
+                "\\," => Some(MathSpacingIntent::Thin),
+                "\\:" => Some(MathSpacingIntent::Medium),
+                "\\;" => Some(MathSpacingIntent::Thick),
+                "\\quad" => Some(MathSpacingIntent::Quad),
+                "\\qquad" => Some(MathSpacingIntent::DoubleQuad),
+                _ => None,
+            };
+            if let Some(intent) = intent {
+                if (index > 0 && matches!(tokens[index - 1].text.as_str(), "_" | "^"))
+                    || tokens
+                        .get(index + 1)
+                        .is_some_and(|next| matches!(next.text.as_str(), "_" | "^"))
+                {
+                    return Err(Box::new((
+                        token.bytes,
+                        Fault::MathSyntax {
+                            reason: Reason::UnexpectedToken,
+                            token: token.text,
+                            expected: vec!["spacing away from scripts".into()],
+                        },
+                    )));
+                }
+                surface.push(MathSurfaceEvent::Spacing {
+                    intent,
+                    bytes: token.bytes,
+                });
+            } else {
+                if matches!(token.text.as_str(), "{" | "(" | "[") {
+                    surface.push(MathSurfaceEvent::Group {
+                        opening: true,
+                        bytes: token.bytes.clone(),
+                    });
+                } else if matches!(token.text.as_str(), "}" | ")" | "]") {
+                    surface.push(MathSurfaceEvent::Group {
+                        opening: false,
+                        bytes: token.bytes.clone(),
+                    });
+                }
+                retained.push(token);
+            }
+        }
+        if previous_end < source.len() {
+            surface.push(MathSurfaceEvent::Spacing {
+                intent: MathSpacingIntent::Ordinary,
+                bytes: previous_end..source.len(),
+            });
+        }
+        tokens = retained;
+    }
     let mut parser = Parser {
         vocabulary,
-        tokens: lex(source)?,
+        tokens,
         at: 0,
         eof: source.len(),
         depth: 0,
@@ -740,11 +1006,35 @@ fn parse_inner(
         commands: Vec::new(),
         arena: Vec::new(),
         display,
+        corpus,
     };
     let root = parser.equality()?;
+    if corpus && matches!(parser.token().text.as_str(), "," | ".") {
+        let token = parser.take();
+        if parser.at == parser.tokens.len() {
+            surface.push(MathSurfaceEvent::TerminalPunctuation {
+                mark: token.text.chars().next().expect("punctuation token"),
+                bytes: token.bytes,
+            });
+        } else {
+            return Err(Box::new((
+                token.bytes,
+                Fault::MathSyntax {
+                    reason: Reason::UnexpectedToken,
+                    token: token.text,
+                    expected: vec!["terminal punctuation".into()],
+                },
+            )));
+        }
+    }
     if parser.at != parser.tokens.len() {
         return Err(parser.syntax(Reason::UnexpectedToken, &["end of expression"]));
     }
+    surface.sort_by_key(|event| match event {
+        MathSurfaceEvent::Spacing { bytes, .. }
+        | MathSurfaceEvent::Group { bytes, .. }
+        | MathSurfaceEvent::TerminalPunctuation { bytes, .. } => bytes.start,
+    });
     let mut ranges = Vec::new();
     let mut stack = vec![(root.index, Vec::new())];
     while let Some((node, path)) = stack.pop() {
@@ -764,6 +1054,7 @@ fn parse_inner(
         draft: root.draft,
         commands: parser.commands,
         ranges,
+        surface,
     })
 }
 
@@ -771,6 +1062,168 @@ fn parse_inner(
 mod inherited_tests {
     use super::*;
     use crate::{addressing, check_expression, notation, seed};
+
+    #[test]
+    fn corpus_equation_keeps_operations_dependencies_and_surface() {
+        let graph = seed().unwrap();
+        let book = addressing(&graph).unwrap();
+        let catalogue = notation(&book).unwrap();
+        let paper = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../documents/paper/parts/partA.tex"
+        ));
+        let source = paper
+            .lines()
+            .find(|line| line.contains(r"\nabla_{\comovfield}\rewardfield"))
+            .unwrap();
+        let parsed = ParsedAssemblyMath::parse_corpus(&catalogue, source).unwrap();
+        let primitive = |id, arguments| ExprDraft::Call {
+            callee: Callee::Primitive(id),
+            arguments,
+        };
+        let definition = |id| ExprDraft::Call {
+            callee: Callee::Definition(id),
+            arguments: vec![],
+        };
+        let gradient = |field| {
+            primitive(
+                PrimitiveId::Juxtapose,
+                vec![
+                    primitive(
+                        PrimitiveId::Subscript,
+                        vec![
+                            primitive(PrimitiveId::Nabla, vec![]),
+                            definition(DefinitionId::Comovfield),
+                        ],
+                    ),
+                    definition(field),
+                ],
+            )
+        };
+        assert_eq!(
+            parsed.draft(),
+            &primitive(
+                PrimitiveId::LessEqual,
+                vec![
+                    primitive(
+                        PrimitiveId::Multiply,
+                        vec![
+                            gradient(DefinitionId::Rewardfield),
+                            gradient(DefinitionId::Accountability)
+                        ],
+                    ),
+                    ExprDraft::Literal { value: "0".into() },
+                ],
+            )
+        );
+        assert!(parsed.surface().iter().any(|event| matches!(event, MathSurfaceEvent::Spacing { intent: MathSpacingIntent::Ordinary, bytes } if &source[bytes.clone()] == "    ")));
+        assert!(parsed.surface().iter().any(|event| matches!(event, MathSurfaceEvent::TerminalPunctuation { mark: ',', bytes } if &source[bytes.clone()] == ",")));
+        assert_eq!(
+            parsed
+                .surface()
+                .iter()
+                .filter(|event| matches!(event, MathSurfaceEvent::Group { .. }))
+                .count(),
+            4
+        );
+        let checked = parsed.check_corpus().unwrap();
+        let dependencies: Vec<_> = checked.effective_dependencies().collect();
+        for id in [
+            DefinitionId::Comovfield,
+            DefinitionId::Rewardfield,
+            DefinitionId::Accountability,
+        ] {
+            assert!(dependencies.contains(&id));
+        }
+    }
+
+    #[test]
+    fn corpus_spacing_is_named_and_unsupported_forms_refuse_at_source() {
+        let graph = seed().unwrap();
+        let book = addressing(&graph).unwrap();
+        let catalogue = notation(&book).unwrap();
+        for (token, intent) in [
+            (r"\,", MathSpacingIntent::Thin),
+            (r"\:", MathSpacingIntent::Medium),
+            (r"\;", MathSpacingIntent::Thick),
+            (r"\quad", MathSpacingIntent::Quad),
+            (r"\qquad", MathSpacingIntent::DoubleQuad),
+        ] {
+            let source = format!(r"\nabla{token}\rewardfield");
+            let parsed = ParsedAssemblyMath::parse_corpus(&catalogue, &source).unwrap();
+            assert!(parsed.surface().iter().any(|event| matches!(event, MathSurfaceEvent::Spacing { intent: actual, bytes } if *actual == intent && &source[bytes.clone()] == token)));
+        }
+        let superscript = ParsedAssemblyMath::parse_corpus(&catalogue, r"\nabla^2").unwrap();
+        assert!(matches!(
+            superscript.draft(),
+            ExprDraft::Call {
+                callee: Callee::Primitive(PrimitiveId::Superscript),
+                ..
+            }
+        ));
+        let comma = ParsedAssemblyMath::parse_corpus(&catalogue, r"\nabla,").unwrap();
+        let period = ParsedAssemblyMath::parse_corpus(&catalogue, r"\nabla.").unwrap();
+        assert!(matches!(
+            comma.surface().last(),
+            Some(MathSurfaceEvent::TerminalPunctuation { mark: ',', .. })
+        ));
+        assert!(matches!(
+            period.surface().last(),
+            Some(MathSurfaceEvent::TerminalPunctuation { mark: '.', .. })
+        ));
+        assert_ne!(
+            comma.surface(),
+            ParsedAssemblyMath::parse_corpus(&catalogue, r"{\nabla},")
+                .unwrap()
+                .surface()
+        );
+        for (source, token, reason) in [
+            (r"\nabla\!\rewardfield", r"\!", Some(Reason::ExpectedAtom)),
+            (r"\sqrt{0}", r"\sqrt", None),
+            (r"\nabla\ge0", r"\ge", None),
+            (r"\readout", r"\readout", Some(Reason::UnexpectedToken)),
+            (r"\nabla+0", "+", Some(Reason::UnexpectedToken)),
+            (r"\nabla=0", "=", Some(Reason::UnexpectedToken)),
+            (r"\DisplayClass{dynamics}", r"\DisplayClass", None),
+            (r"\nabla\label{eq:f:opp}", r"\label", None),
+            (
+                r"\nabla\times\rewardfield",
+                r"\times",
+                Some(Reason::UnexpectedToken),
+            ),
+            (r"\alpha", r"\alpha", Some(Reason::UnexpectedToken)),
+            (r"(\nabla)", "(", Some(Reason::UnexpectedToken)),
+            (r"{\nabla\le0}", r"\le", Some(Reason::UnexpectedToken)),
+            (r"\nabla^23", "23", Some(Reason::UnexpectedToken)),
+            (r"\nabla\,_{c}", r"\,", Some(Reason::UnexpectedToken)),
+            (r"\nabla_\,{c}", r"\,", Some(Reason::UnexpectedToken)),
+            (r"\nabla{}_{c}", "_", Some(Reason::UnexpectedToken)),
+            (r"\nabla_{c}^{2}", "^", Some(Reason::UnexpectedToken)),
+            (
+                r"\nabla_\comovfield",
+                r"\comovfield",
+                Some(Reason::UnexpectedToken),
+            ),
+        ] {
+            let (range, fault) = ParsedAssemblyMath::parse_corpus(&catalogue, source).unwrap_err();
+            assert_eq!(&source[range], token, "{source}");
+            match (fault, reason) {
+                (
+                    Fault::MathSyntax {
+                        reason: actual,
+                        token: actual_token,
+                        ..
+                    },
+                    Some(expected),
+                ) => {
+                    assert_eq!(actual, expected, "{source}");
+                    assert_eq!(actual_token, token, "{source}");
+                }
+                (Fault::UnknownMathCommand { command }, None) => assert_eq!(command, token),
+                (actual, expected) => panic!("{source}: {actual:?} did not match {expected:?}"),
+            }
+        }
+    }
 
     #[test]
     fn source_names_parse_with_located_refusals() {

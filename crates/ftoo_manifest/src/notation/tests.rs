@@ -1268,6 +1268,8 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         (PrimitiveId::Theta, "theta", 0),
         (PrimitiveId::VariantEpsilon, "variant-epsilon", 0),
         (PrimitiveId::Zeta, "zeta", 0),
+        (PrimitiveId::Nabla, "nabla", 0),
+        (PrimitiveId::LessEqual, "less-equal", 2),
     ];
     let n = notation(&book)?;
     assert_eq!(
@@ -1318,7 +1320,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
         &[diag(
             RuleId::M047,
             NotationStage::Catalogue,
-            primitive_site(Alpha, 34, &["id"]),
+            primitive_site(Alpha, 36, &["id"]),
             NotationFault::CatalogMultiplicity {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
@@ -1326,7 +1328,7 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 positions: vec![],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 34, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 36, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 0, positions: [] }\n",
     );
     let mut p = primitives::catalogue();
     let mut duplicate = p[0].clone();
@@ -1342,10 +1344,10 @@ fn n01_primitive_inventory_and_signatures() -> TestResult {
                 entry: RegistryEntry::Primitive(Alpha),
                 expected: 1,
                 actual: 2,
-                positions: vec![0, 35],
+                positions: vec![0, 37],
             },
         )],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 35] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"id\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 37] }\n",
     );
     let mut p = primitives::catalogue();
     p[1].token = "alpha";
@@ -2651,7 +2653,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
             diag(
                 RuleId::M047,
                 NotationStage::Catalogue,
-                primitive_site(PrimitiveId::Beta, 35, &["operation"]),
+                primitive_site(PrimitiveId::Beta, 37, &["operation"]),
                 NotationFault::CatalogMultiplicity {
                     entry: RegistryEntry::Primitive(PrimitiveId::Beta),
                     expected: 1,
@@ -2660,7 +2662,7 @@ fn n01_definition_multiplicity_tokens_and_every_call_arity() -> TestResult {
                 },
             ),
         ],
-        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 35, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
+        "M047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Alpha), index: 0, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Alpha), expected: 1, actual: 2, positions: [0, 1] }\nM047 Catalogue at Registry { file: \"crates/ftoo_manifest/src/notation/primitives.rs\", entry: Primitive(Beta), index: 37, path: [Field(\"operation\")] }: CatalogMultiplicity { entry: Primitive(Beta), expected: 1, actual: 0, positions: [] }\n",
     );
     notation(&book)?;
     Ok(())
@@ -3127,7 +3129,7 @@ fn complete_seed_consumer() {
     let book = addressing(&graph).unwrap();
     let n = notation(&book).unwrap();
     assert_eq!(n.definitions().len(), 47);
-    assert_eq!(n.primitives().len(), 35);
+    assert_eq!(n.primitives().len(), 37);
     assert_eq!(
         n.definitions()
             .iter()

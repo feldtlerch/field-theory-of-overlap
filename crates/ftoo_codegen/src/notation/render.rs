@@ -68,17 +68,18 @@ pub(super) enum SpellingMode {
     Inline,
     Display,
 }
+#[allow(clippy::too_many_lines)] // One closed operation table keeps both target spellings together.
 fn parts(operation: PrimitiveOperation, target: RenderTarget, spelling: SpellingMode) -> Vec<Part> {
     use Part::{Argument as A, Fixed as F};
     use PrimitiveOperation::{
         Add, Alpha, Beta, Calligraphic, CapitalOmega, CapitalXi, Chi, Dimension, Dot, Equal, Eta,
-        Fraction, Gamma, Juxtapose, Lambda, Mu, Multiply, Negate, Omega, Parentheses, Phi, Sigma,
-        Subscript, Subtract, Superscript, Tau, Theta, TightJoin, Times, Underbrace, UprightNet,
-        UprightS, UprightVir, VariantEpsilon, Zeta,
+        Fraction, Gamma, Juxtapose, Lambda, LessEqual, Mu, Multiply, Nabla, Negate, Omega,
+        Parentheses, Phi, Sigma, Subscript, Subtract, Superscript, Tau, Theta, TightJoin, Times,
+        Underbrace, UprightNet, UprightS, UprightVir, VariantEpsilon, Zeta,
     };
     match operation {
         Alpha | Beta | Omega | CapitalOmega | CapitalXi | Chi | Eta | Lambda | Mu | Phi | Tau
-        | Theta | VariantEpsilon | Zeta => {
+        | Theta | VariantEpsilon | Zeta | Nabla => {
             if target == RenderTarget::Macro {
                 vec![F(operation.host_tokens()[0]), F("{}")]
             } else {
@@ -127,6 +128,15 @@ fn parts(operation: PrimitiveOperation, target: RenderTarget, spelling: Spelling
         Superscript => vec![F("{"), A(0), F("}^{"), A(1), F("}")],
         Add if spelling == SpellingMode::Display => vec![A(0), F("\\;+\\;"), A(1)],
         Equal if spelling == SpellingMode::Display => vec![A(0), F("\\;=\\;"), A(1)],
+        LessEqual => vec![
+            A(0),
+            F(if target == RenderTarget::Macro {
+                "\\le{}"
+            } else {
+                "≤"
+            }),
+            A(1),
+        ],
         Add => vec![F("({"), A(0), F("}+{"), A(1), F("})")],
         Equal => vec![F("({"), A(0), F("}={"), A(1), F("})")],
         Negate => vec![
