@@ -83,7 +83,7 @@
       "target_page": 10
     },
     {
-      "source": "documents/paper/parts/partA.tex:425",
+      "source": "documents/paper/parts/partA.tex:423",
       "source_line_sha256": "59e1cb04a208be23a9d0cbb3770b61cabbed847efcbaddfd9513892b80a0c084",
       "site": "parts/partA.tex:425",
       "ordinal": 87,
@@ -227,9 +227,9 @@
       "target_page": 42
     },
     {
-      "source": "documents/paper/parts/partC.tex:283",
+      "source": "documents/paper/parts/partC.tex:279",
       "source_line_sha256": "69d60e5cd54ff5460d391fbda9d52e72b7199b56d6d4e79e319feeb61794b14a",
-      "site": "parts/partC.tex:283",
+      "site": "parts/partC.tex:281",
       "ordinal": 312,
       "command": "ftag",
       "star": false,
@@ -243,9 +243,9 @@
       "target_page": 13
     },
     {
-      "source": "documents/paper/parts/partC.tex:283",
+      "source": "documents/paper/parts/partC.tex:279",
       "source_line_sha256": "69d60e5cd54ff5460d391fbda9d52e72b7199b56d6d4e79e319feeb61794b14a",
-      "site": "parts/partC.tex:283",
+      "site": "parts/partC.tex:281",
       "ordinal": 313,
       "command": "ftag",
       "star": false,

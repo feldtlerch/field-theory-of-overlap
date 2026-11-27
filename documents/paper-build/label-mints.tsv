@@ -328,7 +328,6 @@ f:holonomy	documents/paper/parts/partA.tex
 f:local	documents/paper/parts/partA.tex
 f:opp	documents/paper/parts/partA.tex
 f:path	documents/paper/parts/partA.tex
-f:pool	documents/paper/parts/partA.tex
 f:reach	documents/paper/parts/partA.tex
 f:rew	documents/paper/parts/partA.tex
 f:seal-law	documents/paper/parts/partA.tex
@@ -379,7 +378,6 @@ nrm:incl-expo	documents/paper/explainer/explainer.tex
 nrm:int	documents/paper/parts/gateways.tex
 nrm:martyr	documents/paper/parts/partC.tex
 nrm:maxbook	documents/paper/parts/partC.tex
-nrm:modest	documents/paper/parts/partC.tex
 nrm:nodepl	documents/paper/parts/partC.tex
 nrm:public	documents/paper/parts/gateways.tex
 nrm:self	documents/paper/parts/partC.tex

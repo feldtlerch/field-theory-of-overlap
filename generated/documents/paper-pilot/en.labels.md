@@ -20,6 +20,13 @@ Not yet converted: intervening material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit result:f:pool document paper-pilot language en -->
+*Insight 2.13 (Coherence pools, independence weighs)* · f:pool cont-anch <a id="result-f-pool"></a>
+
+Coherence pools the value; independence supplies the weight.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:say:harm-enlargement document paper-pilot language en -->
 <p align="center"><a id="sec-charm--enlargement"></a><em>Harm is downhill; enlargement is uphill.</em></p>
 <p align="right">sec:harm&#45;enlargement<!-- label sec:say:harm-enlargement --></p>
@@ -29,6 +36,13 @@ Not yet converted: intervening material is omitted from this excerpt.
 <!-- unit sec:say:wonder-beauty document paper-pilot language en -->
 <p align="center"><a id="sec-cwonder--beauty"></a><em>Wonder is the will that crosses before the reward exists; beauty is what it finds on the far side.</em></p>
 <p align="right">sec:wonder&#45;beauty<!-- label sec:say:wonder-beauty --></p>
+
+Not yet converted: intervening material is omitted from this excerpt.
+
+<!-- unit result:nrm:modest document paper-pilot language en -->
+**Definition 11.1 (The known modest&#45;good corner)** · nrm:modest nec <a id="result-nrm-modest"></a>
+
+The known modest&#45;good corner is the local, presently legible beneficiary&#45;good region in which another’s gain is read by that beneficiary’s own measure and enlargement requires neither speculative surplus nor distant witnessing.
 
 Not yet converted: intervening material is omitted from this excerpt.
 

@@ -35,7 +35,7 @@
     "key": "g:knock"
   },
   {
-    "source": "documents/paper/parts/partA.tex:425",
+    "source": "documents/paper/parts/partA.tex:423",
     "site": "parts/partA.tex:425",
     "command": "ftag",
     "star": false,
@@ -98,15 +98,15 @@
     "key": "dyn:rot"
   },
   {
-    "source": "documents/paper/parts/partC.tex:283",
-    "site": "parts/partC.tex:283",
+    "source": "documents/paper/parts/partC.tex:279",
+    "site": "parts/partC.tex:281",
     "command": "ftag",
     "star": false,
     "key": "nrm:good"
   },
   {
-    "source": "documents/paper/parts/partC.tex:283",
-    "site": "parts/partC.tex:283",
+    "source": "documents/paper/parts/partC.tex:279",
+    "site": "parts/partC.tex:281",
     "command": "ftag",
     "star": false,
     "key": "nrm:wise"

@@ -8,8 +8,10 @@ heading = "sec:pilot:paper-excerpt"
 children = [
   { kind = "paragraph", unit = "sec:reading:shadow" },
   { kind = "unit", unit = "sec:say:direction" },
+  { kind = "corpus-slot", unit = "result:f:pool" },
   { kind = "unit", unit = "sec:say:harm-enlargement" },
   { kind = "unit", unit = "sec:say:wonder-beauty" },
+  { kind = "corpus-slot", unit = "result:nrm:modest" },
   { kind = "unit", unit = "sec:say:enemy-to-none" },
   { kind = "paragraph", unit = "sec:boundary:ratio-rate" },
   { kind = "paragraph", unit = "sec:coda:audit-bottoms" },

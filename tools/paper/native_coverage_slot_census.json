@@ -3,14 +3,14 @@
   "source": "documents/paper/explainer/explainer.tex",
   "source_sha256": "12613efc8cef049dd98ff7d5f9f0a9771d7a3b4c97b2eaba7fb78cd6a1126815",
   "source_list_digest": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
-  "import_context_digest": "0d5ecbeb3d89479e040891e52e22b13505167a133f2efc1b33caa0f3c90f860f",
+  "import_context_digest": "522d90422597019e0236eb524b71a237a5262c848396f4793aaa9784f9ff796e",
   "source_digests": {
     "documents/paper/explainer/explainer.tex": "12613efc8cef049dd98ff7d5f9f0a9771d7a3b4c97b2eaba7fb78cd6a1126815",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
-    "documents/paper/parts/partA.tex": "1d7d04332608aa4a129d23df889ac769dd7cdfe599c6a4dcab500dc7c88d0ebf",
+    "documents/paper/parts/partA.tex": "ce98c5c2bb7b513a55ae27dbc7965a0af6f786fcd13191a02e959d3eb697f2c9",
     "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
     "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
-    "documents/paper/parts/partC.tex": "fdfce0e270d14818050f26fabc0cf3a2083037d9732653d4c391816817cd523e",
+    "documents/paper/parts/partC.tex": "8a582fb5a9ed32dfc3a0f6497c149c4b1777c82d2feb643109ed6d731e916bf6",
     "documents/paper/parts/partD.tex": "d911a3d9b21d81ead5d6b48240a985a069b593dc0066445caa9c5b164e14ecfc",
     "documents/paper/parts/partE.tex": "f60d29ade91a03779983f641bc475883447f4d410e3dda7b4b71b4cabd50ba5f",
     "documents/paper/parts/partF.tex": "dffacc0efe1789271d02f1d7b09378932bb2ef487ce542d75ab2a2efb155ca2f",
@@ -139,7 +139,7 @@
           "refused": 9
         },
         "existing-native-inclusion": {
-          "decoded": 3,
+          "decoded": 4,
           "refused": 0
         },
         "heading": {
@@ -163,7 +163,7 @@
           "refused": 3
         },
         "theorem-container": {
-          "decoded": 1,
+          "decoded": 0,
           "refused": 21
         }
       },
@@ -280,6 +280,10 @@
           "decoded": 0,
           "refused": 4
         },
+        "existing-native-inclusion": {
+          "decoded": 1,
+          "refused": 0
+        },
         "heading": {
           "decoded": 11,
           "refused": 0
@@ -297,7 +301,7 @@
           "refused": 4
         },
         "theorem-container": {
-          "decoded": 2,
+          "decoded": 1,
           "refused": 6
         }
       },

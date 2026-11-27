@@ -1,0 +1,9 @@
+schema = 1
+
+[scope]
+document = "paper-pilot"
+source = "documents/paper/parts/partC.tex"
+
+[[scope.occurrences]]
+unit = "result:nrm:modest"
+role = "corpus-slot"

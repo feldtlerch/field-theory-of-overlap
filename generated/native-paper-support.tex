@@ -1,3 +1,25 @@
+\makeatletter
+\ExplSyntaxOn
+\AddToHook{package/zref-clever/after}{
+  % Recover the explicit type, then counter mapping, then counter.
+  \tl_new:N \l_paper_reftype_tl
+  \keys_define:nn {zref-clever/zcsetup}
+    {reftype .tl_set:N = \l_paper_reftype_tl}
+  \zref@setcurrent{zc@type}{
+    \tl_if_empty:NTF \l_paper_reftype_tl
+      {\exp_args:NNe \prop_if_in:NnTF \l__zrefclever_counter_type_prop
+        \l__zrefclever_current_counter_tl
+        {\exp_args:NNe \prop_item:Nn \l__zrefclever_counter_type_prop
+          {\l__zrefclever_current_counter_tl}}
+        {\l__zrefclever_current_counter_tl}}
+      {\l_paper_reftype_tl}}
+}
+\ExplSyntaxOff
+\makeatother
+\RequirePackage{amsthm}
+\RequirePackage{hyperref}
+\RequirePackage{zref-clever}
+\RequirePackage{zref-titleref}
 \ExplSyntaxOn
 \NewDocumentCommand{\grade}{m}
   { {\normalfont\footnotesize\textsc{#1}}\quad }
@@ -241,4 +263,142 @@
     \ensuremath{\chi}
   }
 \RegisterVariance{\comovfield}{operator}
+  \cs_if_exist:NF \tl_set:Ne {\cs_generate_variant:Nn \tl_set:Nn {Ne}}
+\NewDocumentCommand{\ftoolabel}{m}{ \label{#1} }
+
+\cs_new_protected:Npn \ftoo_set_titleref:n #1
+  {
+    \cs_gset:cpn { @currentlabelname } { #1 }
+    \use:c { zref@titleref@setcurrent } { #1 }
+    \cs_gset_eq:cc { zref@titleref@current } { zref@titleref@current }
+  }
+\cs_generate_variant:Nn \ftoo_set_titleref:n { e }
+
+\newtheoremstyle{ftooplain}{\topsep}{\topsep}{\itshape}{0pt}{\bfseries}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+\newtheoremstyle{ftoodefn}{\topsep}{\topsep}{\normalfont}{0pt}{\bfseries}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+\newtheoremstyle{ftoorem}{\topsep}{\topsep}{\normalfont}{0pt}{\itshape}{}{0.5em}%
+  {\thmname{#1}\nobreakspace\thmnumber{#2}\thmnote{\ #3}}
+
+\theoremstyle{ftooplain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\theoremstyle{ftoodefn}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{postulate}[theorem]{Postulate}
+\theoremstyle{ftoorem}
+\newtheorem{insight}[theorem]{Insight}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{property}[theorem]{Property}
+
+\tl_new:N \l_ftoo_thmtype_tl
+\AddToHook{env/theorem/begin}     { \tl_set:Nn \l_ftoo_thmtype_tl { theorem } }
+\AddToHook{env/proposition/begin} { \tl_set:Nn \l_ftoo_thmtype_tl { proposition } }
+\AddToHook{env/lemma/begin}       { \tl_set:Nn \l_ftoo_thmtype_tl { lemma } }
+\AddToHook{env/corollary/begin}   { \tl_set:Nn \l_ftoo_thmtype_tl { corollary } }
+\AddToHook{env/definition/begin}  { \tl_set:Nn \l_ftoo_thmtype_tl { definition } }
+\AddToHook{env/postulate/begin}   { \tl_set:Nn \l_ftoo_thmtype_tl { postulate } }
+\AddToHook{env/conjecture/begin}  { \tl_set:Nn \l_ftoo_thmtype_tl { result } }
+\AddToHook{env/insight/begin}     { \tl_set:Nn \l_ftoo_thmtype_tl { remark } }
+\AddToHook{env/remark/begin}      { \tl_set:Nn \l_ftoo_thmtype_tl { remark } }
+\AddToHook{env/property/begin}    { \tl_set:Nn \l_ftoo_thmtype_tl { result } }
+
+
+\prop_if_exist:NF \g_ftoo_tag_to_id_prop     { \prop_new:N \g_ftoo_tag_to_id_prop }
+\prop_if_exist:NF \g_ftoo_id_to_tag_prop     { \prop_new:N \g_ftoo_id_to_tag_prop }
+\prop_if_exist:NF \g_ftoo_id_to_heading_prop { \prop_new:N \g_ftoo_id_to_heading_prop }
+
+\tl_new:N \l_ftoo_hdr_id_tl
+\tl_new:N \l_ftoo_hdr_tag_tl
+\tl_new:N \l_ftoo_hdr_head_tl
+\cs_generate_variant:Nn \prop_get:NnNF { NVNF }
+
+\msg_new:nnn { ftoo } { hdr-two-argument-form }
+  {
+    \token_to_str:N \hdr~takes~the~tag~alone:~the~heading~is~read~from~the~paper's~
+    manifest~data.~The~second~argument~seen~here~was~'#1'.
+  }
+\msg_new:nnn { ftoo } { hdr-unbound-tag }
+  {
+    The~result~head~mints~'#1',~a~tag~the~manifest~data~binds~to~no~referent.~
+    Bind~'#1'~in~documents/paper/data/ftoo_manifest.tex~or~do~not~mint~it.
+  }
+\msg_new:nnn { ftoo } { hdr-alias-tag }
+  {
+    The~result~head~mints~'#1',~which~is~an~alias~rather~than~the~canonical~
+    tag~of~its~referent.~A~mint~must~print~and~anchor~one~published~name.
+  }
+\msg_new:nnn { ftoo } { hdr-no-heading }
+  {
+    '#1'~resolves~to~a~referent~the~manifest~data~publishes~no~heading~for.~The~
+    heading~is~missing;~review~the~tag~and~its~manifest~declaration.
+  }
+
+\cs_new_protected:Npn \ftoo_hdr_resolved:n #1
+  {
+    \prop_get:NVNF \g_ftoo_id_to_tag_prop \l_ftoo_hdr_id_tl \l_ftoo_hdr_tag_tl
+      { \tl_clear:N \l_ftoo_hdr_tag_tl }
+    \str_if_eq:eeF { \l_ftoo_hdr_tag_tl } { \tl_to_str:n {#1} }
+      { \msg_error:nnn { ftoo } { hdr-alias-tag } {#1} }
+    \prop_get:NVNF \g_ftoo_id_to_heading_prop \l_ftoo_hdr_id_tl \l_ftoo_hdr_head_tl
+      {
+        \msg_error:nnn { ftoo } { hdr-no-heading } {#1}
+        \tl_clear:N \l_ftoo_hdr_head_tl
+      }
+    \ftoo_set_titleref:e { \l_ftoo_hdr_head_tl }
+    ( \tl_use:N \l_ftoo_hdr_head_tl ) \ftootagsep
+    \ftoo_tagfont:n {#1}
+    \tl_set:Ne \l_tmpa_tl { reftype = \l_ftoo_thmtype_tl }
+    \exp_args:NV \zcsetup \l_tmpa_tl
+    \ftoolabel{#1}
+    \zcsetup { reftype = }
+  }
+
+\cs_new_protected:Npn \ftoo_hdr_two_argument:nn #1#2
+  { \msg_error:nnn { ftoo } { hdr-two-argument-form } {#2} }
+
+\cs_new_protected:Npn \ftoo_hdr_dispatch:n #1
+  {
+    \prop_get:NnNTF \g_ftoo_tag_to_id_prop {#1} \l_ftoo_hdr_id_tl
+      { \ftoo_hdr_resolved:n {#1} }
+      { \msg_error:nnn { ftoo } { hdr-unbound-tag } {#1} }
+  }
+
+\NewDocumentCommand{\hdr}{m}
+  {
+    \peek_meaning:NTF \c_group_begin_token
+      { \ftoo_hdr_two_argument:nn {#1} }
+      { \ftoo_hdr_dispatch:n {#1} }
+  }
+
+\NewDocumentCommand{\hdrunbacked}{m m}
+  {
+    \ftoo_set_titleref:n { #1 }
+    (#1) \ftootagsep
+    \ftoo_tagfont:n {#2}
+    \tl_set:Ne \l_tmpa_tl { reftype = \l_ftoo_thmtype_tl }
+    \exp_args:NV \zcsetup \l_tmpa_tl
+    \ftoolabel{#2}
+    \zcsetup { reftype = }
+  }
+
+\NewDocumentCommand{\hdrtitleonly}{m}
+  {
+    \ftoo_set_titleref:n { #1 }
+    (#1)
+  }
+
+\cs_new_protected:Npn \ftoo_tagfont:n     #1 { \text{\small\textsc{#1}} }
+\NewDocumentCommand{\ftootagsep}{}{ \nobreakspace\textperiodcentered\enspace }
+\prop_gput:Nnn \g_ftoo_tag_to_id_prop { f:pool } { sem:claim:witness-pooling-principle }
+\prop_gput:Nnn \g_ftoo_id_to_tag_prop { sem:claim:witness-pooling-principle } { f:pool }
+\prop_gput:Nnn \g_ftoo_id_to_heading_prop { sem:claim:witness-pooling-principle } { Coherence~pools,~independence~weighs }
+\prop_gput:Nnn \g_ftoo_tag_to_id_prop { nrm:modest } { sem:scope:modest-good-corner }
+\prop_gput:Nnn \g_ftoo_id_to_tag_prop { sem:scope:modest-good-corner } { nrm:modest }
+\prop_gput:Nnn \g_ftoo_id_to_heading_prop { sem:scope:modest-good-corner } { The~known~modest-good~corner }
+\NewDocumentCommand\PaperGradeGap{m}{\kern#1}
 \ExplSyntaxOff

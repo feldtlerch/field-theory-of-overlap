@@ -15,3 +15,7 @@ role = "refrain"
 [[scope.occurrences]]
 unit = "sec:say:wonder-beauty"
 role = "refrain"
+
+[[scope.occurrences]]
+unit = "result:f:pool"
+role = "corpus-slot"

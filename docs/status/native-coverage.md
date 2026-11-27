@@ -19,7 +19,7 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 | displayed equations | 0 / 141 | 1 / 1 | 1 / 142 | subset | The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`. |
 | cross-references | 1 / 117 | 0 / 13 | 1 / 130 | subset | Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`. |
 | bibliography citations | 2 / 74 | 0 / 0 | 2 / 74 | subset | Verified parenthetical citations in native paragraphs and the economics box; `dec:documents:paper-tagged-paragraphs`, `dec:documents:native-econ`. |
-| result box: definition | 0 / 42 | 0 / 0 | 0 / 42 | subset | A checked result-form slot carries a registered definition header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
+| result box: definition | 1 / 42 | 0 / 0 | 1 / 42 | subset | A checked result-form slot carries a registered definition header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
 | tables | 0 / 32 | 0 / 3 | 0 / 35 | subset | A native display table exists outside the body inclusions; M055. |
 | result box: econ | 1 / 34 | 0 / 0 | 1 / 34 | subset | The coda box's text and one parenthetical citation form; `dec:documents:native-econ`. |
 | result box: theorem | 0 / 30 | 0 / 0 | 0 / 30 | none | No native theorem box is admitted. |
@@ -30,7 +30,7 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 | formal notes | 0 / 0 | 0 / 12 | 0 / 12 | none | No native formal-note block is admitted. |
 | result box: corollary | 0 / 10 | 0 / 0 | 0 / 10 | none | No native corollary box is admitted. |
 | result box: remark | 0 / 10 | 0 / 0 | 0 / 10 | subset | A checked result-form slot carries a registered remark header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
-| result box: insight | 0 / 9 | 0 / 0 | 0 / 9 | subset | A checked result-form slot carries a registered insight header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
+| result box: insight | 1 / 9 | 0 / 0 | 1 / 9 | subset | A checked result-form slot carries a registered insight header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
 | lists | 0 / 4 | 0 / 2 | 0 / 6 | none | No native list block is admitted. |
 | result box: lemma | 0 / 3 | 0 / 0 | 0 / 3 | none | No native lemma box is admitted. |
 | result box: postulate | 0 / 3 | 0 / 0 | 0 / 3 | none | No native postulate box is admitted. |
@@ -104,14 +104,14 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 | display | 0 | 23 |
 | economics-box | 0 | 33 |
 | epistemology-box | 0 | 1 |
-| existing-native-inclusion | 19 | 0 |
+| existing-native-inclusion | 21 | 0 |
 | heading | 156 | 2 |
 | list | 0 | 2 |
 | paragraph | 112 | 232 |
 | refusal | 0 | 12 |
 | statement-box | 0 | 20 |
 | table | 0 | 33 |
-| theorem-container | 11 | 113 |
+| theorem-container | 9 | 113 |
 
 | First refusal kind | Outer blocks |
 |---|---:|
@@ -177,9 +177,9 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 
 | Document | Native words / all | Word share |
 |---|---:|---:|
-| paper | 647 / 28919 | 2.24% |
+| paper | 687 / 28919 | 2.38% |
 | explainer | 1006 / 8601 | 11.70% |
-| all | 1653 / 37520 | 4.41% |
+| all | 1693 / 37520 | 4.51% |
 
 ## Per-file detail
 
@@ -188,20 +188,20 @@ Word tokens count literal headings, captions, table cells and prose; they exclud
 | Document | Source | Native words / all | Word share | Source blob |
 |---|---|---:|---:|---|
 | paper | [`documents/paper/parts/front.tex`](../../documents/paper/parts/front.tex) | 57 / 2163 | 2.64% | `72978326c5c69231947c0766c9c1639f1dab0db3` |
-| paper | [`documents/paper/parts/partA.tex`](../../documents/paper/parts/partA.tex) | 40 / 3944 | 1.01% | `26d056721554dd62b923ba311beb18150c77bd0a` |
+| paper | [`documents/paper/parts/partA.tex`](../../documents/paper/parts/partA.tex) | 48 / 3944 | 1.22% | `c3829cb2fa1a4bcb9f5f2b88cb6dd6c8af535060` |
 | paper | [`documents/paper/parts/partB.tex`](../../documents/paper/parts/partB.tex) | 0 / 6180 | 0.00% | `416f396158d7209429a5df48e37f5a99949cbf1d` |
 | paper | [`documents/paper/parts/gateways.tex`](../../documents/paper/parts/gateways.tex) | 0 / 863 | 0.00% | `438ebdb6c984ab4d11308d1eb8cb18d20798cf5b` |
-| paper | [`documents/paper/parts/partC.tex`](../../documents/paper/parts/partC.tex) | 0 / 2569 | 0.00% | `61498045f71dd7ed81f1a27314cd685596169252` |
+| paper | [`documents/paper/parts/partC.tex`](../../documents/paper/parts/partC.tex) | 32 / 2569 | 1.25% | `7fbf930c9f265f6f6059a8e432fe80461f260855` |
 | paper | [`documents/paper/parts/partD.tex`](../../documents/paper/parts/partD.tex) | 6 / 2690 | 0.22% | `0774854886fc1d98d0287911ab3646d1a4b5d936` |
 | paper | [`documents/paper/parts/partE.tex`](../../documents/paper/parts/partE.tex) | 0 / 1103 | 0.00% | `56c378ff90abc4e56c601b06099cf020d1655115` |
 | paper | [`documents/paper/parts/partF.tex`](../../documents/paper/parts/partF.tex) | 45 / 2570 | 1.75% | `c735755ba9dec5f857e64847a36d080fb23248ce` |
 | paper | [`documents/paper/parts/partG.tex`](../../documents/paper/parts/partG.tex) | 0 / 1369 | 0.00% | `affe4e9abf3c661d94e9efbfcfab29c4e015c844` |
 | paper | [`documents/paper/parts/coda.tex`](../../documents/paper/parts/coda.tex) | 463 / 992 | 46.67% | `f32fad8baa9a806cb745c984509a53ebdad356f0` |
 | paper | [`documents/paper/parts/appendices.tex`](../../documents/paper/parts/appendices.tex) | 36 / 4476 | 0.80% | `6f5d0d158aa6316f511be9353162e911739fc3f5` |
-| paper | Total | 647 / 28919 | 2.24% | — |
+| paper | Total | 687 / 28919 | 2.38% | — |
 | explainer | [`documents/paper/explainer/explainer.tex`](../../documents/paper/explainer/explainer.tex) | 1006 / 8601 | 11.70% | `3bf2f062080705491a258c1c00a2b28d7de24fed` |
 | explainer | Total | 1006 / 8601 | 11.70% | — |
-| all | Total | 1653 / 37520 | 4.41% | — |
+| all | Total | 1693 / 37520 | 4.51% | — |
 
 ## Limits and regeneration
 
@@ -215,9 +215,9 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 |---|---|
 | `documents/paper/main.tex` | `06bf235acb58b61df74058a8411e6b64a84d2bed` |
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
-| `generated/documents/inclusions.tsv` | `16d838b66ce71b026ecec890a5098b5083615924` |
+| `generated/documents/inclusions.tsv` | `825592001be0f001a417f66d5ee693d28718d45d` |
 | `tools/paper/native_coverage_capabilities.tsv` | `151b4b607b438d73ea4e69c342b5ddf2c0857e88` |
-| `tools/paper/native_coverage_slot_census.json` | `62386413744251b156dd206128395d81749d72a3` |
+| `tools/paper/native_coverage_slot_census.json` | `c28b9058a73c25fc8617d45e3f3a1e0790524ec3` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |
@@ -225,6 +225,8 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 | `generated/documents/explainer-pilot/sec-explainer-plain.tex` | `dbc811c11427ce161a883be934582a4ed7473b09` |
 | `generated/documents/explainer-pilot/sec-say-direction.tex` | `3c7f5590a578c5dcced2cebf2f856faff2f677df` |
 | `generated/documents/explainer-pilot/sec-say-enemy-to-none.tex` | `24799d78631c1e1fbb6bd57e83b5fa9b49d78995` |
+| `generated/documents/paper-pilot/result-f-pool.tex` | `290034c96b157208dfa6158f57d93361f1ca0559` |
+| `generated/documents/paper-pilot/result-nrm-modest.tex` | `b2756594af9c6992fcca7e7b5d101740133af3b4` |
 | `generated/documents/paper-pilot/sec-boundary-ratio-rate.tex` | `53b2cee7819403c753f604a395517dd07dc9266b` |
 | `generated/documents/paper-pilot/sec-coda-audit-bottoms.tex` | `54dd9cce20c26390e517c3a16e8227e008988439` |
 | `generated/documents/paper-pilot/sec-coda-eight-words.tex` | `db01f1b2c4f4f0d5a03d3355fd11dca3877aecb0` |
