@@ -65,11 +65,12 @@ meson test -C "$BUILD" --no-rebuild --suite unit --suite product --suite regress
 |Check in [meson.build](meson.build)|What it checks|
 |---|---|
 |`unit`|Offline workspace tests, `--no-fail-fast`, skipping `support_required`: admission, labels, audit and support-independent artifact checks.|
-|`regression`|Supported native and notation tests, excluding `support_required_paper_gate`.|
+|`regression`|Supported native and notation tests, excluding `support_required_paper_gate`; a live checking capture is compared with its stored record. Text-moving changes in `documents/paper/parts/partB.tex`, `partD.tex`, `partE.tex`, `partF.tex`, `coda.tex` or `appendices.tex` regenerate that record by the command in [the paper guide](tools/paper/README.md).|
 |`documents-verified`, then `pair`|Committed unit-derived artifacts before production of the PDFs and receipt.|
 |`product`|`byte-gate` compares PDFs and receipt; `live-release` runs `paper check-registered-html-gaps`, requiring the plan's HTML gaps and screen destination gaps to equal their canonical registers while the other M065 release parts pass; ordinary release still refuses both gap parts (ADRs 040 and 046); `evidence-T40` consumes the separate identity fixture.|
 |`graph`|G1 checks the content-record cutoff and G2 publication refusal and retention behaviour, both on a nested Meson fixture.|
 |`complete`|The complete plain-conversion check on a committed parent/candidate fixture; run it when the complete-check machinery changes.|
+|`capture-liveness`|Grant and spend controls in each selected paper paragraph body. Run `meson test -C "$BUILD" --no-rebuild --suite capture-liveness --print-errorlogs` when `tools/paper/checking_capture.py`, `tools/paper/test_checking_capture.py`, `documents/paper/ftoo_typed_tools.tex` or `documents/paper/parts/partD.tex`, `partE.tex`, `partF.tex` or `appendices.tex` changes, and before a transfer that consumes a window.|
 
 For the separate graph suite, run `"$NINJA" -C "$BUILD" -j 1 meson-test-prereq`, then `meson test -C "$BUILD" --no-rebuild --suite graph --print-errorlogs`. Hosted CI runs formatting, denied-warning Clippy, support-independent tests and labels with network-isolated test processes; it does not replace the full gate.
 

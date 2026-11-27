@@ -1,7 +1,11 @@
 {
   "prepared_sha256": {
-    "documents/paper/parts/coda.tex": "5347907929b16b004eec51f8cb55187e5288a5d0f3d29976ec92f41d9b93a726",
-    "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823"
+    "documents/paper/parts/appendices.tex": "96332df6bc7aeab508eba8ef797e795b1cda296865206a6e49dfbfd663276bb1",
+    "documents/paper/parts/coda.tex": "52c002e2172faeb55ae79c12dca4d826bb3890e16708bdde1bb2476845381b9c",
+    "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
+    "documents/paper/parts/partD.tex": "457ee988ffc15dbf110cf48c1b323d1b3b546b8ab6a87f08c50188bacdccae5f",
+    "documents/paper/parts/partE.tex": "f60d29ade91a03779983f641bc475883447f4d410e3dda7b4b71b4cabd50ba5f",
+    "documents/paper/parts/partF.tex": "cb206bd68758958a4c9b711d93c5866fe02f47027701ef30485eba8d727b7cb4"
   },
   "records": [
     {
@@ -169,5 +173,228 @@
     "output_sha256": "398461743dca4b29e38bd9337fc9174845893c7389c3f8d381a4755ac4daa50e",
     "status": "complete"
   },
-  "schema": 3
+  "schema": 4,
+  "windows": [
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [
+        {
+          "cites": "a:signaling",
+          "departure": "flatten",
+          "onref": "pr:span",
+          "stopsat": "one scalar credibility where the field splits burned stake, colour-span, and alignment",
+          "table": "tbl:log:concordance",
+          "tag": "e:pow"
+        }
+      ],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/partD.tex",
+        "label_token": "\\label{subsec:rep:factors}",
+        "next_scope": "outside"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partD.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:colour-span}"
+      },
+      "scope": "subsec:colour-span",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [
+        {
+          "cites": "a:robbins,a:fisher,a:capital",
+          "departure": "scalar",
+          "onref": "P:nonorm",
+          "stopsat": "imports interpersonal comparison as a methodological caution; here a type-signature, the gap found within one life twice",
+          "table": "tbl:log:concordance",
+          "tag": "e:robbins"
+        }
+      ],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/partE.tex",
+        "label_token": "\\label{subsec:prof:order}",
+        "next_scope": "outside"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partE.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:prof:leak}"
+      },
+      "scope": "subsec:prof:leak",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/partF.tex",
+        "label_token": "\\label{subsec:still:severance}",
+        "next_scope": "subsec:still:severance"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partF.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:still:hides}"
+      },
+      "scope": "subsec:still:hides",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/partF.tex",
+        "label_token": "\\label{sec:two-boundaries}",
+        "next_scope": "outside"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partF.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:still:severance}"
+      },
+      "scope": "subsec:still:severance",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "label_token": "\\label{app:portraits}",
+        "next_scope": "app:portraits"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "kind": "section",
+        "label_token": "\\label{subsec:corners:scales}"
+      },
+      "scope": "subsec:corners:scales",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "label_token": "\\label{app:cosine}",
+        "next_scope": "app:cosine"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "kind": "section",
+        "label_token": "\\label{app:portraits}"
+      },
+      "scope": "app:portraits",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "@none",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "label_token": "\\label{app:self-limit}",
+        "next_scope": "outside"
+      },
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/appendices.tex",
+        "kind": "section",
+        "label_token": "\\label{app:cosine}"
+      },
+      "scope": "app:cosine",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partD.tex",
+        "kind": "box",
+        "label_token": "\\begin{definition}[\\hdr{pr:gain}]"
+      },
+      "scope": "pr:gain",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partD.tex",
+        "kind": "box",
+        "label_token": "\\begin{definition}[\\hdr{pr:span}]"
+      },
+      "scope": "pr:span",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "feas",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partD.tex",
+        "kind": "box",
+        "label_token": "\\begin{proposition}[\\hdr{pr:span-ident}]"
+      },
+      "scope": "pr:span-ident",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "feas",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partD.tex",
+        "kind": "box",
+        "label_token": "\\begin{corollary}[\\hdr{pr:deltaspan}]"
+      },
+      "scope": "pr:deltaspan",
+      "spend_set": []
+    },
+    {
+      "claimed_grade": "nec",
+      "derived_rows": [],
+      "diagnostics": [],
+      "end_marker": true,
+      "grant_set": [],
+      "location": {
+        "file": "documents/paper/parts/partE.tex",
+        "kind": "box",
+        "label_token": "\\begin{definition}[\\hdrunbacked{The leaked exchange-rates}{P:leak}]"
+      },
+      "scope": "P:leak",
+      "spend_set": []
+    }
+  ]
 }

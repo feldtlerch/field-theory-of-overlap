@@ -86,6 +86,14 @@ test('unit', cargo, args: ['test', '--locked', '--offline', '--workspace', '--no
 test('regression', cargo, args: ['test', '--locked', '--offline', '--workspace', '--no-fail-fast',
   '--', 'support_required', '--skip', 'support_required_paper_gate'],
   suite: 'regression', timeout: 0, is_parallel: false, env: support_env, workdir: source)
+test('checking-capture-stored', python,
+  args: ['-B', source / 'tools/paper/test_checking_capture.py', '--stored-live', source, support,
+    meson.current_build_dir() / 'checking-capture-stored'],
+  suite: 'regression', timeout: 300, is_parallel: false, workdir: source)
+test('checking-capture-window-liveness', python,
+  args: ['-B', source / 'tools/paper/test_checking_capture.py', '--window-live',
+    source, support, meson.current_build_dir() / 'checking-capture-window-liveness'],
+  suite: 'capture-liveness', timeout: 1800, is_parallel: false, workdir: source)
 test('byte-gate', codegen, args: ['check', '--repository', source,
   '--built', meson.current_build_dir() / 'paper'],
   depends: pair, suite: 'product', timeout: 60, is_parallel: false, workdir: source)

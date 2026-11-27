@@ -4,9 +4,12 @@ import argparse
 import copy
 import json
 import pathlib
+import resource
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 from contextlib import contextmanager
 
 import checking_capture as capture
@@ -41,6 +44,14 @@ def changed_file(path, suffix):
 
 def stored_controls():
     repository = pathlib.Path(__file__).resolve().parents[2]
+    paths = {path for _, path, _, _ in (*capture.SCOPES, *capture.WINDOWS)}
+    paths.update(path for _, path, _, _, _ in capture.NESTED)
+    sources = {path: (repository / path).read_text(encoding='utf-8') for path in paths}
+    capture.source_locations(sources)
+    lost = dict(sources)
+    _, _, body_path, anchor = capture.WINDOW_BODIES[-1]
+    lost[body_path] = lost[body_path].replace(anchor, 'missing consuming body', 1)
+    refuses(lambda: capture.source_locations(lost), 'Expected one consuming-body anchor')
     inside = repository / 'inside-checking-capture-control'
     refuses(lambda: dirty_controls(repository, None, inside),
             'Dirty control area lies inside the repository')
@@ -61,6 +72,11 @@ def stored_controls():
         if side['envelope']['instrumentation']['variant'] != 'base':
             raise AssertionError('Source mutation changed the checker instrumentation')
     baseline = load(FIXTURES / 'checking-capture.json')
+    if baseline['schema'] == 4:
+        capture.validate(baseline)
+        baseline = {key: value for key, value in baseline.items()
+                    if key != 'windows'}
+        baseline['schema'] = 3
     if any(side['capture']['records'] != baseline['records'] for side in (left, right)):
         raise AssertionError('Stored pair differs from the established outcomes')
     if capture.compare(left['capture'], right['capture']):
@@ -252,10 +268,68 @@ def active_controls(area):
     print('Active closing and economics controls passed')
 
 
+def window_live_controls(repository, support, area):
+    """Exercise an invisible grant and spend in each selected paragraph body."""
+    require_external_area(repository, area)
+    def run(variant):
+        start = time.monotonic()
+        before = resource.getrusage(resource.RUSAGE_CHILDREN)
+        result = capture.capture(repository, support, area / variant, variant)
+        after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        measured = result['resources']
+        print(json.dumps({'variant': variant, 'wall_seconds': round(time.monotonic() - start, 3),
+                          'own_child_user_delta': round(after.ru_utime - before.ru_utime, 3),
+                          'own_child_system_delta': round(after.ru_stime - before.ru_stime, 3),
+                          'cgroup_scope': measured['scope'],
+                          'cgroup_cpu_deltas': measured['cgroup_cpu_deltas'],
+                          'cgroup_pressure_total_deltas':
+                              measured['cgroup_pressure_total_deltas'],
+                          'cgroup_start': measured['cgroup_before'],
+                          'cgroup_end': measured['cgroup_after'],
+                          'cgroup_memory_peak_bytes':
+                              measured['cgroup_after']['memory_peak_bytes']}, sort_keys=True),
+              flush=True)
+        return result
+
+    base = run('base')
+    capture.validate(base)
+    for body, name, _, _ in capture.WINDOW_BODIES:
+        variant = f'window-{body}-grant'
+        changed = run(variant)
+        capture.validate(changed)
+        differences = capture.compare(base, changed)
+        if differences != [(name, 'grant_set')]:
+            raise AssertionError(f'{name} body effect changed {differences}')
+        refuses(lambda: capture.equal(base, changed), 'Checking capture differs')
+        record = next(row for row in changed['windows'] if row['scope'] == name)
+        if record['grant_set'] != ['c:lam']:
+            raise AssertionError(f'{name} body effect was not captured')
+        spent = run(f'window-{body}-spend')
+        if spent['run']['status'] == 'refused':
+            diagnostic = spent['run']['diagnostic']
+            if (diagnostic['scope'] != name or
+                    diagnostic['identity'] != 'grade-too-strong'):
+                raise AssertionError(f'{name} checker refusal differs: {diagnostic}')
+            refuses(lambda: capture.equal(base, spent), 'Incomplete or refused typeset')
+        else:
+            capture.validate(spent)
+            differences = capture.compare(base, spent)
+            if ((name, 'spend_set') not in differences or
+                    (name, 'diagnostics') not in differences or
+                    any(scope != name for scope, _ in differences)):
+                raise AssertionError(f'{name} checker warning differs: {differences}')
+            refuses(lambda: capture.equal(base, spent), 'Checking capture differs')
+        print(f'{body} consuming-body grant and unmasked spend changed the checker outcome')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live', nargs=3, metavar=('REPOSITORY', 'SUPPORT', 'AREA'),
                         type=pathlib.Path)
+    parser.add_argument('--window-live', nargs=3,
+                        metavar=('REPOSITORY', 'SUPPORT', 'AREA'), type=pathlib.Path)
+    parser.add_argument('--stored-live', nargs=3,
+                        metavar=('REPOSITORY', 'SUPPORT', 'AREA'), type=pathlib.Path)
     args = parser.parse_args()
     if args.live:
         require_external_area(args.live[0], args.live[2])
@@ -265,6 +339,21 @@ def main():
         live_controls(repository, support, area)
         active_controls(area)
         dirty_controls(repository, support, area)
+    if args.window_live:
+        repository, support, area = args.window_live
+        require_external_area(repository, area)
+        area.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=area) as fresh:
+            window_live_controls(repository, support, pathlib.Path(fresh))
+    if args.stored_live:
+        repository, support, area = args.stored_live
+        require_external_area(repository, area)
+        area.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=area) as fresh:
+            actual = capture.capture(repository, support, pathlib.Path(fresh) / 'base', 'base')
+            expected = load(FIXTURES / 'checking-capture.json')
+            capture.check_stored(expected, actual)
+            print(json.dumps(actual['resources'], sort_keys=True))
 
 
 if __name__ == '__main__':

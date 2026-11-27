@@ -4,12 +4,16 @@ An event belongs to the labelled scope current when it is emitted: a box
 restores its enclosing subsection on closing. Grade, spend and grant snapshots,
 diagnostics and rows follow this same rule. The selected scopes are the branch
 and confluence subsections, the mod:branch, dyn:flow and src:nd boxes, and the
-coda section and its four subsection audits. Row fields are the economics
+coda section and its four subsection audits. Seven more labelled section
+windows cover eight selected paper paragraphs, with five nested result audits
+and two independently identified economics rows. Each window has a checked
+opening and closing label; its closing grade audit belongs to that window.
+Row fields are the economics
 writer's arguments; rendered table cells are not observed and need their own
 comparison if the table is converted. An unselected box audit inside a selected
 section window refuses even when it changes its own scope marker. An unselected
-audit, checker diagnostic or economics row in that window refuses; only the two
-outside markers at the known section boundaries close a capture window. Only the
+audit, checker diagnostic or economics row in that window refuses; only the
+declared outside markers at known section boundaries close a capture window. Only the
 checker's l3msg warning and error forms are observed,
 including shorter forms routed through their six-argument form; a checker error
 yields a refused run, while package warnings, infos and notes are outside this
@@ -27,7 +31,8 @@ pair or rendered concordance cells. A rewritten box opening may
 need a new anchor; an absent anchor refuses. The run uses the paper engine's
 fixed rerun count, not the paper-and-explainer auxiliary fixed point.
 Paper edits can stale every variant's provenance; the full check rederives only
-the base fixture. The source-note control inserts a comment after preparation
+the base fixture. Open-spend and strict-diagnostic body variants are due when
+each body is converted. The source-note control inserts a comment after preparation
 at a fixed revision; it uses the same base checker instrumentation on both sides.
 The envelope cannot independently prove a command-only rerun-count variant.
 Pair comparison refuses changes to the checker source as capability changes.
@@ -50,6 +55,10 @@ from prepare import package_names, prepare
 
 PART_B = pathlib.Path('documents/paper/parts/partB.tex')
 CODA = pathlib.Path('documents/paper/parts/coda.tex')
+PART_D = pathlib.Path('documents/paper/parts/partD.tex')
+PART_E = pathlib.Path('documents/paper/parts/partE.tex')
+PART_F = pathlib.Path('documents/paper/parts/partF.tex')
+APPENDICES = pathlib.Path('documents/paper/parts/appendices.tex')
 SCOPES = (
     ('subsec:flow:branch', PART_B, r'\label{subsec:flow:branch}', 'section'),
     ('mod:branch', PART_B, r'\begin{statement}{mod:branch}', 'box'),
@@ -62,8 +71,44 @@ SCOPES = (
     ('subsec:coda:words', CODA, r'\label{subsec:coda:words}', 'section'),
     ('subsec:coda:close', CODA, r'\label{subsec:coda:close}', 'section'),
 )
+WINDOWS = (
+    ('subsec:colour-span', PART_D, r'\label{subsec:colour-span}', 'section'),
+    ('subsec:prof:leak', PART_E, r'\label{subsec:prof:leak}', 'section'),
+    ('subsec:still:hides', PART_F, r'\label{subsec:still:hides}', 'section'),
+    ('subsec:still:severance', PART_F, r'\label{subsec:still:severance}', 'section'),
+    ('subsec:corners:scales', APPENDICES, r'\label{subsec:corners:scales}', 'section'),
+    ('app:portraits', APPENDICES, r'\label{app:portraits}', 'section'),
+    ('app:cosine', APPENDICES, r'\label{app:cosine}', 'section'),
+)
+NESTED = (
+    ('pr:gain', PART_D, r'\begin{definition}[\hdr{pr:gain}]', 'box', 'subsec:colour-span'),
+    ('pr:span', PART_D, r'\begin{definition}[\hdr{pr:span}]', 'box', 'subsec:colour-span'),
+    ('pr:span-ident', PART_D, r'\begin{proposition}[\hdr{pr:span-ident}]', 'box',
+     'subsec:colour-span'),
+    ('pr:deltaspan', PART_D, r'\begin{corollary}[\hdr{pr:deltaspan}]', 'box',
+     'subsec:colour-span'),
+    ('P:leak', PART_E,
+     r'\begin{definition}[\hdrunbacked{The leaked exchange-rates}{P:leak}]', 'box',
+     'subsec:prof:leak'),
+)
+WINDOW_ROW_ANCHORS = (
+    (PART_D, r'\begin{econ}[label=e:pow,'),
+    (PART_E, r'\begin{econ}[label=e:robbins,'),
+)
+WINDOW_ENDS = (
+    ('subsec:colour-span', PART_D, r'\label{subsec:rep:factors}', 'outside'),
+    ('subsec:prof:leak', PART_E, r'\label{subsec:prof:order}', 'outside'),
+    ('subsec:still:hides', PART_F, r'\label{subsec:still:severance}',
+     'subsec:still:severance'),
+    ('subsec:still:severance', PART_F, r'\label{sec:two-boundaries}', 'outside'),
+    ('subsec:corners:scales', APPENDICES, r'\label{app:portraits}', 'app:portraits'),
+    ('app:portraits', APPENDICES, r'\label{app:cosine}', 'app:cosine'),
+    ('app:cosine', APPENDICES, r'\label{app:self-limit}', 'outside'),
+)
 ROW_SCOPES = {'e:dmp': 'subsec:flow:confluence',
               'e:capability': 'subsec:coda:wall'}
+WINDOW_ROW_SCOPES = {'e:pow': 'subsec:colour-span',
+                     'e:robbins': 'subsec:prof:leak'}
 TAP = r'''
 \iow_new:N \g_ftoo_capture_iow
 \iow_open:Nn \g_ftoo_capture_iow {checking-capture.events}
@@ -149,10 +194,20 @@ def unique_replace(text, old, new):
 
 def source_locations(sources):
     result = {}
-    for name, path, anchor, kind in SCOPES:
+    for name, path, anchor, kind in (*SCOPES, *WINDOWS,
+                                     *(entry[:4] for entry in NESTED)):
         if sources[path].count(anchor) != 1:
             raise ValueError(f'Expected one source anchor: {anchor}')
         result[name] = {'file': str(path), 'label_token': anchor, 'kind': kind}
+    for _, path, anchor, _ in WINDOW_ENDS:
+        if sources[path].count(anchor) != 1:
+            raise ValueError(f'Expected one window end: {anchor}')
+    for path, anchor in WINDOW_ROW_ANCHORS:
+        if sources[path].count(anchor) != 1:
+            raise ValueError(f'Expected one economics row anchor: {anchor}')
+    for _, _, path, anchor in WINDOW_BODIES:
+        if sources[path].count(anchor) != 1:
+            raise ValueError(f'Expected one consuming-body anchor: {anchor}')
     return result
 
 
@@ -316,6 +371,74 @@ def instrument_coda(source, variant):
     return source
 
 
+WINDOW_BODIES = (
+    ('colour-span', 'subsec:colour-span', PART_D,
+     'The complete object is the joint author-colour distribution;'),
+    ('prof-leak', 'subsec:prof:leak', PART_E,
+     'Demanding ``show me your conversion constants\'\''),
+    ('still-hides-first', 'subsec:still:hides', PART_F, 'The record sees $0=0$'),
+    ('still-hides-second', 'subsec:still:hides', PART_F,
+     "The held $\\heldweight$ is dark to its holder"),
+    ('still-severance', 'subsec:still:severance', PART_F,
+     'The severing will has two phases.'),
+    ('corners-scales', 'subsec:corners:scales', APPENDICES,
+     'The trivial root ($g=0$:'),
+    ('portraits', 'app:portraits', APPENDICES,
+     'The phase behaviour of \\ftag{dyn:flow}'),
+    ('cosine', 'app:cosine', APPENDICES,
+     'Their shared dimension is what makes a co-movement askable:'),
+)
+
+
+def window_body(variant):
+    key = variant.removeprefix('window-').removesuffix('-grant').removesuffix('-spend')
+    for body, name, path, anchor in WINDOW_BODIES:
+        if body == key:
+            return name, path, anchor
+    raise ValueError(f'Unknown window variant: {variant}')
+
+
+def instrument_windows(sources, variant):
+    """Locate each audited window, including nested box checks and its end."""
+    changed = dict(sources)
+    for name, path, anchor, _ in WINDOWS:
+        changed[path] = mark_after(changed[path], anchor, name)
+    for parent, path, anchor, next_scope in WINDOW_ENDS:
+        if next_scope != 'outside':
+            continue
+        changed[path] = mark_after(changed[path], anchor, 'outside')
+    for name, path, anchor, _, parent in NESTED:
+        source = mark_before_line(changed[path], anchor, name)
+        start = source.index(anchor)
+        closing = r'\end{' + anchor.split(r'\begin{', 1)[1].split('}', 1)[0] + '}'
+        end = source.index(closing, start) + len(closing)
+        source = source[:end] + '\n' + (r'\ExplSyntaxOn\ftoo_capture_scope:n {' +
+                  parent + r'}\ExplSyntaxOff') + source[end:]
+        changed[path] = source
+    if variant.startswith('window-'):
+        if variant.endswith('-grant'):
+            selected = variant.removeprefix('window-').removesuffix('-grant')
+            grant = True
+        elif variant.endswith('-spend'):
+            selected = variant.removeprefix('window-').removesuffix('-spend')
+            grant = False
+        else:
+            raise ValueError(f'Unknown window variant: {variant}')
+        for key, name, path, anchor in WINDOW_BODIES:
+            if selected == key:
+                mask = (r'\clist_put_right:Ne '
+                        r'\l__ftoo_grant_mask_clist {\tl_to_str:n {c:lam}}'
+                        if grant else '')
+                effect = (r'{\ExplSyntaxOn' + mask +
+                          r'\ftoo_spend:nn {c:lam}{capture}\ExplSyntaxOff}')
+                changed[path] = unique_replace(changed[path], anchor,
+                                               anchor + effect)
+                break
+        else:
+            raise ValueError(f'Unknown window variant: {variant}')
+    return changed
+
+
 def parse_events(events, log, locations):
     lines = events.splitlines()
     if not lines or lines[-1] != 'FT-COMPLETE':
@@ -325,21 +448,41 @@ def parse_events(events, log, locations):
     seen_known_rows = set()
     active = None
     enclosing = None
+    restore = None
     outside_count = 0
+    present = [name in locations for name, _, _, _ in WINDOWS]
+    if any(present) and not all(present):
+        raise ValueError('Incomplete window locations')
+    expanded = all(present)
+    base_outside = ((SCOPES[2][0], SCOPES[2][1]),
+                    (SCOPES[-1][0], SCOPES[-1][1]))
+    window_outside = ((name, path) for name, path, _, next_scope in WINDOW_ENDS
+                      if next_scope == 'outside')
+    source_order = tuple(pathlib.Path('documents/paper') / path
+                         for path in INSTRUMENTED if path.startswith('parts/'))
+    outside_after = tuple(name for name, _ in sorted(
+        (*base_outside, *(window_outside if expanded else ())),
+        key=lambda item: source_order.index(item[1])))
+    row_scopes = ROW_SCOPES | (WINDOW_ROW_SCOPES if expanded else {})
     for line in lines[:-1]:
+        if restore is not None:
+            if line != f'FT-SCOPE|{restore}':
+                raise ValueError(f'Nested box did not restore {restore}')
+            restore = None
         parts = [part.strip() for part in line.split('|')]
         if parts[0] == 'FT-SCOPE':
             if len(parts) != 2:
                 raise ValueError('Malformed scope event')
             if parts[1] == 'outside':
-                expected = ('subsec:flow:confluence', 'subsec:coda:close')
-                if (active is not None or outside_count >= len(expected) or
-                        enclosing != expected[outside_count]):
+                if (active is not None or outside_count >= len(outside_after) or
+                        enclosing != outside_after[outside_count]):
                     raise ValueError('Unexpected outside scope marker')
                 outside_count += 1
                 enclosing = None
             elif parts[1] in locations and locations[parts[1]]['kind'] == 'section':
                 enclosing = parts[1]
+            elif parts[1] not in locations and enclosing is not None:
+                raise ValueError(f'Unselected scope marker inside {enclosing}: {parts[1]}')
         elif parts[0] == 'FT-CHECK':
             if len(parts) != 6 or active is not None:
                 raise ValueError('Malformed check event')
@@ -362,6 +505,8 @@ def parse_events(events, log, locations):
                 raise ValueError('Unmatched check end event')
             if active in found:
                 found[active]['end_marker'] = True
+            restore = next((parent for name, _, _, _, parent in NESTED
+                            if name == active), None) if expanded else None
             active = None
         elif parts[0] == 'FT-DIAG':
             if len(parts) != 5:
@@ -393,35 +538,42 @@ def parse_events(events, log, locations):
             if len(parts) != 7:
                 raise ValueError('Malformed economics row')
             scope, departure, tag, onref, cites, stopsat = parts[1:]
-            if tag in ROW_SCOPES and scope != ROW_SCOPES[tag]:
+            if tag in row_scopes and scope != row_scopes[tag]:
                 raise ValueError(f'Economics row scope differs: {tag}')
             if scope not in locations and enclosing is not None:
                 raise ValueError(f'Unselected economics row inside {enclosing}: {scope}')
             if scope in locations:
                 if tag in seen_known_rows:
                     raise ValueError(f'Duplicate economics row: {tag}')
-                if tag in ROW_SCOPES:
+                if tag in row_scopes:
                     seen_known_rows.add(tag)
                 rows[scope].append({'table': 'tbl:log:concordance',
                                     'departure': departure, 'tag': tag,
                                     'onref': onref, 'cites': cites, 'stopsat': stopsat})
         else:
             raise ValueError(f'Unknown checking event: {parts[0]}')
-    if active is not None:
+    if active is not None or restore is not None:
         raise ValueError('Unclosed check event')
-    if outside_count != 2:
+    if outside_count != len(outside_after):
         raise ValueError('Missing outside scope marker')
-    if seen_known_rows != set(ROW_SCOPES):
+    if seen_known_rows != set(row_scopes):
         raise ValueError('Missing economics row')
     for scope, emitted in rows.items():
         if emitted and scope not in found:
             raise ValueError(f'Missing row owner audit: {scope}')
         if scope in found:
             found[scope]['derived_rows'] = emitted
-    missing = [name for name, _, _, _ in SCOPES if name not in found]
+    selected = (*SCOPES, *((*WINDOWS, *(entry[:4] for entry in NESTED))
+                           if expanded else ()))
+    missing = [name for name, _, _, _ in selected if name not in found]
     if missing:
         raise ValueError(f'Missing check record: {missing}')
-    return [found[name] for name, _, _, _ in SCOPES]
+    if expanded:
+        for name, path, anchor, next_scope in WINDOW_ENDS:
+            found[name]['end_location'] = {
+                'file': str(path), 'label_token': anchor,
+                'next_scope': next_scope}
+    return [found[name] for name, _, _, _ in selected]
 
 
 def classify_refusal(log, engine_stream, scope):
@@ -538,7 +690,8 @@ def support_identity(repository, support, packages):
             'bundle_files': {name: sha256((bundle / name).read_bytes()) for name in names}}
 
 
-INSTRUMENTED = ('ftoo_typed_tools.tex', 'parts/partB.tex', 'parts/coda.tex',
+INSTRUMENTED = ('ftoo_typed_tools.tex', 'parts/partB.tex', 'parts/partD.tex',
+                'parts/partE.tex', 'parts/partF.tex', 'parts/coda.tex',
                 'parts/appendices.tex')
 
 
@@ -562,17 +715,21 @@ def instrumentation_variant(variant):
 
 
 def instrumented_bytes(prepared, variant):
-    """Build the exact four files the engine reads from retained prepared bytes."""
+    """Build the checked instrumented files from retained prepared bytes."""
     sources = {path: (prepared / path.relative_to('documents/paper'))
-               .read_text(encoding='utf-8') for path in (PART_B, CODA)}
+               .read_text(encoding='utf-8')
+               for path in (PART_B, PART_D, PART_E, PART_F, CODA, APPENDICES)}
+    sources = instrument_windows(sources, variant)
     typed = (prepared / 'ftoo_typed_tools.tex').read_text(encoding='utf-8')
-    appendices = (prepared / 'parts/appendices.tex').read_text(encoding='utf-8')
     return {
         'ftoo_typed_tools.tex': (typed + tap_for_variant(variant)).encode('utf-8'),
         'parts/partB.tex': instrument_part_b(sources[PART_B], variant).encode('utf-8'),
+        'parts/partD.tex': sources[PART_D].encode('utf-8'),
+        'parts/partE.tex': sources[PART_E].encode('utf-8'),
+        'parts/partF.tex': sources[PART_F].encode('utf-8'),
         'parts/coda.tex': instrument_coda(sources[CODA], variant).encode('utf-8'),
         'parts/appendices.tex': unique_replace(
-            appendices, r'\section{Recovery}',
+            sources[APPENDICES], r'\section{Recovery}',
             r'\section{Recovery}' + '\n' +
             r'\ExplSyntaxOn\ftoo_capture_scope:n {outside}\ExplSyntaxOff'
         ).encode('utf-8'),
@@ -697,10 +854,11 @@ def validate_envelope(envelope, captured, repository, support, work):
                        ('engine_stream_sha256', work / 'engine.txt')):
         if not path.is_file() or sha256(path.read_bytes()) != output.get(name):
             raise ValueError(f'Missing or changed successful output: {name}')
-    locations = {row['scope']: row['location'] for row in captured['records']}
+    checked = (*captured['records'], *captured.get('windows', []))
+    locations = {row['scope']: row['location'] for row in checked}
     events = (paper / 'checking-capture.events').read_text(encoding='utf-8')
     log = (paper / 'main.log').read_text(encoding='utf-8', errors='replace')
-    if parse_events(events, log, locations) != captured['records']:
+    if parse_events(events, log, locations) != list(checked):
         raise ValueError('Checking events differ from capture')
     if not re.search(r'Output written on main\.xdv \(\d+ pages, \d+ bytes\)\.\s*\Z', log):
         raise ValueError('Successful typeset log incomplete')
@@ -764,7 +922,7 @@ def capture(repository, support, work, variant):
     saved = work / 'prepared-inputs'
     shutil.copytree(paper, saved)
     sources = {path: (paper / path.relative_to('documents/paper')).read_text(encoding='utf-8')
-               for path in (PART_B, CODA)}
+               for path in (PART_B, PART_D, PART_E, PART_F, CODA, APPENDICES)}
     locations = source_locations(sources)
     effective_variant = instrumentation_variant(variant)
     for name, data in instrumented_bytes(saved, effective_variant).items():
@@ -798,6 +956,8 @@ def capture(repository, support, work, variant):
         refusal_scope = ('subsec:coda:close' if variant in (
                             'close-paragraph-refusal', 'close-refrain-refusal')
                          else 'subsec:coda:wall' if variant == 'coda-refusal'
+                         else window_body(variant)[0]
+                              if variant.startswith('window-') and variant.endswith('-spend')
                          else 'dyn:flow')
         refusal = classify_refusal(log, engine_stream, refusal_scope)
         records = []
@@ -809,17 +969,20 @@ def capture(repository, support, work, variant):
             raise ValueError('Incomplete typeset log')
         if not event_path.is_file():
             raise ValueError('Missing checking events')
-        records = parse_events(event_path.read_text(encoding='utf-8'), log, locations)
+        checked = parse_events(event_path.read_text(encoding='utf-8'), log, locations)
+        records = checked[:len(SCOPES)]
+        windows = checked[len(SCOPES):]
         if not output_path.is_file():
             raise ValueError('Missing typeset output')
         run = {'status': 'complete', 'engine_exit': result.returncode,
                'output_sha256': hashlib.sha256(output_path.read_bytes()).hexdigest(),
                'log_complete': log_complete}
-    captured = {'schema': 3, 'prepared_sha256': {
+    captured = {'schema': 4, 'prepared_sha256': {
                 str(path): hashlib.sha256(source.encode()).hexdigest()
                 for path, source in sources.items()},
             'run': run,
             'records': records,
+            'windows': windows if run['status'] == 'complete' else [],
             }
     if run['status'] == 'complete':
         dirty_after = preparation_changes(repository)
@@ -841,15 +1004,21 @@ OUTCOME_FIELDS = ('claimed_grade', 'spend_set', 'grant_set', 'diagnostics', 'der
 def compare(base, changed):
     validate(base)
     validate(changed)
-    before = {row['scope']: row for row in base['records']}
-    after = {row['scope']: row for row in changed['records']}
+    if base['schema'] != changed['schema']:
+        raise ValueError('Checking capture schema differs')
+    before = {row['scope']: row for row in
+              (*base['records'], *base.get('windows', []))}
+    after = {row['scope']: row for row in
+             (*changed['records'], *changed.get('windows', []))}
     return [(scope, field) for scope in before for field in OUTCOME_FIELDS
             if before[scope][field] != after[scope][field]]
 
 
 def changed_fields(before, after, scope):
-    left = next(row for row in before['records'] if row['scope'] == scope)
-    right = next(row for row in after['records'] if row['scope'] == scope)
+    left = next(row for row in (*before['records'], *before.get('windows', []))
+                if row['scope'] == scope)
+    right = next(row for row in (*after['records'], *after.get('windows', []))
+                 if row['scope'] == scope)
     return [field for field in OUTCOME_FIELDS if left[field] != right[field]]
 
 
@@ -860,8 +1029,26 @@ def equal(expected, actual):
     print('Checking capture equal')
 
 
+def check_stored(expected, actual):
+    """Bind the stored input inventory as well as the checking outcomes."""
+    old = expected.get('prepared_sha256', {})
+    new = actual.get('prepared_sha256', {})
+    differing = sorted(path for path in old.keys() | new.keys()
+                       if old.get(path) != new.get(path))
+    if differing:
+        drift = compare(expected, actual)
+        outcome = f'outcome drift: {drift}' if drift else 'outcomes unchanged'
+        raise ValueError(
+            f'Stored prepared source digest differs: {", ".join(differing)}; {outcome}. '
+            'Regenerate: CAPTURE_WORK=$(mktemp -d "$BUILD/checking-capture.XXXXXX"); '
+            'python3 -B tools/paper/checking_capture.py "$SRC" "$SUPPORT" '
+            '"$CAPTURE_WORK"; cp "$CAPTURE_WORK/capture.json" '
+            'tools/paper/fixtures/checking-capture.json')
+    equal(expected, actual)
+
+
 def validate(value):
-    if value.get('schema') != 3:
+    if value.get('schema') not in (3, 4):
         raise ValueError('Unsupported checking capture schema')
     run = value.get('run')
     if not isinstance(run, dict) or run.get('status') != 'complete':
@@ -876,13 +1063,34 @@ def validate(value):
         raise ValueError('Missing check record')
     if [row.get('scope') for row in records] != [row[0] for row in SCOPES]:
         raise ValueError('Check scope order differs')
-    for record in records:
+    windows = value.get('windows', [])
+    if value['schema'] == 4:
+        if (not isinstance(windows, list) or len(windows) != len(WINDOWS) + len(NESTED)
+                or [row.get('scope') for row in windows] != [
+                    row[0] for row in (*WINDOWS, *NESTED)]):
+            raise ValueError('Check window order differs')
+        for record, (_, path, anchor, kind) in zip(
+                windows, (*WINDOWS, *(entry[:4] for entry in NESTED))):
+            if record.get('location') != {'file': str(path),
+                                          'label_token': anchor, 'kind': kind}:
+                raise ValueError('Check window start differs')
+        for record, (_, path, anchor, next_scope) in zip(windows, WINDOW_ENDS):
+            if record.get('end_location') != {'file': str(path),
+                                              'label_token': anchor,
+                                              'next_scope': next_scope}:
+                raise ValueError('Check window end differs')
+    elif 'windows' in value:
+        raise ValueError('Legacy capture has unexpected windows')
+    row_scopes = ROW_SCOPES | (WINDOW_ROW_SCOPES if value['schema'] == 4 else {})
+    for record in (*records, *windows):
         if record.get('end_marker') is not True:
             raise ValueError('Missing check end marker')
+        if record.get('location', {}).get('kind') not in ('section', 'box'):
+            raise ValueError('Malformed check location')
         rows = record.get('derived_rows')
         if not isinstance(rows, list):
             raise ValueError('Malformed derived row list')
-        expected_tag = {scope: tag for tag, scope in ROW_SCOPES.items()}.get(record['scope'])
+        expected_tag = {scope: tag for tag, scope in row_scopes.items()}.get(record['scope'])
         if expected_tag and sum(row.get('tag') == expected_tag for row in rows) != 1:
             raise ValueError('Missing economics row')
         for row in rows:
@@ -893,10 +1101,12 @@ def validate(value):
                 raise ValueError('Malformed economics row arguments')
 
 
-def expect_refusal(action, description):
+def expect_refusal(action, description, reason=None):
     try:
         action()
     except (ValueError, FileNotFoundError, json.JSONDecodeError) as error:
+        if reason is not None and reason not in str(error):
+            raise AssertionError(f'{description}: wrong refusal ({error})') from error
         print(f'{description}: refused ({error})')
         return
     raise AssertionError(f'{description}: accepted')
@@ -905,12 +1115,85 @@ def expect_refusal(action, description):
 def selftest(fixture):
     base = json.loads(fixture.read_text(encoding='utf-8'))
     validate(base)
+    if base['schema'] == 4:
+        if len(base['windows']) != len(WINDOWS) + len(NESTED):
+            raise AssertionError('New window fixture is incomplete')
+        record_by_name = {row['scope']: row for row in
+                          (*base['records'], *base['windows'])}
+        events = []
+
+        def emit(name):
+            row = record_by_name[name]
+            events.extend((f'FT-SCOPE|{name}', '|'.join((
+                'FT-CHECK', name, row['location']['kind'], row['claimed_grade'],
+                ','.join(row['spend_set']), ','.join(row['grant_set']))),
+                f'FT-END|{name}'))
+            for item in row['derived_rows']:
+                events.append('|'.join(('FT-ROW', name, *(item[key] for key in
+                              ('departure', 'tag', 'onref', 'cites', 'stopsat')))))
+
+        for row in base['records'][:5]:
+            emit(row['scope'])
+        events.append('FT-SCOPE|outside')
+        for name in ('subsec:colour-span', 'subsec:prof:leak'):
+            emit(name)
+            for nested, _, _, _, parent in NESTED:
+                if parent == name:
+                    emit(nested)
+                    events.append(f'FT-SCOPE|{parent}')
+            events.append('FT-SCOPE|outside')
+        emit('subsec:still:hides')
+        emit('subsec:still:severance')
+        events.append('FT-SCOPE|outside')
+        for row in base['records'][5:]:
+            emit(row['scope'])
+        events.append('FT-SCOPE|outside')
+        for name in ('subsec:corners:scales', 'app:portraits', 'app:cosine'):
+            emit(name)
+        events.extend(('FT-SCOPE|outside', 'FT-COMPLETE'))
+        event_stream = '\n'.join(events) + '\n'
+        locations = {row['scope']: row['location'] for row in
+                     (*base['records'], *base['windows'])}
+        if parse_events(event_stream, '', locations) != [
+                *base['records'], *base['windows']]:
+            raise AssertionError('Synthetic window stream differs from stored capture')
+        expect_refusal(lambda: parse_events(event_stream.replace(
+            'FT-SCOPE|subsec:colour-span\nFT-CHECK',
+            'FT-SCOPE|outside\nFT-CHECK', 1), '', locations),
+            'window outside sequence', 'Unexpected outside scope marker')
+        expect_refusal(lambda: parse_events(event_stream.replace(
+            'FT-ROW|subsec:colour-span|', 'FT-ROW|app:portraits|', 1), '', locations),
+            'window economics row', 'Economics row scope differs')
+        expect_refusal(lambda: parse_events(event_stream.replace(
+            'FT-END|pr:gain\nFT-SCOPE|subsec:colour-span',
+            'FT-END|pr:gain\nFT-SCOPE|outside', 1), '', locations),
+            'nested box restoration', 'Nested box did not restore')
+        incomplete = dict(locations)
+        incomplete.pop('app:cosine')
+        expect_refusal(lambda: parse_events(event_stream, '', incomplete),
+                       'incomplete window locations', 'Incomplete window locations')
+        altered_window = copy.deepcopy(base)
+        altered_window['windows'][0]['end_location']['label_token'] = 'moved end'
+        expect_refusal(lambda: validate(altered_window), 'moved window end')
+        altered_window = copy.deepcopy(base)
+        altered_window['windows'][0]['location']['label_token'] = 'moved start'
+        expect_refusal(lambda: validate(altered_window), 'moved window start')
+        altered_window = copy.deepcopy(base)
+        altered_window['windows'].pop()
+        expect_refusal(lambda: validate(altered_window), 'missing nested audit')
+        base = {key: value for key, value in base.items() if key != 'windows'}
+        base['schema'] = 3
     altered = copy.deepcopy(base)
     altered['prepared_sha256'] = {'prepared source': 'changed'}
     altered['records'][0]['location']['label_token'] = 'moved label'
     if compare(base, altered):
         raise AssertionError('Provenance affected outcome comparison')
     print('source provenance ignored in outcome comparison')
+    expect_refusal(lambda: check_stored(base, altered), 'stale stored preparation',
+                   'Stored prepared source digest differs')
+    altered['records'][0]['grant_set'] = ['c:lam']
+    expect_refusal(lambda: check_stored(base, altered), 'stale preparation and outcome',
+                   'outcome drift:')
     warning = json.loads(fixture.with_name('checking-capture-warning.json')
                          .read_text(encoding='utf-8'))
     if compare(base, warning) != [('mod:branch', 'diagnostics')]:
@@ -1050,30 +1333,28 @@ def selftest(fixture):
                                 'FT-CHECK|subsec:flow:branch|box|nec||')
     expect_refusal(lambda: parse_events(box_stream, '', locations),
                    'unselected box under section scope')
-    nested_box = ('FT-SCOPE|e:added\nFT-CHECK|e:added|box|nec||\n'
-                  'FT-END|e:added\nFT-SCOPE|subsec:coda:wall\n')
+    nested_box = ('FT-CHECK|e:added|box|nec||\nFT-END|e:added\n')
     box_stream = stream.replace('FT-SCOPE|subsec:coda:words',
                                 nested_box + 'FT-SCOPE|subsec:coda:words')
     expect_refusal(lambda: parse_events(box_stream, '', locations),
-                   'unselected box with its own scope marker')
+                   'unselected box audit', 'Unselected audit inside')
     diagnostic_event = 'FT-DIAG|e:added|warning|ftoo|open-debt\n'
     diagnostic_stream = stream.replace(
         'FT-SCOPE|subsec:coda:words',
-        'FT-SCOPE|e:added\n' + diagnostic_event +
-        'FT-SCOPE|subsec:coda:wall\nFT-SCOPE|subsec:coda:words')
+        diagnostic_event + 'FT-SCOPE|subsec:coda:words')
     expect_refusal(lambda: parse_events(diagnostic_stream, '', locations),
-                   'unselected checker diagnostic with its own scope marker')
+                   'unselected checker diagnostic', 'Unselected diagnostic inside')
     row_event = 'FT-ROW|e:added|annex|e:new|dyn:flow|a:dmp|control\n'
     row_stream = stream.replace(
         'FT-SCOPE|subsec:coda:words',
-        'FT-SCOPE|e:added\n' + row_event +
-        'FT-SCOPE|subsec:coda:wall\nFT-SCOPE|subsec:coda:words')
+        row_event + 'FT-SCOPE|subsec:coda:words')
     expect_refusal(lambda: parse_events(row_stream, '', locations),
-                   'unselected economics row with its own scope marker')
-    hidden_stream = box_stream.replace('FT-SCOPE|e:added\n',
-                                       'FT-SCOPE|outside\n', 1)
+                   'unselected economics row', 'Unselected economics row inside')
+    hidden_stream = stream.replace('FT-SCOPE|subsec:coda:words',
+                                   'FT-SCOPE|outside\nFT-SCOPE|subsec:coda:words', 1)
     expect_refusal(lambda: parse_events(hidden_stream, '', locations),
-                   'outside scope marker inside captured section')
+                   'outside scope marker inside captured section',
+                   'Unexpected outside scope marker')
     extra_row = 'FT-ROW|subsec:flow:confluence|annex|e:capture|dyn:flow|a:dmp|control\n'
     with_row = parse_events(stream.replace('FT-COMPLETE', extra_row + 'FT-COMPLETE'),
                             '', locations)
@@ -1154,6 +1435,8 @@ def main():
                                    repository, support)
             expected = json.loads((repository / 'tools/paper/fixtures/checking-capture.json')
                                   .read_text(encoding='utf-8'))
+            # Dirty source copies retain the outcome gate; the standing stored
+            # test binds prepared hashes for the committed corpus separately.
             equal(expected, stored)
         finally:
             measurement = resources(start, cgroup_line, before, cgroup_snapshot(cgroup))
@@ -1178,7 +1461,10 @@ def main():
                                  'close-paragraph-grant',
                                  'close-paragraph-refusal', 'close-refrain-spend',
                                  'close-refrain-grant',
-                                 'close-refrain-refusal'))
+                                 'close-refrain-refusal',
+                                 *(f'window-{name}-{effect}'
+                                   for name, _, _, _ in WINDOW_BODIES
+                                   for effect in ('grant', 'spend'))))
     args = parser.parse_args()
     stored = write_capture(args.work, capture(args.repository, args.support, args.work,
                                               args.variant), args.repository, args.support)
