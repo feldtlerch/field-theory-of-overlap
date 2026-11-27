@@ -65,6 +65,12 @@ Now the hard claim, stated with its own care:
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+## The Signed Externality Log
+
+What, then, can we build? One artifact: a **signed externality log**. Record acts, both valences — harm and help. Price their charge — what actually moved in other lives, read on a rod the log itself publishes: the log’s own measuring axis is posted per entry, criticizable, its lean on the record where every other lean is. Gate on capacity. Log alignment only as context, never as the basis of a charge. Anchor belief in independence and colour&#45;span. Build no global verdict — none crosses the anchor wall.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 This is not despair. It is discipline. Do not flatten direction into magnitude, capacity into realization, persons into scores, witnesses into crowds, facts into verdicts or verdicts into facts, love into preference, goodness into usefulness, or wisdom into self&#45;sacrifice. Hold the distinctions, and the paper&#39;s eight welded words line up where they were earned: <a href="../paper-pilot/en.md#virtue-wonder"><strong><em>wonder</em></strong></a> reaches toward unknown surplus; <a href="../paper-pilot/en.md#virtue-beauty"><strong><em>beauty</em></strong></a> is wonder found; <a href="../paper-pilot/en.md#virtue-goodness"><strong><em>goodness</em></strong></a> enlarges real overlap; <a href="../paper-pilot/en.md#virtue-kindness"><strong><em>kindness</em></strong></a> is goodness at the modest scale; <a href="../paper-pilot/en.md#virtue-love"><strong><em>love</em></strong></a> draws the self along held edges; <a href="../paper-pilot/en.md#virtue-wisdom"><strong><em>wisdom</em></strong></a> guards the boundary from exploitation and erasure; <a href="../paper-pilot/en.md#virtue-truth"><strong><em>truth</em></strong></a> is anchored legibility against capture; <a href="../paper-pilot/en.md#virtue-health"><strong><em>health</em></strong></a> is the self&#45;floor self&#45;deception must not cross.
 
 Not yet converted: intervening material is omitted from this excerpt.

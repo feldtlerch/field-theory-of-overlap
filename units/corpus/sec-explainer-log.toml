@@ -1,0 +1,18 @@
+schema = 1
+
+[unit]
+id = "sec:explainer:log"
+document = "explainer-pilot"
+composition = "corpus-slot"
+language = "en"
+
+[[unit.blocks]]
+kind = "heading"
+level = "section"
+star = false
+title = [{ kind = "text", decoded = "The Signed Externality Log" }]
+label = "sec:explainer:log"
+
+[[unit.blocks]]
+kind = "paragraph"
+runs = [{ kind = "text", decoded = "What, then, can we build? One artifact: a " }, { kind = "style", style = "strong", children = [{ kind = "text", decoded = "signed externality log" }] }, { kind = "text", decoded = ". Record acts, both valences — harm and help. Price their charge — what actually moved in other lives, read on a rod the log itself publishes: the log’s own measuring axis is posted per entry, criticizable, its lean on the record where every other lean is. Gate on capacity. Log alignment only as context, never as the basis of a charge. Anchor belief in independence and colour-span. Build no global verdict — none crosses the anchor wall." }]

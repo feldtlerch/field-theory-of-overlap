@@ -14,6 +14,7 @@ children = [
   { kind = "quotation", unit = "sec:say:enemy-to-none" },
   { kind = "corpus-slot", unit = "sec:explainer:falsifier" },
   { kind = "corpus-slot", unit = "sec:explainer:verdicts-lives" },
+  { kind = "corpus-slot", unit = "sec:explainer:log" },
   { kind = "paragraph", unit = "sec:explainer:eight-words" },
   { kind = "quotation", unit = "sec:coda:record-limit" }
 ]

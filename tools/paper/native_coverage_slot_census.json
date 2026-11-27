@@ -1,11 +1,11 @@
 {
   "schema": 2,
   "source": "documents/paper/explainer/explainer.tex",
-  "source_sha256": "230865c53bbeee8fe9a5dd63b771057a44e0c4fac1e67b52ced9336b082ca858",
+  "source_sha256": "a13cfa1b1cec0c7321b9dca3df0c7757f0f7300e46497d3f13cb8c9f61380659",
   "source_list_digest": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
-  "import_context_digest": "3253f65d0d54b35c696cefa90cf3cc6f58215a08fa6fb9a2040c0d872ed46ec1",
+  "import_context_digest": "e6308c30c1be1762db09f75a9b1f2e089ec2b705d078ffb13abf90efe2d7d3ce",
   "source_digests": {
-    "documents/paper/explainer/explainer.tex": "230865c53bbeee8fe9a5dd63b771057a44e0c4fac1e67b52ced9336b082ca858",
+    "documents/paper/explainer/explainer.tex": "a13cfa1b1cec0c7321b9dca3df0c7757f0f7300e46497d3f13cb8c9f61380659",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
     "documents/paper/parts/partA.tex": "ce98c5c2bb7b513a55ae27dbc7965a0af6f786fcd13191a02e959d3eb697f2c9",
     "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
@@ -26,11 +26,11 @@
           "refused": 1
         },
         "existing-native-inclusion": {
-          "decoded": 10,
+          "decoded": 11,
           "refused": 0
         },
         "heading": {
-          "decoded": 9,
+          "decoded": 8,
           "refused": 0
         },
         "list": {
@@ -38,7 +38,7 @@
           "refused": 2
         },
         "paragraph": {
-          "decoded": 41,
+          "decoded": 40,
           "refused": 43
         },
         "refusal": {
@@ -591,83 +591,66 @@
     {
       "blocks": [
         {
-          "first": 724,
+          "first": 778,
           "kind": "heading",
-          "last": 726
+          "last": 780
         },
         {
-          "first": 727,
+          "first": 781,
           "kind": "paragraph",
-          "last": 734
+          "last": 783
+        },
+        {
+          "first": 784,
+          "kind": "paragraph",
+          "last": 797
+        },
+        {
+          "first": 798,
+          "kind": "paragraph",
+          "last": 809
         }
       ],
-      "first": 724,
-      "last": 734,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:735 Paragraph Unresolved"
+      "first": 778,
+      "last": 809,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:810 Paragraph Unresolved"
     },
     {
       "blocks": [
         {
-          "first": 788,
+          "first": 818,
           "kind": "heading",
-          "last": 790
+          "last": 820
         },
         {
-          "first": 791,
+          "first": 821,
           "kind": "paragraph",
-          "last": 793
+          "last": 834
         },
         {
-          "first": 794,
+          "first": 835,
           "kind": "paragraph",
-          "last": 807
+          "last": 840
         },
         {
-          "first": 808,
-          "kind": "paragraph",
-          "last": 819
-        }
-      ],
-      "first": 788,
-      "last": 819,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:820 Paragraph Unresolved"
-    },
-    {
-      "blocks": [
-        {
-          "first": 828,
-          "kind": "heading",
-          "last": 830
-        },
-        {
-          "first": 831,
-          "kind": "paragraph",
-          "last": 844
-        },
-        {
-          "first": 845,
-          "kind": "paragraph",
-          "last": 850
-        },
-        {
-          "first": 851,
+          "first": 841,
           "kind": "existing-native-inclusion",
-          "last": 852
+          "last": 842
         },
         {
-          "first": 853,
+          "first": 843,
           "kind": "paragraph",
-          "last": 856
+          "last": 846
         },
         {
-          "first": 857,
+          "first": 847,
           "kind": "paragraph",
-          "last": 858
+          "last": 848
         }
       ],
-      "first": 828,
-      "last": 858,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:859 ExistingNativeInclusion Decoded"
+      "first": 818,
+      "last": 848,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:849 ExistingNativeInclusion Decoded"
     }
   ]
 }
