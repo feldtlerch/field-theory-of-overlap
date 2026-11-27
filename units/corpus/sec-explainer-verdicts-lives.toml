@@ -1,0 +1,18 @@
+schema = 1
+
+[unit]
+id = "sec:explainer:verdicts-lives"
+document = "explainer-pilot"
+composition = "corpus-slot"
+language = "en"
+
+[[unit.blocks]]
+kind = "heading"
+level = "section"
+star = false
+title = [{ kind = "text", decoded = "Verdicts and Lives" }]
+label = "sec:explainer:verdicts-lives"
+
+[[unit.blocks]]
+kind = "paragraph"
+runs = [{ kind = "text", decoded = "Now the hard claim, stated with its own care:" }]

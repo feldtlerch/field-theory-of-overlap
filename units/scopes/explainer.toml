@@ -34,6 +34,10 @@ unit = "sec:explainer:falsifier"
 role = "corpus-slot"
 
 [[scope.occurrences]]
+unit = "sec:explainer:verdicts-lives"
+role = "corpus-slot"
+
+[[scope.occurrences]]
 unit = "sec:explainer:eight-words"
 role = "paragraph"
 

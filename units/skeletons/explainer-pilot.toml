@@ -13,6 +13,7 @@ children = [
   { kind = "corpus-slot", unit = "sec:explainer:accountability" },
   { kind = "quotation", unit = "sec:say:enemy-to-none" },
   { kind = "corpus-slot", unit = "sec:explainer:falsifier" },
+  { kind = "corpus-slot", unit = "sec:explainer:verdicts-lives" },
   { kind = "paragraph", unit = "sec:explainer:eight-words" },
   { kind = "quotation", unit = "sec:coda:record-limit" }
 ]
