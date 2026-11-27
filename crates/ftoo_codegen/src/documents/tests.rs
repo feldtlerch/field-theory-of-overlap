@@ -680,11 +680,13 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
     let primitives = [
         (P::Alpha, 0),
         (P::Beta, 0),
+        (P::Nabla, 0),
         (P::Fraction, 2),
         (P::Subscript, 2),
         (P::Superscript, 2),
         (P::Add, 2),
         (P::Equal, 2),
+        (P::LessEqual, 2),
         (P::Negate, 1),
         (P::Multiply, 2),
         (P::Juxtapose, 2),
@@ -723,11 +725,13 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             for token in [
                 "alpha",
                 "beta",
+                "nabla",
                 "fraction",
                 "subscript",
                 "superscript",
                 "add",
                 "equal",
+                "less-equal",
                 "negate",
                 "multiply",
                 "juxtapose",
@@ -764,8 +768,8 @@ fn complete_native_inventory_distinguishes_definition_and_primitive_owners()
             }
         }
     }
-    // 1,040 = 699 existing rows + 341 catalogue rows.
-    assert_eq!(rows.len(), 1_040);
+    // 1,170 = 699 existing rows + 471 catalogue rows.
+    assert_eq!(rows.len(), 1_170);
     assert_eq!(native::sweep_inventory(&catalogue, &rows), Ok(()));
     let missing = NativeCase::Sweep {
         owner: RenderOwner::Definition(D::Dimension),
