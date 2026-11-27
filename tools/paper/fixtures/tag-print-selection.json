@@ -1,0 +1,254 @@
+[
+  {
+    "source": "documents/paper/parts/partA.tex:28",
+    "site": "parts/partA.tex:28",
+    "command": "ftag",
+    "star": false,
+    "key": "epi:fact"
+  },
+  {
+    "source": "documents/paper/parts/partA.tex:30",
+    "site": "parts/partA.tex:30",
+    "command": "ftag",
+    "star": false,
+    "key": "J:tremble"
+  },
+  {
+    "source": "documents/paper/parts/partA.tex:32",
+    "site": "parts/partA.tex:32",
+    "command": "ftag",
+    "star": false,
+    "key": "epi:conv"
+  },
+  {
+    "source": "documents/paper/parts/partA.tex:60",
+    "site": "parts/partA.tex:60",
+    "command": "ftag",
+    "star": false,
+    "key": "src:nd"
+  },
+  {
+    "source": "documents/paper/parts/partA.tex:61",
+    "site": "parts/partA.tex:61",
+    "command": "ftag",
+    "star": false,
+    "key": "g:knock"
+  },
+  {
+    "source": "documents/paper/parts/partA.tex:425",
+    "site": "parts/partA.tex:425",
+    "command": "ftag",
+    "star": false,
+    "key": "J:anchor"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:104",
+    "site": "parts/partB.tex:104",
+    "command": "ftag",
+    "star": false,
+    "key": "src:nd"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:239",
+    "site": "parts/partB.tex:239",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:moment"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:240",
+    "site": "parts/partB.tex:240",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:exact"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:241",
+    "site": "parts/partB.tex:241",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:response"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:922",
+    "site": "parts/partB.tex:922",
+    "command": "ftag",
+    "star": false,
+    "key": "g:knock"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:1045",
+    "site": "parts/partB.tex:1045",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:loop"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:1046",
+    "site": "parts/partB.tex:1046",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:pitch"
+  },
+  {
+    "source": "documents/paper/parts/partB.tex:1046",
+    "site": "parts/partB.tex:1046",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:rot"
+  },
+  {
+    "source": "documents/paper/parts/partC.tex:283",
+    "site": "parts/partC.tex:283",
+    "command": "ftag",
+    "star": false,
+    "key": "nrm:good"
+  },
+  {
+    "source": "documents/paper/parts/partC.tex:283",
+    "site": "parts/partC.tex:283",
+    "command": "ftag",
+    "star": false,
+    "key": "nrm:wise"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:42",
+    "site": "parts/partD.tex:42",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:woven"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:43",
+    "site": "parts/partD.tex:43",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:report"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:372",
+    "site": "parts/partD.tex:372",
+    "command": "ftag",
+    "star": false,
+    "key": "e:hayek"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:422",
+    "site": "parts/partD.tex:422",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:agg"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:422",
+    "site": "parts/partD.tex:422",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:agg"
+  },
+  {
+    "source": "documents/paper/parts/partD.tex:423",
+    "site": "parts/partD.tex:423",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:detach"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:41",
+    "site": "parts/partF.tex:41",
+    "command": "ftag",
+    "star": false,
+    "key": "g:rec"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:48",
+    "site": "parts/partF.tex:48",
+    "command": "ftag",
+    "star": false,
+    "key": "P:nonorm"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:64",
+    "site": "parts/partF.tex:64",
+    "command": "ftag",
+    "star": false,
+    "key": "P:nonorm"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:67",
+    "site": "parts/partF.tex:67",
+    "command": "ftag",
+    "star": false,
+    "key": "op:L"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:74",
+    "site": "parts/partF.tex:74",
+    "command": "ftag",
+    "star": false,
+    "key": "pr:agg"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:133",
+    "site": "parts/partF.tex:133",
+    "command": "ftag",
+    "star": false,
+    "key": "dyn:rot"
+  },
+  {
+    "source": "documents/paper/parts/partF.tex:134",
+    "site": "parts/partF.tex:134",
+    "command": "ftag",
+    "star": false,
+    "key": "epi:fact"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:601",
+    "site": "parts/appendices.tex:601",
+    "command": "ftag",
+    "star": false,
+    "key": "g:rec"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:949",
+    "site": "parts/appendices.tex:949",
+    "command": "ftag",
+    "star": false,
+    "key": "snk:ker"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:950",
+    "site": "parts/appendices.tex:950",
+    "command": "ftag",
+    "star": false,
+    "key": "snk:anch"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:953",
+    "site": "parts/appendices.tex:953",
+    "command": "ftag",
+    "star": false,
+    "key": "snk:two"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:1050",
+    "site": "parts/appendices.tex:1050",
+    "command": "ftag",
+    "star": false,
+    "key": "mod:branch"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:1065",
+    "site": "parts/appendices.tex:1065",
+    "command": "ftag",
+    "star": false,
+    "key": "gen:basins"
+  },
+  {
+    "source": "documents/paper/parts/appendices.tex:1077",
+    "site": "parts/appendices.tex:1077",
+    "command": "ftag",
+    "star": false,
+    "key": "op:vmoral"
+  }
+]

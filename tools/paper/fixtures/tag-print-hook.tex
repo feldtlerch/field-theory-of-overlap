@@ -1,0 +1,42 @@
+% Start is saved after the tag ink enters horizontal mode; end follows the tag.
+\newwrite\PaperTagPositions
+\immediate\openout\PaperTagPositions=\jobname.tag-positions
+\int_new:N \g_paper_tag_position_int
+\prop_new:N \g_paper_tag_selected_prop
+\bool_new:N \g_paper_tag_position_pending_bool
+% SELECTED_SITES
+\tl_new:N \l_paper_tag_star_tl
+\tl_new:N \l_paper_tag_site_tl
+\NewCommandCopy\PaperTagOriginal\ftag
+\cs_new_protected:Npn \paper_tag_position:n #1
+  {\pdfsavepos\write\PaperTagPositions{#1}}
+\cs_generate_variant:Nn \prop_if_in:NnTF {NV}
+\cs_new_eq:NN \paper_tag_original_ink:N \paper_ink:N
+\cs_set_protected:Npn \paper_ink:N #1 {
+  \bool_if:NT \g_paper_tag_position_pending_bool {
+    \mode_if_vertical:T {\leavevmode}
+    \bool_gset_false:N \g_paper_tag_position_pending_bool
+    \exp_args:Nx \paper_tag_position:n
+      {S|\int_use:N\g_paper_tag_position_int|\tl_use:N\l_paper_tag_star_tl|\l_paper_key_tl|
+       \tl_use:N\l_paper_tag_site_tl|\exp_not:N\thepage|
+       \exp_not:N\the\exp_not:N\pdflastxpos|\exp_not:N\the\exp_not:N\pdflastypos}}
+  \paper_tag_original_ink:N #1
+}
+\RenewDocumentCommand\ftag{s m}{
+  \int_gincr:N \g_paper_tag_position_int
+  \IfBooleanTF{#1}{\tl_set:Nn\l_paper_tag_star_tl{1}}
+                   {\tl_set:Nn\l_paper_tag_star_tl{0}}
+  \tl_set:Nx \l_paper_tag_site_tl
+    {\CurrentFilePath/\CurrentFile\c_colon_str\the\inputlineno}
+  \prop_if_in:NVTF \g_paper_tag_selected_prop \l_paper_tag_site_tl
+    {\bool_gset_true:N \g_paper_tag_position_pending_bool}{}
+  \IfBooleanTF{#1}{\PaperTagOriginal*{#2}}{\PaperTagOriginal{#2}}
+  \prop_if_in:NVTF \g_paper_tag_selected_prop \l_paper_tag_site_tl
+    {\bool_if:NT \g_paper_tag_position_pending_bool
+       {\PackageError{paper}{Tag~position~start~absent}{Check~the~tag~ink~hook.}}
+     \exp_args:Nx \paper_tag_position:n
+      {E|\int_use:N\g_paper_tag_position_int|\tl_use:N\l_paper_tag_star_tl|#2|
+       \tl_use:N\l_paper_tag_site_tl|\exp_not:N\thepage|
+       \exp_not:N\the\exp_not:N\pdflastxpos|\exp_not:N\the\exp_not:N\pdflastypos}}
+    {}
+}

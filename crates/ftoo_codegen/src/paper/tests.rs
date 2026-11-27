@@ -349,6 +349,17 @@ fn checking_capture_provenance_controls() {
 }
 
 #[test]
+fn tag_print_capture_stored_controls() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    command_output(
+        Command::new("python3")
+            .current_dir(&root)
+            .args(["-B", "tools/paper/test_tag_print_capture.py"]),
+    )
+    .unwrap();
+}
+
+#[test]
 fn table_evidence_controls() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     command_output(

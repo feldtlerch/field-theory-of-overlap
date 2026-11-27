@@ -1,0 +1,6 @@
+[
+  {"site": "parts/partA.tex:60", "command": "ftag", "key": "src:nd", "star": false, "mode": "located", "atom": "src:nd (definition 4.2)"},
+  {"site": "parts/partA.tex:61", "command": "ftag", "key": "src:nd", "star": false, "mode": "bare", "atom": "src:nd"},
+  {"site": "parts/partA.tex:62", "command": "ftag", "key": "src:nd", "star": true, "mode": "bare", "atom": "src:nd"},
+  {"site": "parts/partA.tex:63", "command": "ftag", "key": "src:nd", "star": true, "mode": "located", "atom": "src:nd (definition 4.2)", "synthetic_association": true}
+]
