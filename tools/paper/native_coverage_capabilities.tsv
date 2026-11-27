@@ -1,0 +1,57 @@
+kind	status	reason
+abstracts	none	No native abstract body is admitted.
+bibliography citations	subset	Verified parenthetical citations in native paragraphs and the economics box; `dec:documents:paper-tagged-paragraphs`, `dec:documents:native-econ`.
+bibliography section	none	The paper back matter is inherited; screen entries alone do not provide all three renderings.
+contents	none	The TeX contents remains inherited.
+cross-references	subset	Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`.
+displayed equations	subset	The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`.
+figures	none	No native figure block is admitted.
+footnotes	none	No native footnote block is admitted.
+formal notes	none	No native formal-note block is admitted.
+granting notes	none	No native granting block is admitted.
+headings	subset	Unnumbered explainer section headings in corpus slots; `dec:documents:bounded-corpus-slot`.
+inline mathematics	subset	Compared inherited symbols and observed HTML expressions cover selected contexts; `dec:notation:compared-inherited-native-support`, `rec:adr:042-html-mathematics`.
+list items	none	No native list-item block is admitted.
+lists	none	No native list block is admitted.
+paragraphs	subset	Tagged paragraph units and bounded explainer corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`.
+refrains or quoted refrains	subset	Selected plain refrain units have a native route; M055.
+result box: corollary	none	No native corollary box is admitted.
+result box: definition	none	No native definition box is admitted.
+result box: econ	subset	The coda box's text and one parenthetical citation form; `dec:documents:native-econ`.
+result box: epist	none	No native epistemology box is admitted.
+result box: insight	none	No native insight box is admitted.
+result box: lemma	none	No native lemma box is admitted.
+result box: postulate	none	No native postulate box is admitted.
+result box: proposition	none	No native proposition box is admitted.
+result box: remark	none	No native remark box is admitted.
+result box: statement	none	No native statement box is admitted.
+result box: theorem	none	No native theorem box is admitted.
+tables	subset	A native display table exists outside the body inclusions; M055.
+tag index section	none	The paper index remains a derived back-matter view.
+tag or handle references	subset	Checked paper tag runs and visible handles cover selected targets; `dec:documents:paper-tagged-paragraphs`, `rec:adr:048-reference-forms`.
+paragraph form: TeX quotes/dashes	yes	The importer decodes these source spellings into text.
+paragraph form: citation	not yet	Citation is not a corpus-slot run.
+paragraph form: code mention	not yet	Opaque code is not a corpus-slot run.
+paragraph form: display adjacency	not yet	The slot does not compose an adjacent display.
+paragraph form: emphasis	yes	The slot carries emph style runs.
+paragraph form: en-space	yes	The slot carries the named en-space intent.
+paragraph form: escaped punctuation	yes	The importer decodes these escaped source characters.
+paragraph form: external link	not yet	The slot has no link run.
+paragraph form: footnote	not yet	The slot has no footnote run.
+paragraph form: heading lead-in/context	not yet	The slot does not compose an arbitrary lead-in.
+paragraph form: layout hook	not yet	The slot does not carry paragraph layout hooks.
+paragraph form: list adjacency	not yet	The slot does not compose an adjacent list.
+paragraph form: math: compound	not yet	The slot has no mathematics run.
+paragraph form: math: one symbol	not yet	The slot has no mathematics run.
+paragraph form: note/refrain adjacency	not yet	The slot does not compose an adjacent note or refrain.
+paragraph form: note/refrain wrapper	not yet	The slot has no note or refrain child.
+paragraph form: other command	not yet	The closed importer refuses unclassified commands.
+paragraph form: other reference	not yet	The slot has no cross-reference run.
+paragraph form: other spacing	not yet	The slot admits only named en-space intent.
+paragraph form: other style	not yet	The slot admits emph and textbf styles only.
+paragraph form: plain prose only	yes	The slot carries text runs.
+paragraph form: prose macro	not yet	The slot has no prose-expanding macro run.
+paragraph form: strong	yes	The slot carries textbf style runs.
+paragraph form: structural artefact	not yet	A counted run may be structural text rather than a prose paragraph.
+paragraph form: tag/handle	not yet	The slot has no tag or handle run.
+paragraph form: title typography	not yet	The slot has no title-typography run.

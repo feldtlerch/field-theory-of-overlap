@@ -76,6 +76,9 @@ class Composition(unittest.TestCase):
                      'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
                      'tools/notation/package.json', 'tools/notation/support-digests.json',
                      'tools/notation/.node-version', 'tools/notation/check.cjs',
+                     'tools/paper/native_coverage.py',
+                     'tools/paper/native_coverage_capabilities.tsv',
+                     'tools/paper/native_coverage_slot_census.json',
                      'documents/paper-build/label-mints.tsv',
                      'documents/paper-build/fontconfig.conf']
             for folder in ('units/statements', 'units/skeletons', 'units/scopes', 'units/displays'):

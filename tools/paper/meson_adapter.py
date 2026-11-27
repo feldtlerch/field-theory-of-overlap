@@ -94,6 +94,9 @@ def documents_record(args):
         'tools/assembly/prepare-native.py', 'tools/notation/package-lock.json',
         'tools/notation/package.json', 'tools/notation/support-digests.json',
         'tools/notation/.node-version', 'tools/notation/check.cjs',
+        'tools/paper/native_coverage.py',
+        'tools/paper/native_coverage_capabilities.tsv',
+        'tools/paper/native_coverage_slot_census.json',
     }
     directories = {}
     for name in ('units/statements', 'units/skeletons', 'units/scopes', 'units/displays'):
@@ -182,6 +185,9 @@ def markdown_sources(repo):
 
 def documents_check(args):
     binary = pathlib.Path(args.binary).resolve()
+    subprocess.run([tool('python3')['path'], '-B',
+                    str(pathlib.Path(args.repository) / 'tools/paper/native_coverage.py'),
+                    '--check'], check=True)
     subprocess.run([str(binary), 'documents-check', '--repository', args.repository,
                     '--support', args.support], check=True)
     replace_if_changed(pathlib.Path(args.output), b'documents checked\n')

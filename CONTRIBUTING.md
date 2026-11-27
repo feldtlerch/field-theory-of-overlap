@@ -26,6 +26,8 @@ Read the [README](README.md) for what is built, the [ADR register](docs/adr/READ
 
 Change authored sources and regenerate; never repair a rendering by hand. Document completeness does not enlarge audit coverage under [ADR 016](docs/adr/016-admission-and-native-documents.md) (`dec:documents:admission-and-native-renderings`).
 
+After changing document body text or inclusions, refresh [native coverage](docs/status/native-coverage.md) with `python3 -B tools/paper/native_coverage.py`; when an importer input changes, refresh its diagnostic snapshot as that page describes. The document freshness check compares the page with its generator's output. The counts inform progress and do not decide admission.
+
 ## Run the checks
 
 Reproducibility is exact: the same declared inputs produce the same bytes, and every committed generated artifact equals its generator's output; generation and checking share one code path. This is decided in [ADR 006](docs/adr/006-byte-gated-generation.md) (`dec:generation:byte-gated`), rests on [ADR 013's locked inputs](docs/adr/013-workspace-norms.md) (`arg:workspace:reasons`), and is applied to the PDF pair by ADRs 014 and 019.

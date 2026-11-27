@@ -429,6 +429,8 @@ def historical_pair(repo, work):
                             capture_output=True, timeout=60)
     require(result.returncode == 0, 'Historical fixture revision failed: ' +
             result.stderr.decode(errors='replace'))
+    shutil.copyfile(repo/'documents/paper-build/fontconfig.conf',
+                    private/'documents/paper-build/fontconfig.conf')
     # The pinned PDFs stay historical; the fixture derives inclusion lines from
     # the pinned source tree so later conversions cannot alter this control.
     inclusion = pathlib.Path('generated/documents/inclusions.tsv')

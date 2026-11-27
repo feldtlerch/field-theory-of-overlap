@@ -1,0 +1,725 @@
+{
+  "schema": 2,
+  "source": "documents/paper/explainer/explainer.tex",
+  "source_sha256": "12613efc8cef049dd98ff7d5f9f0a9771d7a3b4c97b2eaba7fb78cd6a1126815",
+  "source_list_digest": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
+  "import_context_digest": "052d59c7b48f326df501ac92242fefc539569fb7e53da2a8323469542b57f2c4",
+  "source_digests": {
+    "documents/paper/explainer/explainer.tex": "12613efc8cef049dd98ff7d5f9f0a9771d7a3b4c97b2eaba7fb78cd6a1126815",
+    "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
+    "documents/paper/parts/partA.tex": "1d7d04332608aa4a129d23df889ac769dd7cdfe599c6a4dcab500dc7c88d0ebf",
+    "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
+    "documents/paper/parts/gateways.tex": "c28de3ac8f6bf05960ec6e7fae9ea97d23038df454ec0b2313875068f3a9cfcf",
+    "documents/paper/parts/partC.tex": "fdfce0e270d14818050f26fabc0cf3a2083037d9732653d4c391816817cd523e",
+    "documents/paper/parts/partD.tex": "d911a3d9b21d81ead5d6b48240a985a069b593dc0066445caa9c5b164e14ecfc",
+    "documents/paper/parts/partE.tex": "f60d29ade91a03779983f641bc475883447f4d410e3dda7b4b71b4cabd50ba5f",
+    "documents/paper/parts/partF.tex": "dffacc0efe1789271d02f1d7b09378932bb2ef487ce542d75ab2a2efb155ca2f",
+    "documents/paper/parts/partG.tex": "0caf098c70b94ce085a17b2eb941082465ade7ac963a282daabe72913e4a0cc6",
+    "documents/paper/parts/coda.tex": "4524ff3a3f962ed8be42243f66f13a664806017aea639acebd22ffcc92704f6a",
+    "documents/paper/parts/appendices.tex": "88efaf10e58a9dee87bace65e6cb4ec25387feeefd04aaf8c2a3b59b9969d807"
+  },
+  "files": {
+    "documents/paper/explainer/explainer.tex": {
+      "kinds": {
+        "abstract": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "existing-native-inclusion": {
+          "decoded": 7,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 12,
+          "refused": 0
+        },
+        "list": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "paragraph": {
+          "decoded": 45,
+          "refused": 43
+        },
+        "refusal": {
+          "decoded": 0,
+          "refused": 3
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 8
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 2
+        }
+      },
+      "refusal_kinds": {
+        "unresolved mathematics": 1,
+        "unsupported command \\addcontentsline": 1,
+        "unsupported command \\formalfoot": 12,
+        "unsupported command \\gloss": 16,
+        "unsupported command \\hypersetup": 1,
+        "unsupported command \\paperrefrain": 9,
+        "unsupported command \\papervirtue": 1,
+        "unsupported command \\zcref": 2,
+        "unsupported environment abstract": 1,
+        "unsupported environment center": 2,
+        "unsupported environment itemize": 2,
+        "unsupported environment statement": 8,
+        "unsupported environment table": 2,
+        "unsupported environment xltabular": 1
+      }
+    },
+    "documents/paper/parts/front.tex": {
+      "kinds": {
+        "abstract": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "display": {
+          "decoded": 0,
+          "refused": 5
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "existing-native-inclusion": {
+          "decoded": 1,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 9,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 5,
+          "refused": 12
+        },
+        "refusal": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 7
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 2,
+        "unresolved mathematics": 5,
+        "unsupported command \\addcontentsline": 1,
+        "unsupported command \\gradeword": 1,
+        "unsupported command \\hypersetup": 1,
+        "unsupported command \\registername": 1,
+        "unsupported command \\zcref": 1,
+        "unsupported environment abstract": 1,
+        "unsupported environment center": 2,
+        "unsupported environment corollary": 1,
+        "unsupported environment econ": 1,
+        "unsupported environment equation": 5,
+        "unsupported environment postulate": 2,
+        "unsupported environment table": 1,
+        "unsupported result child": 4
+      }
+    },
+    "documents/paper/parts/partA.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 6
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 9
+        },
+        "existing-native-inclusion": {
+          "decoded": 3,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 16,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 9,
+          "refused": 27
+        },
+        "refusal": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 3
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 3
+        },
+        "theorem-container": {
+          "decoded": 1,
+          "refused": 21
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 3,
+        "unresolved mathematics": 19,
+        "unsupported command \\PaperNeedLines": 1,
+        "unsupported command \\refrain": 1,
+        "unsupported command \\virtue": 1,
+        "unsupported command \\zcref": 2,
+        "unsupported environment align": 3,
+        "unsupported environment center": 1,
+        "unsupported environment corollary": 1,
+        "unsupported environment econ": 9,
+        "unsupported environment equation": 3,
+        "unsupported environment postulate": 1,
+        "unsupported environment proposition": 2,
+        "unsupported environment statement": 3,
+        "unsupported environment table": 3,
+        "unsupported environment theorem": 2,
+        "unsupported result child": 13,
+        "unsupported result header": 2
+      }
+    },
+    "documents/paper/parts/partB.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 7
+        },
+        "heading": {
+          "decoded": 27,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 12,
+          "refused": 26
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "theorem-container": {
+          "decoded": 1,
+          "refused": 32
+        }
+      },
+      "refusal_kinds": {
+        "unresolved mathematics": 18,
+        "unsupported command \\gradeword": 1,
+        "unsupported command \\refrain": 3,
+        "unsupported command \\see": 2,
+        "unsupported command \\zcref": 2,
+        "unsupported environment corollary": 6,
+        "unsupported environment econ": 7,
+        "unsupported environment equation": 1,
+        "unsupported environment lemma": 2,
+        "unsupported environment proposition": 4,
+        "unsupported environment statement": 1,
+        "unsupported environment table": 1,
+        "unsupported environment theorem": 14,
+        "unsupported result child": 6
+      }
+    },
+    "documents/paper/parts/gateways.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 3
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "heading": {
+          "decoded": 7,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 4,
+          "refused": 12
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 3
+        }
+      },
+      "refusal_kinds": {
+        "unresolved mathematics": 8,
+        "unsupported command \\gateway": 2,
+        "unsupported command \\gradeword": 1,
+        "unsupported command \\refrain": 1,
+        "unsupported environment econ": 2,
+        "unsupported environment equation": 3,
+        "unsupported environment theorem": 2,
+        "unsupported result child": 1
+      }
+    },
+    "documents/paper/parts/partC.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 4
+        },
+        "heading": {
+          "decoded": 11,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 3,
+          "refused": 19
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 4
+        },
+        "theorem-container": {
+          "decoded": 2,
+          "refused": 6
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 1,
+        "unresolved mathematics": 13,
+        "unsupported command \\refrain": 2,
+        "unsupported command \\see": 1,
+        "unsupported command \\zcref": 2,
+        "unsupported environment econ": 4,
+        "unsupported environment equation": 1,
+        "unsupported environment lemma": 1,
+        "unsupported environment proposition": 2,
+        "unsupported environment statement": 2,
+        "unsupported environment table": 4,
+        "unsupported environment theorem": 1,
+        "unsupported result child": 2
+      }
+    },
+    "documents/paper/parts/partD.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 5
+        },
+        "existing-native-inclusion": {
+          "decoded": 1,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 17,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 9,
+          "refused": 15
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 18
+        }
+      },
+      "refusal_kinds": {
+        "unresolved mathematics": 13,
+        "unsupported command \\gradeword": 1,
+        "unsupported command \\refrain": 1,
+        "unsupported environment corollary": 2,
+        "unsupported environment econ": 5,
+        "unsupported environment equation": 2,
+        "unsupported environment proposition": 1,
+        "unsupported environment theorem": 5,
+        "unsupported result child": 10
+      }
+    },
+    "documents/paper/parts/partE.tex": {
+      "kinds": {
+        "economics-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "heading": {
+          "decoded": 9,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 2,
+          "refused": 12
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 3
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 1,
+        "unresolved mathematics": 7,
+        "unsupported command \\refrain": 2,
+        "unsupported command \\setcounter": 1,
+        "unsupported command \\zcref": 1,
+        "unsupported environment econ": 1,
+        "unsupported environment proposition": 1,
+        "unsupported environment statement": 2,
+        "unsupported environment table": 2,
+        "unsupported environment theorem": 1,
+        "unsupported result header": 1
+      }
+    },
+    "documents/paper/parts/partF.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "economics-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "epistemology-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "existing-native-inclusion": {
+          "decoded": 1,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 16,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 6,
+          "refused": 19
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 8
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 1,
+        "unresolved mathematics": 15,
+        "unsupported command \\PaperParagraph": 1,
+        "unsupported command \\gradeword": 1,
+        "unsupported command \\refrain": 1,
+        "unsupported environment econ": 2,
+        "unsupported environment epist": 1,
+        "unsupported environment equation": 2,
+        "unsupported environment proposition": 1,
+        "unsupported environment statement": 1,
+        "unsupported environment table": 1,
+        "unsupported environment theorem": 1,
+        "unsupported result child": 6
+      }
+    },
+    "documents/paper/parts/partG.tex": {
+      "kinds": {
+        "economics-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "heading": {
+          "decoded": 7,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 0,
+          "refused": 4
+        },
+        "refusal": {
+          "decoded": 0,
+          "refused": 4
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "theorem-container": {
+          "decoded": 0,
+          "refused": 1
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 1,
+        "unresolved mathematics": 2,
+        "unsupported command \\refrain": 1,
+        "unsupported environment econ": 2,
+        "unsupported environment serieslist": 4,
+        "unsupported environment statement": 2,
+        "unsupported environment table": 1,
+        "unsupported environment theorem": 1
+      }
+    },
+    "documents/paper/parts/coda.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "existing-native-inclusion": {
+          "decoded": 5,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 6,
+          "refused": 0
+        },
+        "paragraph": {
+          "decoded": 1,
+          "refused": 3
+        }
+      },
+      "refusal_kinds": {
+        "unresolved mathematics": 1,
+        "unsupported command \\hfill": 1,
+        "unsupported command \\see": 1,
+        "unsupported environment equation": 1
+      }
+    },
+    "documents/paper/parts/appendices.tex": {
+      "kinds": {
+        "display": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "existing-native-inclusion": {
+          "decoded": 1,
+          "refused": 0
+        },
+        "heading": {
+          "decoded": 19,
+          "refused": 2
+        },
+        "paragraph": {
+          "decoded": 16,
+          "refused": 40
+        },
+        "refusal": {
+          "decoded": 0,
+          "refused": 2
+        },
+        "statement-box": {
+          "decoded": 0,
+          "refused": 1
+        },
+        "table": {
+          "decoded": 0,
+          "refused": 18
+        },
+        "theorem-container": {
+          "decoded": 7,
+          "refused": 14
+        }
+      },
+      "refusal_kinds": {
+        "comment in content": 1,
+        "unresolved mathematics": 17,
+        "unsupported command \\GenerateBranchLedger": 1,
+        "unsupported command \\GenerateConcordanceE": 1,
+        "unsupported command \\GenerateEquivalences": 1,
+        "unsupported command \\GenerateEvidence": 1,
+        "unsupported command \\GenerateLedger": 1,
+        "unsupported command \\GenerateRulings": 1,
+        "unsupported command \\addcontentsline": 1,
+        "unsupported command \\appblock": 9,
+        "unsupported command \\auditnote": 3,
+        "unsupported command \\registername": 1,
+        "unsupported command \\texorpdfstring": 2,
+        "unsupported command \\texttt": 1,
+        "unsupported command \\verb": 1,
+        "unsupported environment align": 1,
+        "unsupported environment center": 1,
+        "unsupported environment equation": 1,
+        "unsupported environment proposition": 6,
+        "unsupported environment statement": 1,
+        "unsupported environment table": 18,
+        "unsupported environment theorem": 3,
+        "unsupported environment xltabular": 1,
+        "unsupported result child": 5
+      }
+    }
+  },
+  "admitted_slot_intervals": [
+    {
+      "blocks": [
+        {
+          "first": 212,
+          "kind": "heading",
+          "last": 214
+        },
+        {
+          "first": 215,
+          "kind": "paragraph",
+          "last": 216
+        }
+      ],
+      "first": 212,
+      "last": 216,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:217 StatementBox Unresolved"
+    },
+    {
+      "blocks": [
+        {
+          "first": 630,
+          "kind": "heading",
+          "last": 632
+        },
+        {
+          "first": 633,
+          "kind": "paragraph",
+          "last": 639
+        },
+        {
+          "first": 640,
+          "kind": "paragraph",
+          "last": 650
+        }
+      ],
+      "first": 630,
+      "last": 650,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:651 Paragraph Unresolved"
+    },
+    {
+      "blocks": [
+        {
+          "first": 677,
+          "kind": "heading",
+          "last": 679
+        },
+        {
+          "first": 680,
+          "kind": "paragraph",
+          "last": 681
+        }
+      ],
+      "first": 677,
+      "last": 681,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:682 StatementBox Unresolved"
+    },
+    {
+      "blocks": [
+        {
+          "first": 752,
+          "kind": "heading",
+          "last": 754
+        },
+        {
+          "first": 755,
+          "kind": "paragraph",
+          "last": 762
+        }
+      ],
+      "first": 752,
+      "last": 762,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:763 Paragraph Unresolved"
+    },
+    {
+      "blocks": [
+        {
+          "first": 816,
+          "kind": "heading",
+          "last": 818
+        },
+        {
+          "first": 819,
+          "kind": "paragraph",
+          "last": 821
+        },
+        {
+          "first": 822,
+          "kind": "paragraph",
+          "last": 835
+        },
+        {
+          "first": 836,
+          "kind": "paragraph",
+          "last": 847
+        }
+      ],
+      "first": 816,
+      "last": 847,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:848 Paragraph Unresolved"
+    },
+    {
+      "blocks": [
+        {
+          "first": 856,
+          "kind": "heading",
+          "last": 858
+        },
+        {
+          "first": 859,
+          "kind": "paragraph",
+          "last": 872
+        },
+        {
+          "first": 873,
+          "kind": "paragraph",
+          "last": 878
+        },
+        {
+          "first": 879,
+          "kind": "existing-native-inclusion",
+          "last": 880
+        },
+        {
+          "first": 881,
+          "kind": "paragraph",
+          "last": 884
+        },
+        {
+          "first": 885,
+          "kind": "paragraph",
+          "last": 886
+        }
+      ],
+      "first": 856,
+      "last": 886,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:887 ExistingNativeInclusion Decoded"
+    }
+  ]
+}
