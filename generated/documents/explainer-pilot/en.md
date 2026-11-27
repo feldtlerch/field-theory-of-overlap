@@ -32,6 +32,14 @@ $$
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+## Accountability
+
+Accountability is about the channel and the charge, never the lean. If your action moves someone’s fate, you answer for the movement — even if you feel nothing, even if your feelings cancel, even if your private weighting hides the tie. The careless landlord who “feels nothing” for a tenant still holds the tenant’s winter in his hands; the not&#45;feeling changes nothing about the holding. And the structure is cleanly two&#45;stage: the *gate* is capacity — could anything move through this edge at all? — and it shuts only for the genuine stranger, where the channel itself is zero; the *charge* is what this act actually moved. An act that happens to miss today, over a live channel, leaves you answerable still: the gate never consulted the act.
+
+This gives three different zeros, sorted by their quantifiers:
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <p align="center"><em>Close to all, enemy to none.</em></p>
 <p align="right"><a href="../paper-pilot/en.md#sec-cenemy--to--none">sec:enemy&#45;to&#45;none</a></p>
 

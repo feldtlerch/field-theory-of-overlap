@@ -9,6 +9,7 @@ children = [
   { kind = "corpus-slot", unit = "sec:explainer:plain" },
   { kind = "quotation", unit = "sec:say:direction" },
   { kind = "equation", unit = "eq:explainer:overlap-flow", numbering = "none" },
+  { kind = "corpus-slot", unit = "sec:explainer:accountability" },
   { kind = "quotation", unit = "sec:say:enemy-to-none" },
   { kind = "paragraph", unit = "sec:explainer:eight-words" },
   { kind = "quotation", unit = "sec:coda:record-limit" }

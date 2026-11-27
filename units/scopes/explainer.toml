@@ -18,6 +18,10 @@ role = "equation"
 numbering = "none"
 
 [[scope.occurrences]]
+unit = "sec:explainer:accountability"
+role = "corpus-slot"
+
+[[scope.occurrences]]
 unit = "sec:say:enemy-to-none"
 role = "quotation"
 

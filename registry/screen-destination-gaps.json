@@ -25,7 +25,7 @@
       "position": 7
     },
     {
-      "after-unit": "sec:say:enemy-to-none",
+      "after-unit": "sec:explainer:accountability",
       "before-unit": "eq:explainer:overlap-flow",
       "document": "explainer-pilot",
       "language": "en",
@@ -33,12 +33,20 @@
       "position": 8
     },
     {
+      "after-unit": "sec:say:enemy-to-none",
+      "before-unit": "sec:explainer:accountability::paragraph:2",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 11
+    },
+    {
       "after-unit": "sec:explainer:eight-words",
       "before-unit": "sec:say:enemy-to-none",
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 9
+      "position": 12
     },
     {
       "after-unit": "sec:coda:record-limit",
@@ -46,7 +54,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 10
+      "position": 13
     },
     {
       "after-unit": null,
@@ -54,7 +62,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 11
+      "position": 14
     },
     {
       "after-unit": "sec:reading:shadow",

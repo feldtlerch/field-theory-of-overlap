@@ -13,6 +13,7 @@ documents/paper/parts/appendices.tex	sec:log:andreoni-joint	generated/documents/
 documents/paper/explainer/explainer.tex	sec:explainer:plain	generated/documents/explainer-pilot/sec-explainer-plain.tex	corpus-slot	44
 documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	262
 documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	353
-documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	625
-documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	893
-documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	901
+documents/paper/explainer/explainer.tex	sec:explainer:accountability	generated/documents/explainer-pilot/sec-explainer-accountability.tex	corpus-slot	532
+documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	611
+documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	879
+documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	887
