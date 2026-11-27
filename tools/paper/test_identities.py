@@ -856,9 +856,12 @@ class Identities(unittest.TestCase):
         self.assertEqual((raised.exception.row['code'], raised.exception.row['detail']),
                          ('SyntaxUnsupported',
                           '<source>:2: unsupported source scalar U+005C'))
-        layout_line = (repo/'documents/paper/explainer/explainer.tex').read_text(
-            encoding='utf-8').splitlines()[320]
-        self.assertTrue(layout_line.startswith('\\PaperParagraph{lastline}'))
+        layout_lines = [line for line in
+                        (repo/'documents/paper/explainer/explainer.tex').read_text(
+                            encoding='utf-8').splitlines()
+                        if line.startswith('\\PaperParagraph{lastline}')]
+        self.assertEqual(len(layout_lines), 1)
+        layout_line = layout_lines[0]
         with self.assertRaises(compare_words.Fault) as raised:
             compare_words.decode_located(layout_line, {})
         self.assertEqual(raised.exception.row['code'], 'SyntaxUnsupported')
