@@ -21,21 +21,21 @@
     "key": "epi:conv"
   },
   {
-    "source": "documents/paper/parts/partA.tex:60",
+    "source": "documents/paper/parts/partA.tex:59",
     "site": "parts/partA.tex:60",
     "command": "ftag",
     "star": false,
     "key": "src:nd"
   },
   {
-    "source": "documents/paper/parts/partA.tex:61",
+    "source": "documents/paper/parts/partA.tex:60",
     "site": "parts/partA.tex:61",
     "command": "ftag",
     "star": false,
     "key": "g:knock"
   },
   {
-    "source": "documents/paper/parts/partA.tex:423",
+    "source": "documents/paper/parts/partA.tex:422",
     "site": "parts/partA.tex:425",
     "command": "ftag",
     "star": false,

@@ -7,6 +7,7 @@ document = "paper-pilot"
 heading = "sec:pilot:paper-excerpt"
 children = [
   { kind = "paragraph", unit = "sec:reading:shadow" },
+  { kind = "corpus-slot", unit = "sec:corpus:ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a" },
   { kind = "unit", unit = "sec:say:direction" },
   { kind = "corpus-slot", unit = "result:f:pool" },
   { kind = "unit", unit = "sec:say:harm-enlargement" },

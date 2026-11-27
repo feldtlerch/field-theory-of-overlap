@@ -5,6 +5,10 @@ document = "paper-pilot"
 source = "documents/paper/parts/partA.tex"
 
 [[scope.occurrences]]
+unit = "sec:corpus:ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a"
+role = "corpus-slot"
+
+[[scope.occurrences]]
 unit = "sec:say:direction"
 role = "refrain"
 

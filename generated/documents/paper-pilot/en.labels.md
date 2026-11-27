@@ -14,6 +14,11 @@ One may assume naively that the fact is the light and the principle its elaborat
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:corpus:ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a::paragraph:0 document paper-pilot language en -->
+Recovery of a quantity from observation depends on where the quantity is spent, and exactly one configuration has no spend route at all.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:say:direction document paper-pilot language en -->
 <p align="center"><a id="sec-cwhich--way"></a><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>
 <p align="right">sec:which&#45;way<!-- label sec:say:direction --></p>

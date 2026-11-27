@@ -79,6 +79,10 @@ fn prefix_fixture() -> Result<NativeFixture, Box<dyn std::error::Error>> {
         source.join("units/fixtures/explainer-plain.toml"),
         root.join("units/corpus/explainer-plain.toml"),
     )?;
+    fs::copy(
+        source.join("units/corpus/paper-readability.toml"),
+        root.join("units/corpus/paper-readability.toml"),
+    )?;
     Ok(fixture)
 }
 
@@ -111,6 +115,36 @@ fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
     let root = &fixture.directory.0;
     let support = NativeSupport::from_environment(root).map_err(|error| format!("{error:?}"))?;
     let prepared = generate_documents(root, &support)?;
+    let paper_id = "sec:corpus:ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a";
+    let paper_fragment = prepared
+        .artifacts()
+        .iter()
+        .find(|artifact| {
+            artifact.path()
+                == format!(
+                    "generated/documents/paper-pilot/{}.tex",
+                    paper_id.replace(':', "-")
+                )
+        })
+        .unwrap();
+    assert!(std::str::from_utf8(paper_fragment.bytes())?.starts_with("Recovery of a quantity"));
+    for medium in ["markdown", "html"] {
+        let recovered = prepared
+            .corpus_slot_recovery_export(
+                medium,
+                "documents/paper/parts/partA.tex",
+                37,
+                38,
+                paper_id,
+            )
+            .unwrap();
+        assert!(
+            recovered["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("Recovery of a quantity")
+        );
+    }
     let path = "generated/documents/explainer-pilot/sec-explainer-plain.tex";
     let artifact = prepared
         .artifacts()

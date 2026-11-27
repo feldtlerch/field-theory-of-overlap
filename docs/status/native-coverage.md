@@ -14,7 +14,7 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 |---|---:|---:|---:|---|---|
 | inline mathematics | 1 / 1031 | 0 / 6 | 1 / 1037 | subset | Compared inherited symbols and observed HTML expressions cover selected contexts; `dec:notation:compared-inherited-native-support`, `rec:adr:042-html-mathematics`. |
 | tag or handle references | 4 / 651 | 0 / 138 | 4 / 789 | subset | Checked paper tag runs and visible handles cover selected targets; `dec:documents:paper-tagged-paragraphs`, `rec:adr:048-reference-forms`. |
-| paragraphs | 6 / 238 | 13 / 76 | 19 / 314 | subset | Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`. |
+| paragraphs | 7 / 238 | 13 / 76 | 20 / 314 | subset | Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`. |
 | headings | 0 / 149 | 6 / 14 | 6 / 163 | subset | Unnumbered explainer section headings in corpus slots; `dec:documents:bounded-corpus-slot`. |
 | displayed equations | 0 / 141 | 1 / 1 | 1 / 142 | subset | The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`. |
 | cross-references | 1 / 117 | 0 / 13 | 1 / 130 | subset | Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`. |
@@ -88,9 +88,9 @@ A capability unlock counts an authored explainer paragraph whose only missing de
 
 | Document | Paragraph members | Native | Using only admitted forms | Authored using only admitted forms |
 |---|---:|---:|---:|---:|
-| paper | 238 | 6 | 12 | 12 |
+| paper | 238 | 7 | 12 | 12 |
 | explainer | 76 | 13 | 51 | 39 |
-| all | 314 | 19 | 63 | 51 |
+| all | 314 | 20 | 63 | 51 |
 
 Of the 39 authored explainer paragraphs using only admitted forms, 39 lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). This retained snapshot lists explainer intervals; the importer source report enumerates all 12 body files.
 
@@ -104,10 +104,10 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 | display | 0 | 23 |
 | economics-box | 0 | 33 |
 | epistemology-box | 0 | 1 |
-| existing-native-inclusion | 25 | 0 |
+| existing-native-inclusion | 26 | 0 |
 | heading | 152 | 2 |
 | list | 0 | 2 |
-| paragraph | 107 | 232 |
+| paragraph | 106 | 232 |
 | refusal | 0 | 12 |
 | statement-box | 0 | 20 |
 | table | 0 | 33 |
@@ -191,9 +191,9 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 
 | Document | Native words / all | Word share |
 |---|---:|---:|
-| paper | 687 / 28919 | 2.38% |
+| paper | 710 / 28919 | 2.46% |
 | explainer | 1326 / 8601 | 15.42% |
-| all | 2013 / 37520 | 5.37% |
+| all | 2036 / 37520 | 5.43% |
 
 ## Per-file detail
 
@@ -202,7 +202,7 @@ Word tokens count literal headings, captions, table cells and prose; they exclud
 | Document | Source | Native words / all | Word share | Source blob |
 |---|---|---:|---:|---|
 | paper | [`documents/paper/parts/front.tex`](../../documents/paper/parts/front.tex) | 57 / 2163 | 2.64% | `72978326c5c69231947c0766c9c1639f1dab0db3` |
-| paper | [`documents/paper/parts/partA.tex`](../../documents/paper/parts/partA.tex) | 48 / 3944 | 1.22% | `c3829cb2fa1a4bcb9f5f2b88cb6dd6c8af535060` |
+| paper | [`documents/paper/parts/partA.tex`](../../documents/paper/parts/partA.tex) | 71 / 3944 | 1.80% | `0d6d862acf8ce03ef747797eb52e86ea99dcfcdb` |
 | paper | [`documents/paper/parts/partB.tex`](../../documents/paper/parts/partB.tex) | 0 / 6180 | 0.00% | `416f396158d7209429a5df48e37f5a99949cbf1d` |
 | paper | [`documents/paper/parts/gateways.tex`](../../documents/paper/parts/gateways.tex) | 0 / 863 | 0.00% | `438ebdb6c984ab4d11308d1eb8cb18d20798cf5b` |
 | paper | [`documents/paper/parts/partC.tex`](../../documents/paper/parts/partC.tex) | 32 / 2569 | 1.25% | `7fbf930c9f265f6f6059a8e432fe80461f260855` |
@@ -212,10 +212,10 @@ Word tokens count literal headings, captions, table cells and prose; they exclud
 | paper | [`documents/paper/parts/partG.tex`](../../documents/paper/parts/partG.tex) | 0 / 1369 | 0.00% | `affe4e9abf3c661d94e9efbfcfab29c4e015c844` |
 | paper | [`documents/paper/parts/coda.tex`](../../documents/paper/parts/coda.tex) | 463 / 992 | 46.67% | `f32fad8baa9a806cb745c984509a53ebdad356f0` |
 | paper | [`documents/paper/parts/appendices.tex`](../../documents/paper/parts/appendices.tex) | 36 / 4476 | 0.80% | `6f5d0d158aa6316f511be9353162e911739fc3f5` |
-| paper | Total | 687 / 28919 | 2.38% | — |
+| paper | Total | 710 / 28919 | 2.46% | — |
 | explainer | [`documents/paper/explainer/explainer.tex`](../../documents/paper/explainer/explainer.tex) | 1326 / 8601 | 15.42% | `1828fc0c4534a63ae370734f1f333e29f756dbe0` |
 | explainer | Total | 1326 / 8601 | 15.42% | — |
-| all | Total | 2013 / 37520 | 5.37% | — |
+| all | Total | 2036 / 37520 | 5.43% | — |
 
 ## Limits and regeneration
 
@@ -229,9 +229,9 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 |---|---|
 | `documents/paper/main.tex` | `06bf235acb58b61df74058a8411e6b64a84d2bed` |
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
-| `generated/documents/inclusions.tsv` | `23697a16fa1b63d151ad1c263567d79873cfb1de` |
+| `generated/documents/inclusions.tsv` | `5b4014b9f85e756eb18647444436814181d7ec0d` |
 | `tools/paper/native_coverage_capabilities.tsv` | `ef49751a3894cc755ffe851343d432a31fc57e14` |
-| `tools/paper/native_coverage_slot_census.json` | `e300767d0f9311604f17a9a4a75240fba753c1ed` |
+| `tools/paper/native_coverage_slot_census.json` | `2b7d5a5d4e0e5445d71d3c3733679b22e1c20b19` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |
@@ -251,6 +251,7 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 | `generated/documents/paper-pilot/sec-coda-flourishing-pole.tex` | `ff6de3c59c37ec44d9f485e3aa211049f539e90c` |
 | `generated/documents/paper-pilot/sec-coda-record-limit.tex` | `4e692f961a84b1c7e31b17aa300249dd742057f6` |
 | `generated/documents/paper-pilot/sec-coda-whole-field.tex` | `9a1406a274eef4ae74b9af51d7880160bde5bc7c` |
+| `generated/documents/paper-pilot/sec-corpus-ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a.tex` | `e7dfb7e04755639102cede50c184318983b777f1` |
 | `generated/documents/paper-pilot/sec-log-andreoni-joint.tex` | `503cc3699a946fc6ea4b2048d535e648c50a29ed` |
 | `generated/documents/paper-pilot/sec-reading-shadow.tex` | `4d24564f24d4c7860a8fd3841246a07a116d0c43` |
 | `generated/documents/paper-pilot/sec-say-direction.tex` | `21a05ec3f67d78af620773dde80c8cce27d783e8` |

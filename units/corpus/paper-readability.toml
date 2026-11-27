@@ -1,0 +1,11 @@
+schema = 1
+
+[unit]
+id = "sec:corpus:ccadaf2cc3dc17d84c32c7584c51d8ff6647fec15731f8859dbfcf384492f40a"
+document = "paper-pilot"
+composition = "corpus-slot"
+language = "en"
+
+[[unit.blocks]]
+kind = "paragraph"
+runs = [{ kind = "text", decoded = "Recovery of a quantity from observation depends on where the quantity is spent, and exactly one configuration has no spend route at all." }]
