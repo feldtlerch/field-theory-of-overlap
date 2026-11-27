@@ -523,6 +523,14 @@ pub(crate) fn prepare_context(
     neutral(&markdown, true, AssemblyStage::Source)?;
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
         .and_then(|joint| joint.with_corpus_mints(&corpus_slots))
+        .and_then(|joint| {
+            joint.with_corpus_slots(
+                corpus_slots
+                    .values()
+                    .filter(|slot| slot.id().starts_with("sec:corpus:"))
+                    .map(|slot| (slot.id().to_owned(), slot.source().to_owned())),
+            )
+        })
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let mut registry_joint = joint.clone();
     if root.join(registry::PAPER_MINTS).try_exists().map_err(|e| {
@@ -1129,8 +1137,8 @@ fn render_artifacts_with_slots(
                         let mut index = 0;
                         while index < plan.blocks.len() {
                             let block = &plan.blocks[index];
-                            let (source, unit, advance) = if let Some(slot) = slots.get(&block.unit)
-                            {
+                            let owner = corpus::physical_owner(&block.unit, slots);
+                            let (source, unit, advance) = if let Some(slot) = slots.get(owner) {
                                 (
                                     corpus::fragment(
                                         slot,

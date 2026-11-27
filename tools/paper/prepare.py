@@ -132,14 +132,21 @@ def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys,
     require(data.endswith(b'\\par\n') and b'\r' not in data and b'\0' not in data,
             'M055: Corpus slot body differs: '+fragment)
     parts = data[:-len(b'\\par\n')].rstrip(b'\n').split(b'\n\n')
-    require(len(parts) >= 2 and re.fullmatch(
-        rb'\\section\{[^{}\\\n]+\}\n\\label\{'+re.escape(unit.encode())+rb'\}',
-        parts[0]) is not None,
-        'M055: Corpus slot heading differs: '+fragment)
+    headed = parts[0].startswith(b'\\section{')
+    if headed:
+        require(len(parts) >= 2 and re.fullmatch(
+            rb'\\section\{[^{}\\\n]+\}\n\\label\{'+re.escape(unit.encode())+rb'\}',
+            parts[0]) is not None,
+            'M055: Corpus slot heading differs: '+fragment)
+    else:
+        require(unit.startswith('sec:corpus:') and len(unit) == len('sec:corpus:') + 64
+                and re.fullmatch(r'[0-9a-f]{64}', unit[len('sec:corpus:'):]) is not None
+                and parts[0] and not parts[0].startswith((b'\n', b' ', b'\\par', b'{')),
+                'M055: Corpus slot prose opening differs: '+fragment)
     bodies = []
     children = set()
     paragraphs = 0
-    for body in parts[1:]:
+    for body in parts[int(headed):]:
         match = re.fullmatch(rb'\\PaperNativeParagraph\{([A-Za-z][A-Za-z0-9_:-]*)\}\{(.+)\}',
                              body)
         if match is not None:

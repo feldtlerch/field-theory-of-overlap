@@ -853,6 +853,20 @@ pub(super) fn check_destinations(
     Ok(())
 }
 
+pub(super) fn screen_block_node_count(block: &Block, withheld: bool) -> usize {
+    if withheld
+        || block.depth == Some(2)
+        || block.result.is_some()
+        || block.econ.is_some()
+        || block.paragraph
+        || block.equation
+    {
+        1
+    } else {
+        2 // A refrain or quotation has a body and an attribution.
+    }
+}
+
 #[allow(clippy::too_many_lines)] // Each document section is assembled in its visible order.
 pub(super) fn model(
     plan: &DocumentPlan,
@@ -908,6 +922,7 @@ pub(super) fn model(
     ));
     let mut main = vec![element("h1", &[("id", "content")], heading_nodes)];
     for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+        let expected_nodes = screen_block_node_count(block, screen.html_gaps.contains_key(&index));
         if !screen.gaps[index - 1].message.is_empty() {
             main.push(element(
                 "p",
@@ -916,6 +931,7 @@ pub(super) fn model(
             ));
         }
         if let Some(gap) = screen.html_gaps.get(&index) {
+            debug_assert_eq!(expected_nodes, 1);
             main.push(element(
                 "p",
                 &[("class", "gap")],
@@ -924,6 +940,7 @@ pub(super) fn model(
             continue;
         }
         if block.depth == Some(2) {
+            debug_assert_eq!(expected_nodes, 1);
             let fragment = super::plan::public_fragment(plan, &block.site, &block.unit)?;
             main.push(element(
                 "h2",
@@ -933,6 +950,7 @@ pub(super) fn model(
             continue;
         }
         if let Some(result) = &block.result {
+            debug_assert_eq!(expected_nodes, 1);
             let kind = match result.kind {
                 ftoo_manifest::corpus::ResultKind::Insight => "Insight",
                 ftoo_manifest::corpus::ResultKind::Remark => "Remark",
@@ -974,6 +992,7 @@ pub(super) fn model(
             continue;
         }
         if let Some(econ) = &block.econ {
+            debug_assert_eq!(expected_nodes, 1);
             let header_id = format!("{}-header", econ.fragment);
             main.push(element(
                 "section",
@@ -1020,10 +1039,12 @@ pub(super) fn model(
             continue;
         }
         if block.paragraph {
+            debug_assert_eq!(expected_nodes, 1);
             main.push(element("p", &[], inline(&block.runs, prepared, index)));
             continue;
         }
         if block.equation {
+            debug_assert_eq!(expected_nodes, 1);
             let math = prepared
                 .iter()
                 .find(|item| item.block == index && item.run == 0)
@@ -1037,6 +1058,7 @@ pub(super) fn model(
         }
         let refrain =
             &screen.refrains[super::plan::refrain_index(&plan.blocks, index).expect("refrain")];
+        debug_assert_eq!(expected_nodes, 2);
         let attrs = if refrain.quotation.is_none() {
             vec![("class", "refrain"), ("id", refrain.fragment.as_str())]
         } else {

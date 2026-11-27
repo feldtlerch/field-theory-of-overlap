@@ -226,6 +226,102 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
 }
 
 #[test]
+fn support_required_corpus_paragraph_recovery_uses_plan_position() {
+    use ftoo_manifest::corpus::{SlotBlock, SlotDraft, SlotRun, admit_slot};
+
+    let id = format!("sec:corpus:{}", "a".repeat(64));
+    let slot = admit_slot(
+        SlotDraft {
+            schema: 1,
+            id: id.clone(),
+            document: "paper-pilot".into(),
+            composition: "corpus-slot".into(),
+            language: "en".into(),
+            paper_mint: None,
+            blocks: vec![SlotBlock::Paragraph {
+                runs: vec![SlotRun::Text("Original sentence.".into())],
+            }],
+        },
+        "units/corpus/fixture.toml",
+        |_, _, _| false,
+    )
+    .unwrap();
+    let mut plan = prose_plan("Original sentence.");
+    plan.blocks[1].unit = format!("{id}::paragraph:0");
+    let mut later = prose_plan("Later sentence.").blocks.pop().unwrap();
+    later.unit = "later".into();
+    later.runs = vec![plan::Inline::Text("Later sentence.".into())];
+    plan.blocks.push(later);
+    plan.screen.as_mut().unwrap().gaps[1].position = GapPosition::Between;
+    plan.screen.as_mut().unwrap().gaps[1].message.clear();
+    plan.screen.as_mut().unwrap().gaps.push(plan::ScreenGap {
+        position: GapPosition::After,
+        message: "Later content is unavailable.".into(),
+        site: input::site("fixture.toml"),
+        boundaries: vec![],
+    });
+    let rendered = super::super::html::render(&plan, &support(), &[], None).unwrap();
+    assert_eq!(
+        html_recovery::slot_html_text(&plan, &slot, &rendered).unwrap(),
+        "Original sentence."
+    );
+    let moved = rendered
+        .replacen(">Original sentence.</p>", ">Moved sentence.</p>", 1)
+        .replacen(">Later sentence.</p>", ">Original sentence.</p>", 1);
+    assert_ne!(moved, rendered);
+    assert!(
+        format!(
+            "{:?}",
+            html_recovery::slot_html_text(&plan, &slot, &moved).unwrap_err()
+        )
+        .contains("HTML corpus paragraph position")
+    );
+
+    let site = input::site("fixture.toml");
+    let mut preceded = prose_plan("Original sentence.");
+    preceded.blocks[1].unit = format!("{id}::paragraph:0");
+    preceded.blocks.insert(
+        1,
+        plan::Block {
+            pending_names: BTreeMap::new(),
+            displays: BTreeMap::new(),
+            unit: "sec:fixture:prior-refrain".into(),
+            depth: None,
+            quotation: false,
+            paragraph: false,
+            equation: false,
+            econ: None,
+            result: None,
+            site: site.clone(),
+            runs: vec![plan::Inline::Text("Prior refrain.".into())],
+        },
+    );
+    let screen = preceded.screen.as_mut().unwrap();
+    screen.gaps.insert(
+        1,
+        plan::ScreenGap {
+            position: GapPosition::Between,
+            message: String::new(),
+            site: site.clone(),
+            boundaries: vec![],
+        },
+    );
+    screen.refrains.push(plan::ScreenRefrain {
+        handle: "sec:record-limit".into(),
+        bound_label: "sec:coda:record-limit".into(),
+        fragment: "sec-crecord--limit".into(),
+        quotation: None,
+        site,
+        binding_site: None,
+    });
+    let with_refrain = super::super::html::render(&preceded, &support(), &[], None).unwrap();
+    assert_eq!(
+        html_recovery::slot_html_text(&preceded, &slot, &with_refrain).unwrap(),
+        "Original sentence."
+    );
+}
+
+#[test]
 fn support_required_corpus_heading_and_styled_space_recover_at_their_positions() {
     let support = support();
     let mut plan = prose_plan("Ties. Start with two lives.");

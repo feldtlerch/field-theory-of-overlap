@@ -156,7 +156,12 @@ fn slot_identity_uses_the_semantic_label_grammar() {
 fn census_reaches_a_paragraph_after_an_existing_use() {
     let bytes = inherited_source();
     let source = imported(&bytes);
-    let intervals = admitted_intervals(&source, &bytes, |_, _, _| true);
+    let intervals = admitted_intervals(
+        &source,
+        &bytes,
+        |_, _, _| true,
+        |_, _, _| format!("sec:corpus:{}", "0".repeat(64)),
+    );
     assert!(
         intervals
             .iter()

@@ -1,7 +1,8 @@
 use super::containers::decode_result;
 use super::{
     AccountOwner, AccountPiece, BlockDraft, BlockFields, BlockKind, BlockStatus, EventDraft,
-    ImportFault, MathDraft, Refusal, ResultKind, Run, Site, SourceDraft, TableCell, TargetDraft,
+    ImportFault, MathDraft, ParagraphBoundary, ParagraphEdge, Refusal, ResultKind, Run, Site,
+    SourceDraft, TableCell, TargetDraft,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -838,6 +839,107 @@ fn opening_hook(line: &str) -> bool {
         )
 }
 
+fn previous_line(text: &str, end: usize) -> Option<(usize, &str)> {
+    if end == 0 {
+        return None;
+    }
+    let prior_end = end - usize::from(text.as_bytes().get(end - 1) == Some(&b'\n'));
+    let start = text[..prior_end].rfind('\n').map_or(0, |index| index + 1);
+    Some((start, &text[start..prior_end]))
+}
+
+fn paragraph_edges(text: &str, start: usize, end: usize) -> (ParagraphEdge, ParagraphEdge) {
+    let line_start = text[..start].rfind('\n').map_or(0, |index| index + 1);
+    let mut cursor = line_start;
+    while let Some((at, line)) = previous_line(text, cursor) {
+        if !line.trim_start().starts_with('%') || line.trim_start().starts_with("% generated:") {
+            break;
+        }
+        cursor = at;
+    }
+    let left = if let Some((_, line)) = previous_line(text, cursor) {
+        if line.trim().is_empty() {
+            ParagraphEdge::Blank
+        } else {
+            let mut prefix_cursor = cursor;
+            if let Some((at, line)) = previous_line(text, prefix_cursor)
+                && matches!(
+                    line.trim(),
+                    "\\secgrade{nec}%"
+                        | "\\secgrade{feas}%"
+                        | "\\secgrade{cont}%"
+                        | "\\secgrade{cont-anch}%"
+                )
+            {
+                prefix_cursor = at;
+            }
+            let label_seen = if let Some((at, line)) = previous_line(text, prefix_cursor)
+                && line.trim().starts_with("\\label{")
+                && line.trim().ends_with('}')
+            {
+                prefix_cursor = at;
+                true
+            } else {
+                false
+            };
+            if let Some((_, line)) = previous_line(text, prefix_cursor)
+                && (line.trim().starts_with("\\section{")
+                    || line.trim().starts_with("\\subsection{"))
+                && line.trim().ends_with('}')
+                && label_seen
+                && start == line_start
+            {
+                ParagraphEdge::HeadingTail
+            } else {
+                ParagraphEdge::Unproved
+            }
+        }
+    } else {
+        ParagraphEdge::Unproved
+    };
+    let mut next = end;
+    while next < text.len() {
+        let line_end = text[next..]
+            .find('\n')
+            .map_or(text.len(), |offset| next + offset + 1);
+        let line = text[next..line_end].trim();
+        if line.starts_with('%') && !line.starts_with("% generated:") {
+            next = line_end;
+            continue;
+        }
+        let right = if line.is_empty() {
+            ParagraphEdge::Blank
+        } else if (line.starts_with("\\section{") || line.starts_with("\\subsection{"))
+            && line.ends_with('}')
+        {
+            ParagraphEdge::Heading
+        } else {
+            ParagraphEdge::Unproved
+        };
+        return (left, right);
+    }
+    (left, ParagraphEdge::Unproved)
+}
+
+#[cfg(test)]
+#[test]
+fn native_markers_do_not_supply_paragraph_boundaries() {
+    let after = "Earlier prose.\n\n% generated: sec:reading:earlier\nCurrent prose.\n\n";
+    let start = after.find("Current prose.").unwrap();
+    let end = start + "Current prose.\n".len();
+    assert_eq!(
+        paragraph_edges(after, start, end).0,
+        ParagraphEdge::Unproved
+    );
+    let before = "\nCurrent prose.\n% generated: sec:reading:later\n\nLater prose.\n";
+    let start = before.find("Current prose.").unwrap();
+    let end = start + "Current prose.\n".len();
+    assert_eq!(
+        paragraph_edges(before, start, end).1,
+        ParagraphEdge::Unproved
+    );
+}
+
 fn admitted_layout(value: &str) -> bool {
     value.split(',').all(|part| {
         matches!(
@@ -925,6 +1027,7 @@ impl Importer<'_> {
         native: bool,
     ) {
         let index = self.draft.blocks.len();
+        let paragraph = matches!(fields, BlockFields::Paragraph { .. });
         self.draft.blocks.push(BlockDraft {
             local_index: index,
             site: site(self.path, self.text, start, end),
@@ -944,6 +1047,28 @@ impl Importer<'_> {
             end_byte: end,
             owner,
         });
+        if paragraph {
+            let (left, right) = paragraph_edges(self.text, start, end);
+            let semantic = located_inline(self.path, self.text, start, end).map_or_else(
+                |_| String::new(),
+                |pieces| {
+                    pieces
+                        .into_iter()
+                        .map(|piece| piece.semantic)
+                        .collect::<String>()
+                },
+            );
+            let mut tokens = semantic.split_whitespace();
+            let first_token = tokens.next().map(str::to_owned);
+            let last_token = semantic.split_whitespace().last().map(str::to_owned);
+            self.draft.paragraph_boundaries.push(ParagraphBoundary {
+                block_index: index,
+                left,
+                right,
+                first_token,
+                last_token,
+            });
+        }
     }
     #[allow(clippy::too_many_arguments)] // Accounted range and fault range are independent.
     fn refuse(
@@ -1451,6 +1576,7 @@ pub fn import_source(
             blocks: Vec::new(),
             events: Vec::new(),
             accounting: Vec::new(),
+            paragraph_boundaries: Vec::new(),
             refusals: Vec::new(),
             byte_length: bytes.len(),
         },

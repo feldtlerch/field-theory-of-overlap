@@ -46,6 +46,45 @@ fn digest(bytes: &[u8]) -> String {
     crate::hex(&Sha256::digest(bytes))
 }
 
+pub(crate) fn paragraph_slot_id(
+    document: &str,
+    source: &str,
+    source_blob: &str,
+    start: usize,
+    end: usize,
+) -> String {
+    let mut tuple = Vec::new();
+    let start_bytes = (start as u64).to_be_bytes();
+    let end_bytes = (end as u64).to_be_bytes();
+    let parts: [&[u8]; 5] = [
+        document.as_bytes(),
+        source.as_bytes(),
+        source_blob.as_bytes(),
+        &start_bytes,
+        &end_bytes,
+    ];
+    for part in parts {
+        tuple.extend_from_slice(&(part.len() as u64).to_be_bytes());
+        tuple.extend_from_slice(part);
+    }
+    format!("sec:corpus:{}", digest(&tuple))
+}
+
+fn check_paragraph_slot_identity(
+    actual: &str,
+    document: &str,
+    source: &str,
+    source_blob: &str,
+    start: usize,
+    end: usize,
+) -> Result<(), String> {
+    let expected = paragraph_slot_id(document, source, source_blob, start, end);
+    if actual != expected {
+        return Err("paragraph slot id differs from its captured source interval".into());
+    }
+    Ok(())
+}
+
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")
@@ -110,8 +149,8 @@ fn selection(request: &Assignment, bytes: &[u8], before: bool) -> Result<(usize,
         || request.form != "coarse-slot"
         || request.first == 0
         || request.first > request.last
-        || (!result_form && request.blocks.len() < 2)
-        || (!result_form && request.blocks[0].kind != "heading")
+        || request.blocks.is_empty()
+        || (!result_form && !matches!(request.blocks[0].kind.as_str(), "heading" | "paragraph"))
         || request.blocks[0].first != request.first
         || request
             .blocks
@@ -547,7 +586,11 @@ fn before_blocks(
                 root,
                 revision,
                 unit,
-                "explainer-pilot",
+                if request.source.contains("/explainer/") {
+                    "explainer-pilot"
+                } else {
+                    "paper-pilot"
+                },
                 "en",
                 index,
                 true,
@@ -555,7 +598,8 @@ fn before_blocks(
             continue;
         }
         let start = draft.site.start_byte;
-        let end = if index == 0 {
+        let heading = index == 0 && selected.kind == "heading";
+        let end = if heading {
             line_start(
                 bytes,
                 selected
@@ -571,7 +615,7 @@ fn before_blocks(
             pieces,
             mut controls,
             label_controls,
-        } = if index == 0 {
+        } = if heading {
             before_heading(&source, request, text, start, end)?
         } else {
             BeforeHeading {
@@ -652,11 +696,29 @@ fn after_blocks(
     let checked = slots
         .get(&request.unit)
         .ok_or("candidate slot has no checked native owner")?;
-    if checked.document() != "explainer-pilot" || checked.language() != "en" {
+    let document = if request.source.contains("/explainer/") {
+        "explainer-pilot"
+    } else {
+        "paper-pilot"
+    };
+    if checked.document() != document || checked.language() != "en" {
         return Err("candidate slot document or language differs".into());
     }
-    let slot_path = checked.source();
-    let (bytes, blob) = captured(root, revision, slot_path)?;
+    if !matches!(checked.blocks().first(), Some(SlotBlock::Heading { .. })) {
+        let (start, end) = selection(request, parent_bytes, true)?;
+        check_paragraph_slot_identity(
+            checked.id(),
+            if document == "paper-pilot" {
+                "paper"
+            } else {
+                "explainer"
+            },
+            &request.source,
+            &request.source_blob,
+            start,
+            end,
+        )?;
+    }
     let child_markers = checked
         .blocks()
         .iter()
@@ -684,6 +746,17 @@ fn after_blocks(
     if checked.blocks().len() != request.blocks.len() {
         return Err("native slot identity or order changed".into());
     }
+    after_block_values(root, revision, request, checked)
+}
+
+fn after_block_values(
+    root: &Path,
+    revision: &str,
+    request: &Assignment,
+    checked: &ftoo_manifest::corpus::CheckedSlot,
+) -> Result<Vec<Value>, String> {
+    let slot_path = checked.source();
+    let (bytes, blob) = captured(root, revision, slot_path)?;
     let text = std::str::from_utf8(&bytes).map_err(|error| error.to_string())?;
     let tree = toml::parse(slot_path, text).map_err(|error| error.to_string())?;
     let nodes = &field(field(&tree, "unit")?, "blocks")?.elements;
@@ -706,7 +779,7 @@ fn after_blocks(
         }
         let (runs, field_name) = match block {
             SlotBlock::Heading { title, .. } if index == 0 => (title, "title"),
-            SlotBlock::Paragraph { runs } if index >= 1 => (runs, "runs"),
+            SlotBlock::Paragraph { runs } => (runs, "runs"),
             _ => return Err(format!("native block {index} changed kind")),
         };
         let run_node = field(node, field_name)?;
@@ -931,14 +1004,14 @@ pub fn export_correspondence(
         return Err("assignment exceeds byte bound".into());
     }
     let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
+    let result_form = request.blocks.len() == 1 && request.blocks[0].kind == "theorem-container";
     let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
         .map_err(|error| error.to_string())?;
-    let result_form = request.blocks.len() == 1 && request.blocks[0].kind == "theorem-container";
     if !(request.source.starts_with("documents/paper/explainer/")
-        || result_form && request.source.starts_with("documents/paper/parts/"))
+        || request.source.starts_with("documents/paper/parts/"))
         || !source_list.lines().any(|path| path == request.source)
     {
-        return Err("assignment source is outside the declared explainer sources".into());
+        return Err("assignment source is outside the declared body sources".into());
     }
     for revision in [&request.parent, &request.candidate] {
         if revision.len() != 40
@@ -1049,12 +1122,11 @@ pub(crate) fn recovery_selection(
     let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
     let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
         .map_err(|error| error.to_string())?;
-    let result_form = request.blocks.len() == 1 && request.blocks[0].kind == "theorem-container";
     if !(request.source.starts_with("documents/paper/explainer/")
-        || result_form && request.source.starts_with("documents/paper/parts/"))
+        || request.source.starts_with("documents/paper/parts/"))
         || !source_list.lines().any(|path| path == request.source)
     {
-        return Err("assignment source is outside the declared explainer sources".into());
+        return Err("assignment source is outside the declared body sources".into());
     }
     if git(root, &["rev-parse", "HEAD"])? != request.candidate {
         return Err("captured checkout revision differs from assignment candidate".into());
@@ -1071,6 +1143,27 @@ mod tests {
         path::PathBuf,
         time::{SystemTime, UNIX_EPOCH},
     };
+
+    #[test]
+    fn paragraph_id_binds_source_blob_and_interval() {
+        let expected = paragraph_slot_id("paper", "partA.tex", "parent-blob", 20, 40);
+        assert!(
+            check_paragraph_slot_identity(&expected, "paper", "partA.tex", "parent-blob", 20, 40)
+                .is_ok()
+        );
+        for (document, source, blob, start, end) in [
+            ("explainer", "partA.tex", "parent-blob", 20, 40),
+            ("paper", "partB.tex", "parent-blob", 20, 40),
+            ("paper", "partA.tex", "changed-blob", 20, 40),
+            ("paper", "partA.tex", "parent-blob", 21, 40),
+            ("paper", "partA.tex", "parent-blob", 20, 41),
+        ] {
+            assert_eq!(
+                check_paragraph_slot_identity(&expected, document, source, blob, start, end),
+                Err("paragraph slot id differs from its captured source interval".into())
+            );
+        }
+    }
 
     fn repo() -> PathBuf {
         let nonce = SystemTime::now()

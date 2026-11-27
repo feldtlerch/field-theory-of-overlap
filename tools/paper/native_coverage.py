@@ -579,11 +579,14 @@ def blob_id(path):
 
 
 def render_markdown(root, coverage, things, capabilities, paragraphs, form_capabilities, census):
+    paper_source_count = sum(source != 'TOTAL' and document == 'paper'
+                             for document, source, *_ in coverage)
+    body_source_count = sum(source != 'TOTAL' for _, source, *_ in coverage)
     lines = [
         "# Native document coverage", "",
         "[ADR 030](../adr/030-native-renderings-complete-graph-native-model.md) requires every paper and explainer passage to come from one native source for PDF, Markdown and HTML, and every rendered table to have a native body in each medium by release 0.6.0; a missing-content placeholder does not meet that boundary.", "",
         "The identities below name measured file bytes, independent of the commit that contains them.", "",
-        f"The {sum(source != 'TOTAL' and document == 'paper' for document, source, *_ in coverage)} paper body files selected by `main.tex` and the explainer body are counted with each checked inclusion marker replaced by its generated fragment. Native means content from those inclusions; the remaining body TeX is authored. The paper's derived index and bibliography sections are counted as objects, but their entries are outside the body-word denominator.", "",
+        f"The {paper_source_count} paper body files selected by `main.tex` and the explainer body are counted with each checked inclusion marker replaced by its generated fragment. Native means content from those inclusions; the remaining body TeX is authored. The paper's derived index and bibliography sections are counted as objects, but their entries are outside the body-word denominator.", "",
         "## Classes", "",
         "Each member is an occurrence of its class. Inline forms and objects may be nested, so class rows do not sum to a document block count. Native route names whether a checked route carries none, a subset, or all member forms; native counts measure inclusions in the body sources.", "",
         "| Class | Paper native / members | Explainer native / members | All native / members | Native route | Basis |",
@@ -620,7 +623,7 @@ def render_markdown(root, coverage, things, capabilities, paragraphs, form_capab
         selected = [row for row in paragraphs if document == "all" or row["document"] == document]
         lines.append(f"| {document} | {len(selected)} | {sum(row['origin'] == 'native' for row in selected)} | {sum(not row['blockers'] for row in selected)} | {sum(row['origin'] == 'authored' and not row['blockers'] for row in selected)} |")
     eligible, in_stretch = slot_summary(paragraphs, census)
-    lines.extend(["", f"Of the {eligible} authored explainer paragraphs using only admitted forms, {in_stretch} lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). The importer reports slot intervals for the explainer only.", "",
+    lines.extend(["", f"Of the {eligible} authored explainer paragraphs using only admitted forms, {in_stretch} lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). This retained snapshot lists explainer intervals; the importer source report enumerates all {body_source_count} body files.", "",
         "## Importer blocks and refusals", "",
         "The importer owns block splitting and diagnostic refusal counts. Its counts below differ from the lexical paragraph and word measures above; neither measure substitutes for the other.", "",
         "| Kind | Fully decoded | Refused |", "|---|---:|---:|"])

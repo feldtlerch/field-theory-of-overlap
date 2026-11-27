@@ -14,7 +14,7 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 |---|---:|---:|---:|---|---|
 | inline mathematics | 1 / 1031 | 0 / 6 | 1 / 1037 | subset | Compared inherited symbols and observed HTML expressions cover selected contexts; `dec:notation:compared-inherited-native-support`, `rec:adr:042-html-mathematics`. |
 | tag or handle references | 4 / 651 | 0 / 138 | 4 / 789 | subset | Checked paper tag runs and visible handles cover selected targets; `dec:documents:paper-tagged-paragraphs`, `rec:adr:048-reference-forms`. |
-| paragraphs | 6 / 238 | 13 / 76 | 19 / 314 | subset | Tagged paragraph units and bounded explainer corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`. |
+| paragraphs | 6 / 238 | 13 / 76 | 19 / 314 | subset | Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`. |
 | headings | 0 / 149 | 6 / 14 | 6 / 163 | subset | Unnumbered explainer section headings in corpus slots; `dec:documents:bounded-corpus-slot`. |
 | displayed equations | 0 / 141 | 1 / 1 | 1 / 142 | subset | The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`. |
 | cross-references | 1 / 117 | 0 / 13 | 1 / 130 | subset | Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`. |
@@ -92,7 +92,7 @@ A capability unlock counts an authored explainer paragraph whose only missing de
 | explainer | 76 | 13 | 51 | 39 |
 | all | 314 | 19 | 63 | 51 |
 
-Of the 39 authored explainer paragraphs using only admitted forms, 7 lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). The importer reports slot intervals for the explainer only.
+Of the 39 authored explainer paragraphs using only admitted forms, 39 lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). This retained snapshot lists explainer intervals; the importer source report enumerates all 12 body files.
 
 ## Importer blocks and refusals
 
@@ -166,6 +166,24 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 
 | Explainer admissible interval | Stopping condition |
 |---|---|
+| 89–138 | `documents/paper/explainer/explainer.tex:140 StatementBox Unresolved` |
+| 145–147 | `documents/paper/explainer/explainer.tex:149 Refusal Unresolved` |
+| 224–224 | `documents/paper/explainer/explainer.tex:226 Paragraph Unresolved` |
+| 232–256 | `documents/paper/explainer/explainer.tex:258 ExistingNativeInclusion Decoded` |
+| 282–283 | `documents/paper/explainer/explainer.tex:285 StatementBox Unresolved` |
+| 289–297 | `documents/paper/explainer/explainer.tex:299 StatementBox Unresolved` |
+| 303–312 | `documents/paper/explainer/explainer.tex:314 Paragraph Unresolved` |
+| 340–347 | `documents/paper/explainer/explainer.tex:349 ExistingNativeInclusion Decoded` |
+| 351–366 | `documents/paper/explainer/explainer.tex:368 Paragraph Unresolved` |
+| 374–374 | `documents/paper/explainer/explainer.tex:376 StatementBox Unresolved` |
+| 439–454 | `documents/paper/explainer/explainer.tex:456 Paragraph Unresolved` |
+| 492–497 | `documents/paper/explainer/explainer.tex:499 Paragraph Unresolved` |
+| 599–605 | `documents/paper/explainer/explainer.tex:607 ExistingNativeInclusion Decoded` |
+| 609–615 | `documents/paper/explainer/explainer.tex:617 Paragraph Unresolved` |
+| 667–692 | `documents/paper/explainer/explainer.tex:694 Paragraph Unresolved` |
+| 701–709 | `documents/paper/explainer/explainer.tex:711 Paragraph Unresolved` |
+| 737–737 | `documents/paper/explainer/explainer.tex:739 List Unresolved` |
+| 749–764 | `documents/paper/explainer/explainer.tex:766 Paragraph Unresolved` |
 | 778–809 | `documents/paper/explainer/explainer.tex:810 Paragraph Unresolved` |
 | 818–848 | `documents/paper/explainer/explainer.tex:849 ExistingNativeInclusion Decoded` |
 
@@ -212,8 +230,8 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 | `documents/paper/main.tex` | `06bf235acb58b61df74058a8411e6b64a84d2bed` |
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
 | `generated/documents/inclusions.tsv` | `23697a16fa1b63d151ad1c263567d79873cfb1de` |
-| `tools/paper/native_coverage_capabilities.tsv` | `151b4b607b438d73ea4e69c342b5ddf2c0857e88` |
-| `tools/paper/native_coverage_slot_census.json` | `75b5c03356566f6a2e16076adaae9f1e1daebc59` |
+| `tools/paper/native_coverage_capabilities.tsv` | `ef49751a3894cc755ffe851343d432a31fc57e14` |
+| `tools/paper/native_coverage_slot_census.json` | `e300767d0f9311604f17a9a4a75240fba753c1ed` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |

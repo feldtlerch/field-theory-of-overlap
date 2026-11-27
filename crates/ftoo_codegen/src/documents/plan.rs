@@ -1215,7 +1215,9 @@ pub(super) fn slot_markdown_text(
     let start = plan
         .blocks
         .iter()
-        .position(|block| block.unit == slot.id())
+        .position(|block| {
+            block.unit == slot.id() || block.unit == format!("{}::paragraph:0", slot.id())
+        })
         .ok_or_else(|| {
             emission_failure(
                 plan,

@@ -1,8 +1,8 @@
 //! Admission of a bounded ordered corpus slot and its independent source correspondence.
 
 use super::{
-    AccountOwner, BlockFields, BlockKind, BlockStatus, ImportFault, ResultGradeCode, ResultHeader,
-    ResultKind, ResultPartKind, Run, SourceDraft, validate_accounting,
+    AccountOwner, BlockFields, BlockKind, BlockStatus, ImportFault, ParagraphEdge, ResultGradeCode,
+    ResultHeader, ResultKind, ResultPartKind, Run, SourceDraft, validate_accounting,
 };
 use serde::Serialize;
 
@@ -125,6 +125,7 @@ pub enum SlotFault {
 /// One maximal interval admitted by the same native grammar and source transfer check.
 #[derive(Clone, Debug, Serialize)]
 pub struct SlotInterval {
+    pub unit: String,
     pub first: usize,
     pub last: usize,
     pub blocks: Vec<SlotIntervalBlock>,
@@ -203,15 +204,24 @@ pub fn admit_slot(
         return Err(SlotFault::Schema);
     }
     let result_slot = matches!(draft.blocks.as_slice(), [SlotBlock::Result { .. }]);
-    let prefix = if result_slot { "result:" } else { "sec:" };
-    if !draft.id.starts_with(prefix)
-        || !crate::units::label_name(&draft.id)
-        || draft.document
-            != if result_slot {
-                "paper-pilot"
-            } else {
-                "explainer-pilot"
-            }
+    let headed = matches!(draft.blocks.first(), Some(SlotBlock::Heading { .. }));
+    let paragraph_id = draft.id.strip_prefix("sec:corpus:").is_some_and(|suffix| {
+        suffix.len() == 64
+            && suffix
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    });
+    if !(if result_slot {
+        draft.id.starts_with("result:")
+            && crate::units::label_name(&draft.id)
+            && draft.document == "paper-pilot"
+    } else if headed {
+        draft.document == "explainer-pilot"
+            && draft.id.starts_with("sec:")
+            && crate::units::label_name(&draft.id)
+    } else {
+        paragraph_id
+    }) || !matches!(draft.document.as_str(), "paper-pilot" | "explainer-pilot")
         || draft.composition != "corpus-slot"
         || draft.language != "en"
     {
@@ -253,7 +263,7 @@ pub fn admit_slot(
     if draft.paper_mint.is_some() {
         return Err(SlotFault::SourceMint);
     }
-    if draft.blocks.len() < 2
+    if draft.blocks.is_empty()
         || !draft
             .blocks
             .iter()
@@ -263,22 +273,24 @@ pub fn admit_slot(
             index: draft.blocks.len(),
         });
     }
-    match &draft.blocks[0] {
-        SlotBlock::Heading {
-            level,
-            star,
-            title,
-            label,
-        } if level == "section"
-            && !star
-            && label == &draft.id
-            && matches!(title.as_slice(), [SlotRun::Text(text)] if !text.trim().is_empty()
+    if headed {
+        match &draft.blocks[0] {
+            SlotBlock::Heading {
+                level,
+                star,
+                title,
+                label,
+            } if level == "section"
+                && !star
+                && label == &draft.id
+                && matches!(title.as_slice(), [SlotRun::Text(text)] if !text.trim().is_empty()
                 && !text.chars().any(|ch| matches!(ch, '{' | '}' | '\\' | '\n' | '\r'))
                 && !merges_tex_text(text)) => {}
-        _ => return Err(SlotFault::ChildOrder { index: 0 }),
+            _ => return Err(SlotFault::ChildOrder { index: 0 }),
+        }
     }
     let mut children = std::collections::BTreeSet::new();
-    for (index, block) in draft.blocks.iter().enumerate().skip(1) {
+    for (index, block) in draft.blocks.iter().enumerate().skip(usize::from(headed)) {
         match block {
             SlotBlock::Use { unit, role } if role == "paragraph" && unit != &draft.id => {
                 if !children.insert(unit) {
@@ -397,18 +409,34 @@ fn awaiting_paragraph(children: &[SlotBlock], fault: &SlotFault) -> bool {
             .any(|child| matches!(child, SlotBlock::Paragraph { .. }))
 }
 
-/// Report each heading's longest slot-grammar and accounting-admissible prefix.
+/// Report maximal, nonoverlapping source-boundary and slot-grammar admissible intervals.
 #[must_use]
 pub fn admitted_intervals(
     source: &SourceDraft,
     bytes: &[u8],
     has_child: impl Fn(&str, &str, &str) -> bool,
+    derive_id: impl Fn(&SourceDraft, usize, usize) -> String,
 ) -> Vec<SlotInterval> {
-    if source.document != "explainer" || source.language != "en" {
+    if !matches!(source.document.as_str(), "paper" | "explainer") || source.language != "en" {
         return Vec::new();
     }
+    let mut intervals = headed_intervals(source, bytes, &has_child);
+    let paragraphs = paragraph_intervals(source, bytes, &intervals, &has_child, &derive_id);
+    intervals.extend(paragraphs);
+    intervals.sort_by_key(|interval| interval.first);
+    intervals
+}
+
+fn headed_intervals(
+    source: &SourceDraft,
+    bytes: &[u8],
+    has_child: &impl Fn(&str, &str, &str) -> bool,
+) -> Vec<SlotInterval> {
     let mut intervals = Vec::new();
     for (heading_index, heading) in source.blocks.iter().enumerate() {
+        if source.document != "explainer" {
+            break;
+        }
         if !matches!(heading.kind, BlockKind::Heading) {
             continue;
         }
@@ -458,7 +486,7 @@ pub fn admitted_intervals(
                 paper_mint: None,
                 blocks: children.clone(),
             };
-            let checked = match admit_slot(candidate, &source.path, &has_child) {
+            let checked = match admit_slot(candidate, &source.path, has_child) {
                 Ok(checked) => checked,
                 Err(fault) if awaiting_paragraph(&children, &fault) => {
                     continue;
@@ -479,19 +507,9 @@ pub fn admitted_intervals(
                 stop = format!("{}:{} {fault}", source.path, block.site.start_line);
                 break;
             }
-            let selected = source.blocks[heading_index..=index]
-                .iter()
-                .enumerate()
-                .map(|(offset, selected)| SlotIntervalBlock {
-                    kind: selected.kind.clone(),
-                    first: selected.site.start_line,
-                    last: source
-                        .blocks
-                        .get(heading_index + offset + 1)
-                        .map_or(last, |next| next.site.start_line.saturating_sub(1)),
-                })
-                .collect();
+            let selected = headed_interval_blocks(source, heading_index, index, last);
             best = Some(SlotInterval {
+                unit: label.exact_key.clone(),
                 first: heading.site.start_line,
                 last,
                 blocks: selected,
@@ -504,6 +522,135 @@ pub fn admitted_intervals(
         }
     }
     intervals
+}
+
+fn headed_interval_blocks(
+    source: &SourceDraft,
+    heading_index: usize,
+    end_index: usize,
+    last: usize,
+) -> Vec<SlotIntervalBlock> {
+    source.blocks[heading_index..=end_index]
+        .iter()
+        .enumerate()
+        .map(|(offset, selected)| SlotIntervalBlock {
+            kind: selected.kind.clone(),
+            first: selected.site.start_line,
+            last: source
+                .blocks
+                .get(heading_index + offset + 1)
+                .map_or(last, |next| next.site.start_line.saturating_sub(1)),
+        })
+        .collect()
+}
+
+fn paragraph_intervals(
+    source: &SourceDraft,
+    bytes: &[u8],
+    intervals: &[SlotInterval],
+    has_child: &impl Fn(&str, &str, &str) -> bool,
+    derive_id: &impl Fn(&SourceDraft, usize, usize) -> String,
+) -> Vec<SlotInterval> {
+    let mut selected = Vec::new();
+    for index in 0..source.blocks.len() {
+        let first_block = &source.blocks[index];
+        if first_block.kind != BlockKind::Paragraph
+            || inside_intervals(intervals, first_block.site.start_line)
+            || inside_intervals(&selected, first_block.site.start_line)
+        {
+            continue;
+        }
+        let Some(boundary) = source
+            .paragraph_boundaries
+            .iter()
+            .find(|entry| entry.block_index == index)
+        else {
+            continue;
+        };
+        if !matches!(
+            boundary.left,
+            ParagraphEdge::Blank | ParagraphEdge::HeadingTail
+        ) {
+            continue;
+        }
+        let mut children = Vec::new();
+        let mut best = None;
+        let mut stop = "end of source".to_owned();
+        for end_index in index..source.blocks.len() {
+            let block = &source.blocks[end_index];
+            if inside_intervals(intervals, block.site.start_line) {
+                stop = "existing headed interval".into();
+                break;
+            }
+            let Some(child) = imported_child(block, "") else {
+                stop = format!(
+                    "{}:{} {:?} {:?}",
+                    source.path, block.site.start_line, block.kind, block.status
+                );
+                break;
+            };
+            children.push(child);
+            let first = first_block.site.start_line;
+            let last = block.site.end_line;
+            let Some(begin) = line_start(bytes, first) else {
+                break;
+            };
+            let end = line_start(bytes, last + 1).unwrap_or(bytes.len());
+            let id = derive_id(source, begin, end);
+            let candidate = SlotDraft {
+                schema: 1,
+                id: id.clone(),
+                document: format!("{}-pilot", source.document),
+                composition: "corpus-slot".into(),
+                language: "en".into(),
+                paper_mint: None,
+                blocks: children.clone(),
+            };
+            let checked = match admit_slot(candidate, &source.path, has_child) {
+                Ok(checked) => checked,
+                Err(fault) => {
+                    stop = format!("{}:{} {fault}", source.path, block.site.start_line);
+                    break;
+                }
+            };
+            if let Err(fault) = check_transfer(&checked, source, &source.path, bytes, first, last) {
+                stop = format!("{}:{} {fault}", source.path, block.site.start_line);
+                break;
+            }
+            best = Some(SlotInterval {
+                unit: id,
+                first,
+                last,
+                blocks: source.blocks[index..=end_index]
+                    .iter()
+                    .enumerate()
+                    .map(|(offset, child)| SlotIntervalBlock {
+                        kind: child.kind.clone(),
+                        first: child.site.start_line,
+                        last: source
+                            .blocks
+                            .get(index + offset + 1)
+                            .filter(|_| index + offset < end_index)
+                            .map_or(child.site.end_line, |next| {
+                                next.site.start_line.saturating_sub(1)
+                            }),
+                    })
+                    .collect(),
+                stopping_condition: String::new(),
+            });
+        }
+        if let Some(mut interval) = best {
+            interval.stopping_condition = stop;
+            selected.push(interval);
+        }
+    }
+    selected
+}
+
+fn inside_intervals(intervals: &[SlotInterval], line: usize) -> bool {
+    intervals
+        .iter()
+        .any(|interval| interval.first <= line && line <= interval.last)
 }
 
 fn line_start(bytes: &[u8], line: usize) -> Option<usize> {
@@ -637,6 +784,22 @@ pub fn check_transfer(
                     runs: actual,
                 },
             ) if layout.is_empty() => {
+                let boundary = source
+                    .paragraph_boundaries
+                    .iter()
+                    .find(|entry| entry.block_index == block.local_index)
+                    .ok_or(SlotFault::SourceBlock { index })?;
+                if !matches!(
+                    boundary.left,
+                    ParagraphEdge::Blank | ParagraphEdge::HeadingTail
+                ) || !matches!(
+                    boundary.right,
+                    ParagraphEdge::Blank | ParagraphEdge::Heading
+                ) || boundary.first_token.is_none()
+                    || boundary.last_token.is_none()
+                {
+                    return Err(SlotFault::SourceBlock { index });
+                }
                 if imported_runs(actual, true).as_deref() != Some(runs) {
                     return Err(SlotFault::SourceContent { index });
                 }
@@ -709,14 +872,13 @@ fn check_selected_accounting(
         .iter()
         .filter(|target| target.site.start_byte >= begin && target.site.start_byte < end)
         .collect();
-    let valid_mint = if matches!(slot.blocks(), [SlotBlock::Result { .. }]) {
-        labels == 0 && targets.is_empty()
-    } else {
-        labels == 1
-            && matches!(targets.as_slice(), [target] if target.exact_key == slot.id()
-                && target.selector == slot.id() && target.source_command == "\\label")
-    };
-    if !valid_mint {
+    let headed = matches!(slot.blocks().first(), Some(SlotBlock::Heading { .. }));
+    if (headed
+        && (labels != 1
+            || !matches!(targets.as_slice(), [target] if target.exact_key == slot.id()
+            && target.selector == slot.id() && target.source_command == "\\label")))
+        || (!headed && (labels != 0 || !targets.is_empty()))
+    {
         return Err(SlotFault::SourceMint);
     }
     Ok(())

@@ -1764,10 +1764,7 @@ pub(super) fn slot_html_text(
         }
         return Ok(parts.join(" "));
     }
-    let fragment = super::plan::public_fragment(plan, &plan.blocks[0].site, slot.id())?;
-    let start = main.iter().position(|node| matches!(node,
-        Node::Element { name, attributes, .. } if name == "h2" && attributes == &[("id".into(), fragment.clone())]
-    )).ok_or_else(|| mismatch(plan, "HTML corpus heading"))?;
+    let start = slot_html_start(plan, slot, main)?;
     let mut parts = Vec::new();
     for node in main
         .get(start..start + slot.blocks().len())
@@ -1776,4 +1773,67 @@ pub(super) fn slot_html_text(
         parts.push(slot_node_text(node).ok_or_else(|| mismatch(plan, "HTML corpus child text"))?);
     }
     Ok(parts.join(" "))
+}
+
+fn slot_html_start(
+    plan: &DocumentPlan,
+    slot: &ftoo_manifest::corpus::CheckedSlot,
+    main: &[Node],
+) -> Result<usize, DocumentError> {
+    if matches!(
+        slot.blocks().first(),
+        Some(ftoo_manifest::corpus::SlotBlock::Heading { .. })
+    ) {
+        let fragment = super::plan::public_fragment(plan, &plan.blocks[0].site, slot.id())?;
+        main.iter().position(|node| matches!(node,
+            Node::Element { name, attributes, .. } if name == "h2" && attributes == &[("id".into(), fragment.clone())]
+        )).ok_or_else(|| mismatch(plan, "HTML corpus heading"))
+    } else {
+        fn run_text(runs: &[ftoo_manifest::corpus::SlotRun]) -> String {
+            let mut text = String::new();
+            for run in runs {
+                match run {
+                    ftoo_manifest::corpus::SlotRun::Text(value) => text.push_str(value),
+                    ftoo_manifest::corpus::SlotRun::EnSpace => text.push(' '),
+                    ftoo_manifest::corpus::SlotRun::Style { children, .. } => {
+                        text.push_str(&run_text(children));
+                    }
+                }
+            }
+            text
+        }
+        let Some(ftoo_manifest::corpus::SlotBlock::Paragraph { runs }) = slot.blocks().first()
+        else {
+            return Err(mismatch(plan, "HTML corpus first paragraph"));
+        };
+        let first = plan
+            .blocks
+            .iter()
+            .position(|block| block.unit == format!("{}::paragraph:0", slot.id()))
+            .ok_or_else(|| mismatch(plan, "HTML corpus paragraph position"))?;
+        let screen = plan
+            .screen
+            .as_ref()
+            .ok_or_else(|| mismatch(plan, "HTML corpus paragraph position"))?;
+        let mut at = 1; // The document heading occupies the first main node.
+        for index in 1..=first {
+            at += usize::from(!screen.gaps[index - 1].message.is_empty());
+            if index < first {
+                at += super::html::screen_block_node_count(
+                    &plan.blocks[index],
+                    screen.html_gaps.contains_key(&index),
+                );
+            }
+        }
+        let Some(Node::Element { name, .. }) = main.get(at) else {
+            return Err(mismatch(plan, "HTML corpus paragraph position"));
+        };
+        if name != "p" {
+            return Err(mismatch(plan, "HTML corpus paragraph position"));
+        }
+        if slot_node_text(&main[at]).as_deref() != Some(run_text(runs).as_str()) {
+            return Err(mismatch(plan, "HTML corpus paragraph position"));
+        }
+        Ok(at)
+    }
 }

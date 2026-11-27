@@ -252,6 +252,25 @@ class StreamComparisonControls(unittest.TestCase):
                 self.assertEqual(compare_words.main(), 0)
             self.assertEqual(slot.call_count, 1)
 
+    def test_paper_paragraph_slot_request_uses_its_source(self):
+        source = 'documents/paper/parts/partA.tex'
+        body = b'Recovery of a quantity from observation depends on where the quantity is spent, and\nexactly one configuration has no spend route at all.\n'
+        blob = hashlib.sha1(b'blob ' + str(len(body)).encode() + b'\0' + body).hexdigest()
+        assignment = dict(schema=4, form='coarse-slot', parent='a' * 40,
+                          candidate='b' * 40, source=source,
+                          **{'source-blob': blob}, first=1, last=2,
+                          unit='sec:corpus:' + 'a' * 64,
+                          blocks=[dict(kind='paragraph', first=1, last=2)])
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            repo = root / 'repo'
+            (repo / 'documents/paper-build').mkdir(parents=True)
+            (repo / 'documents/paper-build/sources.tsv').write_text(source + '\n')
+            request = root / 'assignment.json'
+            request.write_text(json.dumps(assignment))
+            with mock.patch.object(compare_words, 'git', return_value=body):
+                self.assertEqual(compare_words.capture_assignment(repo, request)[0], assignment)
+
     def test_named_strong_and_en_space_controls_are_source_bound(self):
         export, captured, assignment, revision = self.slot_export()
         path = assignment['source']

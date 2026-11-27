@@ -567,10 +567,11 @@ def coarse_slot_assignment(row, source_bytes):
                     'request')
     kinds = [block['kind'] for block in row['blocks']]
     result_form = kinds == ['theorem-container']
-    if (not result_form and (len(kinds) < 2 or kinds[0] != 'heading' or
-            'paragraph' not in kinds[1:] or
+    headed = kinds[0] == 'heading'
+    if (not result_form and (kinds[0] not in ('heading', 'paragraph') or
+            'paragraph' not in kinds or
             any(kind not in ('paragraph', 'existing-native-inclusion')
-                for kind in kinds[1:]))):
+                for kind in kinds[int(headed):]))):
         raise Fault('AssignmentInvalid', 'coarse-slot child kinds differ', 'request')
     return row
 
@@ -1021,20 +1022,21 @@ def compare_slot_streams(assignment, before_blocks, after_blocks, pdfs,
     """Compare a selected ordered slot and both complete PDF streams."""
     selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
     result_form = len(assignment['blocks']) == 1 and assignment['blocks'][0]['kind'] == 'theorem-container'
-    selected_document = 'paper' if result_form else 'explainer'
+    selected_document = ('explainer' if assignment['source'] ==
+                         'documents/paper/explainer/explainer.tex' else 'paper')
     if result_form:
         if before_blocks[0]['result'] != after_blocks[0]['result']:
             raise Fault('CorrespondenceInvalid', 'result header changed across transfer',
                         'correspondence')
-        old = select_result_pdf(pdfs['paper']['before'], selection, before_blocks[0],
+        old = select_result_pdf(pdfs[selected_document]['before'], selection, before_blocks[0],
                                 before_blocks[0]['result'], markdown['text'], 'paper', 'before')
-        new = select_result_pdf(pdfs['paper']['after'], selection, after_blocks[0],
+        new = select_result_pdf(pdfs[selected_document]['after'], selection, after_blocks[0],
                                 after_blocks[0]['result'], markdown['text'], 'paper', 'after')
     else:
-        old = select_pdf_stretch(pdfs['explainer']['before'], selection, before_blocks,
-                                 'explainer', 'before')
-        new = select_pdf_stretch(pdfs['explainer']['after'], selection, after_blocks,
-                                 'explainer', 'after')
+        old = select_pdf_stretch(pdfs[selected_document]['before'], selection, before_blocks,
+                                 selected_document, 'before')
+        new = select_pdf_stretch(pdfs[selected_document]['after'], selection, after_blocks,
+                                 selected_document, 'after')
     if markdown['scope'] != selection or html['scope'] != selection:
         raise Fault('SelectionInvalid', 'screen source scope differs from slot',
                     'correspondence')
@@ -2043,7 +2045,8 @@ def capture_assignment(repo, assignment_path):
         parent = assignment.get('parent')
         declared = (repo / 'documents/paper-build/sources.tsv').read_text().splitlines()
         if (not isinstance(source, str) or
-                not source.startswith('documents/paper/explainer/') or
+                not (source.startswith('documents/paper/parts/') or
+                     source == 'documents/paper/explainer/explainer.tex') or
                 source not in declared or
                 not isinstance(parent, str) or
                 re.fullmatch(r'[0-9a-f]{40}', parent) is None):

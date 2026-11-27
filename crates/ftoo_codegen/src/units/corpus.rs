@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::Path,
+    process::Command,
 };
 mod correspondence;
 mod slot;
@@ -21,6 +22,24 @@ mod tests;
 
 fn digest(bytes: &[u8]) -> String {
     crate::hex(&Sha256::digest(bytes))
+}
+
+fn git_blob(path: &Path) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["hash-object", "--no-filters"])
+        .arg(path)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "source blob hash refused: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8(output.stdout)
+        .map_err(|error| error.to_string())?
+        .trim()
+        .to_owned())
 }
 
 #[allow(clippy::case_sensitive_file_extension_comparisons)] // The declared source list uses exact lowercase TeX names.
@@ -86,10 +105,11 @@ fn all_fault_rows(sources: &[SourceDraft], source_bytes: &BTreeMap<String, Vec<u
 }
 
 fn residue(
+    root: &Path,
     corpus: &CorpusDraft,
     source_bytes: &BTreeMap<String, Vec<u8>>,
     units: &ftoo_manifest::LanguageCheckedUnits,
-) -> Value {
+) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut kinds_total: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
     let mut refusals_total: BTreeMap<String, (usize, Vec<Value>)> = BTreeMap::new();
@@ -97,6 +117,7 @@ fn residue(
     let mut unresolved_total = 0usize;
     let mut accounted_total = 0usize;
     for source in &corpus.sources {
+        let blob = git_blob(&root.join(&source.path))?;
         let mut kinds: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
         let mut decoded = 0usize;
         let mut unresolved = 0usize;
@@ -153,17 +174,7 @@ fn residue(
             .iter()
             .map(|piece| piece.end_byte - piece.start_byte)
             .sum();
-        let intervals = admitted_intervals(
-            source,
-            &source_bytes[&source.path],
-            |unit, document, language| {
-                units.units().iter().any(|entry| {
-                    entry.label().as_str() == unit
-                        && entry.document() == document
-                        && entry.texts().contains_key(language)
-                })
-            },
-        );
+        let intervals = source_intervals(source, &source_bytes[&source.path], units, &blob);
         accounted_total += accounted;
         decoded_total += decoded;
         unresolved_total += unresolved;
@@ -180,13 +191,35 @@ fn residue(
     }
     let kind_rows: BTreeMap<_, _> = kinds_total.into_iter().map(|(kind, (fully_decoded, refused, source_line_incidence))|
         (kind, json!({"fully_decoded":fully_decoded,"refused":refused,"source_line_incidence":source_line_incidence}))).collect();
-    json!({
+    Ok(json!({
         "schema":1,"source_list_digest":corpus.source_list_digest,"source_count":corpus.sources.len(),
         "fully_decoded_outer":decoded_total,"remaining_outer":unresolved_total,
         "kinds":kind_rows,"refusal_kinds":refusals_total,"all_faults":all_fault_rows(&corpus.sources, source_bytes),
         "accounted_bytes":accounted_total,"source_bytes":source_bytes.values().map(Vec::len).sum::<usize>(),
         "transfer_ready":false,"files":files
-    })
+    }))
+}
+
+fn source_intervals(
+    source: &SourceDraft,
+    bytes: &[u8],
+    units: &ftoo_manifest::LanguageCheckedUnits,
+    blob: &str,
+) -> Vec<ftoo_manifest::corpus::SlotInterval> {
+    admitted_intervals(
+        source,
+        bytes,
+        |unit, document, language| {
+            units.units().iter().any(|entry| {
+                entry.label().as_str() == unit
+                    && entry.document() == document
+                    && entry.texts().contains_key(language)
+            })
+        },
+        |source, start, end| {
+            correspondence::paragraph_slot_id(&source.document, &source.path, blob, start, end)
+        },
+    )
 }
 
 /// Read the declared body files, validate source ownership and write diagnostic drafts.
@@ -260,7 +293,7 @@ pub fn dry_run(root: &Path, output: &Path) -> Result<Value, String> {
         transfer_ready: false,
     };
     let units = crate::load_unit_files(&root).map_err(|error| error.to_string())?;
-    let report = residue(&corpus, &source_bytes, &units);
+    let report = residue(&root, &corpus, &source_bytes, &units)?;
     fs::create_dir(&output).map_err(|error| error.to_string())?;
     serialize(&output.join("draft.json"), &corpus)?;
     serialize(&output.join("residue.json"), &report)?;

@@ -13,7 +13,7 @@ headings	subset	Unnumbered explainer section headings in corpus slots; `dec:docu
 inline mathematics	subset	Compared inherited symbols and observed HTML expressions cover selected contexts; `dec:notation:compared-inherited-native-support`, `rec:adr:042-html-mathematics`.
 list items	none	No native list-item block is admitted.
 lists	none	No native list block is admitted.
-paragraphs	subset	Tagged paragraph units and bounded explainer corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`.
+paragraphs	subset	Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`.
 refrains or quoted refrains	subset	Selected plain refrain units have a native route; M055.
 result box: corollary	none	No native corollary box is admitted.
 result box: definition	subset	A checked result-form slot carries a registered definition header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`.

@@ -13,6 +13,177 @@ fn draft(text: &str) -> SourceDraft {
 }
 
 #[test]
+fn paragraph_tail_requires_a_captured_source_boundary() {
+    let identity = format!("sec:corpus:{}", "a".repeat(64));
+    let body = "Recovery of a quantity from observation depends on where the quantity is spent, and\nexactly one configuration has no spend route at all.\n";
+    let make_slot = || {
+        admit_slot(SlotDraft {
+        schema: 1,
+        id: identity.clone(),
+        document: "paper-pilot".into(),
+        composition: "corpus-slot".into(),
+        language: "en".into(),
+        paper_mint: None,
+        blocks: vec![SlotBlock::Paragraph { runs: vec![SlotRun::Text(
+            "Recovery of a quantity from observation depends on where the quantity is spent, and exactly one configuration has no spend route at all.".into()
+        )] }],
+    }, "units/corpus/readability.toml", |_, _, _| false).unwrap()
+    };
+    let source = format!(
+        "\\subsection{{Readability}}\n\\label{{subsec:readability}}\n\\secgrade{{nec}}%\n{body}\n\\begin{{table}}\n\\end{{table}}\n"
+    );
+    let imported = draft(&source);
+    let slot = make_slot();
+    assert!(check_transfer(&slot, &imported, &imported.path, source.as_bytes(), 4, 5).is_ok());
+    assert_eq!(
+        imported
+            .paragraph_boundaries
+            .iter()
+            .find(|row| row.block_index == 1)
+            .unwrap()
+            .left,
+        ParagraphEdge::HeadingTail
+    );
+    for (changed, first, last, fault) in [
+        (
+            source.replace("all.\n\n\\begin", "all.\n\\begin"),
+            4,
+            5,
+            SlotFault::SourceBlock { index: 0 },
+        ),
+        (
+            source.replace("\\secgrade{nec}%\n", "\\secgrade{nec}%\n\\par\n"),
+            5,
+            6,
+            SlotFault::SourceBlock { index: 0 },
+        ),
+        (
+            source.replace("and\nexactly", "and\n% split\nexactly"),
+            4,
+            4,
+            SlotFault::SourceBlock { index: 0 },
+        ),
+        (
+            source.replace("and\nexactly", "and\n% split\nexactly"),
+            6,
+            6,
+            SlotFault::SourceBlock { index: 0 },
+        ),
+    ] {
+        let candidate = draft(&changed);
+        assert_eq!(
+            check_transfer(
+                &slot,
+                &candidate,
+                &candidate.path,
+                changed.as_bytes(),
+                first,
+                last
+            ),
+            Err(fault)
+        );
+    }
+    let after_table = format!("\\begin{{table}}\n\\end{{table}}\n{body}\n");
+    let imported = draft(&after_table);
+    assert_eq!(
+        check_transfer(
+            &slot,
+            &imported,
+            &imported.path,
+            after_table.as_bytes(),
+            3,
+            4
+        ),
+        Err(SlotFault::SourceBlock { index: 0 })
+    );
+}
+
+#[test]
+fn a_paper_heading_slot_refuses_at_identity() {
+    let paragraph = SlotBlock::Paragraph {
+        runs: vec![SlotRun::Text("A sentence.".into())],
+    };
+    let heading = SlotBlock::Heading {
+        level: "section".into(),
+        star: false,
+        title: vec![SlotRun::Text("A heading".into())],
+        label: "sec:paper:heading".into(),
+    };
+    let slot = SlotDraft {
+        schema: 1,
+        id: "sec:paper:heading".into(),
+        document: "paper-pilot".into(),
+        composition: "corpus-slot".into(),
+        language: "en".into(),
+        paper_mint: None,
+        blocks: vec![heading, paragraph],
+    };
+    assert_eq!(
+        admit_slot(slot, "units/corpus/paper-heading.toml", |_, _, _| false),
+        Err(SlotFault::Identity)
+    );
+}
+
+#[test]
+fn paragraph_slot_id_requires_lowercase_hex_digest() {
+    let base = SlotDraft {
+        schema: 1,
+        id: format!("sec:corpus:{}", "a".repeat(64)),
+        document: "paper-pilot".into(),
+        composition: "corpus-slot".into(),
+        language: "en".into(),
+        paper_mint: None,
+        blocks: vec![SlotBlock::Paragraph {
+            runs: vec![SlotRun::Text("A sentence.".into())],
+        }],
+    };
+    assert!(admit_slot(base.clone(), "units/corpus/id.toml", |_, _, _| false).is_ok());
+    for id in [
+        format!("sec:corpus:{}", "a".repeat(63)),
+        format!("sec:corpus:{}Z", "a".repeat(63)),
+        format!("sec:corpus:{}A", "a".repeat(63)),
+    ] {
+        let mut changed = base.clone();
+        changed.id = id;
+        assert_eq!(
+            admit_slot(changed, "units/corpus/id.toml", |_, _, _| false),
+            Err(SlotFault::Identity)
+        );
+    }
+}
+
+#[test]
+fn selecting_both_pieces_of_a_comment_split_paragraph_refuses() {
+    let source = "\\subsection{Readability}\n\\label{subsec:readability}\n\\secgrade{nec}%\nRecovery of a quantity from observation depends on where the quantity is spent, and\n% split\nexactly one configuration has no spend route at all.\n\n";
+    let imported = draft(source);
+    let slot = admit_slot(
+        SlotDraft {
+            schema: 1,
+            id: format!("sec:corpus:{}", "a".repeat(64)),
+            document: "paper-pilot".into(),
+            composition: "corpus-slot".into(),
+            language: "en".into(),
+            paper_mint: None,
+            blocks: vec![
+                SlotBlock::Paragraph {
+                    runs: vec![SlotRun::Text("Recovery of a quantity from observation depends on where the quantity is spent, and".into())],
+                },
+                SlotBlock::Paragraph {
+                    runs: vec![SlotRun::Text("exactly one configuration has no spend route at all.".into())],
+                },
+            ],
+        },
+        "units/corpus/split.toml",
+        |_, _, _| false,
+    )
+    .unwrap();
+    assert_eq!(
+        check_transfer(&slot, &imported, &imported.path, source.as_bytes(), 4, 6),
+        Err(SlotFault::SourceBlock { index: 0 })
+    );
+}
+
+#[test]
 fn registered_results_decode_real_plain_children() {
     for (part, key, kind, grade) in [
         (

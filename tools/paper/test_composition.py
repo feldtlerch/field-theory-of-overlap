@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
-from prepare import scope_fragments, declared_fragments, apply_fragment_replacements
+from prepare import scope_fragments, declared_fragments, apply_fragment_replacements, corpus_slot_bodies
 from identities import input_paths
 import meson_adapter
 
@@ -305,6 +305,16 @@ class CorpusSlotPreparation(unittest.TestCase):
                     patch('prepare.assembly_json', return_value=json.dumps(bridge).encode()):
                 with self.assertRaisesRegex(ValueError, 'Authored paragraph duplicates'):
                     declared_fragments(root, [source])
+    def test_paragraph_tail_starts_with_its_prose(self):
+        unit = 'sec:corpus:' + 'a' * 64
+        body = b'Recovery of a quantity.\n\\par\n'
+        self.assertEqual(corpus_slot_bodies(body, unit, 'fragment.tex',
+                                            'documents/paper/parts/partA.tex', pathlib.Path('.'), set(), [])[0],
+                         [b'Recovery of a quantity.'])
+        for prefix in (b'\n', b'\\par\n', b' ', b'{'):
+            with self.assertRaisesRegex(ValueError, 'Corpus slot prose opening differs'):
+                corpus_slot_bodies(prefix + body, unit, 'fragment.tex',
+                                   'documents/paper/parts/partA.tex', pathlib.Path('.'), set(), [])
 
 
 if __name__ == '__main__':

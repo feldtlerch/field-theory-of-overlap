@@ -138,6 +138,35 @@ fn native_paper_mint_is_unique_before_strict_projection() {
 }
 
 #[test]
+fn paragraph_slot_identity_joins_the_primary_mint_owner() {
+    let corpus = corpus("sec:fixture:unit");
+    let markdown = check_markdown_sources(vec![source("fixture.md", RECORDS)]).unwrap();
+    let joint = collect_joint_mints(&corpus, &markdown).unwrap();
+    let slot = "sec:corpus:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let joined = joint
+        .clone()
+        .with_corpus_slots(vec![(slot.into(), "units/corpus/slot.toml".into())])
+        .unwrap();
+    assert_eq!(joined.mints()[slot].kind, MintKind::UnitMetadata);
+    assert!(
+        format!(
+            "{:?}",
+            joined
+                .clone()
+                .with_corpus_slots(vec![(slot.into(), "second.toml".into())])
+        )
+        .contains("DuplicateMint")
+    );
+    assert!(
+        format!(
+            "{:?}",
+            joined.with_paper_mints(vec![(slot.into(), "paper.tex".into())])
+        )
+        .contains("DuplicateMint")
+    );
+}
+
+#[test]
 fn native_paper_mint_does_not_resolve_a_unit_citation() {
     let corpus = paper_corpus_with_target_text(
         "bd:rep",

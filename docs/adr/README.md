@@ -59,5 +59,6 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |052|Native virtue occurrences|accepted; qualifies 033's virtue exclusion and 037's bridge version; uses 040's transitional destinations; amends M041, M055, M063, M064 and M077; native ownership transfer remains open|
 |053|Whole-corpus native import|accepted; diagnostic import precedes any native transfer; observed profile admissions require implemented consumers; bounded corpus-slot composition and its first comparison consumer are governed by 055|
 |054|Generated gap registers|accepted; qualifies 046's registered-check clause as replaced by 040 for canonical generation of the two gap registers while retaining reviewable diffs and release refusal|
-|055|Bounded corpus-slot composition|accepted; qualifies 043's unchanged-residual proof and extends M055, M077 and M079 for one checked ordered coarse slot|
+|055|Bounded corpus-slot composition|accepted; qualifies 043's unchanged-residual proof and extends M055, M077 and M079 for one checked ordered coarse slot; paragraph source boundaries and paragraph-only slots are governed by 058|
 |056|Checked result containers in corpus composition|accepted; admits checked result-form corpus slots beside 055's heading form, qualifies the compared native support of 041 as qualified by 044, and amends M039, M041, M055, M063, M077 and M079; children remain independently admitted|
+|058|Source-bounded paragraph slots|accepted; qualifies 055's admitted composition and amends M055 and M077 for checked paragraph bodies and heading-led prose tails|

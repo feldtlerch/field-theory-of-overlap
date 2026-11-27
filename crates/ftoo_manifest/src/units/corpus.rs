@@ -294,6 +294,25 @@ pub struct AccountPiece {
     pub owner: AccountOwner,
 }
 
+/// Captured source evidence for one outer prose paragraph.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ParagraphBoundary {
+    pub block_index: usize,
+    pub left: ParagraphEdge,
+    pub right: ParagraphEdge,
+    pub first_token: Option<String>,
+    pub last_token: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ParagraphEdge {
+    Blank,
+    HeadingTail,
+    Heading,
+    Unproved,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct SourceDraft {
     pub path: String,
@@ -306,6 +325,7 @@ pub struct SourceDraft {
     pub blocks: Vec<BlockDraft>,
     pub events: Vec<EventDraft>,
     pub accounting: Vec<AccountPiece>,
+    pub paragraph_boundaries: Vec<ParagraphBoundary>,
     pub refusals: Vec<Refusal>,
     pub byte_length: usize,
 }

@@ -651,6 +651,49 @@ impl JointMints<'_, '_> {
     }
 }
 impl JointMints<'_, '_> {
+    /// Join checked coarse unit identities to the permanent primary mint namespace.
+    /// # Errors
+    /// Refuses a reserved or duplicate identity at its unit metadata site.
+    pub fn with_corpus_slots(
+        mut self,
+        slots: impl IntoIterator<Item = (String, String)>,
+    ) -> Result<Self, LabelErrors> {
+        let mut candidates: Mints = self
+            .mints
+            .iter()
+            .map(|(key, origin)| (key.clone(), vec![origin.clone()]))
+            .collect();
+        for (unit, file) in slots {
+            candidates
+                .entry(unit.clone())
+                .or_default()
+                .push(MintOrigin {
+                    kind: MintKind::UnitMetadata,
+                    site: LabelSite::Unit {
+                        unit,
+                        site: UnitSite {
+                            file,
+                            path: vec![PathPart::Key("unit".into()), PathPart::Key("id".into())],
+                            anchor: SourceAnchor::Unavailable,
+                            decoded: None,
+                            occurrence: None,
+                        },
+                    },
+                });
+        }
+        let mut errors = reserved(&candidates);
+        if errors.is_empty() {
+            errors = duplicates(&candidates, LabelStage::Namespace);
+        }
+        if !errors.is_empty() {
+            return Err(LabelErrors(errors));
+        }
+        self.mints = candidates
+            .into_iter()
+            .filter_map(|(key, origins)| origins.into_iter().next().map(|origin| (key, origin)))
+            .collect();
+        Ok(self)
+    }
     /// Check the admitted open-question store against the joint inventory as a mint origin.
     /// The result serves this check only; store labels enter no citation domain yet.
     /// # Errors
