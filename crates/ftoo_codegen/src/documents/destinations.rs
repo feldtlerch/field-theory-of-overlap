@@ -105,6 +105,10 @@ pub(super) fn econ_fragment(title: &str) -> Option<String> {
     title_fragment(title)
 }
 
+pub(super) fn result_fragment(key: &str) -> Option<String> {
+    title_fragment(key).map(|fragment| format!("result-{fragment}"))
+}
+
 #[derive(Clone, Copy)]
 enum HeadingNumber {
     Section(i32),
@@ -602,6 +606,185 @@ fn master_sources<'a>(
     Ok(result)
 }
 
+/// Count result events in captured paper order, including unconverted kinds before a slot.
+/// # Errors
+/// Refuses a changed counter declaration, unsupported counter event, missing or repeated slot.
+#[allow(clippy::too_many_lines)] // The source-order traversal keeps section resets and result steps together.
+pub(super) fn result_numbers(
+    inputs: &BTreeMap<String, Vec<u8>>,
+    slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
+) -> Result<BTreeMap<String, String>, DestinationError> {
+    use ftoo_manifest::corpus::{BlockFields, BlockKind, ResultHeader, SlotBlock, import_source};
+    let selected: BTreeMap<_, _> = slots
+        .iter()
+        .filter_map(|(id, slot)| match slot.blocks() {
+            [SlotBlock::Result { key, .. }] => Some((id.as_str(), key.as_str())),
+            _ => None,
+        })
+        .collect();
+    if selected.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let path = "documents/paper/macros_overlap.tex";
+    let macros = inputs
+        .get(path)
+        .ok_or_else(|| DestinationError::MissingSource(path.into()))?;
+    if macros.as_slice() != super::inherited_support::compared_macros().as_bytes() {
+        return Err(DestinationError::UnsupportedOutline(format!(
+            "result counter declaration at {path}"
+        )));
+    }
+    let mut section = -1_i32;
+    let mut ordinal = 0_u32;
+    let mut found = BTreeMap::new();
+    let known = [
+        "theorem",
+        "proposition",
+        "lemma",
+        "corollary",
+        "definition",
+        "postulate",
+        "insight",
+        "remark",
+    ];
+    for (file, source) in master_sources("result", inputs)? {
+        for (index, raw) in source.lines().enumerate() {
+            let line = without_comment(raw);
+            if [
+                "\\appendix",
+                "\\setcounter{section}",
+                "\\addtocounter{section}",
+                "\\stepcounter{section}",
+                "\\refstepcounter{section}",
+                "\\counterwithin{section}",
+                "\\counterwithout{section}",
+                "\\numberwithin{section}",
+                "\\setcounter{theorem}",
+                "\\addtocounter{theorem}",
+                "\\stepcounter{theorem}",
+                "\\refstepcounter{theorem}",
+                "\\counterwithin{theorem}",
+                "\\counterwithout{theorem}",
+                "\\numberwithin{theorem}",
+                "\\begin{conjecture}",
+                "\\begin{property}",
+            ]
+            .iter()
+            .any(|command| line.contains(command))
+            {
+                return Err(DestinationError::UnsupportedOutline(format!(
+                    "result counter at {file}:{}",
+                    index + 1
+                )));
+            }
+        }
+        let markers: Vec<_> = slots
+            .iter()
+            .filter(|(_, slot)| slot.document() == "paper-pilot")
+            .map(|(id, _)| (id.clone(), "corpus-slot".into()))
+            .collect();
+        let imported = import_source(file, source.as_bytes(), "captured".into(), &markers)
+            .map_err(|_| {
+                DestinationError::UnsupportedOutline(format!("result import at {file}"))
+            })?;
+        for block in &imported.blocks {
+            match &block.fields {
+                BlockFields::Heading {
+                    level, star: false, ..
+                } if block.kind == BlockKind::Heading && level == "\\section" => {
+                    section = section.checked_add(1).ok_or_else(|| {
+                        DestinationError::UnsupportedOutline(format!(
+                            "result section at {file}:{}",
+                            block.site.start_line
+                        ))
+                    })?;
+                    ordinal = 0;
+                }
+                BlockFields::NativeInclusion { unit, role, .. }
+                    if role == "corpus-slot" && selected.contains_key(unit.as_str()) =>
+                {
+                    if section < 0 {
+                        return Err(DestinationError::UnsupportedOutline(format!(
+                            "result before section at {file}:{}",
+                            block.site.start_line
+                        )));
+                    }
+                    ordinal = ordinal.checked_add(1).ok_or_else(|| {
+                        DestinationError::UnsupportedOutline(format!(
+                            "result overflow at {file}:{}",
+                            block.site.start_line
+                        ))
+                    })?;
+                    if found
+                        .insert(unit.clone(), format!("{section}.{ordinal}"))
+                        .is_some()
+                    {
+                        return Err(DestinationError::DuplicateTarget(unit.clone()));
+                    }
+                }
+                _ if block.kind == BlockKind::TheoremContainer => {
+                    let beginning = source.get(block.site.start_byte..).ok_or_else(|| {
+                        DestinationError::UnsupportedOutline(format!(
+                            "result range at {file}:{}",
+                            block.site.start_line
+                        ))
+                    })?;
+                    beginning
+                        .strip_prefix("\\begin{")
+                        .and_then(|rest| rest.split_once('}'))
+                        .map(|(name, _)| name)
+                        .filter(|name| known.contains(name))
+                        .ok_or_else(|| {
+                            DestinationError::UnsupportedOutline(format!(
+                                "result kind at {file}:{}",
+                                block.site.start_line
+                            ))
+                        })?;
+                    if section < 0 {
+                        return Err(DestinationError::UnsupportedOutline(format!(
+                            "result before section at {file}:{}",
+                            block.site.start_line
+                        )));
+                    }
+                    ordinal = ordinal.checked_add(1).ok_or_else(|| {
+                        DestinationError::UnsupportedOutline(format!(
+                            "result overflow at {file}:{}",
+                            block.site.start_line
+                        ))
+                    })?;
+                    if let BlockFields::Result {
+                        header: ResultHeader::Registered { key, .. },
+                        ..
+                    } = &block.fields
+                    {
+                        for (id, selected_key) in &selected {
+                            if key == selected_key
+                                && found
+                                    .insert((*id).into(), format!("{section}.{ordinal}"))
+                                    .is_some()
+                            {
+                                return Err(DestinationError::DuplicateTarget((*id).into()));
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            if found.len() == selected.len() {
+                return Ok(found);
+            }
+        }
+    }
+    Err(DestinationError::MissingHeading(
+        selected
+            .keys()
+            .find(|id| !found.contains_key(**id))
+            .copied()
+            .unwrap_or("result")
+            .into(),
+    ))
+}
+
 /// Count the inherited economics events in paper order, including a converted marker.
 #[allow(clippy::too_many_lines)] // Counter events and their source-order refusals form one bounded reader.
 pub(super) fn economics_number(
@@ -927,6 +1110,74 @@ mod tests {
             },
         )]);
         target_from_inputs(label, &mints, inputs)
+    }
+
+    #[test]
+    fn result_counter_uses_all_preceding_kinds_and_the_compared_declaration() {
+        use ftoo_manifest::corpus::admit_slot;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut inputs = real_outline_inputs();
+        let support = "documents/paper/macros_overlap.tex";
+        inputs.insert(support.into(), std::fs::read(root.join(support)).unwrap());
+        let mut slots = BTreeMap::new();
+        for fixture in ["result-pool.toml", "result-modest.toml"] {
+            let file = format!("units/fixtures/{fixture}");
+            let draft = crate::parse_slot(&crate::UnitSource {
+                file: file.clone(),
+                bytes: std::fs::read(root.join(&file)).unwrap(),
+            })
+            .unwrap();
+            let checked = admit_slot(draft, &file, |_, _, _| false).unwrap();
+            slots.insert(checked.id().into(), checked);
+        }
+        let original = result_numbers(&inputs, &slots).unwrap();
+        assert_eq!(original.len(), 2);
+        assert!(
+            original
+                .values()
+                .all(|number| number.split_once('.').is_some())
+        );
+        let mut changed = inputs.clone();
+        let source_path = "documents/paper/parts/partA.tex";
+        let mut source = String::from_utf8(changed[source_path].clone()).unwrap();
+        let begin = source.find("\\begin{definition}[\\hdr{f:eff}]").unwrap();
+        let end =
+            begin + source[begin..].find("\\end{definition}").unwrap() + "\\end{definition}".len();
+        source.replace_range(begin..end, "");
+        changed.insert(source_path.into(), source.into_bytes());
+        let altered = result_numbers(&changed, &slots).unwrap();
+        assert_ne!(altered["result:f:pool"], original["result:f:pool"]);
+        assert_eq!(altered["result:nrm:modest"], original["result:nrm:modest"]);
+
+        for event in [
+            "\\appendix\n",
+            "\\setcounter{section}{2}\n",
+            "\\begin{conjecture}\n",
+        ] {
+            let mut changed = inputs.clone();
+            let source = format!(
+                "{event}{}",
+                String::from_utf8(changed[source_path].clone()).unwrap()
+            );
+            changed.insert(source_path.into(), source.into_bytes());
+            assert!(matches!(
+                result_numbers(&changed, &slots),
+                Err(DestinationError::UnsupportedOutline(message))
+                    if message == format!("result counter at {source_path}:1")
+            ));
+        }
+
+        let mut changed = inputs;
+        replace_input(
+            &mut changed,
+            support,
+            "\\newtheorem{insight}[theorem]{Insight}",
+            "\\newtheorem{insight}[theorem]{Result}",
+        );
+        assert!(matches!(
+            result_numbers(&changed, &slots),
+            Err(DestinationError::UnsupportedOutline(_))
+        ));
     }
 
     #[test]
@@ -1326,8 +1577,15 @@ mod tests {
             "\\PaperNeedLines{5}\\subsection{The two rewards}",
             "\\Unknown{5}\\subsection{The two rewards}",
         );
+        let source = prefixed.get("documents/paper/parts/partA.tex").unwrap();
+        let changed = b"\\Unknown{5}\\subsection{The two rewards}";
+        let offset = source
+            .windows(changed.len())
+            .position(|part| part == changed)
+            .unwrap();
+        let line = source[..offset].split(|byte| *byte == b'\n').count();
         assert!(
-            matches!(target(&prefixed), Err(DestinationError::UnsupportedOutline(site)) if site.contains("partA.tex:529"))
+            matches!(target(&prefixed), Err(DestinationError::UnsupportedOutline(site)) if site.contains(&format!("partA.tex:{line}")))
         );
         let mut master_appendix = base.clone();
         replace_input(

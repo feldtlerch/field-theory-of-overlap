@@ -5,6 +5,59 @@ const LABEL: &str = "dec:fixture:target";
 const AUTHORITY: &str = "dec:fixture:authority";
 
 #[test]
+fn checked_result_header_is_one_documentary_mint_and_absent_from_strict_scope() {
+    let file = "units/corpus/result-pool.toml";
+    let key = "f:pool";
+    let site = UnitSite {
+        file: file.into(),
+        path: vec![PathPart::Key("unit".into())],
+        anchor: SourceAnchor::Unavailable,
+        decoded: None,
+        occurrence: None,
+    };
+    let slot = corpus::admit_slot(
+        corpus::SlotDraft {
+            schema: 1,
+            id: "result:f:pool".into(),
+            document: "paper-pilot".into(),
+            composition: "corpus-slot".into(),
+            language: "en".into(),
+            paper_mint: Some(corpus::SlotPaperMint {
+                selector: "header".into(),
+                key: key.into(),
+                declaration: site.child("documentary-targets").child("header"),
+                placement: site.child("blocks").child("target"),
+            }),
+            blocks: vec![corpus::SlotBlock::Result {
+                kind: corpus::ResultKind::Insight,
+                target: "header".into(),
+                key: key.into(),
+                grade: Some(corpus::ResultGradeCode::ContAnch),
+                grade_gap: false,
+                children: vec![vec![corpus::SlotRun::Text("A plain child.".into())]],
+            }],
+        },
+        file,
+        |_, _, _| false,
+    )
+    .unwrap();
+    let slots = BTreeMap::from([(slot.id().to_owned(), slot)]);
+    let corpus = corpus();
+    let markdown = markdown();
+    let joint = collect_joint_mints(&corpus, &markdown)
+        .unwrap()
+        .with_corpus_mints(&slots)
+        .unwrap();
+    assert_eq!(joint.mints()[key].kind, MintKind::UnitPaperMint);
+    assert!(!joint.clone().strict_units().mints().contains_key(key));
+    let error = joint
+        .with_paper_mints(vec![(key.into(), "documents/paper/parts/partA.tex".into())])
+        .unwrap_err();
+    assert!(matches!(&error.diagnostics()[0].fault,
+        LabelFault::DuplicateMint { label, .. } if label == key));
+}
+
+#[test]
 fn native_paper_origin_evidences_documentary_target_without_strict_citation() {
     let site = UnitSite {
         file: "units/statements/fixture-paper.toml".into(),

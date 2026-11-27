@@ -932,6 +932,47 @@ pub(super) fn model(
             ));
             continue;
         }
+        if let Some(result) = &block.result {
+            let kind = match result.kind {
+                ftoo_manifest::corpus::ResultKind::Insight => "Insight",
+                ftoo_manifest::corpus::ResultKind::Remark => "Remark",
+                ftoo_manifest::corpus::ResultKind::Definition => "Definition",
+            };
+            let title = format!("{kind} {} ({})", result.number, result.title);
+            let style = if matches!(result.kind, ftoo_manifest::corpus::ResultKind::Definition) {
+                "strong"
+            } else {
+                "em"
+            };
+            let header = element(
+                "header",
+                &[],
+                vec![element(
+                    "p",
+                    &[],
+                    vec![
+                        element(style, &[], vec![Node::Text(title)]),
+                        Node::Text(format!(
+                            " · {}{}",
+                            result.key,
+                            result
+                                .grade
+                                .map_or_else(String::new, |grade| format!(" {}", grade.name()))
+                        )),
+                    ],
+                )],
+            );
+            let mut contents = vec![header];
+            for child in &result.children {
+                contents.push(element("p", &[], inline(child, prepared, index)));
+            }
+            main.push(element(
+                "section",
+                &[("class", "result"), ("id", &result.fragment)],
+                contents,
+            ));
+            continue;
+        }
         if let Some(econ) = &block.econ {
             let header_id = format!("{}-header", econ.fragment);
             main.push(element(

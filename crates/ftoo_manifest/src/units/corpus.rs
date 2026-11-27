@@ -130,7 +130,8 @@ pub enum ResultKind {
 }
 
 impl ResultKind {
-    pub(super) fn from_name(name: &str) -> Option<Self> {
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "insight" => Some(Self::Insight),
             "remark" => Some(Self::Remark),
@@ -139,7 +140,8 @@ impl ResultKind {
         }
     }
 
-    pub(super) fn name(self) -> &'static str {
+    #[must_use]
+    pub fn name(self) -> &'static str {
         match self {
             Self::Insight => "insight",
             Self::Remark => "remark",
@@ -171,7 +173,8 @@ pub enum ResultGradeCode {
 }
 
 impl ResultGradeCode {
-    pub(super) fn from_name(name: &str) -> Option<Self> {
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
         match name {
             "nec" => Some(Self::Nec),
             "cont-anch" => Some(Self::ContAnch),
@@ -182,7 +185,8 @@ impl ResultGradeCode {
         }
     }
 
-    pub(super) fn name(self) -> &'static str {
+    #[must_use]
+    pub fn name(self) -> &'static str {
         match self {
             Self::Nec => "nec",
             Self::ContAnch => "cont-anch",
@@ -337,7 +341,7 @@ impl std::fmt::Display for ImportFault {
 impl std::error::Error for ImportFault {}
 
 pub use admission::{
-    CheckedSlot, SlotBlock, SlotDraft, SlotFault, SlotInterval, SlotIntervalBlock, SlotRun,
-    SlotStyle, admit_slot, admitted_intervals, check_transfer,
+    CheckedSlot, SlotBlock, SlotDraft, SlotFault, SlotInterval, SlotIntervalBlock, SlotPaperMint,
+    SlotRun, SlotStyle, admit_slot, admitted_intervals, check_transfer,
 };
 pub use import::{ensure_unchanged, import_source, validate_accounting};

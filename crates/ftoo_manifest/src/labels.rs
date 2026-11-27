@@ -566,6 +566,47 @@ pub struct JointMints<'u, 'm> {
     mints: BTreeMap<String, MintOrigin>,
 }
 impl JointMints<'_, '_> {
+    /// Extend the documentary inventory with checked corpus header mints.
+    /// # Errors
+    /// Refuses a reserved or duplicate key, including an authored paper mint of the same key.
+    pub fn with_corpus_mints(
+        mut self,
+        slots: &BTreeMap<String, crate::corpus::CheckedSlot>,
+    ) -> Result<Self, LabelErrors> {
+        let mut candidates: BTreeMap<String, Vec<MintOrigin>> = self
+            .mints
+            .iter()
+            .map(|(key, origin)| (key.clone(), vec![origin.clone()]))
+            .collect();
+        for (id, slot) in slots {
+            if let Some(mint) = slot.paper_mint() {
+                candidates
+                    .entry(mint.key.clone())
+                    .or_default()
+                    .push(MintOrigin {
+                        kind: MintKind::UnitPaperMint,
+                        site: LabelSite::UnitPaperMint {
+                            unit: id.clone(),
+                            selector: mint.selector.clone(),
+                            declaration: mint.declaration.clone(),
+                            placement: mint.placement.clone(),
+                        },
+                    });
+            }
+        }
+        let mut errors = reserved(&candidates);
+        if errors.is_empty() {
+            errors = duplicates(&candidates, LabelStage::Namespace);
+        }
+        if !errors.is_empty() {
+            return Err(LabelErrors(errors));
+        }
+        self.mints = candidates
+            .into_iter()
+            .filter_map(|(key, origins)| origins.into_iter().next().map(|origin| (key, origin)))
+            .collect();
+        Ok(self)
+    }
     #[must_use]
     pub fn mints(&self) -> &BTreeMap<String, MintOrigin> {
         &self.mints

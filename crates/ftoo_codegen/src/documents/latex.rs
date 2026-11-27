@@ -105,6 +105,29 @@ pub(super) fn render(plan: &DocumentPlan) -> String {
             block.unit, plan.document, plan.language
         )
         .expect("string write");
+        if let Some(result) = &block.result {
+            write!(
+                output,
+                "\\begin{{{}}}[\\hdr{{{}}}]",
+                result.kind.name(),
+                result.key
+            )
+            .expect("string write");
+            if let Some(grade) = result.grade {
+                write!(output, "\\grade{{{}}}", grade.name()).expect("string write");
+            }
+            if result.grade_gap {
+                output.push_str("\\PaperGradeGap{-2pt}");
+            }
+            output.push('\n');
+            for child in &result.children {
+                output.push_str("  ");
+                prose_inline(&mut output, child);
+                output.push('\n');
+            }
+            writeln!(output, "\\end{{{}}}\n", result.kind.name()).expect("string write");
+            continue;
+        }
         if block.equation {
             let (_, source) = block.equation_pair().expect("checked equation body");
             writeln!(output, "\\[\n{source}.\n\\]\n").expect("string write");

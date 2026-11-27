@@ -1140,6 +1140,7 @@ fn quotation_use_requires_an_existing_unit_owned_by_another_document()
                     paragraph: position.paragraph(),
                     equation: position.equation(),
                     econ: None,
+                    result: None,
                     site: position.site().clone(),
                     runs: vec![plan::Inline::Text(unit.texts()[language].text().into())],
                 };
@@ -1298,6 +1299,7 @@ fn typography_apostrophe_contexts() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text(text.into())],
     };
@@ -1418,6 +1420,7 @@ fn fragment_macro_follows_planned_quotation() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: input::site("units/statements/fixture.toml"),
         runs: vec![plan::Inline::Text("Refrain.".into())],
     };
@@ -2354,7 +2357,7 @@ fn support_required_native_lost_character_is_a_complete_hard_error(
     } else {
         ""
     };
-    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (12.72265625 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
+    let stdout=format!("note: using only cached resource files\n{format_progress}note: Running TeX ...\nnote: Writing `{}` (19.818359375 KiB)\n",scratch.join("output/document.log").display()).into_bytes();
     let stderr = if support.cold_format.get() {
         include_bytes!("../../tests/fixtures/native/cold-lost-character-refusal.stderr").to_vec()
     } else {
@@ -2419,6 +2422,7 @@ fn independent_recovery_checks_both_targets_and_missing_blocks() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Coefficient ".into()),
@@ -3777,6 +3781,7 @@ fn screen_excerpt_equation_recovery_rejects_attachment_swap() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![plan::Inline::Text("A reading".into())],
         },
@@ -4342,6 +4347,7 @@ fn markdown_style_screen_paragraph_is_observed() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Screen".into())],
     };

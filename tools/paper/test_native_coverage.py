@@ -3,6 +3,7 @@
 import hashlib
 import json
 import unittest
+from collections import Counter
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -11,6 +12,12 @@ import native_coverage
 
 
 class InclusionTests(unittest.TestCase):
+    def test_native_count_requires_a_route(self):
+        counts = Counter({("native", "result box: insight"): 1})
+        with self.assertRaisesRegex(ValueError, "native members have no route: result box: insight"):
+            native_coverage.check_native_routes({"result box: insight": ("none", "")}, counts)
+        native_coverage.check_native_routes({"result box: insight": ("subset", "")}, counts)
+
     def test_substitution_and_exactly_once(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

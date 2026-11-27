@@ -1,8 +1,8 @@
 //! Admission of a bounded ordered corpus slot and its independent source correspondence.
 
 use super::{
-    AccountOwner, BlockFields, BlockKind, BlockStatus, ImportFault, Run, SourceDraft,
-    validate_accounting,
+    AccountOwner, BlockFields, BlockKind, BlockStatus, ImportFault, ResultGradeCode, ResultHeader,
+    ResultKind, ResultPartKind, Run, SourceDraft, validate_accounting,
 };
 use serde::Serialize;
 
@@ -37,6 +37,22 @@ pub enum SlotBlock {
     Paragraph {
         runs: Vec<SlotRun>,
     },
+    Result {
+        kind: ResultKind,
+        target: String,
+        key: String,
+        grade: Option<ResultGradeCode>,
+        grade_gap: bool,
+        children: Vec<Vec<SlotRun>>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SlotPaperMint {
+    pub selector: String,
+    pub key: String,
+    pub declaration: crate::UnitSite,
+    pub placement: crate::UnitSite,
 }
 
 /// Parsed native data, still untrusted until admitted with its child-unit owner.
@@ -47,6 +63,7 @@ pub struct SlotDraft {
     pub document: String,
     pub composition: String,
     pub language: String,
+    pub paper_mint: Option<SlotPaperMint>,
     pub blocks: Vec<SlotBlock>,
 }
 
@@ -81,6 +98,11 @@ impl CheckedSlot {
     #[must_use]
     pub fn source(&self) -> &str {
         &self.source
+    }
+
+    #[must_use]
+    pub fn paper_mint(&self) -> Option<&SlotPaperMint> {
+        self.draft.paper_mint.as_ref()
     }
 }
 
@@ -162,9 +184,16 @@ fn valid_runs(runs: &[SlotRun], inside_style: bool) -> bool {
     !merges_tex_text(&adjacent_text)
 }
 
+fn result_mint(draft: &SlotDraft, target: &str, key: &str, source: &str) -> bool {
+    matches!(&draft.paper_mint, Some(mint)
+        if mint.selector == target && mint.key == key
+            && mint.declaration.file == source && mint.placement.file == source)
+}
+
 /// Admit the native grammar and resolve every inherited child without reading old source bytes.
 /// # Errors
 /// Refuses an unsupported mode, child order, run or missing checked child owner.
+#[allow(clippy::too_many_lines)] // Result and heading forms share one admission boundary.
 pub fn admit_slot(
     draft: SlotDraft,
     source: &str,
@@ -173,13 +202,56 @@ pub fn admit_slot(
     if draft.schema != 1 {
         return Err(SlotFault::Schema);
     }
-    if !draft.id.starts_with("sec:")
+    let result_slot = matches!(draft.blocks.as_slice(), [SlotBlock::Result { .. }]);
+    let prefix = if result_slot { "result:" } else { "sec:" };
+    if !draft.id.starts_with(prefix)
         || !crate::units::label_name(&draft.id)
-        || draft.document != "explainer-pilot"
+        || draft.document
+            != if result_slot {
+                "paper-pilot"
+            } else {
+                "explainer-pilot"
+            }
         || draft.composition != "corpus-slot"
         || draft.language != "en"
     {
         return Err(SlotFault::Identity);
+    }
+    if let [
+        SlotBlock::Result {
+            target,
+            key,
+            grade,
+            grade_gap,
+            children,
+            ..
+        },
+    ] = draft.blocks.as_slice()
+    {
+        if !result_mint(&draft, target, key, source) {
+            return Err(SlotFault::SourceMint);
+        }
+        if key.is_empty()
+            || !key
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'-' | b'_'))
+            || *grade_gap && grade.is_none()
+            || children.is_empty()
+        {
+            return Err(SlotFault::ChildOrder { index: 0 });
+        }
+        for (index, runs) in children.iter().enumerate() {
+            if !valid_runs(runs, false) {
+                return Err(SlotFault::UnsupportedRun { index });
+            }
+        }
+        return Ok(CheckedSlot {
+            draft,
+            source: source.into(),
+        });
+    }
+    if draft.paper_mint.is_some() {
+        return Err(SlotFault::SourceMint);
     }
     if draft.blocks.len() < 2
         || !draft
@@ -383,6 +455,7 @@ pub fn admitted_intervals(
                 document: "explainer-pilot".into(),
                 composition: "corpus-slot".into(),
                 language: "en".into(),
+                paper_mint: None,
                 blocks: children.clone(),
             };
             let checked = match admit_slot(candidate, &source.path, &has_child) {
@@ -448,6 +521,7 @@ fn line_start(bytes: &[u8], line: usize) -> Option<usize> {
 /// Compare every selected draft block and accounting piece with the independently authored slot.
 /// # Errors
 /// Refuses changed child order, words, styles, spacing, mint, event or interval accounting.
+#[allow(clippy::too_many_lines)] // Result children and ordinary slot blocks share the source-accounting traversal.
 pub fn check_transfer(
     slot: &CheckedSlot,
     source: &SourceDraft,
@@ -480,6 +554,53 @@ pub fn check_transfer(
             return Err(SlotFault::SourceBlock { index });
         }
         match (proposed, &block.kind, &block.fields) {
+            (
+                SlotBlock::Result {
+                    kind,
+                    key,
+                    grade,
+                    grade_gap,
+                    children,
+                    ..
+                },
+                BlockKind::TheoremContainer,
+                BlockFields::Result {
+                    result_kind,
+                    header:
+                        ResultHeader::Registered {
+                            key: actual_key, ..
+                        },
+                    grade: actual_grade,
+                    parts,
+                },
+            ) if kind == result_kind && key == actual_key => {
+                if grade != &actual_grade.as_ref().map(|value| value.code)
+                    || *grade_gap
+                        != parts
+                            .iter()
+                            .any(|part| part.kind == ResultPartKind::GradeGap)
+                    || children.len() != block.children.len()
+                {
+                    return Err(SlotFault::SourceContent { index });
+                }
+                for (expected, actual) in children.iter().zip(&block.children) {
+                    let BlockFields::Paragraph {
+                        continuation: false,
+                        layout,
+                        runs,
+                    } = &actual.fields
+                    else {
+                        return Err(SlotFault::SourceBlock { index });
+                    };
+                    if actual.kind != BlockKind::Paragraph
+                        || actual.status != BlockStatus::Decoded
+                        || !layout.is_empty()
+                        || imported_runs(runs, true).as_deref() != Some(expected)
+                    {
+                        return Err(SlotFault::SourceContent { index });
+                    }
+                }
+            }
             (
                 SlotBlock::Heading {
                     level, star, title, ..
@@ -588,11 +709,271 @@ fn check_selected_accounting(
         .iter()
         .filter(|target| target.site.start_byte >= begin && target.site.start_byte < end)
         .collect();
-    if labels != 1
-        || !matches!(targets.as_slice(), [target] if target.exact_key == slot.id()
-            && target.selector == slot.id() && target.source_command == "\\label")
-    {
+    let valid_mint = if matches!(slot.blocks(), [SlotBlock::Result { .. }]) {
+        labels == 0 && targets.is_empty()
+    } else {
+        labels == 1
+            && matches!(targets.as_slice(), [target] if target.exact_key == slot.id()
+                && target.selector == slot.id() && target.source_command == "\\label")
+    };
+    if !valid_mint {
         return Err(SlotFault::SourceMint);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod result_tests {
+    use super::*;
+    use crate::corpus::{ResultHeader, import_source};
+
+    fn mint(path: &str, key: &str) -> SlotPaperMint {
+        let site = crate::UnitSite {
+            file: path.into(),
+            path: Vec::new(),
+            anchor: crate::SourceAnchor::Unavailable,
+            decoded: None,
+            occurrence: None,
+        };
+        SlotPaperMint {
+            selector: "header".into(),
+            key: key.into(),
+            declaration: site.clone(),
+            placement: site,
+        }
+    }
+
+    fn live_result(part: &str, key: &str) -> (String, SourceDraft, SlotDraft, usize, usize) {
+        let path = format!("documents/paper/parts/{part}");
+        let bytes = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../units/fixtures")
+                .join(format!(
+                    "result-{}-source.tex",
+                    if key == "f:pool" { "pool" } else { "modest" }
+                )),
+        )
+        .unwrap();
+        let source = import_source(&path, bytes.as_bytes(), "digest".into(), &[]).unwrap();
+        let block = source
+            .blocks
+            .iter()
+            .find(|block| {
+                matches!(&block.fields, BlockFields::Result {
+                header: ResultHeader::Registered { key: actual, .. }, ..
+            } if actual == key)
+            })
+            .unwrap();
+        let BlockFields::Result {
+            result_kind,
+            grade,
+            parts,
+            ..
+        } = &block.fields
+        else {
+            panic!("result fields")
+        };
+        let children = block
+            .children
+            .iter()
+            .map(|child| {
+                let BlockFields::Paragraph { runs, .. } = &child.fields else {
+                    panic!("paragraph child")
+                };
+                imported_runs(runs, true).unwrap()
+            })
+            .collect();
+        let first = block.site.start_line;
+        let last = 1 + bytes[..block.site.end_byte.saturating_sub(1)]
+            .matches('\n')
+            .count();
+        let slot = SlotDraft {
+            schema: 1,
+            id: format!("result:{key}"),
+            document: "paper-pilot".into(),
+            composition: "corpus-slot".into(),
+            language: "en".into(),
+            paper_mint: Some(mint(&source.path, key)),
+            blocks: vec![SlotBlock::Result {
+                kind: *result_kind,
+                target: "header".into(),
+                key: key.into(),
+                grade: grade.as_ref().map(|value| value.code),
+                grade_gap: parts
+                    .iter()
+                    .any(|part| part.kind == ResultPartKind::GradeGap),
+                children,
+            }],
+        };
+        (bytes, source, slot, first, last)
+    }
+
+    #[test]
+    fn real_plain_results_require_key_grade_gap_and_child_words() {
+        for (part, key) in [("partA.tex", "f:pool"), ("partC.tex", "nrm:modest")] {
+            let (bytes, source, draft, first, last) = live_result(part, key);
+            let checked = admit_slot(draft.clone(), &source.path, |_, _, _| false).unwrap();
+            assert!(
+                check_transfer(
+                    &checked,
+                    &source,
+                    &source.path,
+                    bytes.as_bytes(),
+                    first,
+                    last
+                )
+                .is_ok()
+            );
+
+            let mut missing_mint = draft.clone();
+            missing_mint.paper_mint = None;
+            assert_eq!(
+                admit_slot(missing_mint, &source.path, |_, _, _| false),
+                Err(SlotFault::SourceMint)
+            );
+
+            let mut wrong_selector = draft.clone();
+            let SlotBlock::Result { target, .. } = &mut wrong_selector.blocks[0] else {
+                unreachable!()
+            };
+            *target = "other".into();
+            assert_eq!(
+                admit_slot(wrong_selector, &source.path, |_, _, _| false),
+                Err(SlotFault::SourceMint)
+            );
+
+            let mut changed = draft.clone();
+            let SlotBlock::Result { key, .. } = &mut changed.blocks[0] else {
+                unreachable!()
+            };
+            key.push('x');
+            changed.paper_mint.as_mut().unwrap().key.push('x');
+            let checked = admit_slot(changed, &source.path, |_, _, _| false).unwrap();
+            assert_eq!(
+                check_transfer(
+                    &checked,
+                    &source,
+                    &source.path,
+                    bytes.as_bytes(),
+                    first,
+                    last
+                ),
+                Err(SlotFault::SourceBlock { index: 0 })
+            );
+
+            let mut changed = draft.clone();
+            let SlotBlock::Result { grade_gap, .. } = &mut changed.blocks[0] else {
+                unreachable!()
+            };
+            *grade_gap = !*grade_gap;
+            let checked = admit_slot(changed, &source.path, |_, _, _| false).unwrap();
+            assert_eq!(
+                check_transfer(
+                    &checked,
+                    &source,
+                    &source.path,
+                    bytes.as_bytes(),
+                    first,
+                    last
+                ),
+                Err(SlotFault::SourceContent { index: 0 })
+            );
+
+            let mut changed = draft.clone();
+            let SlotBlock::Result { grade, .. } = &mut changed.blocks[0] else {
+                unreachable!()
+            };
+            *grade = None;
+            if let Ok(checked) = admit_slot(changed, &source.path, |_, _, _| false) {
+                assert_eq!(
+                    check_transfer(
+                        &checked,
+                        &source,
+                        &source.path,
+                        bytes.as_bytes(),
+                        first,
+                        last
+                    ),
+                    Err(SlotFault::SourceContent { index: 0 })
+                );
+            }
+
+            let mut changed = draft;
+            let SlotBlock::Result { children, .. } = &mut changed.blocks[0] else {
+                unreachable!()
+            };
+            children[0].push(SlotRun::Text("changed".into()));
+            let checked = admit_slot(changed, &source.path, |_, _, _| false).unwrap();
+            assert_eq!(
+                check_transfer(
+                    &checked,
+                    &source,
+                    &source.path,
+                    bytes.as_bytes(),
+                    first,
+                    last
+                ),
+                Err(SlotFault::SourceContent { index: 0 })
+            );
+        }
+    }
+
+    #[test]
+    fn ungraded_remark_keeps_absence_and_child_order() {
+        let text = "\\begin{remark}[\\hdr{r:plain}]\nFirst.\n\nSecond.\n\\end{remark}\n";
+        let path = "documents/paper/parts/partA.tex";
+        let source = import_source(path, text.as_bytes(), "digest".into(), &[]).unwrap();
+        let block = &source.blocks[0];
+        assert_eq!(block.children.len(), 2);
+        let children: Vec<_> = block
+            .children
+            .iter()
+            .map(|child| {
+                let BlockFields::Paragraph { runs, .. } = &child.fields else {
+                    unreachable!()
+                };
+                imported_runs(runs, true).unwrap()
+            })
+            .collect();
+        let draft = SlotDraft {
+            schema: 1,
+            id: "result:r:plain".into(),
+            document: "paper-pilot".into(),
+            composition: "corpus-slot".into(),
+            language: "en".into(),
+            paper_mint: Some(mint(path, "r:plain")),
+            blocks: vec![SlotBlock::Result {
+                kind: ResultKind::Remark,
+                target: "header".into(),
+                key: "r:plain".into(),
+                grade: None,
+                grade_gap: false,
+                children,
+            }],
+        };
+        let checked = admit_slot(draft.clone(), path, |_, _, _| false).unwrap();
+        check_transfer(&checked, &source, path, text.as_bytes(), 1, 6).unwrap();
+
+        let mut graded = draft.clone();
+        let SlotBlock::Result { grade, .. } = &mut graded.blocks[0] else {
+            unreachable!()
+        };
+        *grade = Some(ResultGradeCode::Nec);
+        let checked = admit_slot(graded, path, |_, _, _| false).unwrap();
+        assert_eq!(
+            check_transfer(&checked, &source, path, text.as_bytes(), 1, 6),
+            Err(SlotFault::SourceContent { index: 0 })
+        );
+
+        let mut reordered = draft;
+        let SlotBlock::Result { children, .. } = &mut reordered.blocks[0] else {
+            unreachable!()
+        };
+        children.swap(0, 1);
+        let checked = admit_slot(reordered, path, |_, _, _| false).unwrap();
+        assert_eq!(
+            check_transfer(&checked, &source, path, text.as_bytes(), 1, 6),
+            Err(SlotFault::SourceContent { index: 0 })
+        );
+    }
 }

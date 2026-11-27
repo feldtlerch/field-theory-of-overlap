@@ -17,6 +17,7 @@ fn with_reference(document: &str, file: &str, label: &str) -> DocumentPlan {
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![Inline::See {
                 label: label.into(),
@@ -692,6 +693,7 @@ fn markdown_math_context_envelopes() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs,
     };
@@ -985,6 +987,7 @@ fn markdown_math_recovery_rejects_envelope_and_body_damage() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("Value ".into()),
@@ -1002,6 +1005,7 @@ fn markdown_math_recovery_rejects_envelope_and_body_damage() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![Inline::Text("Following.".into())],
     });
@@ -1141,6 +1145,7 @@ fn plan(book: &ftoo_manifest::AddressBook<'_>) -> DocumentPlan {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: super::super::input::site("fixture.toml"),
             runs: vec![Inline::Text("Body.".into())],
         }],
@@ -1326,6 +1331,7 @@ fn excerpt_plan() -> DocumentPlan {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![Inline::Text(text.into())],
     };
@@ -1394,6 +1400,7 @@ fn paper_tag_reader_span() {
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("A ".into()),
@@ -3117,6 +3124,7 @@ fn reader_pending_collects_unavailable_objects_with_real_mixed_origins() {
                 paragraph: false,
                 equation: false,
                 econ: None,
+                result: None,
                 site: definition_site.clone(),
                 runs: vec![],
             };
@@ -3138,6 +3146,7 @@ fn reader_pending_collects_unavailable_objects_with_real_mixed_origins() {
                             paragraph: false,
                             equation: false,
                             econ: None,
+                            result: None,
                             site: definition_site.clone(),
                             runs,
                         }],
@@ -3289,6 +3298,7 @@ fn reader_pending_shared_selection_retains_both_target_bodies_and_definition_sit
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: super::super::input::site(name),
                     runs: vec![run(name)],
                 }],

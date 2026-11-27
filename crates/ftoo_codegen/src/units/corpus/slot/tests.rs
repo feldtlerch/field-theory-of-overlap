@@ -55,6 +55,74 @@ fn imported(bytes: &[u8]) -> ftoo_manifest::corpus::SourceDraft {
 }
 
 #[test]
+fn registered_result_shape_keeps_kind_grade_gap_and_ordered_plain_children() {
+    let source = "schema = 1\n[unit]\nid = \"result:f:pool\"\ndocument = \"paper-pilot\"\ncomposition = \"corpus-slot\"\nlanguage = \"en\"\n[unit.documentary-targets]\nheader = \"f:pool\"\n[[unit.blocks]]\nkind = \"result\"\nresult-kind = \"insight\"\ntarget = \"header\"\nkey = \"f:pool\"\ngrade = \"cont-anch\"\ngrade-gap = false\nchildren = [{ kind = \"paragraph\", runs = [{ kind = \"text\", decoded = \"Coherence pools the value; independence supplies the weight.\" }] }]\n";
+    let draft = parsed(source).unwrap();
+    assert!(
+        matches!(&draft.blocks[..], [ftoo_manifest::corpus::SlotBlock::Result {
+        kind: ftoo_manifest::corpus::ResultKind::Insight,
+        key, grade: Some(ftoo_manifest::corpus::ResultGradeCode::ContAnch),
+        grade_gap: false, children, ..
+    }] if key == "f:pool" && children.len() == 1)
+    );
+    let changed = source.replace("result-kind = \"insight\"", "result-kind = \"theorem\"");
+    assert!(parsed(&changed).unwrap_err().contains("UnknownToken"));
+    let changed = source.replace("kind = \"paragraph\"", "kind = \"heading\"");
+    assert!(parsed(&changed).is_err());
+    let changed = source.replace("target = \"header\"", "target = \"missing\"");
+    assert!(parsed(&changed).unwrap_err().contains("MissingField"));
+    let changed = source.replace("header = \"f:pool\"", "header = \"f:other\"");
+    assert!(parsed(&changed).unwrap_err().contains("UnknownToken"));
+}
+
+#[test]
+fn real_result_fixtures_match_their_source_intervals() {
+    use ftoo_manifest::corpus::{BlockFields, ResultHeader};
+    for (fixture, source_fixture, part, key) in [
+        (
+            "result-pool.toml",
+            "result-pool-source.tex",
+            "partA.tex",
+            "f:pool",
+        ),
+        (
+            "result-modest.toml",
+            "result-modest-source.tex",
+            "partC.tex",
+            "nrm:modest",
+        ),
+    ] {
+        let unit_path = format!("units/fixtures/{fixture}");
+        let unit_bytes = fs::read(root().join(&unit_path)).unwrap();
+        let draft = parse_slot(&UnitSource {
+            file: unit_path.clone(),
+            bytes: unit_bytes,
+        })
+        .unwrap();
+        let checked = admit_slot(draft, &unit_path, |_, _, _| false).unwrap();
+        assert_eq!(checked.paper_mint().unwrap().key, key);
+        let source_path = format!("documents/paper/parts/{part}");
+        let bytes = fs::read(root().join("units/fixtures").join(source_fixture)).unwrap();
+        let source = import_source(&source_path, &bytes, digest(&bytes), &[]).unwrap();
+        let result = source
+            .blocks
+            .iter()
+            .find(|block| {
+                matches!(&block.fields,
+                BlockFields::Result { header: ResultHeader::Registered { key: actual, .. }, .. }
+                    if actual == key)
+            })
+            .unwrap();
+        let first = result.site.start_line;
+        let last = bytes[..result.site.end_byte.saturating_sub(1)]
+            .split(|byte| *byte == b'\n')
+            .count();
+        check_transfer(&checked, &source, &source_path, &bytes, first, last)
+            .unwrap_or_else(|error| panic!("{fixture}: {error:?}; source={:?}", result.children));
+    }
+}
+
+#[test]
 fn real_prefix_admits_exact_six_children_and_all_source_pieces() {
     let slot = checked(&fixture()).unwrap();
     let bytes = inherited_source();

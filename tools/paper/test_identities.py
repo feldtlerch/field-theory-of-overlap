@@ -16,8 +16,8 @@ from unittest import mock
 import argparse
 from common import read, write, timed
 import compare_words
-from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds, virtue_roster
-from ledger import leaks, occurrence_differences, ledger_binding, check_destination, screen_references, check_screen_references, virtue_site, check_native_virtue_row, check_virtue_context, check_virtue_inventory, check_companion_mints, auxiliary, native_virtue_plan
+from identities import CapturedInputs, _assignment_line, assembly_json, bindings, holds, virtue_roster, result_header_requests
+from ledger import leaks, occurrence_differences, ledger_binding, check_destination, screen_references, check_screen_references, check_screen_results, virtue_site, check_native_virtue_row, check_virtue_context, check_virtue_inventory, check_companion_mints, auxiliary, native_virtue_plan
 from prepare import declared_fragments, versioned, paper_master, scope_fragments
 
 FRAGMENTS = tuple(row[:4] for row in scope_fragments(pathlib.Path(__file__).resolve().parents[2]))
@@ -25,6 +25,64 @@ PARENT_REVISION = '68643f63939af28693897b84478e1e4988c40e32'
 
 
 class Identities(unittest.TestCase):
+    def test_result_header_compares_typesetter_number_title_type_and_destination(self):
+        class Pdf:
+            def __init__(self, page):
+                self.page = page
+
+            def destination(self, anchor):
+                self.assert_anchor = anchor
+                return self.page
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            generated = root/'generated/documents'
+            (generated/'paper-pilot').mkdir(parents=True)
+            write(generated/'inclusions.tsv',
+                  'documents/paper/parts/partA.tex\tresult:f:pool\t'
+                  'generated/documents/paper-pilot/result-f-pool.tex\tcorpus-slot\t420\n')
+            write(generated/'paper-pilot/result-f-pool.tex',
+                  '\\begin{insight}[\\hdr{f:pool}]\\grade{cont-anch}\n'
+                  '  Coherence pools the value; independence supplies the weight.\n'
+                  '\\end{insight}\n')
+            screen = ('<!-- unit result:f:pool document paper-pilot language en -->\n'
+                      '*Insight 2.13 (Coherence pools, independence weighs)* · f:pool '
+                      'cont-anch <a id="result-f-pool"></a>\n')
+            write(generated/'paper-pilot/en.labels.md', screen)
+            headers = [{'unit':'result:f:pool','key':'f:pool',
+                        'title':'Coherence pools, independence weighs'}]
+            target = {'default':'2.13','title':headers[0]['title'],
+                      'zc@type':'remark','page':'19','anchor':'theorem.2.13'}
+            check_screen_results(root, {'f:pool':target}, Pdf(19), headers)
+            for field, value in [('default','2.14'),('title','Changed'),
+                                 ('zc@type','definition')]:
+                changed = dict(target, **{field:value})
+                with self.subTest(field=field), self.assertRaisesRegex(
+                        ValueError, 'result number, title or reference kind differs'):
+                    check_screen_results(root, {'f:pool':changed}, Pdf(19), headers)
+            with self.assertRaisesRegex(ValueError, 'auxiliary/PDF page discrepancy'):
+                check_screen_results(root, {'f:pool':target}, Pdf(20), headers)
+            write(generated/'paper-pilot/en.labels.md', screen.replace('2.13','2.14'))
+            with self.assertRaisesRegex(ValueError, 'result number, title or reference kind differs'):
+                check_screen_results(root, {'f:pool':target}, Pdf(19), headers)
+
+    def test_result_header_requests_have_one_checked_corpus_owner(self):
+        source = ('[unit]\nid = "result:f:pool"\ndocument = "paper-pilot"\n'
+                  'composition = "corpus-slot"\nlanguage = "en"\n'
+                  '[unit.documentary-targets]\nheader = "f:pool"\n'
+                  '[[unit.blocks]]\nkind = "result"\ntarget = "header"\nkey = "f:pool"\n')
+        files = {'units/corpus/pool.toml': source,
+                 'units/corpus/existing.toml': '[unit]\nid = "sec:plain"\nblocks = [{kind = "paragraph"}]\n'}
+        self.assertEqual(result_header_requests(files, files.__getitem__),
+                         {'f:pool': ('units/corpus/pool.toml', 'result:f:pool')})
+        files['units/corpus/other.toml'] = source.replace('result:f:pool', 'result:f:other')
+        with self.assertRaisesRegex(ValueError, 'duplicate or malformed result header key'):
+            result_header_requests(files, files.__getitem__)
+        files.pop('units/corpus/other.toml')
+        files['units/corpus/pool.toml'] = source.replace('target = "header"', 'target = "other"')
+        with self.assertRaisesRegex(ValueError, 'result header selector differs'):
+            result_header_requests(files, files.__getitem__)
+
     def test_virtue_ledger_inventory_refusals(self):
         position = ('documents/paper/parts/coda.tex', 8)
         native = {position: ('sec:coda:eight-words', [('virtue', 'wonder')])}
@@ -605,8 +663,12 @@ class Identities(unittest.TestCase):
         source = pathlib.Path(__file__).resolve().parents[2]
         unit_path = 'units/statements/coda-flourishing-pole.toml'
         bridge = json.loads(assembly_json(source))
-        self.assertEqual([row['path'] for row in bridge['inputs']
-                          if row['path'].startswith('units/')], [unit_path])
+        expected = {unit_path}
+        expected.update(path for path in (
+            'units/corpus/result-pool.toml', 'units/corpus/result-modest.toml')
+            if (source/path).is_file())
+        self.assertEqual({row['path'] for row in bridge['inputs']
+                          if row['path'].startswith('units/')}, expected)
         repo = self.root/'native-target-change'
         subprocess.run(['git', 'clone', '--quiet', '--no-hardlinks', str(source), str(repo)],
                        check=True)
@@ -624,10 +686,10 @@ class Identities(unittest.TestCase):
         parent = compare_words.parent_snapshot(repo, parent_revision, parent_dir)
         held = CapturedInputs(repo)
         inputs = compare_words.snapshot_inputs(repo, candidate_dir, held)
-        self.assertEqual([row['path'] for row in parent['inputs']
-                          if row['path'].startswith('units/')], [unit_path])
-        self.assertEqual([row['path'] for row in inputs
-                          if row['path'].startswith('units/')], [unit_path])
+        self.assertEqual({row['path'] for row in parent['inputs']
+                          if row['path'].startswith('units/')}, expected)
+        self.assertEqual({row['path'] for row in inputs
+                          if row['path'].startswith('units/')}, expected)
         args = argparse.Namespace(unit='sec:coda:whole-field', before_source=None,
                                   before_revision=parent_revision)
         before, after = compare_words.selected_sources(repo, args, parent,
@@ -2229,7 +2291,7 @@ class Identities(unittest.TestCase):
 
     def test_assembly_json_evidence_and_refusals(self):
         value=json.loads(assembly_json(self.root))
-        self.assertEqual(list(value), ['schema','inputs','bindings','virtues','departures','native_targets','bibliography'])
+        self.assertEqual(list(value), ['schema','inputs','bindings','virtues','departures','native_targets','result_headers','bibliography'])
         self.assertEqual(value['schema'], 2)
         self.assertEqual(value['bibliography']['source'], 'documents/paper/references.bib')
         self.assertEqual(value['bibliography']['stock_sha256'], hashlib.sha256(

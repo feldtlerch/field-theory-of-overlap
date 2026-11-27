@@ -94,6 +94,7 @@ fn retained_selected_outcomes_census_and_scope_are_derived() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![Inline::Math {
                 definition_site: site.clone(),

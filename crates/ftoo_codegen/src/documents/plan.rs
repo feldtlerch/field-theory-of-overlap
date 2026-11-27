@@ -1095,6 +1095,17 @@ pub(super) fn check_emission(
             .into_iter()
             .filter(|r| !matches!(r.kind, EmissionKind::PendingExplanation(_)))
             .collect();
+        if let Some(result) = &block.result {
+            let value = framed.and_then(|body| recover_result_latex(body, result));
+            let mut record = records[0].clone();
+            record.value = value.unwrap_or_else(|| framed.unwrap_or(body).into());
+            if record != records[0] || plan.blocks.get(index).is_none_or(|b| b.unit != block.unit) {
+                first_range.get_or_insert(start..end);
+            }
+            actual_records.push(record);
+            actual_records.extend(pending_actual);
+            continue;
+        }
         if let Some(display) = block.displays.get(&target) {
             let actual = framed
                 .and_then(|body| recover_display_block(body, block, display, &records, target));
@@ -1194,6 +1205,7 @@ fn slot_recovered_text(runs: &[Recovered]) -> Option<String> {
     Some(text)
 }
 
+#[allow(clippy::too_many_lines)] // Each checked block form has a separate recovery branch.
 pub(super) fn slot_markdown_text(
     plan: &DocumentPlan,
     slot: &ftoo_manifest::corpus::CheckedSlot,
@@ -1232,9 +1244,10 @@ pub(super) fn slot_markdown_text(
             )
         })?;
     let mut words = Vec::new();
+    let chunks = grouped_excerpt_chunks(plan, source);
     for block in children {
-        let body = source
-            .split("\n\n")
+        let body = chunks
+            .iter()
             .find_map(|chunk| {
                 let (unit, _, _, body) = excerpt_unit(chunk)?;
                 (unit == block.unit).then_some(body)
@@ -1251,6 +1264,22 @@ pub(super) fn slot_markdown_text(
                     },
                 )
             })?;
+        if let Some(result) = &block.result {
+            let text = excerpt_result(body, result).ok_or_else(|| {
+                emission_failure(
+                    plan,
+                    DocumentTarget::Markdown,
+                    0..source.len(),
+                    AssemblyFault::EmissionMismatch {
+                        missing: plan.records(DocumentTarget::Markdown),
+                        unexpected: vec![],
+                        changed: vec![],
+                    },
+                )
+            })?;
+            words.push(text);
+            continue;
+        }
         let body = if let Some(depth) = block.depth {
             body.strip_prefix(&format!("{} ", "#".repeat(depth)))
         } else {
@@ -1314,6 +1343,127 @@ fn excerpt_econ(source: &str, block: &Block, econ: &EconPlan) -> Option<Vec<Reco
     let body = source.strip_prefix(&header)?.strip_suffix(&footer)?;
     let actual = recover_markdown(body, block.runs.iter().flat_map(inline_handles))?;
     (actual == expected_runs(block, DocumentTarget::Markdown)).then_some(actual)
+}
+fn excerpt_result(source: &str, result: &ResultPlan) -> Option<String> {
+    let mut parts = source.split("\n\n");
+    let header = parts.next()?;
+    let anchor = format!(" <a id=\"{}\"></a>", result.fragment);
+    let header = header.strip_suffix(&anchor)?;
+    let grade = result
+        .grade
+        .map_or_else(String::new, |grade| format!(" {}", grade.name()));
+    let header = header.strip_suffix(&grade)?;
+    let (heading, key) = header.rsplit_once(" · ")?;
+    if key != super::markdown::text(&result.key) {
+        return None;
+    }
+    let style = if matches!(result.kind, ftoo_manifest::corpus::ResultKind::Definition) {
+        "**"
+    } else {
+        "*"
+    };
+    let heading = heading.strip_prefix(style)?.strip_suffix(style)?;
+    let kind = match result.kind {
+        ftoo_manifest::corpus::ResultKind::Insight => "Insight",
+        ftoo_manifest::corpus::ResultKind::Remark => "Remark",
+        ftoo_manifest::corpus::ResultKind::Definition => "Definition",
+    };
+    let (number, title) = heading
+        .strip_prefix(kind)?
+        .strip_prefix(' ')?
+        .split_once(" (")?;
+    if number != result.number || title.strip_suffix(')')? != super::markdown::text(&result.title) {
+        return None;
+    }
+    let mut recovered = vec![
+        kind.to_owned(),
+        number.into(),
+        result.title.clone(),
+        result.key.clone(),
+    ];
+    if let Some(grade) = result.grade {
+        recovered.push(grade.name().into());
+    }
+    let children: Vec<_> = parts.collect();
+    if children.len() != result.children.len() {
+        return None;
+    }
+    for (source, expected) in children.into_iter().zip(&result.children) {
+        let actual = recover_markdown(source, expected.iter().flat_map(inline_handles))?;
+        let reference: Vec<_> = expected
+            .iter()
+            .filter_map(|run| expected_run(run, DocumentTarget::Markdown, false))
+            .collect();
+        if actual != reference {
+            return None;
+        }
+        recovered.push(slot_recovered_text(&actual)?);
+    }
+    Some(recovered.join(" "))
+}
+
+fn recover_result_latex(source: &str, result: &ResultPlan) -> Option<String> {
+    let mut begin = format!("\\begin{{{}}}[\\hdr{{{}}}]", result.kind.name(), result.key);
+    if let Some(grade) = result.grade {
+        use std::fmt::Write as _;
+        write!(begin, "\\grade{{{}}}", grade.name()).expect("string write");
+    }
+    if result.grade_gap {
+        begin.push_str("\\PaperGradeGap{-2pt}");
+    }
+    begin.push('\n');
+    let end = format!("\\end{{{}}}", result.kind.name());
+    let mut body = source.strip_prefix(&begin)?;
+    body = body.strip_suffix(&end)?.strip_suffix('\n')?;
+    let children: Vec<_> = body.lines().collect();
+    if children.len() != result.children.len() {
+        return None;
+    }
+    let mut fields = vec![
+        result.kind_label().into(),
+        result.number.clone(),
+        result.title.clone(),
+        result.key.clone(),
+    ];
+    if let Some(grade) = result.grade {
+        fields.push(grade.name().into());
+    }
+    for (actual, expected) in children.into_iter().zip(&result.children) {
+        let actual = recover_prose_latex(actual.strip_prefix("  ")?)?;
+        let reference: Vec<_> = expected
+            .iter()
+            .filter_map(|run| expected_run(run, DocumentTarget::Latex, true))
+            .collect();
+        if actual != reference {
+            return None;
+        }
+        fields.push(slot_recovered_text(&actual)?);
+    }
+    Some(fields.join(" "))
+}
+
+fn grouped_excerpt_chunks(plan: &DocumentPlan, source: &str) -> Vec<String> {
+    let mut grouped: Vec<String> = Vec::new();
+    for chunk in source.split("\n\n") {
+        let belongs_to_result = grouped.last().is_some_and(|previous| {
+            excerpt_unit(previous).is_some_and(|(unit, _, _, _)| {
+                plan.blocks.iter().any(|block| {
+                    block.unit == unit
+                        && block.result.as_ref().is_some_and(|result| {
+                            previous.matches("\n\n").count() < result.children.len()
+                        })
+                })
+            })
+        });
+        if excerpt_unit(chunk).is_none() && belongs_to_result {
+            let previous = grouped.last_mut().expect("checked preceding result");
+            previous.push_str("\n\n");
+            previous.push_str(chunk);
+        } else {
+            grouped.push(chunk.into());
+        }
+    }
+    grouped
 }
 fn excerpt_unit(source: &str) -> Option<(&str, &str, &str, &str)> {
     let (metadata, body) = source.split_once('\n')?;
@@ -1435,11 +1585,13 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
     let start = source.find("<!-- unit ").unwrap_or(source.len());
     let mut cursor = start;
     let mut body_index = 0;
-    for chunk in source[start..]
-        .strip_suffix('\n')
-        .expect("checked envelope")
-        .split("\n\n")
-    {
+    for owned in grouped_excerpt_chunks(
+        plan,
+        source[start..]
+            .strip_suffix('\n')
+            .expect("checked envelope"),
+    ) {
+        let chunk = owned.as_str();
         let range = cursor..cursor + chunk.len();
         cursor = range.end + 2;
         let before = actual.len();
@@ -1470,7 +1622,9 @@ fn check_excerpt_emission(plan: &DocumentPlan, source: &str) -> Result<(), Docum
                     .econ
                     .as_ref()
                     .and_then(|econ| excerpt_econ(body, block, econ));
-                let text = if let Some(depth) = block.depth {
+                let text = if let Some(result) = &block.result {
+                    excerpt_result(body, result)
+                } else if let Some(depth) = block.depth {
                     body.strip_prefix(&format!("{} ", "#".repeat(depth)))
                         .and_then(excerpt_text)
                 } else if block.econ.is_some() {
@@ -1814,6 +1968,7 @@ pub(super) struct Block {
     pub paragraph: bool,
     pub equation: bool,
     pub econ: Option<EconPlan>,
+    pub result: Option<ResultPlan>,
     pub site: UnitSite,
     pub runs: Vec<Inline>,
 }
@@ -1830,6 +1985,84 @@ pub(super) struct EconPlan {
     pub stops_at: String,
     pub citations: Vec<String>,
     pub fragment: String,
+}
+#[derive(Clone)]
+pub(super) struct ResultPlan {
+    pub kind: ftoo_manifest::corpus::ResultKind,
+    pub key: String,
+    pub title: String,
+    pub number: String,
+    pub grade: Option<ftoo_manifest::corpus::ResultGradeCode>,
+    pub grade_gap: bool,
+    pub children: Vec<Vec<Inline>>,
+    pub fragment: String,
+}
+impl ResultPlan {
+    pub(super) fn kind_label(&self) -> &'static str {
+        match self.kind {
+            ftoo_manifest::corpus::ResultKind::Insight => "Insight",
+            ftoo_manifest::corpus::ResultKind::Remark => "Remark",
+            ftoo_manifest::corpus::ResultKind::Definition => "Definition",
+        }
+    }
+    fn record_value(&self, target: DocumentTarget) -> String {
+        let mut fields = vec![
+            self.kind_label().to_owned(),
+            self.number.clone(),
+            self.title.clone(),
+            self.key.clone(),
+        ];
+        if let Some(grade) = self.grade {
+            fields.push(grade.name().into());
+        }
+        for child in &self.children {
+            let text: String = child.iter().map(canonical_run).collect();
+            fields.push(if target == DocumentTarget::Latex {
+                text.replace('\'', "’")
+            } else {
+                text
+            });
+        }
+        fields.join(" ")
+    }
+}
+
+#[cfg(test)]
+mod result_recovery_tests {
+    use super::{DocumentTarget, Inline, ResultPlan, excerpt_result, recover_result_latex};
+    use ftoo_manifest::corpus::{ResultGradeCode, ResultKind};
+
+    #[test]
+    fn result_recovery_rejects_changed_header_child_and_order() {
+        let result = ResultPlan {
+            kind: ResultKind::Insight,
+            key: "f:pool".into(),
+            title: "Coherence pools, independence weighs".into(),
+            number: "2.13".into(),
+            grade: Some(ResultGradeCode::ContAnch),
+            grade_gap: false,
+            children: vec![vec![Inline::Text(
+                "Coherence pools the value; independence supplies the weight.".into(),
+            )]],
+            fragment: "result-f-pool".into(),
+        };
+        let latex = "\\begin{insight}[\\hdr{f:pool}]\\grade{cont-anch}\n  Coherence pools the value; independence supplies the weight.\n\\end{insight}";
+        let markdown = "*Insight 2.13 (Coherence pools, independence weighs)* · f:pool cont-anch <a id=\"result-f-pool\"></a>\n\nCoherence pools the value; independence supplies the weight.";
+        assert_eq!(
+            recover_result_latex(latex, &result),
+            Some(result.record_value(DocumentTarget::Latex))
+        );
+        assert_eq!(
+            excerpt_result(markdown, &result),
+            Some(result.record_value(DocumentTarget::Markdown))
+        );
+        assert!(recover_result_latex(&latex.replace("f:pool", "f:wrong"), &result).is_none());
+        assert!(recover_result_latex(&latex.replace("weight.", "weighx."), &result).is_none());
+        assert!(recover_result_latex(&latex.replace("cont-anch", "nec"), &result).is_none());
+        assert!(excerpt_result(&markdown.replace("2.13", "2.14"), &result).is_none());
+        assert!(excerpt_result(&markdown.replace("weight.", "weighx."), &result).is_none());
+        assert!(excerpt_result(&format!("{markdown}\n\nUnexpected child."), &result).is_none());
+    }
 }
 impl Block {
     pub(super) fn equation_pair(&self) -> Option<(&str, &str)> {
@@ -2113,6 +2346,7 @@ impl Coverage {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: self.site.clone(),
             runs: self.runs.clone(),
         }
@@ -2452,13 +2686,19 @@ pub(super) fn refrain_index(blocks: &[Block], index: usize) -> Option<usize> {
     (index > 0
         && blocks[index].depth.is_none()
         && !blocks[index].paragraph
-        && !blocks[index].equation)
-        .then(|| {
-            blocks[1..index]
-                .iter()
-                .filter(|block| block.depth.is_none() && !block.paragraph && !block.equation)
-                .count()
-        })
+        && !blocks[index].equation
+        && blocks[index].result.is_none())
+    .then(|| {
+        blocks[1..index]
+            .iter()
+            .filter(|block| {
+                block.depth.is_none()
+                    && !block.paragraph
+                    && !block.equation
+                    && block.result.is_none()
+            })
+            .count()
+    })
 }
 #[derive(Clone, Debug)]
 pub(super) struct ScreenGap {
@@ -2514,6 +2754,17 @@ pub(super) fn check_public_anchors(plan: &DocumentPlan) -> Result<(), DocumentEr
                 &plan.blocks[0].site,
                 AssemblyFault::DuplicatePublicAnchor {
                     fragment: econ.fragment.clone(),
+                },
+            ));
+        }
+    }
+    for result in plan.blocks.iter().filter_map(|block| block.result.as_ref()) {
+        if !seen.insert(result.fragment.clone()) {
+            return Err(screen_failure(
+                plan,
+                &plan.blocks[0].site,
+                AssemblyFault::DuplicatePublicAnchor {
+                    fragment: result.fragment.clone(),
                 },
             ));
         }
@@ -2605,6 +2856,13 @@ pub(super) fn check_excerpt_shape(
         && plan.blocks[0].depth == Some(1)
         && plan.blocks[1..].iter().all(|block| {
             let corpus_child = block.site.file.starts_with("units/corpus/");
+            if let Some(result) = &block.result {
+                return corpus_child
+                    && !result.children.is_empty()
+                    && result.children.iter().all(|child| {
+                        !child.is_empty() && child.iter().all(|run| matches!(run, Inline::Text(_)))
+                    });
+            }
             if block.depth == Some(2) {
                 return corpus_child && matches!(block.runs.as_slice(), [Inline::Text(_)]);
             }
@@ -3202,6 +3460,22 @@ pub(super) fn plan_screens_with_slots(
             ));
         }
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
+            if let Some(result) = &block.result {
+                if !anchors.insert((
+                    plan.document.clone(),
+                    plan.language.clone(),
+                    result.fragment.clone(),
+                )) {
+                    return Err(screen_failure(
+                        plan,
+                        &block.site,
+                        AssemblyFault::DuplicatePublicAnchor {
+                            fragment: result.fragment.clone(),
+                        },
+                    ));
+                }
+                continue;
+            }
             if let Some(econ) = &block.econ
                 && !anchors.insert((
                     plan.document.clone(),
@@ -3357,7 +3631,8 @@ pub(super) fn plan_screens_with_slots(
         }
         let mut refrains = Vec::new();
         for (index, block) in plan.blocks.iter().enumerate().skip(1) {
-            if block.depth.is_some() || block.paragraph || block.equation {
+            if block.depth.is_some() || block.paragraph || block.equation || block.result.is_some()
+            {
                 continue;
             }
             let site = if slots.is_empty() {
@@ -3509,17 +3784,21 @@ impl DocumentPlan {
                 target,
                 occurrence: None,
                 value: {
-                    // Only prose text shares apostrophe spellings; handles and mentions stay literal.
-                    block
-                        .runs
-                        .iter()
-                        .map(|run| match run {
-                            Inline::Text(text) if target == DocumentTarget::Latex => {
-                                text.replace('\'', "’")
-                            }
-                            _ => canonical_run(run),
-                        })
-                        .collect::<String>()
+                    if let Some(result) = &block.result {
+                        result.record_value(target)
+                    } else {
+                        // Only prose text shares apostrophe spellings; handles and mentions stay literal.
+                        block
+                            .runs
+                            .iter()
+                            .map(|run| match run {
+                                Inline::Text(text) if target == DocumentTarget::Latex => {
+                                    text.replace('\'', "’")
+                                }
+                                _ => canonical_run(run),
+                            })
+                            .collect::<String>()
+                    }
                 },
                 site: block.site.clone(),
             });
@@ -3898,8 +4177,10 @@ fn slot_inline(source: &[ftoo_manifest::corpus::SlotRun], site: &UnitSite) -> Ve
 }
 
 #[allow(clippy::too_many_arguments)] // The checked child uses the ordinary plan's full owner context.
+#[allow(clippy::too_many_lines)] // Both slot forms use the same ordered owner traversal.
 fn slot_blocks(
     slot: &ftoo_manifest::corpus::CheckedSlot,
+    result_numbers: &BTreeMap<String, String>,
     corpus: &ftoo_manifest::LanguageCheckedUnits,
     welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>,
     equations: &Equations,
@@ -3919,6 +4200,58 @@ fn slot_blocks(
             .child("blocks")
             .child(&child_index.to_string());
         let (unit, depth, paragraph, runs) = match child {
+            ftoo_manifest::corpus::SlotBlock::Result {
+                kind,
+                key,
+                grade,
+                grade_gap,
+                children,
+                ..
+            } => {
+                let row = paper_lookup.and_then(|lookup| lookup.result_header(key));
+                let number = result_numbers.get(slot.id());
+                let fragment = super::destinations::result_fragment(key);
+                let (Some(row), Some(number), Some(fragment)) = (row, number, fragment) else {
+                    return Err(super::failure(
+                        RuleId::M055,
+                        AssemblyStage::Ownership,
+                        AssemblySite::Source(site),
+                        AssemblyFault::UnknownToken {
+                            value: key.clone(),
+                            expected: vec!["checked result title, number and destination".into()],
+                        },
+                    ));
+                };
+                blocks.push(Block {
+                    pending_names: BTreeMap::new(),
+                    displays: BTreeMap::new(),
+                    unit: slot.id().into(),
+                    depth: None,
+                    quotation: false,
+                    paragraph: false,
+                    equation: false,
+                    econ: None,
+                    result: Some(ResultPlan {
+                        kind: *kind,
+                        key: key.clone(),
+                        title: row.title.clone(),
+                        number: number.clone(),
+                        grade: *grade,
+                        grade_gap: *grade_gap,
+                        children: children
+                            .iter()
+                            .enumerate()
+                            .map(|(index, runs)| {
+                                slot_inline(runs, &site.child("children").child(&index.to_string()))
+                            })
+                            .collect(),
+                        fragment,
+                    }),
+                    site,
+                    runs: Vec::new(),
+                });
+                continue;
+            }
             ftoo_manifest::corpus::SlotBlock::Heading { title, .. } => (
                 slot.id().to_owned(),
                 Some(2),
@@ -3965,6 +4298,7 @@ fn slot_blocks(
             paragraph,
             equation: false,
             econ: None,
+            result: None,
             site,
             runs,
         };
@@ -4016,6 +4350,17 @@ pub(super) fn build_with_slots(
     inputs: &BTreeMap<String, Vec<u8>>,
     paper_documents: &BTreeSet<String>,
 ) -> Result<Vec<DocumentPlan>, DocumentError> {
+    let result_numbers = super::destinations::result_numbers(inputs, slots).map_err(|error| {
+        super::failure(
+            RuleId::M055,
+            AssemblyStage::Ownership,
+            AssemblySite::Source(super::input::site("documents/paper/main.tex")),
+            AssemblyFault::UnknownToken {
+                value: format!("{error:?}"),
+                expected: vec!["checked result counter order".into()],
+            },
+        )
+    })?;
     let corpus = skeletons.corpus();
     let book = welded.integrated().resolved().book();
     let equation_units: BTreeSet<_> = skeletons
@@ -4060,6 +4405,7 @@ pub(super) fn build_with_slots(
                     let slot = &slots[position.unit()];
                     let children = slot_blocks(
                         slot,
+                        &result_numbers,
                         corpus,
                         welded,
                         &equations,
@@ -4121,6 +4467,7 @@ pub(super) fn build_with_slots(
                     paragraph: position.paragraph(),
                     equation: position.equation(),
                     econ,
+                    result: None,
                     site: if position.paragraph() || position.equation() {
                         unit.texts()[language].site().clone()
                     } else {
@@ -5500,6 +5847,7 @@ pub(super) fn display_plans(
                 paragraph: false,
                 equation: false,
                 econ: None,
+                result: None,
                 site: region.site(&region.source().site),
                 runs,
                 displays: BTreeMap::new(),
@@ -6260,6 +6608,7 @@ pub(super) fn fixture_citation_plan(welded: &WeldedUnits<'_, '_, '_, '_, '_, '_>
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: super::input::site("fixture.toml"),
         pending_names: BTreeMap::new(),
         displays: BTreeMap::new(),

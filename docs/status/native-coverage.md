@@ -19,7 +19,7 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 | displayed equations | 0 / 141 | 1 / 1 | 1 / 142 | subset | The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`. |
 | cross-references | 1 / 117 | 0 / 13 | 1 / 130 | subset | Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`. |
 | bibliography citations | 2 / 74 | 0 / 0 | 2 / 74 | subset | Verified parenthetical citations in native paragraphs and the economics box; `dec:documents:paper-tagged-paragraphs`, `dec:documents:native-econ`. |
-| result box: definition | 0 / 42 | 0 / 0 | 0 / 42 | none | No native definition box is admitted. |
+| result box: definition | 0 / 42 | 0 / 0 | 0 / 42 | subset | A checked result-form slot carries a registered definition header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
 | tables | 0 / 32 | 0 / 3 | 0 / 35 | subset | A native display table exists outside the body inclusions; M055. |
 | result box: econ | 1 / 34 | 0 / 0 | 1 / 34 | subset | The coda box's text and one parenthetical citation form; `dec:documents:native-econ`. |
 | result box: theorem | 0 / 30 | 0 / 0 | 0 / 30 | none | No native theorem box is admitted. |
@@ -29,8 +29,8 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 | result box: proposition | 0 / 17 | 0 / 0 | 0 / 17 | none | No native proposition box is admitted. |
 | formal notes | 0 / 0 | 0 / 12 | 0 / 12 | none | No native formal-note block is admitted. |
 | result box: corollary | 0 / 10 | 0 / 0 | 0 / 10 | none | No native corollary box is admitted. |
-| result box: remark | 0 / 10 | 0 / 0 | 0 / 10 | none | No native remark box is admitted. |
-| result box: insight | 0 / 9 | 0 / 0 | 0 / 9 | none | No native insight box is admitted. |
+| result box: remark | 0 / 10 | 0 / 0 | 0 / 10 | subset | A checked result-form slot carries a registered remark header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
+| result box: insight | 0 / 9 | 0 / 0 | 0 / 9 | subset | A checked result-form slot carries a registered insight header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`. |
 | lists | 0 / 4 | 0 / 2 | 0 / 6 | none | No native list block is admitted. |
 | result box: lemma | 0 / 3 | 0 / 0 | 0 / 3 | none | No native lemma box is admitted. |
 | result box: postulate | 0 / 3 | 0 / 0 | 0 / 3 | none | No native postulate box is admitted. |
@@ -216,8 +216,8 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 | `documents/paper/main.tex` | `06bf235acb58b61df74058a8411e6b64a84d2bed` |
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
 | `generated/documents/inclusions.tsv` | `16d838b66ce71b026ecec890a5098b5083615924` |
-| `tools/paper/native_coverage_capabilities.tsv` | `5e29398a51a75639d170462968df7539ae897c20` |
-| `tools/paper/native_coverage_slot_census.json` | `2293ed157eb0767dbf6046c5519b349aab9eac70` |
+| `tools/paper/native_coverage_capabilities.tsv` | `151b4b607b438d73ea4e69c342b5ddf2c0857e88` |
+| `tools/paper/native_coverage_slot_census.json` | `62386413744251b156dd206128395d81749d72a3` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |

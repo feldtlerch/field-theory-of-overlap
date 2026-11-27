@@ -60,3 +60,4 @@ Documents in this repository mint labels of the form `kind:area:slug` — a kind
 |053|Whole-corpus native import|accepted; diagnostic import precedes any native transfer; observed profile admissions require implemented consumers; bounded corpus-slot composition and its first comparison consumer are governed by 055|
 |054|Generated gap registers|accepted; qualifies 046's registered-check clause as replaced by 040 for canonical generation of the two gap registers while retaining reviewable diffs and release refusal|
 |055|Bounded corpus-slot composition|accepted; qualifies 043's unchanged-residual proof and extends M055, M077 and M079 for one checked ordered coarse slot|
+|056|Checked result containers in corpus composition|accepted; admits checked result-form corpus slots beside 055's heading form, qualifies the compared native support of 041 as qualified by 044, and amends M039, M041, M055, M063, M077 and M079; children remain independently admitted|

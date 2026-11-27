@@ -55,8 +55,13 @@ def input_paths(repo, captured=None):
         (path.relative_to(repo).as_posix()
          for path in (repo/'units/statements').glob('*.toml')),
         lambda file: read_text(repo/file))
+    results = result_header_requests(
+        (path.relative_to(repo).as_posix()
+         for path in (repo/'units/corpus').glob('*.toml')),
+        lambda file: read_text(repo/file))
     return sorted(set(INPUTS + CHECK_INPUTS + bibroute.INPUTS + sources) |
-                  {file for file, _, _ in native.values()})
+                  {file for file, _, _ in native.values()} |
+                  {file for file, _ in results.values()})
 
 
 def native_target_requests(files, read_text):
@@ -71,6 +76,29 @@ def native_target_requests(files, read_text):
         require(key is not None, 'M063: native target selector absent: '+selector)
         require(key not in targets, 'M063: native target has two unit owners: '+key)
         targets[key] = (file, unit['id'], selector)
+    return targets
+
+
+def result_header_requests(files, read_text):
+    """Select the checked corpus sources that request a registered result header."""
+    targets = {}
+    for file in sorted(files):
+        unit = tomllib.loads(read_text(file))['unit']
+        results = [block for block in unit['blocks'] if block['kind'] == 'result']
+        if not results:
+            continue
+        require(len(results) == len(unit['blocks']) == 1 and
+                unit['document'] == 'paper-pilot' and unit['composition'] == 'corpus-slot' and
+                unit['language'] == 'en', 'M063: result header owner differs: '+file)
+        key = results[0]['key']
+        selector = results[0].get('target')
+        declarations = unit.get('documentary-targets', {})
+        require(isinstance(selector, str) and len(declarations) == 1 and
+                declarations.get(selector) == key,
+                'M063: result header selector differs: '+file)
+        require(KEY.fullmatch(key) and key not in targets,
+                'M063: duplicate or malformed result header key: '+key)
+        targets[key] = (file, unit['id'])
     return targets
 
 
@@ -323,6 +351,41 @@ def assembly_json(repo):
     targets.sort(key=lambda row: row['key'])
     require({row['key'] for row in targets} == set(all_econ),
             'M063: native target inventory differs')
+    result_headers = []
+    requests = result_header_requests(
+        (path.relative_to(repo).as_posix()
+         for path in (repo/'units/corpus').glob('*.toml')),
+        lambda file: captured.read(repo/file))
+    heading_pattern = re.compile(r'\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop \{ ([^{}]+) \} \{ ([^{}]+) \}')
+    reverse_pattern = re.compile(r'\\prop_gput:Nnn \\g_ftoo_id_to_tag_prop \{ ([^{}]+) \} \{ ([^{}]+) \}')
+    headings = {}
+    reverse = {}
+    for match in heading_pattern.finditer(manifest):
+        require(match[1] not in headings, 'M063: duplicate result heading: '+match[1])
+        headings[match[1]] = (match[2], _site(source_file, manifest.count('\n', 0, match.start()) + 1))
+    for match in reverse_pattern.finditer(manifest):
+        require(match[1] not in reverse, 'M063: duplicate reverse paper tag: '+match[1])
+        reverse[match[1]] = (match[2], _site(source_file, manifest.count('\n', 0, match.start()) + 1))
+    for key, (file, unit_id) in sorted(requests.items()):
+        binding = rows.get(key)
+        require(binding is not None and binding['source_status'] == 'paper' and
+                binding['spelling'] == key, 'M063: result header is not a canonical paper key: '+key)
+        target = binding['target']
+        require(reverse.get(target, (None,))[0] == key and target in headings and
+                len(declarations.get(key, [])) == 1,
+                'M063: result header binding or heading differs: '+key)
+        title_source, heading_site = headings[target]
+        require(title_source.strip() and not any(char in title_source for char in '\\{}$%#\n\r'),
+                'M063: unsupported result heading: '+key)
+        title = title_source.replace('~', ' ')
+        unit_text = captured.read(repo/file)
+        sites = [number for number, line in enumerate(unit_text.splitlines(), 1)
+                 if re.fullmatch(r'key\s*=\s*"'+re.escape(key)+r'"', line)]
+        require(len(sites) == 1, 'M063: result header source site differs: '+key)
+        result_headers.append({'key': key, 'unit': unit_id, 'target': target,
+                               'title': title, 'tag_site': declarations[key][0],
+                               'reverse_site': reverse[target][1], 'heading_site': heading_site,
+                               'unit_site': _site(file, sites[0])})
     stock = captured.read_bytes(repo/'documents/paper/references.bib')
     derived = bibroute.derive_bytes(stock)
     result = {'schema': 2,
@@ -332,6 +395,7 @@ def assembly_json(repo):
               'virtues': virtues,
               'departures': departure_rows,
               'native_targets': targets,
+              'result_headers': result_headers,
               'bibliography': {'source': 'documents/paper/references.bib',
                                'stock_sha256': hashlib.sha256(stock).hexdigest(),
                                'derived_sha256': hashlib.sha256(derived).hexdigest(),

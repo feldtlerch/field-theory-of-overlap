@@ -102,18 +102,22 @@ fn line_start(bytes: &[u8], line: usize) -> Result<usize, String> {
 }
 
 fn selection(request: &Assignment, bytes: &[u8], before: bool) -> Result<(usize, usize), String> {
+    let result_form = request.blocks.len() == 1
+        && request.blocks[0].kind == "theorem-container"
+        && request.blocks[0].first == request.first
+        && request.blocks[0].last == request.last;
     if request.schema != 4
         || request.form != "coarse-slot"
         || request.first == 0
         || request.first > request.last
-        || request.blocks.len() < 2
-        || request.blocks[0].kind != "heading"
+        || (!result_form && request.blocks.len() < 2)
+        || (!result_form && request.blocks[0].kind != "heading")
         || request.blocks[0].first != request.first
         || request
             .blocks
             .last()
             .is_none_or(|block| block.last != request.last)
-        || !request.blocks.iter().any(|block| block.kind == "paragraph")
+        || (!result_form && !request.blocks.iter().any(|block| block.kind == "paragraph"))
         || request.blocks.iter().enumerate().any(|(index, block)| {
             block.first == 0
                 || block.first > block.last
@@ -726,6 +730,158 @@ fn after_blocks(
     Ok(blocks)
 }
 
+#[allow(clippy::too_many_lines)] // Each captured side has a distinct source owner.
+fn result_blocks(
+    root: &Path,
+    revision: &str,
+    request: &Assignment,
+    parent_bytes: &[u8],
+    parent_blob: &str,
+    before: bool,
+) -> Result<(Vec<Value>, Vec<Value>, Value), String> {
+    use ftoo_manifest::corpus::{BlockFields, ResultHeader, ResultPartKind};
+    let text = std::str::from_utf8(parent_bytes).map_err(|error| error.to_string())?;
+    let inclusions = input::import_inclusions(root).map_err(|error| error.to_string())?;
+    let markers = inclusions
+        .iter()
+        .filter(|row| row.source == request.source)
+        .map(|row| (row.unit.clone(), row.role.clone()))
+        .collect::<Vec<_>>();
+    let source = import_source(
+        &request.source,
+        parent_bytes,
+        digest(parent_bytes),
+        &markers,
+    )
+    .map_err(|error| error.to_string())?;
+    let (first, end) = selection(request, parent_bytes, true)?;
+    let selected: Vec<_> = source
+        .blocks
+        .iter()
+        .filter(|block| block.site.start_byte >= first && block.site.start_byte < end)
+        .collect();
+    let [draft] = selected.as_slice() else {
+        return Err("selected result is not one imported outer block".into());
+    };
+    if draft.status != BlockStatus::Decoded
+        || draft.kind != BlockKind::TheoremContainer
+        || draft.site.start_line != request.first
+        || draft.site.end_line > request.last
+    {
+        return Err("selected result differs from its imported interval".into());
+    }
+    let BlockFields::Result {
+        result_kind,
+        header: ResultHeader::Registered { key, .. },
+        grade,
+        parts,
+    } = &draft.fields
+    else {
+        return Err("selected result lacks a registered header".into());
+    };
+    let [child] = draft.children.as_slice() else {
+        return Err("selected result requires one admitted plain child".into());
+    };
+    if child.kind != BlockKind::Paragraph || child.status != BlockStatus::Decoded {
+        return Err("selected result child is not admitted plain prose".into());
+    }
+    let gap = parts
+        .iter()
+        .any(|part| part.kind == ResultPartKind::GradeGap);
+    if before {
+        let metadata = json!({"kind":result_kind.name(),"key":key,
+            "grade":grade.as_ref().map(|value| value.code.name()),"grade_gap":gap});
+        let start = child.site.start_byte;
+        let stop = child.site.end_byte;
+        let pieces = located_inline(&request.source, text, start, stop)?;
+        let (tokens, controls) = tokenize(&pieces, text)?;
+        let block = json!({"kind":"paragraph","index":0,
+            "origin":origin(&request.source,parent_blob,parent_bytes,start,stop,None),
+            "tokens":tokens,"controls":controls});
+        return Ok((
+            vec![block],
+            source_accounting(&source, first, end)?,
+            metadata,
+        ));
+    }
+    let units = crate::load_unit_files(root).map_err(|error| error.to_string())?;
+    let (slots, _) =
+        crate::documents::corpus::load(root, &units).map_err(|error| error.to_string())?;
+    let checked = slots
+        .get(&request.unit)
+        .ok_or("candidate result has no checked native owner")?;
+    if checked.document() != "paper-pilot" || checked.language() != "en" {
+        return Err("candidate result document or language differs".into());
+    }
+    check_transfer(
+        checked,
+        &source,
+        &request.source,
+        parent_bytes,
+        request.first,
+        request.last,
+    )
+    .map_err(|error| format!("parent result transfer refuses: {error}"))?;
+    let [
+        SlotBlock::Result {
+            kind,
+            key: native_key,
+            grade: native_grade,
+            grade_gap,
+            children,
+            ..
+        },
+    ] = checked.blocks()
+    else {
+        return Err("native result block differs".into());
+    };
+    if kind != result_kind
+        || native_key != key
+        || *native_grade != grade.as_ref().map(|value| value.code)
+        || *grade_gap != gap
+        || children.len() != 1
+    {
+        return Err("native result header or child count differs".into());
+    }
+    let metadata = json!({"kind":kind.name(),"key":native_key,
+        "grade":native_grade.as_ref().map(|value| value.name()),"grade_gap":grade_gap});
+    let slot_path = checked.source();
+    let (bytes, blob) = captured(root, revision, slot_path)?;
+    let native = std::str::from_utf8(&bytes).map_err(|error| error.to_string())?;
+    let tree = toml::parse(slot_path, native).map_err(|error| error.to_string())?;
+    let [node] = field(field(&tree, "unit")?, "blocks")?.elements.as_slice() else {
+        return Err("native result has more than one block".into());
+    };
+    let [child_node] = field(node, "children")?.elements.as_slice() else {
+        return Err("native result has more than one child".into());
+    };
+    let run_node = field(child_node, "runs")?;
+    let mut value = String::new();
+    for run in &run_node.elements {
+        native_text(run, native, &mut value)?;
+    }
+    let mut expected = String::new();
+    append_native_runs(&children[0], &mut expected);
+    if value != expected {
+        return Err("native result child locator differs from checked runs".into());
+    }
+    let (start, stop) = span(&run_node.site.anchor)?;
+    let (tokens, controls) = tokenize(&plain_pieces(&value, 0), &value)?;
+    let block = json!({"kind":"paragraph","index":0,
+        "origin":origin(slot_path,&blob,&bytes,start,stop,Some("unit.blocks[0].children[0].runs")),
+        "tokens":tokens,"controls":controls});
+    let (marker_start, marker_end) = selection(
+        request,
+        &fs::read(root.join(&request.source)).map_err(|error| error.to_string())?,
+        false,
+    )?;
+    Ok((
+        vec![block],
+        vec![json!({"kind":"block","range":[marker_start,marker_end]})],
+        metadata,
+    ))
+}
+
 /// Check that a selected native child retains the same authored bytes.
 fn unchanged_native_children(root: &Path, request: &Assignment) -> Result<(), String> {
     let units = crate::load_unit_files(root).map_err(|error| error.to_string())?;
@@ -760,6 +916,7 @@ fn unchanged_native_children(root: &Path, request: &Assignment) -> Result<(), St
 /// Export one captured side of a bounded ordered slot.
 /// # Errors
 /// Refuses changed source blobs, malformed assignments, unsupported syntax and ambiguous output paths.
+#[allow(clippy::too_many_lines)] // Both admitted slot forms share one capture boundary.
 pub fn export_correspondence(
     root: &Path,
     assignment: &Path,
@@ -776,7 +933,9 @@ pub fn export_correspondence(
     let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
     let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
         .map_err(|error| error.to_string())?;
-    if !request.source.starts_with("documents/paper/explainer/")
+    let result_form = request.blocks.len() == 1 && request.blocks[0].kind == "theorem-container";
+    if !(request.source.starts_with("documents/paper/explainer/")
+        || result_form && request.source.starts_with("documents/paper/parts/"))
         || !source_list.lines().any(|path| path == request.source)
     {
         return Err("assignment source is outside the declared explainer sources".into());
@@ -810,19 +969,35 @@ pub fn export_correspondence(
     }
     let (bytes, blob) = captured(root, revision, &request.source)?;
     let (first, end) = selection(&request, &bytes, side == "before")?;
-    let (blocks, accounting) = if side == "before" {
-        before_blocks(root, revision, &bytes, &blob, &request)?
+    let (blocks, accounting, result_metadata) = if result_form {
+        let parent_bytes = blob_bytes(root, &parent_blob)?;
+        let (blocks, accounting, metadata) = result_blocks(
+            root,
+            revision,
+            &request,
+            &parent_bytes,
+            &parent_blob,
+            side == "before",
+        )?;
+        (blocks, accounting, Some(metadata))
+    } else if side == "before" {
+        let (blocks, accounting) = before_blocks(root, revision, &bytes, &blob, &request)?;
+        (blocks, accounting, None)
     } else {
         unchanged_native_children(root, &request)?;
-        (
+        let (blocks, accounting) = (
             after_blocks(root, revision, &request, &blob_bytes(root, &parent_blob)?)?,
             vec![json!({"kind":"block","range":[first,end]})],
-        )
+        );
+        (blocks, accounting, None)
     };
     let selection = json!({"source":request.source,"first":request.first,"last":request.last,"unit":request.unit});
-    let result = json!({"schema":1,"side":side,"revision":revision,"selection":selection,
+    let mut result = json!({"schema":1,"side":side,"revision":revision,"selection":selection,
         "source-blob":blob,"source-sha256":digest(&bytes),
         "accounting":accounting,"blocks":blocks});
+    if let Some(metadata) = result_metadata {
+        result["result"] = metadata;
+    }
     if fs::read(root.join(&request.source)).map_err(|error| error.to_string())? != bytes {
         return Err("source changed during correspondence export".into());
     }
@@ -874,7 +1049,9 @@ pub(crate) fn recovery_selection(
     let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
     let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
         .map_err(|error| error.to_string())?;
-    if !request.source.starts_with("documents/paper/explainer/")
+    let result_form = request.blocks.len() == 1 && request.blocks[0].kind == "theorem-container";
+    if !(request.source.starts_with("documents/paper/explainer/")
+        || result_form && request.source.starts_with("documents/paper/parts/"))
         || !source_list.lines().any(|path| path == request.source)
     {
         return Err("assignment source is outside the declared explainer sources".into());

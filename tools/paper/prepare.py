@@ -91,8 +91,44 @@ def checked_paragraph_body(body, fragment, source, repository, auxiliary_keys):
     return b' '.join(body.split())
 
 
-def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys):
+def corpus_slot_bodies(data, unit, fragment, source, repository, auxiliary_keys,
+                       result_headers):
     """Check each ordered slot part and reuse paragraph checks for every child use."""
+    headers = [row for row in result_headers if row['unit'] == unit]
+    if headers:
+        require(len(headers) == 1, 'M055: Corpus result owner differs: '+fragment)
+        row = headers[0]
+        path = repository/row['unit_site']['file']
+        owner = tomllib.loads(read(path))['unit']
+        require(len(owner['blocks']) == 1 and owner['blocks'][0]['kind'] == 'result',
+                'M055: Corpus result owner differs: '+fragment)
+        block = owner['blocks'][0]
+        key = row['key']
+        require(block['key'] == key and block['result-kind'] in ('insight', 'remark', 'definition')
+                and owner['documentary-targets'].get(block['target']) == key,
+                'M055: Corpus result header differs: '+fragment)
+        require(key not in auxiliary_keys, 'M055: Duplicate auxiliary handle: '+key)
+        auxiliary_keys.add(key)
+        prefix = ('\\begin{'+block['result-kind']+'}[\\hdr{'+key+'}]').encode()
+        if 'grade' in block:
+            require(block['grade'] in ('nec', 'cont-anch', 'feas', 'cont-comm', 'cont'),
+                    'M055: Corpus result grade differs: '+fragment)
+            prefix += ('\\grade{'+block['grade']+'}').encode()
+        if block.get('grade-gap', False):
+            require('grade' in block, 'M055: Corpus result grade gap differs: '+fragment)
+            prefix += b'\\PaperGradeGap{-2pt}'
+        prefix += b'\n'
+        children = block['children']
+        require(children and all(child['kind'] == 'paragraph' and
+                                 len(child['runs']) == 1 and child['runs'][0]['kind'] == 'text'
+                                 for child in children),
+                'M055: Corpus result child differs: '+fragment)
+        printed = [child['runs'][0]['decoded'].replace('’', "'").replace('—', '---')
+                   for child in children]
+        body = b''.join(b'  '+text.encode()+b'\n' for text in printed)
+        expected = prefix+body+('\\end{'+block['result-kind']+'}\n').encode()
+        require(data == expected, 'M055: Corpus result fragment differs: '+fragment)
+        return [b' '.join(text.encode().split()) for text in printed], set()
     require(data.endswith(b'\\par\n') and b'\r' not in data and b'\0' not in data,
             'M055: Corpus slot body differs: '+fragment)
     parts = data[:-len(b'\\par\n')].rstrip(b'\n').split(b'\n\n')
@@ -147,7 +183,8 @@ def declared_fragments(repository, rows):
         data = (repository/fragment).read_bytes()
         if role == 'corpus-slot':
             slot_bodies, child_labels = corpus_slot_bodies(
-                data, unit, fragment, source, repository, auxiliary_keys)
+                data, unit, fragment, source, repository, auxiliary_keys,
+                bridge['result_headers'])
             paragraph_bodies.extend(slot_bodies)
             require(not child_use_labels.intersection(child_labels),
                     'M055: Corpus slot child occurs twice: '+fragment)

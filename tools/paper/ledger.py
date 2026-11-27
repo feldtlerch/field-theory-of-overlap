@@ -2,13 +2,14 @@
 import argparse
 import collections
 import hashlib
+import html
 import json
 import pathlib
 import posixpath
 import re
 import tomllib
 from common import read, require, timed, write
-from identities import CapturedInputs, bindings, virtue_roster
+from identities import CapturedInputs, assembly_json, bindings, virtue_roster
 from pdf_text import Pdf
 
 INPUTS = ['tools/paper/ledger.py', 'tools/paper/identities.py', 'tools/paper/pdf_text.py',
@@ -56,7 +57,7 @@ def auxiliary(path, job, unique_keys=()):
                 counts[m[1]] += 1
                 require(not (m[1].startswith('v:') and counts[m[1]] > 1),
                         'M064: duplicate virtue auxiliary definition: '+m[1])
-                result[m[1]] = {k:property_value(line,k) for k in ('default','page','anchor','title')}
+                result[m[1]] = {k:property_value(line,k) for k in ('default','page','anchor','title','zc@type')}
             include=re.match(r'\\@input\{([^}]+)\}',line)
             if include:
                 part=path/include[1]
@@ -188,6 +189,48 @@ def check_screen_economics(repo, paper_auxiliary, paper_pdf):
                 'M055: screen/PDF economics number or title differs: '+key)
         check_destination('main', key, target['anchor'], int(target['page']), paper_pdf.destination(target['anchor']))
     return targets
+
+
+def check_screen_results(repo, paper_auxiliary, paper_pdf, headers):
+    """Compare planned result headers with the independent typesetter evidence."""
+    screen = read(repo/'generated/documents/paper-pilot/en.labels.md')
+    inclusions = [line.split('\t') for line in
+                  read(repo/'generated/documents/inclusions.tsv').splitlines()]
+    by_unit = {unit: fragment for _,unit,fragment,role,_ in inclusions
+               if role == 'corpus-slot'}
+    keys = set()
+    for row in headers:
+        unit, key, title = row['unit'], row['key'], row['title']
+        require(key not in keys and unit in by_unit,
+                'M055: result header occurrence differs: '+key)
+        keys.add(key)
+        fragment = read(repo/by_unit[unit])
+        first = fragment.splitlines()[0]
+        match = re.fullmatch(r'\\begin\{(insight|remark|definition)\}\[\\hdr\{([^{}]+)\}\]'
+                             r'(?:\\grade\{(nec|feas|cont|cont-anch|cont-comm)\})?'
+                             r'(?:\\PaperGradeGap\{-2pt\})?',first)
+        require(match is not None and match[2] == key,
+                'M055: generated result header differs: '+key)
+        kind, _, grade = match.groups()
+        label = kind.capitalize()
+        style = '**' if kind == 'definition' else '*'
+        pattern = (r'<!-- unit '+re.escape(unit)+r' document paper-pilot language en -->\n'
+                   + re.escape(style)+re.escape(label)+r' ([0-9]+\.[0-9]+) '
+                   + r'\(([^\n]+)\)'+re.escape(style)+r' · '+re.escape(key)
+                   + (r' '+re.escape(grade) if grade else '')
+                   + r' <a id="result-[a-z0-9-]+"></a>')
+        matches = list(re.finditer(pattern, screen))
+        require(len(matches) == 1 and html.unescape(matches[0][2]) == title,
+                'M055: recovered result header differs: '+key)
+        target = paper_auxiliary.get(key)
+        expected_type = 'definition' if kind == 'definition' else 'remark'
+        require(target is not None and matches[0][1] == target['default']
+                and title == target['title'].replace('~',' ')
+                and expected_type == target['zc@type'] and target['page'] and target['anchor'],
+                'M055: result number, title or reference kind differs: '+key)
+        check_destination('main', key, target['anchor'], int(target['page']),
+                          paper_pdf.destination(target['anchor']))
+
 def check_paragraph_tag_modes(repo, rows):
     """Bind converted tags and handle placements to their authored source and shipped mode."""
     for row in (repo/'generated/documents/inclusions.tsv').read_text(encoding='utf-8').splitlines():
@@ -246,6 +289,7 @@ def check(repo, work):
     lookup = bindings(repo)
     captured = CapturedInputs(repo)
     virtues = {row['key']: row for row in virtue_roster(repo, lookup, captured)}
+    result_headers = json.loads(assembly_json(repo))['result_headers']
     captured.verify()
     native = native_virtue_plan(repo)
     native_seen = collections.Counter()
@@ -259,11 +303,13 @@ def check(repo, work):
         require(len(fields) == 5, 'M055: Inclusion row differs')
         body = (repo/fields[2]).read_bytes()
         auxiliary_keys.update(key.decode('ascii') for key in re.findall(rb'\\handle\{([^{}]+)\}', body))
+    auxiliary_keys.update(row['key'] for row in result_headers)
     aux = {job:auxiliary(paper,job, auxiliary_keys if job == 'main' else ()) for job in docs}
     check_auxiliary_destinations(auxiliary_keys, aux['main'], docs['main'])
     check_companion_mints(aux['main_explainer'], virtues)
     check_screen_references(repo,aux['main'],docs['main'])
     check_screen_economics(repo,aux['main'],docs['main'])
+    check_screen_results(repo,aux['main'],docs['main'],result_headers)
     rows=[]; issues=[]; observed=collections.Counter()
     known={v['spelling'].casefold() for v in lookup.values()}
     for job,pdf in docs.items():

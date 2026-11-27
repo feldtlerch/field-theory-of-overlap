@@ -3,7 +3,9 @@
 use crate::{UnitSource, units::toml};
 use ftoo_manifest::{
     RuleId, ShapeKind, UnitDiagnostic, UnitErrors, UnitFault, UnitSite, UnitStage,
-    corpus::{SlotBlock, SlotDraft, SlotRun, SlotStyle},
+    corpus::{
+        ResultGradeCode, ResultKind, SlotBlock, SlotDraft, SlotPaperMint, SlotRun, SlotStyle,
+    },
 };
 use toml::Node;
 #[cfg(test)]
@@ -132,10 +134,71 @@ fn block(node: &Node, text: &str) -> Result<SlotBlock, Box<UnitDiagnostic>> {
                 role: string(fields[2])?,
             })
         }
+        "result" => {
+            let mut keys = vec!["kind", "result-kind", "target", "key", "children"];
+            if node.fields.iter().any(|(name, _, _)| name == "grade") {
+                keys.push("grade");
+            }
+            if node.fields.iter().any(|(name, _, _)| name == "grade-gap") {
+                keys.push("grade-gap");
+            }
+            toml::fixed(node, &keys)?;
+            let kind_node = field(node, "result-kind")?;
+            let kind_name = string(kind_node)?;
+            let result_kind = ResultKind::from_name(&kind_name).ok_or_else(|| {
+                token(
+                    kind_node.site.clone(),
+                    kind_name,
+                    &["insight", "remark", "definition"],
+                )
+            })?;
+            let grade = node
+                .fields
+                .iter()
+                .find(|(name, _, _)| name == "grade")
+                .map(|(_, _, value)| {
+                    let name = string(value)?;
+                    ResultGradeCode::from_name(&name).ok_or_else(|| {
+                        token(
+                            value.site.clone(),
+                            name,
+                            &["nec", "cont-anch", "feas", "cont-comm", "cont"],
+                        )
+                    })
+                })
+                .transpose()?;
+            let grade_gap = node
+                .fields
+                .iter()
+                .find(|(name, _, _)| name == "grade-gap")
+                .map(|(_, _, value)| boolean(value, text))
+                .transpose()?
+                .unwrap_or(false);
+            let children = toml::typed(field(node, "children")?, ShapeKind::Array)?
+                .elements
+                .iter()
+                .map(|child| match block(child, text)? {
+                    SlotBlock::Paragraph { runs } => Ok(runs),
+                    _ => Err(token(
+                        child.site.clone(),
+                        "result child".into(),
+                        &["paragraph"],
+                    )),
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(SlotBlock::Result {
+                kind: result_kind,
+                target: string(field(node, "target")?)?,
+                key: string(field(node, "key")?)?,
+                grade,
+                grade_gap,
+                children,
+            })
+        }
         _ => Err(token(
             discriminator.site.clone(),
             kind,
-            &["heading", "paragraph", "use"],
+            &["heading", "paragraph", "use", "result"],
         )),
     }
 }
@@ -159,21 +222,52 @@ fn parse(source: &UnitSource) -> Result<SlotDraft, Box<UnitDiagnostic>> {
             },
         }));
     }
-    let fields = toml::fixed(
-        root[1],
-        &["id", "document", "composition", "language", "blocks"],
-    )?;
+    let mut keys = vec!["id", "document", "composition", "language", "blocks"];
+    if root[1]
+        .fields
+        .iter()
+        .any(|(key, _, _)| key == "documentary-targets")
+    {
+        keys.push("documentary-targets");
+    }
+    let fields = toml::fixed(root[1], &keys)?;
     let blocks = toml::typed(fields[4], ShapeKind::Array)?
         .elements
         .iter()
         .map(|node| block(node, text))
         .collect::<Result<Vec<_>, _>>()?;
+    let paper_mint = if let [SlotBlock::Result { target, key, .. }] = blocks.as_slice() {
+        let targets = field(root[1], "documentary-targets")?;
+        toml::typed(targets, ShapeKind::Table)?;
+        let [(_, _, value)] = targets.fields.as_slice() else {
+            return Err(token(
+                targets.site.clone(),
+                "documentary-targets".into(),
+                &["one target"],
+            ));
+        };
+        let declared = field(targets, target)?;
+        let declared_key = string(declared)?;
+        if !std::ptr::eq(value, declared) || declared_key != *key {
+            return Err(token(declared.site.clone(), declared_key, &[key]));
+        }
+        let result_node = &toml::typed(fields[4], ShapeKind::Array)?.elements[0];
+        Some(SlotPaperMint {
+            selector: target.clone(),
+            key: key.clone(),
+            declaration: declared.site.clone(),
+            placement: field(result_node, "target")?.site.clone(),
+        })
+    } else {
+        None
+    };
     Ok(SlotDraft {
         schema: 1,
         id: string(fields[0])?,
         document: string(fields[1])?,
         composition: string(fields[2])?,
         language: string(fields[3])?,
+        paper_mint,
         blocks,
     })
 }

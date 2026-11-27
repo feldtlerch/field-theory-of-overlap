@@ -414,6 +414,42 @@ fn render_with_paper_spans(plan: &DocumentPlan) -> (String, Vec<(Range<usize>, S
                 output.push_str("\n\n");
                 continue;
             }
+            if let Some(result) = &block.result {
+                let kind = match result.kind {
+                    ftoo_manifest::corpus::ResultKind::Insight => "Insight",
+                    ftoo_manifest::corpus::ResultKind::Remark => "Remark",
+                    ftoo_manifest::corpus::ResultKind::Definition => "Definition",
+                };
+                let header_start = output.len();
+                let style = if matches!(result.kind, ftoo_manifest::corpus::ResultKind::Definition)
+                {
+                    "**"
+                } else {
+                    "*"
+                };
+                write!(
+                    output,
+                    "{style}{kind} {} ({}){style} · {}{} <a id=\"{}\"></a>\n\n",
+                    result.number,
+                    text(&result.title),
+                    text(&result.key),
+                    result
+                        .grade
+                        .map_or_else(String::new, |grade| format!(" {}", grade.name())),
+                    result.fragment
+                )
+                .expect("string write");
+                let key_at = output[header_start..]
+                    .find(&text(&result.key))
+                    .expect("checked result key")
+                    + header_start;
+                paper_spans.push((key_at..key_at + text(&result.key).len(), result.key.clone()));
+                for child in &result.children {
+                    inline(&mut output, child);
+                    output.push_str("\n\n");
+                }
+                continue;
+            }
             if let Some(econ) = &block.econ {
                 output.push_str("<table>\n<tr>\n<td>\n");
                 let header_start = output.len();
@@ -831,6 +867,24 @@ pub(super) fn check_reader(
                     .econ
                     .as_ref()
                     .is_some_and(|econ| econ.fragment == fragment)
+            }) {
+                if reader.matches(&format!("id=\"{fragment}\"")).count() != 1 {
+                    return Err(role_failure(
+                        plan,
+                        false,
+                        start..end,
+                        AssemblyFault::InvalidPublicAnchor {
+                            fragment: fragment.into(),
+                        },
+                    ));
+                }
+                continue;
+            }
+            if plan.blocks.iter().any(|block| {
+                block
+                    .result
+                    .as_ref()
+                    .is_some_and(|result| result.fragment == fragment)
             }) {
                 if reader.matches(&format!("id=\"{fragment}\"")).count() != 1 {
                     return Err(role_failure(

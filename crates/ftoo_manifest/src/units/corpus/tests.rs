@@ -31,8 +31,11 @@ fn registered_results_decode_real_plain_children() {
         let path = format!("documents/paper/parts/{part}");
         let source = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../")
-                .join(&path),
+                .join("../../units/fixtures")
+                .join(format!(
+                    "result-{}-source.tex",
+                    if key == "f:pool" { "pool" } else { "modest" }
+                )),
         )
         .unwrap();
         let imported = import_source(&path, source.as_bytes(), "digest".into(), &[]).unwrap();

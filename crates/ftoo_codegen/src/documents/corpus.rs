@@ -126,6 +126,57 @@ pub(super) fn fragment(
             output.push('\n');
         }
         match child {
+            ftoo_manifest::corpus::SlotBlock::Result {
+                kind,
+                key,
+                grade,
+                grade_gap,
+                children,
+                ..
+            } => {
+                let Some(result) = &block.result else {
+                    return Err(failure(
+                        RuleId::M055,
+                        AssemblyStage::Emission,
+                        AssemblySite::Source(input::site(slot.source())),
+                        AssemblyFault::UnknownToken {
+                            value: key.clone(),
+                            expected: vec!["planned result".into()],
+                        },
+                    ));
+                };
+                if result.kind != *kind
+                    || result.key != *key
+                    || result.grade != *grade
+                    || result.grade_gap != *grade_gap
+                    || result.children.len() != children.len()
+                {
+                    return Err(failure(
+                        RuleId::M055,
+                        AssemblyStage::Emission,
+                        AssemblySite::Source(input::site(slot.source())),
+                        AssemblyFault::UnknownToken {
+                            value: key.clone(),
+                            expected: vec!["matching checked result fields".into()],
+                        },
+                    ));
+                }
+                write!(output, "\\begin{{{}}}[\\hdr{{{key}}}]", kind.name()).expect("string write");
+                if let Some(grade) = grade {
+                    write!(output, "\\grade{{{}}}", grade.name()).expect("string write");
+                }
+                if *grade_gap {
+                    output.push_str("\\PaperGradeGap{-2pt}");
+                }
+                output.push('\n');
+                for runs in children {
+                    output.push_str("  ");
+                    paper_runs(&mut output, runs);
+                    output.push('\n');
+                }
+                writeln!(output, "\\end{{{}}}", kind.name()).expect("string write");
+                return Ok(output);
+            }
             ftoo_manifest::corpus::SlotBlock::Heading { title, .. } => {
                 output.push_str("\\section{");
                 paper_runs(&mut output, title);

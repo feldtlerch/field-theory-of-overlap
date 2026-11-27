@@ -1030,6 +1030,74 @@ fn check_main(
             at += 1;
             continue;
         }
+        if let Some(result) = &block.result {
+            let section = element(
+                plan,
+                known,
+                body,
+                "section",
+                &[("class", "result"), ("id", &result.fragment)],
+                "HTML result section",
+            )?;
+            let [header, children @ ..] = section else {
+                return Err(mismatch(plan, "HTML result inventory"));
+            };
+            if children.len() != result.children.len() {
+                return Err(mismatch(plan, "HTML result child count"));
+            }
+            let header = element(plan, known, header, "header", &[], "HTML result header")?;
+            let [header] = header else {
+                return Err(mismatch(plan, "HTML result header inventory"));
+            };
+            let header = element(plan, known, header, "p", &[], "HTML result heading")?;
+            let [styled, key] = header else {
+                return Err(mismatch(plan, "HTML result heading inventory"));
+            };
+            let style = if matches!(result.kind, ftoo_manifest::corpus::ResultKind::Definition) {
+                "strong"
+            } else {
+                "em"
+            };
+            let styled = element(plan, known, styled, style, &[], "HTML result title")?;
+            text(
+                plan,
+                known,
+                styled,
+                &format!(
+                    "{} {} ({})",
+                    result.kind_label(),
+                    result.number,
+                    result.title
+                ),
+                "HTML result title and number",
+            )?;
+            let expected = format!(
+                " · {}{}",
+                result.key,
+                result
+                    .grade
+                    .map_or_else(String::new, |grade| format!(" {}", grade.name()))
+            );
+            let [Node::Text(actual)] = std::slice::from_ref(key) else {
+                return Err(mismatch(plan, "HTML result key"));
+            };
+            let begin = expected.find(&result.key).expect("checked result key");
+            public_run_text(
+                plan,
+                known,
+                actual,
+                std::slice::from_ref(&(begin..begin + result.key.len())),
+            )?;
+            if actual != &expected {
+                return Err(mismatch(plan, "HTML result key and grade"));
+            }
+            for (child, expected) in children.iter().zip(&result.children) {
+                let child = element(plan, known, child, "p", &[], "HTML result child")?;
+                runs(plan, known, expected, child, false, index, prepared)?;
+            }
+            at += 1;
+            continue;
+        }
         if let Some(econ) = &block.econ {
             let header_id = format!("{}-header", econ.fragment);
             let section = element(
@@ -1645,6 +1713,57 @@ pub(super) fn slot_html_text(
     let Some(Node::Element { children: main, .. }) = body.get(2) else {
         return Err(mismatch(plan, "HTML corpus recovery"));
     };
+    if let Some(result) = plan.blocks.iter().find_map(|block| {
+        (block.unit == slot.id())
+            .then_some(block.result.as_ref())
+            .flatten()
+    }) {
+        let section = main.iter().find(|node| matches!(node,
+            Node::Element { name, attributes, .. }
+                if name == "section" && attributes.iter().any(|(key, value)| key == "id" && value == &result.fragment)
+        )).ok_or_else(|| mismatch(plan, "HTML corpus result"))?;
+        let Node::Element { children, .. } = section else {
+            return Err(mismatch(plan, "HTML corpus result"));
+        };
+        let Some(Node::Element {
+            children: header, ..
+        }) = children.first()
+        else {
+            return Err(mismatch(plan, "HTML corpus result header"));
+        };
+        let heading = header
+            .first()
+            .and_then(slot_node_text)
+            .ok_or_else(|| mismatch(plan, "HTML corpus result header"))?;
+        let expected_heading = format!(
+            "{} {} ({}) · {}{}",
+            result.kind_label(),
+            result.number,
+            result.title,
+            result.key,
+            result
+                .grade
+                .map_or_else(String::new, |grade| format!(" {}", grade.name()))
+        );
+        if heading != expected_heading || children.len() != result.children.len() + 1 {
+            return Err(mismatch(plan, "HTML corpus result header"));
+        }
+        let mut parts = vec![
+            result.kind_label().to_owned(),
+            result.number.clone(),
+            result.title.clone(),
+            result.key.clone(),
+        ];
+        if let Some(grade) = result.grade {
+            parts.push(grade.name().into());
+        }
+        for child in &children[1..] {
+            parts.push(
+                slot_node_text(child).ok_or_else(|| mismatch(plan, "HTML corpus result child"))?,
+            );
+        }
+        return Ok(parts.join(" "));
+    }
     let fragment = super::plan::public_fragment(plan, &plan.blocks[0].site, slot.id())?;
     let start = main.iter().position(|node| matches!(node,
         Node::Element { name, attributes, .. } if name == "h2" && attributes == &[("id".into(), fragment.clone())]

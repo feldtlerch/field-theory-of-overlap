@@ -7,6 +7,7 @@ import hashlib
 import json
 import pathlib
 import re
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -15,7 +16,7 @@ import unicodedata
 
 from identities import (CHECK_INPUTS, INPUTS as BINDING_INPUTS,
                         CapturedInputs, bindings, input_paths, native_target_requests,
-                        virtue_roster)
+                        result_header_requests, virtue_roster)
 from inputs import inventory
 from meson_adapter import pdf_libraries
 from pdf_text import Pdf
@@ -410,6 +411,118 @@ def select_pdf_stretch(extracted, selection, decoded_blocks, document, side):
                              ranges=[proof['range'] for proof in proofs], proofs=proofs)
 
 
+def _result_rotation(extracted, body_start, expected, header_start, header_end,
+                     document, side):
+    """Prove one bounded two-line visual transposition from pinned rectangles."""
+    stream = extracted['stream']
+    raw = stream[body_start:body_start + len(expected)]
+    candidates = []
+
+    def ink(first, last):
+        positions = extracted['offsets'][first:last]
+        glyphs = [(page, extracted['raw_pages'][page - 1]['rectangles'][offset])
+                  for page, offset in positions]
+        glyphs = [(page, rect) for page, rect in glyphs if rect is not None]
+        if not glyphs or len({page for page, _ in glyphs}) != 1:
+            return None
+        ys = [rect[1] for _, rect in glyphs]
+        if max(ys) - min(ys) > 3:
+            return None
+        return glyphs[0][0], statistics.median(ys), min(rect[0] for _, rect in glyphs), max(rect[2] for _, rect in glyphs)
+
+    for cut in (match.start() for match in re.finditer(' ', expected)):
+        first, second = expected[:cut], expected[cut + 1:]
+        if not first or not second or raw != second + ' ' + first:
+            continue
+        second_ink = ink(body_start, body_start + len(second))
+        first_start = body_start + len(second) + 1
+        first_ink = ink(first_start, first_start + len(first))
+        header_ink = ink(header_start, header_end)
+        if (second_ink is None or first_ink is None or header_ink is None or
+                second_ink[0] != first_ink[0] or first_ink[0] != header_ink[0] or
+                not header_ink[1] <= first_ink[1] < second_ink[1] - 3 or
+                first_ink[2] <= header_ink[3]):
+            continue
+        candidates.append((first_start, body_start + len(expected)))
+    if len(candidates) != 1:
+        raise Fault('CorrespondenceInvalid',
+                    'result visual line order or bounded character accounting is ambiguous: '
+                    + str(len(candidates)) + ' candidates',
+                    'correspondence', document, side)
+    body_end = candidates[0][1]
+    last_page, last_offset = extracted['offsets'][body_end - 1]
+    last_rectangle = extracted['raw_pages'][last_page - 1]['rectangles'][last_offset]
+    following = body_end
+    while following < len(stream) and stream[following].isspace():
+        following += 1
+    if following < len(stream):
+        next_page, next_offset = extracted['offsets'][following]
+        next_rectangle = extracted['raw_pages'][next_page - 1]['rectangles'][next_offset]
+        if (next_page == last_page and last_rectangle is not None and
+                next_rectangle is not None and
+                abs(next_rectangle[1] - last_rectangle[1]) <= 3):
+            raise Fault('CorrespondenceInvalid',
+                        'result bounded region has an unaccounted glyph',
+                        'correspondence', document, side)
+    return body_end
+
+
+def select_result_pdf(extracted, selection, child, metadata, recovered, document, side):
+    """Corroborate one result header and child without changing the complete PDF stream."""
+    kind = metadata['kind'].capitalize()
+    key = metadata['key']
+    grade = metadata['grade']
+    body = child['semantic']
+    ending = ' ' + key + ((' ' + grade) if grade else '') + ' ' + body
+    if not recovered.startswith(kind + ' ') or not recovered.endswith(ending):
+        raise Fault('CorrespondenceInvalid', 'recovered result header or child differs',
+                    'correspondence', document, side)
+    middle = recovered[len(kind) + 1:-len(ending)]
+    number, separator, title = middle.partition(' ')
+    if not separator or not title or re.fullmatch(r'[0-9]+\.[0-9]+', number) is None:
+        raise Fault('CorrespondenceInvalid', 'result number or title differs',
+                    'correspondence', document, side)
+    printed = (kind + ' ' + number + ' (' + title + ') · ' + key.upper()
+               + ((' ' + grade.upper()) if grade else ''))
+    matches = list(re.finditer(re.escape(printed), extracted['stream']))
+    if len(matches) != 1:
+        raise Fault('CorrespondenceInvalid', 'result printed header is absent or ambiguous',
+                    'correspondence', document, side)
+    header = matches[0]
+    body_start = header.end() + 1
+    if extracted['stream'][header.end():body_start] != ' ':
+        raise Fault('CorrespondenceInvalid', 'result header/body boundary differs',
+                    'correspondence', document, side)
+    try:
+        child_proof = align_located(child, extracted, document, side)
+    except Fault as fault:
+        if fault.row['code'] != 'CorrespondenceInvalid':
+            raise
+        body_end = _result_rotation(extracted, body_start, child['extracted'],
+                                    header.start(), header.end(), document, side)
+        decisions = []
+        edits = []
+    else:
+        if child_proof['range'][0] != body_start:
+            raise Fault('CorrespondenceInvalid', 'result child does not follow its header',
+                        'correspondence', document, side)
+        body_end = child_proof['range'][1]
+        decisions = child_proof['decisions']
+        edits = child_proof['edits']
+    if any(row['normalized_offset'] >= header.start() and
+           row['normalized_offset'] < body_end and
+           not any(item['normalized_offset'] == row['normalized_offset']
+                   for item in decisions)
+           for row in line_events(extracted, document, side)):
+        raise Fault('LineEndUnresolved', 'result region has an undecided line end',
+                    'correspondence', document, side)
+    proof = dict(range=[header.start(), body_end], canonical=recovered,
+                 edits=edits, decisions=decisions)
+    return _CheckedPdfStream(text=recovered, coverage=True, scope=selection,
+                             range=proof['range'], aggregate=proof,
+                             ranges=[proof['range']], proofs=[proof])
+
+
 def coarse_slot_assignment(row, source_bytes):
     """Validate a bounded, ordered coarse-slot form against its parent blob.
 
@@ -453,10 +566,11 @@ def coarse_slot_assignment(row, source_bytes):
         raise Fault('AssignmentInvalid', 'coarse-slot interval is not fully accounted',
                     'request')
     kinds = [block['kind'] for block in row['blocks']]
-    if (len(kinds) < 2 or kinds[0] != 'heading' or
+    result_form = kinds == ['theorem-container']
+    if (not result_form and (len(kinds) < 2 or kinds[0] != 'heading' or
             'paragraph' not in kinds[1:] or
             any(kind not in ('paragraph', 'existing-native-inclusion')
-                for kind in kinds[1:])):
+                for kind in kinds[1:]))):
         raise Fault('AssignmentInvalid', 'coarse-slot child kinds differ', 'request')
     return row
 
@@ -498,9 +612,12 @@ def located_slot_export(data, captured, assignment, side, revision, nested_units
     """Bind the importer's located blocks to this side's captured source bytes."""
     row = _unique_json(data, 'CorrespondenceInvalid')
     selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
-    if (not isinstance(row, dict) or set(row) != {
+    result_form = len(assignment['blocks']) == 1 and assignment['blocks'][0]['kind'] == 'theorem-container'
+    expected_fields = {
             'schema', 'side', 'revision', 'selection', 'source-blob', 'source-sha256',
-            'blocks', 'accounting'} or type(row['schema']) is not int or row['schema'] != 1 or
+            'blocks', 'accounting'} | ({'result'} if result_form else set())
+    if (not isinstance(row, dict) or set(row) != expected_fields or
+            type(row['schema']) is not int or row['schema'] != 1 or
             row['side'] != side or row['revision'] != revision or
             row['selection'] != selection or
             not isinstance(row['blocks'], list) or
@@ -508,6 +625,18 @@ def located_slot_export(data, captured, assignment, side, revision, nested_units
         raise Fault('CorrespondenceInvalid', 'located slot identity or blocks differ',
                     'snapshot')
     inherited = captured.get(assignment['source'])
+    if result_form:
+        metadata = row['result']
+        if (not isinstance(metadata, dict) or set(metadata) != {
+                'kind', 'key', 'grade', 'grade_gap'} or
+                metadata['kind'] not in ('insight', 'remark', 'definition') or
+                not isinstance(metadata['key'], str) or not metadata['key'] or
+                metadata['grade'] not in (None, 'nec', 'cont-anch', 'feas',
+                                          'cont-comm', 'cont') or
+                type(metadata['grade_gap']) is not bool or
+                (metadata['grade_gap'] and metadata['grade'] is None)):
+            raise Fault('CorrespondenceInvalid', 'result header metadata differs',
+                        'snapshot')
     if (not isinstance(inherited, bytes) or
             row['source-sha256'] != digest(inherited) or
             row['source-blob'] != hashlib.sha1(
@@ -557,7 +686,8 @@ def located_slot_export(data, captured, assignment, side, revision, nested_units
         kind = selected['kind']
         if (not isinstance(block, dict) or set(block) != {
                 'kind', 'index', 'origin', 'tokens', 'controls'} or
-                block['kind'] != kind or type(block['index']) is not int or
+                block['kind'] != ('paragraph' if result_form else kind) or
+                type(block['index']) is not int or
                 block['index'] != ordinal or not isinstance(block['origin'], dict) or
                 set(block['origin']) != {'path', 'blob', 'sha256', 'range', 'field'} or
                 not isinstance(block['tokens'], list) or not block['tokens'] or
@@ -698,7 +828,8 @@ def located_slot_export(data, captured, assignment, side, revision, nested_units
                            token['semantic'] for index, token in enumerate(tokens))
         decoded.append(dict(tokens=tokens, source_bytes=source_bytes, base_offset=base,
                             source_controls=controls, extracted=extracted, semantic=semantic,
-                            origin=origin, kind=kind))
+                            origin=origin, kind=kind,
+                            result=row['result'] if result_form else None))
     if nested_units is not None and use_index != len(nested_units):
         raise Fault('CorrespondenceInvalid', 'located slot child owner differs', 'snapshot')
     if side == 'after' and (len(native_paths) != 1 or
@@ -889,10 +1020,21 @@ def compare_slot_streams(assignment, before_blocks, after_blocks, pdfs,
                          markdown, html, envelope):
     """Compare a selected ordered slot and both complete PDF streams."""
     selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
-    old = select_pdf_stretch(pdfs['explainer']['before'], selection, before_blocks,
-                             'explainer', 'before')
-    new = select_pdf_stretch(pdfs['explainer']['after'], selection, after_blocks,
-                             'explainer', 'after')
+    result_form = len(assignment['blocks']) == 1 and assignment['blocks'][0]['kind'] == 'theorem-container'
+    selected_document = 'paper' if result_form else 'explainer'
+    if result_form:
+        if before_blocks[0]['result'] != after_blocks[0]['result']:
+            raise Fault('CorrespondenceInvalid', 'result header changed across transfer',
+                        'correspondence')
+        old = select_result_pdf(pdfs['paper']['before'], selection, before_blocks[0],
+                                before_blocks[0]['result'], markdown['text'], 'paper', 'before')
+        new = select_result_pdf(pdfs['paper']['after'], selection, after_blocks[0],
+                                after_blocks[0]['result'], markdown['text'], 'paper', 'after')
+    else:
+        old = select_pdf_stretch(pdfs['explainer']['before'], selection, before_blocks,
+                                 'explainer', 'before')
+        new = select_pdf_stretch(pdfs['explainer']['after'], selection, after_blocks,
+                                 'explainer', 'after')
     if markdown['scope'] != selection or html['scope'] != selection:
         raise Fault('SelectionInvalid', 'screen source scope differs from slot',
                     'correspondence')
@@ -906,8 +1048,8 @@ def compare_slot_streams(assignment, before_blocks, after_blocks, pdfs,
         raise Fault('CorrespondenceInvalid', screens['reason'], 'correspondence')
     full = {}
     for document in ('paper', 'explainer'):
-        proofs_before = old['aggregate'] if document == 'explainer' else ()
-        proofs_after = new['aggregate'] if document == 'explainer' else ()
+        proofs_before = old['aggregate'] if document == selected_document else ()
+        proofs_after = new['aggregate'] if document == selected_document else ()
         full[document] = compare_pdf_streams(
             pdfs[document]['before'], pdfs[document]['after'],
             proofs_before, proofs_after, envelope, document)
@@ -1419,9 +1561,14 @@ def input_paths_from_parent(repo, commit):
                      'units/statements').decode('utf-8').splitlines()
     native = native_target_requests(
         unit_files, lambda file: git(repo, 'show', commit + ':' + file).decode('utf-8'))
+    corpus_files = git(repo, 'ls-tree', '-r', '--name-only', commit,
+                       'units/corpus').decode('utf-8').splitlines()
+    results = result_header_requests(
+        corpus_files, lambda file: git(repo, 'show', commit + ':' + file).decode('utf-8'))
     # These are validation reads of the current binding owner, not paper byte inputs.
     return (set(sources) | set(BINDING_INPUTS + CHECK_INPUTS + [source_list]) |
-            {file for file, _, _ in native.values()})
+            {file for file, _, _ in native.values()} |
+            {file for file, _ in results.values()})
 
 
 def parent_fragments(snapshot):

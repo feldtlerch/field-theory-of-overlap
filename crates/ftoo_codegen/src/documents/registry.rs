@@ -150,7 +150,19 @@ pub(crate) struct CheckedPaperLookup {
     inputs: BTreeMap<String, Vec<u8>>,
     departures: BTreeMap<String, String>,
     native_targets: BTreeMap<String, (String, PaperEvidenceSite)>,
+    result_headers: BTreeMap<String, ResultHeaderBinding>,
     derived_bibliography: String,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ResultHeaderBinding {
+    pub key: String,
+    pub unit: String,
+    pub target: String,
+    pub title: String,
+    pub tag_site: PaperEvidenceSite,
+    pub reverse_site: PaperEvidenceSite,
+    pub heading_site: PaperEvidenceSite,
+    pub unit_site: PaperEvidenceSite,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct VirtueBinding {
@@ -176,6 +188,48 @@ impl CheckedPaperLookup {
     #[must_use]
     pub(crate) fn native_target(&self, key: &str) -> Option<&(String, PaperEvidenceSite)> {
         self.native_targets.get(key)
+    }
+    #[must_use]
+    pub(crate) fn result_header(&self, key: &str) -> Option<&ResultHeaderBinding> {
+        self.result_headers.get(key)
+    }
+    pub(crate) fn validate_results(
+        &self,
+        slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
+    ) -> Result<(), PaperLookupError> {
+        let mut seen = BTreeSet::new();
+        for (id, slot) in slots {
+            let [ftoo_manifest::corpus::SlotBlock::Result { key, .. }] = slot.blocks() else {
+                continue;
+            };
+            let row = self
+                .result_header(key)
+                .ok_or_else(|| protocol(key, "result header row absent"))?;
+            let source = self
+                .inputs
+                .get(&row.unit_site.file)
+                .ok_or_else(|| protocol(key, "result unit source absent"))?;
+            let line = std::str::from_utf8(source)
+                .map_err(|_| protocol(key, "result unit source encoding"))?
+                .lines()
+                .nth(row.unit_site.line.saturating_sub(1));
+            if row.unit != *id
+                || row.unit_site.file != slot.source()
+                || line != Some(format!("key = \"{key}\"").as_str())
+                || !matches!(self.entries.get(key), Some(PaperResolution::Available(value))
+                    if value.key == *key && value.spelling == *key && value.target == row.target)
+                || !seen.insert(key)
+            {
+                return Err(protocol(key, "result header owner or binding differs"));
+            }
+        }
+        if seen.len() != self.result_headers.len() {
+            return Err(protocol(
+                "result_headers",
+                "result header row has no checked slot",
+            ));
+        }
+        Ok(())
     }
     #[must_use]
     pub(crate) fn derived_bibliography(&self) -> &str {
@@ -287,6 +341,7 @@ impl CheckedPaperLookup {
                 "virtues",
                 "departures",
                 "native_targets",
+                "result_headers",
                 "bibliography",
             ],
             "assembly-json",
@@ -493,8 +548,62 @@ impl CheckedPaperLookup {
                 return Err(protocol(key, "native target evidence differs"));
             }
         }
+        let mut result_headers = BTreeMap::new();
+        for row in array(top[6], "result_headers", 4096)? {
+            let values = fields(
+                row,
+                &[
+                    "key",
+                    "unit",
+                    "target",
+                    "title",
+                    "tag_site",
+                    "reverse_site",
+                    "heading_site",
+                    "unit_site",
+                ],
+                "result_headers",
+            )?;
+            let key = string(values[0], "result_headers.key")?;
+            let unit = string(values[1], "result_headers.unit")?;
+            let target = string(values[2], "result_headers.target")?;
+            let title = string(values[3], "result_headers.title")?;
+            let tag_site = evidence(values[4], "result_headers.tag_site")?;
+            let reverse_site = evidence(values[5], "result_headers.reverse_site")?;
+            let heading_site = evidence(values[6], "result_headers.heading_site")?;
+            let unit_site = evidence(values[7], "result_headers.unit_site")?;
+            if key.is_empty()
+                || unit.is_empty()
+                || target.is_empty()
+                || title.trim().is_empty()
+                || heading_site.file != "documents/paper/data/ftoo_manifest.tex"
+                || tag_site.file != heading_site.file
+                || reverse_site.file != heading_site.file
+                || !unit_site.file.starts_with("units/corpus/")
+                || std::path::Path::new(&unit_site.file).extension()
+                    != Some(std::ffi::OsStr::new("toml"))
+                || !inputs.contains_key(&unit_site.file)
+                || result_headers
+                    .insert(
+                        key.into(),
+                        ResultHeaderBinding {
+                            key: key.into(),
+                            unit: unit.into(),
+                            target: target.into(),
+                            title: title.into(),
+                            tag_site,
+                            reverse_site,
+                            heading_site,
+                            unit_site,
+                        },
+                    )
+                    .is_some()
+            {
+                return Err(protocol(key, "result header evidence differs"));
+            }
+        }
         let bibliography = fields(
-            top[6],
+            top[7],
             &["source", "stock_sha256", "derived_sha256", "derived_utf8"],
             "bibliography",
         )?;
@@ -519,6 +628,7 @@ impl CheckedPaperLookup {
             inputs,
             departures,
             native_targets,
+            result_headers,
             derived_bibliography: derived_bibliography.into(),
         })
     }

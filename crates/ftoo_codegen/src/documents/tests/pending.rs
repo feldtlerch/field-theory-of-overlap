@@ -58,6 +58,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site("block"),
         runs: vec![
             run("alias-first", vec![alias.clone(), one.clone()]),
@@ -87,6 +88,7 @@ fn pending_document_records_merge_symbols_and_alias_reasons_in_catalogue_order()
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: site(name),
                     runs: vec![run(name, vec![three.clone(), one.clone()])],
                 }],
@@ -273,6 +275,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![math(), plan::Inline::Text(" and ".into()), math()],
         };
@@ -294,6 +297,7 @@ pub(super) fn support_required_pending_paragraphs_are_complete_label_neutral_and
                             paragraph: false,
                             equation: false,
                             econ: None,
+                            result: None,
                             site: site.clone(),
                             runs: vec![math()],
                         }],

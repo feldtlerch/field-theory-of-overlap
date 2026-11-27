@@ -109,6 +109,7 @@ fn bibliography_main_document_requires_screen_at_citation_site() {
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![Inline::BibliographyCitation {
                 kind: BibliographyCitationKind::Parenthetical,
@@ -195,6 +196,7 @@ fn bibliography_paragraph_emphasis_refuses_doubled_dash() {
         paragraph: true,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![Inline::Styled {
             kind: StyleKind::Emphasis,
@@ -295,6 +297,7 @@ fn bibliography_latex_document_recovers_the_source_command_and_entry() {
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("See ".into()),
@@ -374,6 +377,7 @@ fn support_required_bibliography_latex_context_typesets() -> Result<(), Box<dyn 
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 Inline::Text("See ".into()),
@@ -467,6 +471,7 @@ fn context_graph(
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: runs(0, unit, "en", &welded, &BTreeMap::new(), "", None).unwrap(),
     };
@@ -2027,6 +2032,7 @@ fn display_citation_sites_count_mentions_across_regions_and_languages() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![Inline::Text("Caption.".into())],
             pending_names: BTreeMap::new(),

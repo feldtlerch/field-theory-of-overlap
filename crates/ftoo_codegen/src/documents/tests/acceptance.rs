@@ -92,6 +92,7 @@ fn support_required_paper_context_paragraph() -> Result<(), Box<dyn std::error::
         paragraph: true,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("one—-two".into())],
     };
@@ -224,6 +225,7 @@ fn paper_paragraph_refuses_object_bound_mathematics_at_its_use() {
         paragraph: true,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Math {
             definition_site: site.clone(),
@@ -264,6 +266,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
             paragraph: true,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![plan::Inline::Math {
                 definition_site: site.clone(),
@@ -288,6 +291,7 @@ fn paper_paragraph_native_command_set_agrees_at_shape_and_emission() {
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: site.clone(),
                     runs: vec![plan::Inline::Text("Heading".into())],
                 },
@@ -1532,6 +1536,7 @@ fn runtime_refusal_localizes_one_authored_occurrence() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: input::site("units/statements/fixture.toml"),
             runs: vec![
                 plan::Inline::Text("Before ".into()),
@@ -1620,6 +1625,7 @@ fn independent_emission_compares_complete_ordered_blocks() {
                 paragraph: false,
                 equation: false,
                 econ: None,
+                result: None,
                 site: input::site(&format!("units/statements/{name}.toml")),
                 runs: vec![plan::Inline::Text(name.to_uppercase())],
             })
@@ -1746,6 +1752,7 @@ fn emission_retains_distinct_math_keys_with_identical_renderings() {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: input::site("units/statements/fixture.toml"),
             runs: ["first", "second", "first"]
                 .into_iter()
@@ -1795,6 +1802,7 @@ fn independent_emission_has_exact_omitted_repeated_swapped_and_changed_use_recor
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![
                 plan::Inline::Tag {
@@ -2143,6 +2151,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: input::site("units/statements/fixture.toml"),
                     runs: vec![plan::Inline::Tag {
                         handle: handle.into(),
@@ -2161,6 +2170,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: origin.clone(),
                     runs: std::mem::take(&mut plan.blocks[0].runs),
                     displays: BTreeMap::new(),
@@ -2174,6 +2184,7 @@ pub(super) fn support_required_native_lifecycle_tables_reject_at_prose_and_displ
                     paragraph: false,
                     equation: false,
                     econ: None,
+                    result: None,
                     site: input::site("units/displays/fixture.toml"),
                     runs: vec![plan::Inline::Text("Cell.".into())],
                     displays: BTreeMap::new(),

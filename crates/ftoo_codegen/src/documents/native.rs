@@ -1170,6 +1170,104 @@ mod inherited_sweep_tests {
     }
 
     #[test]
+    fn support_required_compared_result_header_typesets_in_native_context() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let support = NativeSupport::from_environment(&root).unwrap();
+        let lock = native_support::lock(&root).unwrap();
+        let graph = ftoo_manifest::seed().unwrap();
+        let book = ftoo_manifest::addressing(&graph).unwrap();
+        let catalogue = ftoo_manifest::notation(&book).unwrap();
+        let notation = crate::prepare_notation(&catalogue).unwrap();
+        let symbols =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[0]))
+                .unwrap();
+        let historical =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[1]))
+                .unwrap();
+        let registers =
+            fs::read_to_string(root.join(super::super::inherited_support::COMPARED_PATHS[2]))
+                .unwrap();
+        let typed_tools =
+            fs::read_to_string(root.join(super::super::inherited_support::TYPED_PATH)).unwrap();
+        let macros_overlap =
+            fs::read_to_string(root.join(super::super::inherited_support::MACROS_PATH)).unwrap();
+        let manifest =
+            fs::read_to_string(root.join("documents/paper/data/ftoo_manifest.tex")).unwrap();
+        let target = "sem:claim:witness-pooling-principle";
+        let key = "f:pool";
+        let located = |line: &str| ftoo_manifest::PaperEvidenceSite {
+            file: "documents/paper/data/ftoo_manifest.tex".into(),
+            line: manifest
+                .lines()
+                .position(|candidate| candidate == line)
+                .unwrap()
+                + 1,
+        };
+        let row = super::super::registry::ResultHeaderBinding {
+            key: key.into(),
+            unit: "result:f:pool".into(),
+            target: target.into(),
+            title: "Coherence pools, independence weighs".into(),
+            tag_site: located(&format!(
+                "\\prop_gput:Nnn \\g_ftoo_tag_to_id_prop {{ {key} }} {{ {target} }}"
+            )),
+            reverse_site: located(&format!(
+                "\\prop_gput:Nnn \\g_ftoo_id_to_tag_prop {{ {target} }} {{ {key} }}"
+            )),
+            heading_site: located(&format!(
+                "\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop {{ {target} }} {{ Coherence~pools,~independence~weighs }}"
+            )),
+            unit_site: ftoo_manifest::PaperEvidenceSite {
+                file: "units/corpus/result-pool.toml".into(),
+                line: 1,
+            },
+        };
+        let module = super::super::inherited_support::generate(
+            &catalogue,
+            super::super::inherited_support::Sources {
+                symbols: &symbols,
+                historical: &historical,
+                registers: &registers,
+                typed_tools: &typed_tools,
+                macros_overlap: &macros_overlap,
+                manifest: &manifest,
+                compat: include_str!("../../../../documents/paper-build/compat.tex"),
+                layout: include_str!("../../../../documents/paper-build/reader-hooks.tex"),
+            },
+            &[&row],
+        )
+        .unwrap();
+        let addressing = fs::read_to_string(root.join("generated/addressing.tex")).unwrap();
+        let source = format!(
+            "{}\\section{{Test}}\n\\begin{{insight}}[\\hdr{{f:pool}}]\\grade{{cont-anch}} Coherence pools the value; independence supplies the weight.\\end{{insight}}\n\\end{{document}}\n",
+            super::super::latex::start("assembly-sweep", "en"),
+        );
+        support.set_inherited(module.as_bytes(), typed_tools.as_bytes());
+        let result = consume(
+            &support,
+            &lock,
+            &source,
+            notation.declarations(),
+            &addressing,
+            NativeCase::Document {
+                document: "paper-pilot".into(),
+                language: "en".into(),
+            },
+            vec![],
+        );
+        if let Err(super::super::diagnostics::DocumentError::Assembly(errors)) = &result {
+            for row in errors.diagnostics() {
+                if let super::super::diagnostics::AssemblyFault::NativeRejected { log, .. } =
+                    &row.fault
+                {
+                    panic!("{}", String::from_utf8_lossy(log));
+                }
+            }
+        }
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
     fn support_required_missing_inherited_native_declaration_refuses_with_strict_screen_intact() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let support = NativeSupport::from_environment(&root).unwrap();
@@ -1205,7 +1303,11 @@ mod inherited_sweep_tests {
                 registers: &registers,
                 typed_tools: &typed_tools,
                 macros_overlap: &macros_overlap,
+                manifest: "",
+                compat: "",
+                layout: "",
             },
+            &[],
         )
         .unwrap();
         let addressing = fs::read_to_string(root.join("generated/addressing.tex")).unwrap();

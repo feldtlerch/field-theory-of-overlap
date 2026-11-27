@@ -6,6 +6,12 @@ use ftoo_manifest::{
 
 const TYPED_TOOLS: &str = include_str!("../../../../documents/paper/ftoo_typed_tools.tex");
 const MACROS_OVERLAP: &str = include_str!("../../../../documents/paper/macros_overlap.tex");
+const COMPAT: &str = include_str!("../../../../documents/paper-build/compat.tex");
+const LAYOUT: &str = include_str!("../../../../documents/paper-build/reader-hooks.tex");
+#[must_use]
+pub(super) fn compared_macros() -> &'static str {
+    MACROS_OVERLAP
+}
 const PREDECESSORS: &str = "\\NewDocumentCommand{\\grade}{m}\n  { {\\normalfont\\footnotesize\\textsc{#1}}\\quad }\n\\NewCommandCopy{\\secgrade}{\\grade}\n\\NewDocumentCommand{\\gradeword}{m}{ \\textsc{#1} }\n";
 pub(super) const PATH: &str = "generated/native-paper-support.tex";
 pub(super) const TYPED_PATH: &str = "documents/paper/ftoo_typed_tools.tex";
@@ -23,18 +29,122 @@ pub(super) struct Sources<'a> {
     pub registers: &'a str,
     pub typed_tools: &'a str,
     pub macros_overlap: &'a str,
+    pub manifest: &'a str,
+    pub compat: &'a str,
+    pub layout: &'a str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Refusal {
     ChangedSource(&'static str),
     MissingPrecondition(&'static str),
+    InvalidResultHeader(String),
+}
+
+fn source_line<'a>(source: &'a str, site: &ftoo_manifest::PaperEvidenceSite) -> Option<&'a str> {
+    source.lines().nth(site.line.checked_sub(1)?)
+}
+
+fn result_support(
+    macros: &str,
+    manifest: &str,
+    compat: &str,
+    headers: &[&super::registry::ResultHeaderBinding],
+) -> Result<String, Refusal> {
+    use std::fmt::Write as _;
+    let start = macros
+        .find("\\NewDocumentCommand{\\ftoolabel}{m}")
+        .ok_or(Refusal::MissingPrecondition("result header closure"))?;
+    let end = macros
+        .find("\\numberwithin{equation}{section}")
+        .ok_or(Refusal::MissingPrecondition("result header closure"))?;
+    let variant = compat
+        .lines()
+        .find(|line| {
+            line.trim_start()
+                .starts_with("\\cs_if_exist:NF \\tl_set:Ne")
+        })
+        .ok_or(Refusal::MissingPrecondition("result compatibility variant"))?;
+    let mut output = format!("{variant}\n");
+    output.push_str(&macros[start..end]);
+    for prefix in [
+        "\\cs_new_protected:Npn \\ftoo_tagfont:n ",
+        "\\NewDocumentCommand{\\ftootagsep}",
+    ] {
+        let line = macros
+            .lines()
+            .find(|line| line.starts_with(prefix))
+            .ok_or(Refusal::MissingPrecondition("result tag presentation"))?;
+        writeln!(output, "{line}").expect("string write");
+    }
+    for row in headers {
+        let lines = [
+            (
+                &row.tag_site,
+                format!(
+                    "\\prop_gput:Nnn \\g_ftoo_tag_to_id_prop {{ {} }} {{ {} }}",
+                    row_key(row),
+                    row.target
+                ),
+            ),
+            (
+                &row.reverse_site,
+                format!(
+                    "\\prop_gput:Nnn \\g_ftoo_id_to_tag_prop {{ {} }} {{ {} }}",
+                    row.target,
+                    row_key(row)
+                ),
+            ),
+        ];
+        for (site, expected) in lines {
+            let line = source_line(manifest, site)
+                .ok_or_else(|| Refusal::InvalidResultHeader(row.unit.clone()))?;
+            if line != expected {
+                return Err(Refusal::InvalidResultHeader(row.unit.clone()));
+            }
+            writeln!(output, "{line}").expect("string write");
+        }
+        let heading = source_line(manifest, &row.heading_site)
+            .ok_or_else(|| Refusal::InvalidResultHeader(row.unit.clone()))?;
+        let prefix = format!(
+            "\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop {{ {} }} {{ ",
+            row.target
+        );
+        let value = heading
+            .strip_prefix(&prefix)
+            .and_then(|value| value.strip_suffix(" }"))
+            .ok_or_else(|| Refusal::InvalidResultHeader(row.unit.clone()))?;
+        if value.replace('~', " ") != row.title {
+            return Err(Refusal::InvalidResultHeader(row.unit.clone()));
+        }
+        writeln!(output, "{heading}").expect("string write");
+    }
+    Ok(output)
+}
+
+fn row_key(row: &super::registry::ResultHeaderBinding) -> &str {
+    row.key.as_str()
+}
+
+fn result_compat_preamble(source: &str) -> Result<&str, Refusal> {
+    let start = source
+        .find("\\makeatletter\n\\ExplSyntaxOn\n\\AddToHook{package/zref-clever/after}{")
+        .ok_or(Refusal::MissingPrecondition(
+            "result reference type compatibility",
+        ))?;
+    let tail = &source[start..];
+    let closing = "\\ExplSyntaxOff\n\\makeatother\n";
+    let end = tail.find(closing).ok_or(Refusal::MissingPrecondition(
+        "result reference type compatibility",
+    ))? + closing.len();
+    Ok(&tail[..end])
 }
 
 /// A checked catalogue has already admitted these exact source declarations under M078.
 pub(super) fn generate(
     _notation: &CheckedNotation<'_, '_>,
     sources: Sources<'_>,
+    headers: &[&super::registry::ResultHeaderBinding],
 ) -> Result<String, Refusal> {
     if !sources.macros_overlap.contains(PREDECESSORS) {
         return Err(Refusal::MissingPrecondition("grade definitions"));
@@ -56,7 +166,18 @@ pub(super) fn generate(
             return Err(Refusal::ChangedSource(path));
         }
     }
-    let mut output = String::from("\\ExplSyntaxOn\n");
+    let mut output = String::new();
+    if !headers.is_empty() {
+        if sources.compat != COMPAT {
+            return Err(Refusal::ChangedSource("compat.tex"));
+        }
+        if sources.layout != LAYOUT {
+            return Err(Refusal::ChangedSource("reader-hooks.tex"));
+        }
+        output.push_str(result_compat_preamble(sources.compat)?);
+        output.push_str("\\RequirePackage{amsthm}\n\\RequirePackage{hyperref}\n\\RequirePackage{zref-clever}\n\\RequirePackage{zref-titleref}\n");
+    }
+    output.push_str("\\ExplSyntaxOn\n");
     output.push_str(PREDECESSORS);
     output.push_str("\\input{ftoo_typed_tools.tex}\n");
     for (_, declaration) in INHERITED_SOURCE_DECLARATIONS {
@@ -66,6 +187,21 @@ pub(super) fn generate(
         output.push_str(&declaration);
     }
     output.push_str(INHERITED_VARIANCE_DECLARATION);
+    if !headers.is_empty() {
+        output.push_str(&result_support(
+            sources.macros_overlap,
+            sources.manifest,
+            sources.compat,
+            headers,
+        )?);
+        let grade_gap = sources
+            .layout
+            .lines()
+            .find(|line| line.starts_with("\\NewDocumentCommand\\PaperGradeGap{m}{"))
+            .ok_or(Refusal::MissingPrecondition("result grade gap"))?;
+        output.push_str(grade_gap);
+        output.push('\n');
+    }
     output.push_str("\\ExplSyntaxOff\n");
     Ok(output)
 }
@@ -74,6 +210,49 @@ pub(super) fn generate(
 mod tests {
     use super::*;
 
+    #[test]
+    fn result_header_support_uses_the_compared_source_lines() {
+        let manifest = include_str!("../../../../documents/paper/data/ftoo_manifest.tex");
+        let target = "sem:claim:witness-pooling-principle";
+        let key = "f:pool";
+        let located = |line: &str| ftoo_manifest::PaperEvidenceSite {
+            file: "documents/paper/data/ftoo_manifest.tex".into(),
+            line: manifest
+                .lines()
+                .position(|candidate| candidate == line)
+                .unwrap()
+                + 1,
+        };
+        let tag = format!("\\prop_gput:Nnn \\g_ftoo_tag_to_id_prop {{ {key} }} {{ {target} }}");
+        let reverse = format!("\\prop_gput:Nnn \\g_ftoo_id_to_tag_prop {{ {target} }} {{ {key} }}");
+        let heading = format!(
+            "\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop {{ {target} }} {{ Coherence~pools,~independence~weighs }}"
+        );
+        let row = super::super::registry::ResultHeaderBinding {
+            key: key.into(),
+            unit: "result:f:pool".into(),
+            target: target.into(),
+            title: "Coherence pools, independence weighs".into(),
+            tag_site: located(&tag),
+            reverse_site: located(&reverse),
+            heading_site: located(&heading),
+            unit_site: ftoo_manifest::PaperEvidenceSite {
+                file: "units/corpus/result-pool.toml".into(),
+                line: 1,
+            },
+        };
+        let module = result_support(MACROS_OVERLAP, manifest, COMPAT, &[&row]).unwrap();
+        assert!(module.contains("\\newtheorem{insight}[theorem]{Insight}"));
+        assert!(module.contains(&tag));
+        assert!(module.contains(&reverse));
+        assert!(module.contains(&heading));
+        let changed = manifest.replacen(&heading, "\\prop_gput:Nnn \\g_ftoo_id_to_heading_prop { sem:claim:witness-pooling-principle } { Changed }", 1);
+        assert_eq!(
+            result_support(MACROS_OVERLAP, &changed, COMPAT, &[&row]),
+            Err(Refusal::InvalidResultHeader(row.unit))
+        );
+    }
+
     fn sources() -> Sources<'static> {
         Sources {
             symbols: INHERITED_SOURCE_FILES[0].1,
@@ -81,6 +260,9 @@ mod tests {
             registers: INHERITED_SOURCE_FILES[2].1,
             typed_tools: TYPED_TOOLS,
             macros_overlap: MACROS_OVERLAP,
+            manifest: "",
+            compat: "",
+            layout: "",
         }
     }
 
@@ -89,7 +271,7 @@ mod tests {
         let graph = ftoo_manifest::seed().unwrap();
         let book = ftoo_manifest::addressing(&graph).unwrap();
         let notation = ftoo_manifest::notation(&book).unwrap();
-        let output = generate(&notation, sources()).unwrap();
+        let output = generate(&notation, sources(), &[]).unwrap();
         let mut expected = String::from(concat!(
             "\\ExplSyntaxOn\n",
             "\\NewDocumentCommand{\\grade}{m}\n  { {\\normalfont\\footnotesize\\textsc{#1}}\\quad }\n",
@@ -131,7 +313,8 @@ mod tests {
                 Sources {
                     symbols: &changed,
                     ..sources()
-                }
+                },
+                &[]
             ),
             Err(Refusal::ChangedSource("ftoo_symbols.tex"))
         );
@@ -145,7 +328,8 @@ mod tests {
                 Sources {
                     symbols: &duplicate,
                     ..sources()
-                }
+                },
+                &[]
             ),
             Err(Refusal::ChangedSource("ftoo_symbols.tex"))
         );
@@ -157,7 +341,8 @@ mod tests {
                 Sources {
                     macros_overlap: &missing,
                     ..sources()
-                }
+                },
+                &[]
             ),
             Err(Refusal::MissingPrecondition("grade definitions"))
         );
@@ -173,7 +358,8 @@ mod tests {
                 Sources {
                     typed_tools: &changed_tools,
                     ..sources()
-                }
+                },
+                &[]
             ),
             Err(Refusal::ChangedSource("ftoo_typed_tools.tex"))
         );

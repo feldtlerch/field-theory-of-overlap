@@ -1,0 +1,18 @@
+schema = 1
+
+[unit]
+id = "result:f:pool"
+document = "paper-pilot"
+composition = "corpus-slot"
+language = "en"
+
+[unit.documentary-targets]
+header = "f:pool"
+
+[[unit.blocks]]
+kind = "result"
+result-kind = "insight"
+target = "header"
+key = "f:pool"
+grade = "cont-anch"
+children = [{ kind = "paragraph", runs = [{ kind = "text", decoded = "Coherence pools the value; independence supplies the weight." }] }]

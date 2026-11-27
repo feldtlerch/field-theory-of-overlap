@@ -1,5 +1,6 @@
 """Controls for checked inclusions and source markers."""
 import pathlib
+import json
 import shutil
 import subprocess
 import sys
@@ -243,7 +244,8 @@ class CorpusSlotPreparation(unittest.TestCase):
             source_file.write_bytes(b'% generated: sec:explainer:plain\n')
             output_file.write_bytes(body)
             inclusion.write_text(f'{source}\t{unit}\t{fragment}\tcorpus-slot\t1\n')
-            with patch('prepare.assembly_json', return_value=b'{"native_targets":[]}'), \
+            with patch('prepare.assembly_json',
+                       return_value=b'{"native_targets":[],"result_headers":[]}'), \
                     patch('prepare.bindings', return_value={}):
                 self.assertEqual(scope_fragments(root)[0][3], 'corpus-slot')
                 self.assertEqual(declared_fragments(root, [source])[(source, 1)], body)
@@ -277,6 +279,31 @@ class CorpusSlotPreparation(unittest.TestCase):
                     declared_fragments(root, [source])
                 source_file.write_bytes(b'% generated: sec:explainer:plain\n' * 2)
                 with self.assertRaisesRegex(ValueError, 'Fragment marker/declaration differs'):
+                    declared_fragments(root, [source])
+
+    def test_result_authored_duplicate_uses_printed_spelling(self):
+        repository = pathlib.Path(__file__).resolve().parents[2]
+        source = 'documents/paper/parts/partC.tex'
+        unit = 'result:nrm:modest'
+        fragment = 'generated/documents/paper-pilot/result-nrm-modest.tex'
+        unit_path = 'units/corpus/result-modest.toml'
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for name in (source, fragment, unit_path):
+                (root/name).parent.mkdir(parents=True, exist_ok=True)
+            (root/fragment).write_bytes(
+                b'\\begin{definition}[\\hdr{nrm:modest}]\\grade{nec}\\PaperGradeGap{-2pt}\n'
+                b"  The known modest-good corner is the local, presently legible beneficiary-good region in which another's gain is read by that beneficiary's own measure and enlargement requires neither speculative surplus nor distant witnessing.\n"
+                b'\\end{definition}\n')
+            (root/unit_path).write_bytes((repository/'units/fixtures/result-modest.toml').read_bytes())
+            printed = (root/fragment).read_bytes().splitlines()[1].strip()
+            (root/source).write_bytes(('% generated: '+unit+'\n').encode()+printed+b'\n')
+            bridge = dict(native_targets=[], result_headers=[
+                dict(unit=unit, key='nrm:modest', unit_site=dict(file=unit_path))])
+            with patch('prepare.scope_fragments', return_value=[
+                    (source, unit, fragment, 'corpus-slot', 1)]), \
+                    patch('prepare.assembly_json', return_value=json.dumps(bridge).encode()):
+                with self.assertRaisesRegex(ValueError, 'Authored paragraph duplicates'):
                     declared_fragments(root, [source])
 
 

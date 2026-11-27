@@ -16,14 +16,14 @@ lists	none	No native list block is admitted.
 paragraphs	subset	Tagged paragraph units and bounded explainer corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`.
 refrains or quoted refrains	subset	Selected plain refrain units have a native route; M055.
 result box: corollary	none	No native corollary box is admitted.
-result box: definition	none	No native definition box is admitted.
+result box: definition	subset	A checked result-form slot carries a registered definition header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`.
 result box: econ	subset	The coda box's text and one parenthetical citation form; `dec:documents:native-econ`.
 result box: epist	none	No native epistemology box is admitted.
-result box: insight	none	No native insight box is admitted.
+result box: insight	subset	A checked result-form slot carries a registered insight header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`.
 result box: lemma	none	No native lemma box is admitted.
 result box: postulate	none	No native postulate box is admitted.
 result box: proposition	none	No native proposition box is admitted.
-result box: remark	none	No native remark box is admitted.
+result box: remark	subset	A checked result-form slot carries a registered remark header, its actual optional grade and admitted gap, and one plain paragraph child; `dec:documents:checked-result-containers`.
 result box: statement	none	No native statement box is admitted.
 result box: theorem	none	No native theorem box is admitted.
 tables	subset	A native display table exists outside the body inclusions; M055.

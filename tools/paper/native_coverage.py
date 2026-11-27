@@ -491,6 +491,7 @@ def measure(root):
         if document in {"paper", "all"}:
             counts.update(composition)
         things[document] = counts
+    check_native_routes(capabilities, things["all"])
     rows = [row for document, files in documents.items() for source in files
             for row in paragraph_rows(document, source, root, inclusions)]
     roles = marker_roles(root)
@@ -504,6 +505,12 @@ def measure(root):
                 raise ValueError(f"paragraph count differs: {document}: {origin}: {expected} != {actual}")
     census = load_slot_census(root)
     return coverage, things, capabilities, rows, form_capabilities, census
+
+
+def check_native_routes(capabilities, counts):
+    for kind, (status, _) in capabilities.items():
+        if status == "none" and counts[("native", kind)]:
+            raise ValueError(f"native members have no route: {kind}")
 
 
 def percent(part, whole):

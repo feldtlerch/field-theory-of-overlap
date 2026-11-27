@@ -197,6 +197,7 @@ fn prose_plan(text: &str) -> plan::DocumentPlan {
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![plan::Inline::Text("A reading".into())],
         },
@@ -240,6 +241,7 @@ fn support_required_corpus_heading_and_styled_space_recover_at_their_positions()
             paragraph: false,
             equation: false,
             econ: None,
+            result: None,
             site: site.clone(),
             runs: vec![plan::Inline::Text("The Whole Idea, in Plain Words".into())],
         },
@@ -752,6 +754,7 @@ fn support_required_html_swapped_notice_and_block_refuses() {
         paragraph: true,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Second words.".into())],
     });
@@ -996,6 +999,7 @@ fn support_required_html_nested_styles_and_quotation_destination() {
         paragraph: false,
         equation: false,
         econ: None,
+        result: None,
         site: site.clone(),
         runs: vec![plan::Inline::Text("Closing words.".into())],
     });

@@ -66,8 +66,15 @@ fn prefix_fixture() -> Result<NativeFixture, Box<dyn std::error::Error>> {
             "unit = \"sec:explainer:plain\"\nrole = \"corpus-slot\"",
         ),
     )?;
-    fs::remove_dir_all(root.join("units/corpus"))?;
-    fs::create_dir_all(root.join("units/corpus"))?;
+    for entry in fs::read_dir(root.join("units/corpus"))? {
+        let entry = entry?;
+        if !matches!(
+            entry.file_name().to_str(),
+            Some("result-pool.toml" | "result-modest.toml")
+        ) {
+            fs::remove_file(entry.path())?;
+        }
+    }
     fs::copy(
         source.join("units/fixtures/explainer-plain.toml"),
         root.join("units/corpus/explainer-plain.toml"),

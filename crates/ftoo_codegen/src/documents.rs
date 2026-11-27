@@ -481,6 +481,19 @@ pub(crate) fn prepare_context(
     let corpus = crate::load_unit_sources(declaration.clone(), statements.clone())
         .map_err(DocumentError::Units)?;
     let (corpus_slots, corpus_sources) = corpus::load(root, &corpus)?;
+    if corpus_slots.values().any(|slot| {
+        matches!(
+            slot.blocks(),
+            [ftoo_manifest::corpus::SlotBlock::Result { .. }]
+        )
+    }) {
+        for file in [
+            "documents/paper-build/compat.tex",
+            "documents/paper-build/reader-hooks.tex",
+        ] {
+            inputs.insert(file.into(), input::read(root, file)?);
+        }
+    }
     for source in &corpus_sources {
         merge_checked_input(&mut inputs, source.file.clone(), source.bytes.clone())?;
     }
@@ -497,6 +510,9 @@ pub(crate) fn prepare_context(
         lookup
             .validate_econ(&corpus)
             .map_err(DocumentError::PaperLookup)?;
+        lookup
+            .validate_results(&corpus_slots)
+            .map_err(DocumentError::PaperLookup)?;
     }
     if let Some(lookup) = &paper_lookup {
         for (path, bytes) in lookup.inputs() {
@@ -506,6 +522,7 @@ pub(crate) fn prepare_context(
     let markdown = crate::load_markdown_files(root).map_err(DocumentError::Labels)?;
     neutral(&markdown, true, AssemblyStage::Source)?;
     let joint = ftoo_manifest::collect_joint_mints(&corpus, &markdown)
+        .and_then(|joint| joint.with_corpus_mints(&corpus_slots))
         .map_err(|e| DocumentError::Labels(crate::LabelFileError::Labels(e)))?;
     let mut registry_joint = joint.clone();
     if root.join(registry::PAPER_MINTS).try_exists().map_err(|e| {
@@ -694,6 +711,7 @@ pub(crate) fn prepare_context(
             &selected,
             &plans,
             &corpus_slots,
+            paper_lookup.as_ref(),
             notation,
             &inputs,
             &known_labels,
@@ -935,6 +953,7 @@ fn render_artifacts(
         selected,
         plans,
         &BTreeMap::new(),
+        None,
         notation,
         inputs,
         known_labels,
@@ -949,6 +968,7 @@ fn render_artifacts_with_slots(
     selected: &BTreeMap<String, Vec<DocumentOutput>>,
     plans: &[plan::DocumentPlan],
     slots: &BTreeMap<String, ftoo_manifest::corpus::CheckedSlot>,
+    paper_lookup: Option<&registry::CheckedPaperLookup>,
     notation: &crate::RenderableNotation<'_, '_, '_>,
     inputs: &BTreeMap<String, Vec<u8>>,
     known_labels: &[&str],
@@ -963,6 +983,15 @@ fn render_artifacts_with_slots(
     let notation_status = notation.status_artifact();
     check_rendered_bytes("generated/notation-status.json", &notation_status, &[])?;
     let source_text = |path: &str| std::str::from_utf8(&inputs[path]).unwrap_or("");
+    let headers: Vec<_> = slots
+        .values()
+        .filter_map(|slot| match slot.blocks() {
+            [ftoo_manifest::corpus::SlotBlock::Result { key, .. }] => {
+                paper_lookup.and_then(|lookup| lookup.result_header(key))
+            }
+            _ => None,
+        })
+        .collect();
     let inherited = inherited_support::generate(
         notation.catalogue(),
         inherited_support::Sources {
@@ -971,7 +1000,20 @@ fn render_artifacts_with_slots(
             registers: source_text(inherited_support::COMPARED_PATHS[2]),
             typed_tools: source_text(inherited_support::TYPED_PATH),
             macros_overlap: source_text(inherited_support::MACROS_PATH),
+            manifest: inputs
+                .get("documents/paper/data/ftoo_manifest.tex")
+                .and_then(|value| std::str::from_utf8(value).ok())
+                .unwrap_or(""),
+            compat: inputs
+                .get("documents/paper-build/compat.tex")
+                .and_then(|value| std::str::from_utf8(value).ok())
+                .unwrap_or(""),
+            layout: inputs
+                .get("documents/paper-build/reader-hooks.tex")
+                .and_then(|value| std::str::from_utf8(value).ok())
+                .unwrap_or(""),
         },
+        &headers,
     )
     .map_err(|refusal| {
         let (rule, path) = match &refusal {
@@ -995,6 +1037,9 @@ fn render_artifacts_with_slots(
             }
             inherited_support::Refusal::MissingPrecondition(_) => {
                 (RuleId::M056, inherited_support::MACROS_PATH)
+            }
+            inherited_support::Refusal::InvalidResultHeader(_) => {
+                (RuleId::M056, "documents/paper/data/ftoo_manifest.tex")
             }
         };
         failure(
