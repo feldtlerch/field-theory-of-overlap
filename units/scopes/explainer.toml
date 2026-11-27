@@ -30,6 +30,10 @@ unit = "sec:say:enemy-to-none"
 role = "quotation"
 
 [[scope.occurrences]]
+unit = "sec:explainer:falsifier"
+role = "corpus-slot"
+
+[[scope.occurrences]]
 unit = "sec:explainer:eight-words"
 role = "paragraph"
 

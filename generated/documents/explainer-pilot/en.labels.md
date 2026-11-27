@@ -67,6 +67,17 @@ Not yet converted: intervening material is omitted from this excerpt.
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:explainer:falsifier document explainer-pilot language en -->
+## Tests the Theory Can Fail
+
+<!-- unit sec:explainer:falsifier::paragraph:1 document explainer-pilot language en -->
+The theory stakes its empirical standing on a ladder — three instruments, ordered cheapest first, all reading the same class of thing: the part of a tie’s dynamics that *turns* instead of merely growing or fading, which no story of “everyone just follows the payoff gradient” can produce. If relationships were only motion on a landscape of rewards, nothing would ever rotate. Rotation is therefore the theory’s chosen tripwire.
+
+<!-- unit sec:explainer:falsifier::paragraph:2 document explainer-pilot language en -->
+The cheapest rung needs no experiment at all, only a patient record of a *held* tie: if the dynamics have a turning part, the tremor of maintenance does not just jitter — it circulates, and two logged coordinates suffice to catch the circulation in the correlations. &#40;One logged coordinate can never catch it; rotation needs a plane. The instruction “log two things, not one” is itself a falsifiable design principle.&#41; The second rung is release: let a tie go, and if there is a turning part, it does not fade monotonically — it spirals, souring and rekindling at shrinking amplitude, with a fixed pitch. And the two rungs must *agree*: the circulation of the held tremor and the pitch of the released spiral read the same underlying turn, so their disagreement kills the model outright, not a parameter.
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:explainer:eight-words document explainer-pilot language en -->
 This is not despair. It is discipline. Do not flatten direction into magnitude, capacity into realization, persons into scores, witnesses into crowds, facts into verdicts or verdicts into facts, love into preference, goodness into usefulness, or wisdom into self&#45;sacrifice. Hold the distinctions, and the paper&#39;s eight welded words line up where they were earned: <a href="../paper-pilot/en.md#virtue-wonder"><strong><em>wonder</em></strong></a><!-- virtue v:wonder --> reaches toward unknown surplus; <a href="../paper-pilot/en.md#virtue-beauty"><strong><em>beauty</em></strong></a><!-- virtue v:beauty --> is wonder found; <a href="../paper-pilot/en.md#virtue-goodness"><strong><em>goodness</em></strong></a><!-- virtue v:goodness --> enlarges real overlap; <a href="../paper-pilot/en.md#virtue-kindness"><strong><em>kindness</em></strong></a><!-- virtue v:kindness --> is goodness at the modest scale; <a href="../paper-pilot/en.md#virtue-love"><strong><em>love</em></strong></a><!-- virtue v:love --> draws the self along held edges; <a href="../paper-pilot/en.md#virtue-wisdom"><strong><em>wisdom</em></strong></a><!-- virtue v:wisdom --> guards the boundary from exploitation and erasure; <a href="../paper-pilot/en.md#virtue-truth"><strong><em>truth</em></strong></a><!-- virtue v:truth --> is anchored legibility against capture; <a href="../paper-pilot/en.md#virtue-health"><strong><em>health</em></strong></a><!-- virtue v:health --> is the self&#45;floor self&#45;deception must not cross.
 

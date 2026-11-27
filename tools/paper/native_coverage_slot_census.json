@@ -1,11 +1,11 @@
 {
   "schema": 2,
   "source": "documents/paper/explainer/explainer.tex",
-  "source_sha256": "1ab1cb0722da2f84a462c2ac13068ff9442cd23c406d813b557b2c64752929d2",
+  "source_sha256": "bfce501d802a212007147990316452248653095cc37d758a82155216ad883914",
   "source_list_digest": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
-  "import_context_digest": "7a25f697921d6c60c1530f69e09e4646916f5739918ab4487a898bb0e69c3260",
+  "import_context_digest": "b0e7aeeb4031426328ff1e9024372fef146fb01facc80083c96bd7fc0bc59df8",
   "source_digests": {
-    "documents/paper/explainer/explainer.tex": "1ab1cb0722da2f84a462c2ac13068ff9442cd23c406d813b557b2c64752929d2",
+    "documents/paper/explainer/explainer.tex": "bfce501d802a212007147990316452248653095cc37d758a82155216ad883914",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
     "documents/paper/parts/partA.tex": "ce98c5c2bb7b513a55ae27dbc7965a0af6f786fcd13191a02e959d3eb697f2c9",
     "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
@@ -26,11 +26,11 @@
           "refused": 1
         },
         "existing-native-inclusion": {
-          "decoded": 8,
+          "decoded": 9,
           "refused": 0
         },
         "heading": {
-          "decoded": 11,
+          "decoded": 10,
           "refused": 0
         },
         "list": {
@@ -38,7 +38,7 @@
           "refused": 2
         },
         "paragraph": {
-          "decoded": 44,
+          "decoded": 42,
           "refused": 43
         },
         "refusal": {
@@ -591,122 +591,100 @@
     {
       "blocks": [
         {
-          "first": 626,
+          "first": 653,
           "kind": "heading",
-          "last": 628
+          "last": 655
         },
         {
-          "first": 629,
+          "first": 656,
           "kind": "paragraph",
-          "last": 635
-        },
-        {
-          "first": 636,
-          "kind": "paragraph",
-          "last": 646
+          "last": 657
         }
       ],
-      "first": 626,
-      "last": 646,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:647 Paragraph Unresolved"
+      "first": 653,
+      "last": 657,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:658 StatementBox Unresolved"
     },
     {
       "blocks": [
         {
-          "first": 673,
+          "first": 728,
           "kind": "heading",
-          "last": 675
+          "last": 730
         },
         {
-          "first": 676,
+          "first": 731,
           "kind": "paragraph",
-          "last": 677
+          "last": 738
         }
       ],
-      "first": 673,
-      "last": 677,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:678 StatementBox Unresolved"
+      "first": 728,
+      "last": 738,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:739 Paragraph Unresolved"
     },
     {
       "blocks": [
         {
-          "first": 748,
+          "first": 792,
           "kind": "heading",
-          "last": 750
+          "last": 794
         },
         {
-          "first": 751,
+          "first": 795,
           "kind": "paragraph",
-          "last": 758
-        }
-      ],
-      "first": 748,
-      "last": 758,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:759 Paragraph Unresolved"
-    },
-    {
-      "blocks": [
+          "last": 797
+        },
+        {
+          "first": 798,
+          "kind": "paragraph",
+          "last": 811
+        },
         {
           "first": 812,
-          "kind": "heading",
-          "last": 814
-        },
-        {
-          "first": 815,
           "kind": "paragraph",
-          "last": 817
-        },
-        {
-          "first": 818,
-          "kind": "paragraph",
-          "last": 831
-        },
-        {
-          "first": 832,
-          "kind": "paragraph",
-          "last": 843
+          "last": 823
         }
       ],
-      "first": 812,
-      "last": 843,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:844 Paragraph Unresolved"
+      "first": 792,
+      "last": 823,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:824 Paragraph Unresolved"
     },
     {
       "blocks": [
         {
-          "first": 852,
+          "first": 832,
           "kind": "heading",
+          "last": 834
+        },
+        {
+          "first": 835,
+          "kind": "paragraph",
+          "last": 848
+        },
+        {
+          "first": 849,
+          "kind": "paragraph",
           "last": 854
         },
         {
           "first": 855,
-          "kind": "paragraph",
-          "last": 868
-        },
-        {
-          "first": 869,
-          "kind": "paragraph",
-          "last": 874
-        },
-        {
-          "first": 875,
           "kind": "existing-native-inclusion",
-          "last": 876
+          "last": 856
         },
         {
-          "first": 877,
+          "first": 857,
           "kind": "paragraph",
-          "last": 880
+          "last": 860
         },
         {
-          "first": 881,
+          "first": 861,
           "kind": "paragraph",
-          "last": 882
+          "last": 862
         }
       ],
-      "first": 852,
-      "last": 882,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:883 ExistingNativeInclusion Decoded"
+      "first": 832,
+      "last": 862,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:863 ExistingNativeInclusion Decoded"
     }
   ]
 }

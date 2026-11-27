@@ -18,5 +18,6 @@ documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/ex
 documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	349
 documents/paper/explainer/explainer.tex	sec:explainer:accountability	generated/documents/explainer-pilot/sec-explainer-accountability.tex	corpus-slot	528
 documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	607
-documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	875
-documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	883
+documents/paper/explainer/explainer.tex	sec:explainer:falsifier	generated/documents/explainer-pilot/sec-explainer-falsifier.tex	corpus-slot	626
+documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	855
+documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	863
