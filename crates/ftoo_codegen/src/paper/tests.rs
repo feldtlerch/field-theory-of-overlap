@@ -663,6 +663,6 @@ fn correspondence_command_refuses_wrong_side_and_unrelated_options() {
             .err()
             .unwrap()
             .to_string()
-            .contains("belong only")
+            .contains("side belongs only to import-correspondence")
     );
 }

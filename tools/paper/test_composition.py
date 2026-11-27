@@ -261,7 +261,7 @@ class CorpusSlotPreparation(unittest.TestCase):
                 output_file.write_bytes(body.replace(
                     b'Help and cost.',
                     b'\\PaperNativeParagraph{sec:reading:plain-intro}{The intro.}'))
-                with self.assertRaisesRegex(ValueError, 'Corpus slot paragraph differs'):
+                with self.assertRaisesRegex(ValueError, 'Corpus slot child differs'):
                     declared_fragments(root, [source])
                 output_file.write_bytes(body)
                 source_file.write_bytes(source_file.read_bytes() +

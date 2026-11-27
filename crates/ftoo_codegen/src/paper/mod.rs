@@ -697,10 +697,12 @@ fn request(args: &[OsString]) -> Result<Request> {
             return Err(format!("Duplicate option {key}").into());
         }
     }
-    if operation != "import-correspondence"
-        && (values.contains_key("--assignment") || values.contains_key("--side"))
+    if (operation != "import-correspondence"
+        && operation != "documents-recovery"
+        && values.contains_key("--assignment"))
+        || (operation != "import-correspondence" && values.contains_key("--side"))
     {
-        return Err("Assignment and side belong only to import-correspondence".into());
+        return Err("Assignment belongs to import-correspondence or documents-recovery; side belongs only to import-correspondence".into());
     }
     let root = values.get("--repository").map_or_else(
         || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
@@ -758,6 +760,13 @@ fn run_documents(req: &Request) -> Result<()> {
             .map_err(|error| PaperFault::Input(error.to_string()))?;
         release::screen_parts(&req.root, &prepared, true)
     } else if req.operation == "documents-recovery" {
+        let assignment = req
+            .values
+            .get("--assignment")
+            .ok_or("Recovery assignment required")?;
+        let (source, first, last, unit) =
+            crate::units::corpus::recovery_selection(&req.root, Path::new(assignment))
+                .map_err(PaperFault::Input)?;
         let output = req
             .values
             .get("--output-dir")
@@ -771,13 +780,7 @@ fn run_documents(req: &Request) -> Result<()> {
         fs::create_dir_all(&output).map_err(|e| e.to_string())?;
         for medium in ["markdown", "html"] {
             let export = prepared
-                .corpus_slot_recovery_export(
-                    medium,
-                    "documents/paper/explainer/explainer.tex",
-                    44,
-                    98,
-                    "sec:explainer:plain",
-                )
+                .corpus_slot_recovery_export(medium, &source, first, last, &unit)
                 .ok_or("Checked corpus-slot recovery unavailable")?;
             let bytes =
                 serde_json::to_vec_pretty(&export).map_err(|e| PaperFault::Input(e.to_string()))?;

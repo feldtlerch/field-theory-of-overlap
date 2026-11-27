@@ -47,17 +47,26 @@ class StreamComparisonControls(unittest.TestCase):
         inherited = ('\n\n'.join((words[0], '% generated: sec:reading:plain-intro',
                                   *words[2:]))).encode()
         source = inherited if side == 'before' else b'% generated: sec:slot\n'
-        corpus = ('\n\n'.join((words[0], *words[2:]))).encode()
-        captured = {source_name: source, intro_name: b'Intro'}
+        corpus = ('[unit]\nid = "sec:slot"\nbody = """\n' +
+                  '\n\n'.join((words[0], *words[2:])) + '\n"""\n').encode()
+        captured = {source_name: source,
+                    intro_name: b'[unit]\nid = "sec:reading:plain-intro"\ntext = "Intro"\n'}
         if side == 'after':
             captured[corpus_name] = corpus
         parent_blob = hashlib.sha1(b'blob ' + str(len(inherited)).encode() +
                                    b'\0' + inherited).hexdigest()
         assignment = dict(source=source_name, first=1, last=11, unit='sec:slot',
+                          blocks=[dict(kind=kind, first=first, last=last)
+                                  for kind, first, last in zip(
+                                      ('heading', 'existing-native-inclusion',
+                                       'paragraph', 'paragraph', 'paragraph', 'paragraph'),
+                                      (1, 3, 5, 7, 9, 11),
+                                      (2, 4, 6, 8, 10, 11))],
                           **{'source-blob': parent_blob})
         revision = 'a' * 40 if side == 'before' else 'b' * 40
         blocks = []
-        for index, (word, kind) in enumerate(zip(words, compare_words.SLOT_KINDS)):
+        for index, (word, selected) in enumerate(zip(words, assignment['blocks'])):
+            kind = selected['kind']
             path = intro_name if index == 1 else source_name if side == 'before' else corpus_name
             data = captured[path]
             start = data.index(word.encode())
@@ -149,7 +158,8 @@ class StreamComparisonControls(unittest.TestCase):
         export, captured, assignment, revision = self.slot_export('after')
         path = 'units/corpus/explainer-plain.toml'
         field = b'[[unit.blocks]]\nruns = [{ kind = "text", decoded = "Heading" }]\n'
-        raw = field * 5
+        header = b'[unit]\nid = "sec:slot"\n'
+        raw = header + field * 5
         captured[path] = raw
         blob = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
         native_index = 0
@@ -157,7 +167,7 @@ class StreamComparisonControls(unittest.TestCase):
             if block['origin']['path'] == path:
                 block['origin']['blob'] = blob
                 block['origin']['sha256'] = compare_words.digest(raw)
-                start = native_index * len(field)
+                start = len(header) + native_index * len(field)
                 block['origin']['range'] = [start, start + len(field)]
                 native_index += 1
         blocks = compare_words.located_slot_export(
@@ -172,6 +182,32 @@ class StreamComparisonControls(unittest.TestCase):
         self.assertEqual(raised.exception.row['detail'],
                          'native slot token spelling length differs')
 
+    def test_located_slot_native_and_nested_owners_refuse_mismatches(self):
+        export, captured, assignment, revision = self.slot_export('after')
+        data = json.dumps(export).encode()
+        compare_words.located_slot_export(
+            data, captured, assignment, 'after', revision,
+            ['sec:reading:plain-intro'])
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.located_slot_export(
+                data, captured, assignment, 'after', revision, ['sec:reading:other'])
+        self.assertEqual(raised.exception.row['detail'], 'located slot child owner differs')
+        changed = dict(captured)
+        changed['units/corpus/explainer-plain.toml'] = changed[
+            'units/corpus/explainer-plain.toml'].replace(b'sec:slot', b'sec:other')
+        altered = json.loads(json.dumps(export))
+        native = changed['units/corpus/explainer-plain.toml']
+        for block in altered['blocks']:
+            if block['origin']['path'] == 'units/corpus/explainer-plain.toml':
+                block['origin']['sha256'] = compare_words.digest(native)
+                block['origin']['blob'] = hashlib.sha1(
+                    b'blob ' + str(len(native)).encode() + b'\0' + native).hexdigest()
+        with self.assertRaises(compare_words.Fault) as raised:
+            compare_words.located_slot_export(
+                json.dumps(altered).encode(), changed, assignment, 'after', revision,
+                ['sec:reading:plain-intro'])
+        self.assertEqual(raised.exception.row['detail'], 'located slot native owner differs')
+
     def test_slot_request_capture_and_cli_dispatch(self):
         export, captured, _, _ = self.slot_export()
         name = 'documents/paper/explainer/explainer.tex'
@@ -182,18 +218,21 @@ class StreamComparisonControls(unittest.TestCase):
                           first=1, last=11, unit='sec:slot',
                           blocks=[dict(kind=kind, first=1 + index * 2,
                                        last=1 + index * 2)
-                                  for index, kind in enumerate(compare_words.SLOT_KINDS)])
+                                  for index, kind in enumerate(
+                                      block['kind'] for block in self.slot_export()[2]['blocks'])])
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             repo = root / 'repo'
             repo.mkdir()
+            (repo / 'documents/paper-build').mkdir(parents=True)
+            (repo / 'documents/paper-build/sources.tsv').write_text(name + '\n')
             request = root / 'request.json'
             request.write_text(json.dumps(assignment))
             with mock.patch.object(compare_words, 'git', return_value=source):
                 captured_request = compare_words.capture_assignment(repo, request)
             self.assertEqual(captured_request[0], assignment)
             changed = json.loads(json.dumps(assignment))
-            changed['blocks'][1]['kind'] = 'paragraph'
+            changed['blocks'][1]['kind'] = 'heading'
             request.write_text(json.dumps(changed))
             with mock.patch.object(compare_words, 'git', return_value=source):
                 with self.assertRaises(compare_words.Fault) as raised:
@@ -399,9 +438,12 @@ class StreamComparisonControls(unittest.TestCase):
                 path.parent.mkdir(parents=True)
                 path.write_bytes(before_paths[source])
                 return dict(inputs=[dict(path=source,
-                                         sha256=compare_words.digest(before_paths[source]))])
+                                         sha256=compare_words.digest(before_paths[source]))],
+                            fragments=[(source, 'sec:reading:plain-intro',
+                                        'generated/documents/explainer-pilot/sec-reading-plain-intro.tex',
+                                        'paragraph', 3)])
 
-            def export(_, __, ___, ____, _____, side, output):
+            def export(_, __, ___, ____, _____, ______, side, output):
                 data = json.dumps(before_export if side == 'before' else after_export).encode()
                 path = output / (side + '-correspondence/correspondence.json')
                 path.parent.mkdir(parents=True)
@@ -560,11 +602,11 @@ class StreamComparisonControls(unittest.TestCase):
                             source).hexdigest()
         assignment = dict(schema=4, form='coarse-slot', parent='a' * 40,
                           candidate='b' * 40,
-                          source='documents/paper/parts/coda.tex',
+                          source='documents/paper/explainer/slot.tex',
                           **{'source-blob': blob}, first=1, last=3,
-                          unit='sec:reading:coda', blocks=[
-                              dict(kind='paragraph', first=1, last=1),
-                              dict(kind='display', first=3, last=3)])
+                          unit='sec:explainer:slot', blocks=[
+                              dict(kind='heading', first=1, last=1),
+                              dict(kind='paragraph', first=3, last=3)])
         self.assertIs(compare_words.coarse_slot_assignment(assignment, source), assignment)
         altered = dict(assignment, blocks=[assignment['blocks'][1],
                                            assignment['blocks'][0]])
@@ -786,9 +828,12 @@ class SlotEnvelopeControls(unittest.TestCase):
             return ''.join('\t'.join(map(str, row)) + '\n' for row in rows).encode()
 
         other = 'documents/paper/data/other.tex'
+        source_list = 'documents/paper-build/sources.tsv'
         before = {source: old_source, old_fragment: old_body, inclusion: encode(old_rows),
+                  source_list: (source + '\n').encode(),
                   other: b'unchanged'}
         after = {source: new_source, new_fragment: new_body, inclusion: encode(new_rows),
+                 source_list: (source + '\n').encode(),
                  other: b'unchanged'}
         shared = 'generated/documents/explainer-pilot/sec-other.tex'
         before[shared] = after[shared] = b'other fragment'
@@ -806,7 +851,11 @@ class SlotEnvelopeControls(unittest.TestCase):
             path.write_bytes(b'{"schema":1}\n')
         parent_record['inputs'].append(dict(path=extra))
         candidate_inputs.append(dict(path=extra))
-        slot = dict(source=source, first=1, last=6, unit='sec:explainer:plain')
+        slot = dict(source=source, first=1, last=6, unit='sec:explainer:plain',
+                    blocks=[dict(kind=kind, first=index + 1, last=index + 1)
+                            for index, kind in enumerate(
+                                ('heading', 'existing-native-inclusion', 'paragraph',
+                                 'paragraph', 'paragraph', 'paragraph'))])
         return parent_record, parent, candidate, candidate_inputs, slot
 
     def test_slot_receipt_and_nested_use_substitution(self):
@@ -815,13 +864,46 @@ class SlotEnvelopeControls(unittest.TestCase):
             result = compare_words.slot_source_envelope(*rows)
             self.assertEqual((result['available'], result['nested_use'],
                               result['inclusion_shift']),
-                             (True, 'sec:reading:plain-intro', -5))
+                             (True, 'sec:reading:plain-intro', -5), result['reasons'])
             candidate = rows[2]
             changed = candidate / 'documents/paper/data/other.tex'
             changed.write_bytes(b'changed macro')
             result = compare_words.slot_source_envelope(*rows)
             self.assertIn('slot outside input differs: documents/paper/data/other.tex',
                           result['reasons'])
+
+    def test_slot_keeps_the_checked_inclusion_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent_record, parent, candidate, candidate_inputs, slot = self.fixture(
+                pathlib.Path(directory))
+            source_list = 'documents/paper-build/sources.tsv'
+            inclusion = 'generated/documents/inclusions.tsv'
+            other = 'documents/paper/parts/front.tex'
+            other_row = (other, 'sec:front',
+                         'generated/documents/paper-pilot/sec-front.tex', 'paragraph', 1)
+            parent_record['fragments'].insert(0, other_row)
+            for folder in (parent, candidate):
+                path = folder / inclusion
+                path.write_bytes(('\t'.join(map(str, other_row)) + '\n').encode() +
+                                 path.read_bytes())
+                path = folder / source_list
+                path.write_text(slot['source'] + '\n' + other + '\n')
+                receipt_path = folder / 'generated/paper/inputs.json'
+                receipt = json.loads(receipt_path.read_text())
+                for name in (inclusion, source_list):
+                    receipt['inputs'][name] = compare_words.digest((folder / name).read_bytes())
+                receipt_path.write_bytes(compare_words.json_bytes(receipt))
+                if folder == parent:
+                    parent_record['receipt'] = receipt
+            result = compare_words.slot_source_envelope(
+                parent_record, parent, candidate, candidate_inputs, slot)
+            self.assertTrue(result['available'], result['reasons'])
+            rows = (candidate / inclusion).read_text().splitlines()
+            (candidate / inclusion).write_text('\n'.join((rows[0], rows[2], rows[1])) + '\n')
+            self.assertIn('slot inclusion rows differ',
+                          compare_words.slot_source_envelope(
+                              parent_record, parent, candidate, candidate_inputs,
+                              slot)['reasons'])
 
     def test_slot_shift_child_and_receipt_refusals(self):
         changes = [
@@ -853,6 +935,21 @@ class SlotEnvelopeControls(unittest.TestCase):
             receipt['inputs'][rows[4]['source']] = '0' * 64
             receipt_path.write_bytes(compare_words.json_bytes(receipt))
             self.assertIn('candidate receipt row differs: ' + rows[4]['source'],
+                          compare_words.slot_source_envelope(*rows)['reasons'])
+
+    def test_slot_extra_receipt_input_refuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            rows = self.fixture(pathlib.Path(directory))
+            candidate = rows[2]
+            extra = 'documents/paper/data/extra.tex'
+            path = candidate / extra
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'extra input\n')
+            receipt_path = candidate / 'generated/paper/inputs.json'
+            receipt = json.loads(receipt_path.read_text())
+            receipt['inputs'][extra] = compare_words.digest(path.read_bytes())
+            receipt_path.write_bytes(compare_words.json_bytes(receipt))
+            self.assertIn('slot receipt input membership differs',
                           compare_words.slot_source_envelope(*rows)['reasons'])
 
 

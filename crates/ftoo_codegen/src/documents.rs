@@ -2,7 +2,7 @@
 #![allow(clippy::result_large_err)]
 pub(crate) mod artifacts;
 mod bibliography;
-mod corpus;
+pub(crate) mod corpus;
 mod destinations;
 mod diagnostics;
 mod display;
@@ -122,7 +122,14 @@ pub struct PreparedDocuments {
     observed_outputs: BTreeMap<String, Vec<u8>>,
     unavailable: Vec<destinations::IndexEntry>,
     screen_gap_rows: Vec<ScreenGapRow>,
-    slot_recovered: BTreeMap<(String, String), String>,
+    slot_recovered: BTreeMap<(String, String), SlotRecovery>,
+}
+#[derive(Debug)]
+struct SlotRecovery {
+    source: String,
+    document: String,
+    language: String,
+    text: String,
 }
 impl PreparedDocuments {
     /// Return a checked excerpt recovery bound to the emitted screen bytes.
@@ -136,17 +143,18 @@ impl PreparedDocuments {
         unit: &str,
     ) -> Option<serde_json::Value> {
         use sha2::{Digest as _, Sha256};
-        if source != "documents/paper/explainer/explainer.tex"
-            || first == 0
-            || last < first
-            || unit != "sec:explainer:plain"
-            || !matches!(medium, "markdown" | "html")
-        {
+        if first == 0 || last < first || !matches!(medium, "markdown" | "html") {
             return None;
         }
-        let text = self.slot_recovered.get(&(unit.into(), medium.into()))?;
+        let recovered = self.slot_recovered.get(&(unit.into(), medium.into()))?;
+        if source != recovered.source {
+            return None;
+        }
         let extension = if medium == "markdown" { "md" } else { "html" };
-        let path = format!("generated/documents/explainer-pilot/en.{extension}");
+        let path = format!(
+            "generated/documents/{}/{}.{}",
+            recovered.document, recovered.language, extension
+        );
         let artifact = self
             .artifacts
             .iter()
@@ -158,7 +166,7 @@ impl PreparedDocuments {
             "selection": {"source": source, "first": first, "last": last, "unit": unit},
             "coverage": "excerpt",
             "rendering": {"path": path, "sha256": sha256},
-            "text": text,
+            "text": &recovered.text,
         }))
     }
     #[must_use]
@@ -692,6 +700,10 @@ pub(crate) fn prepare_context(
         )?;
         let mut slot_recovered = BTreeMap::new();
         for slot in corpus_slots.values() {
+            let inclusion = inclusions
+                .iter()
+                .find(|row| row.unit == slot.id() && row.role == "corpus-slot")
+                .expect("checked physical slot occurrence");
             let plan = plans
                 .iter()
                 .find(|plan| plan.document == slot.document())
@@ -713,7 +725,15 @@ pub(crate) fn prepare_context(
                 } else {
                     html_recovery::slot_html_text(plan, slot, source)?
                 };
-                slot_recovered.insert((slot.id().into(), medium.into()), text);
+                slot_recovered.insert(
+                    (slot.id().into(), medium.into()),
+                    SlotRecovery {
+                        source: inclusion.source.clone(),
+                        document: slot.document().into(),
+                        language: slot.language().into(),
+                        text,
+                    },
+                );
             }
         }
         let mut inclusion_text = String::new();
@@ -1067,7 +1087,10 @@ fn render_artifacts_with_slots(
                             let (source, unit, advance) = if let Some(slot) = slots.get(&block.unit)
                             {
                                 (
-                                    corpus::fragment(slot, &plan.blocks[index + 1])?,
+                                    corpus::fragment(
+                                        slot,
+                                        &plan.blocks[index..index + slot.blocks().len()],
+                                    )?,
                                     slot.id(),
                                     slot.blocks().len(),
                                 )

@@ -1,6 +1,8 @@
 use super::*;
 use crate::units::corpus::digest;
-use ftoo_manifest::corpus::{SlotFault, admit_slot, check_transfer, import_source};
+use ftoo_manifest::corpus::{
+    SlotFault, admit_slot, admitted_intervals, check_transfer, import_source,
+};
 use std::{fs, path::Path};
 
 fn root() -> std::path::PathBuf {
@@ -25,13 +27,17 @@ fn parsed(text: &str) -> Result<ftoo_manifest::corpus::SlotDraft, String> {
 
 fn checked(text: &str) -> Result<ftoo_manifest::corpus::CheckedSlot, SlotFault> {
     let units = crate::load_unit_files(&root()).unwrap();
-    admit_slot(parsed(text).unwrap(), |unit, document, language| {
-        units.units().iter().any(|entry| {
-            entry.label().as_str() == unit
-                && entry.document() == document
-                && entry.texts().contains_key(language)
-        })
-    })
+    admit_slot(
+        parsed(text).unwrap(),
+        "units/fixtures/explainer-plain.toml",
+        |unit, document, language| {
+            units.units().iter().any(|entry| {
+                entry.label().as_str() == unit
+                    && entry.document() == document
+                    && entry.texts().contains_key(language)
+            })
+        },
+    )
 }
 
 fn imported(bytes: &[u8]) -> ftoo_manifest::corpus::SourceDraft {
@@ -53,9 +59,41 @@ fn real_prefix_admits_exact_six_children_and_all_source_pieces() {
     let slot = checked(&fixture()).unwrap();
     let bytes = inherited_source();
     let draft = imported(&bytes);
-    check_transfer(&slot, &draft, &bytes, 44, 98).unwrap();
+    check_transfer(
+        &slot,
+        &draft,
+        "documents/paper/explainer/explainer.tex",
+        &bytes,
+        44,
+        98,
+    )
+    .unwrap();
     assert_eq!(slot.blocks().len(), 6);
     assert_eq!(slot.id(), "sec:explainer:plain");
+}
+
+#[test]
+fn slot_identity_uses_the_semantic_label_grammar() {
+    for id in ["sec:x", "sec::", "sec:explainer:plain::paragraph:1"] {
+        let mut draft = parsed(&fixture()).unwrap();
+        draft.id = id.into();
+        assert_eq!(
+            admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| true).unwrap_err(),
+            SlotFault::Identity
+        );
+    }
+}
+
+#[test]
+fn census_reaches_a_paragraph_after_an_existing_use() {
+    let bytes = inherited_source();
+    let source = imported(&bytes);
+    let intervals = admitted_intervals(&source, &bytes, |_, _, _| true);
+    assert!(
+        intervals
+            .iter()
+            .any(|interval| interval.first == 44 && interval.last == 98)
+    );
 }
 
 #[test]
@@ -71,8 +109,21 @@ fn unknown_fields_styles_events_and_children_refuse() {
     assert!(parsed(&unknown_child).unwrap_err().contains("UnknownToken"));
     let mut omitted = parsed(&source).unwrap();
     omitted.blocks.remove(3);
+    let admitted = admit_slot(omitted, "units/fixtures/explainer-plain.toml", |_, _, _| {
+        true
+    })
+    .unwrap();
+    let bytes = inherited_source();
     assert_eq!(
-        admit_slot(omitted, |_, _, _| true).unwrap_err(),
+        check_transfer(
+            &admitted,
+            &imported(&bytes),
+            "documents/paper/explainer/explainer.tex",
+            &bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::ChildOrder { index: 5 }
     );
 }
@@ -84,14 +135,33 @@ fn reordered_or_changed_prose_refuses_against_the_imported_source() {
     let imported = imported(&bytes);
     let mut swapped = parsed(&source).unwrap();
     swapped.blocks.swap(4, 5);
-    let swapped = admit_slot(swapped, |_, _, _| true).unwrap();
+    let swapped = admit_slot(swapped, "units/fixtures/explainer-plain.toml", |_, _, _| {
+        true
+    })
+    .unwrap();
     assert_eq!(
-        check_transfer(&swapped, &imported, &bytes, 44, 98).unwrap_err(),
+        check_transfer(
+            &swapped,
+            &imported,
+            "documents/paper/explainer/explainer.tex",
+            &bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::SourceContent { index: 4 }
     );
     let changed = source.replacen("Start with two lives.", "Start with three lives.", 1);
     assert_eq!(
-        check_transfer(&checked(&changed).unwrap(), &imported, &bytes, 44, 98).unwrap_err(),
+        check_transfer(
+            &checked(&changed).unwrap(),
+            &imported,
+            "documents/paper/explainer/explainer.tex",
+            &bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::SourceContent { index: 2 }
     );
 }
@@ -107,7 +177,15 @@ fn duplicate_heading_mint_and_unrelated_event_refuse_at_transfer() {
     );
     let bytes = duplicated.as_bytes();
     assert_eq!(
-        check_transfer(&slot, &imported(bytes), bytes, 44, 98).unwrap_err(),
+        check_transfer(
+            &slot,
+            &imported(bytes),
+            "documents/paper/explainer/explainer.tex",
+            bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::SourceMint
     );
     let event = source.replacen(
@@ -117,7 +195,15 @@ fn duplicate_heading_mint_and_unrelated_event_refuse_at_transfer() {
     );
     let bytes = event.as_bytes();
     assert_eq!(
-        check_transfer(&slot, &imported(bytes), bytes, 44, 98).unwrap_err(),
+        check_transfer(
+            &slot,
+            &imported(bytes),
+            "documents/paper/explainer/explainer.tex",
+            bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::SourceEvent
     );
 }
@@ -126,7 +212,10 @@ fn duplicate_heading_mint_and_unrelated_event_refuse_at_transfer() {
 fn native_child_owner_is_required_even_when_the_marker_exists() {
     let draft = parsed(&fixture()).unwrap();
     assert_eq!(
-        admit_slot(draft, |_, _, _| false).unwrap_err(),
+        admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| {
+            false
+        })
+        .unwrap_err(),
         SlotFault::ChildOwner
     );
 }
@@ -136,7 +225,7 @@ fn duplicate_child_use_refuses_without_a_second_source_marker() {
     let mut draft = parsed(&fixture()).unwrap();
     draft.blocks[2] = draft.blocks[1].clone();
     assert_eq!(
-        admit_slot(draft, |_, _, _| true).unwrap_err(),
+        admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| true).unwrap_err(),
         SlotFault::ChildOrder { index: 2 }
     );
 }
@@ -149,9 +238,17 @@ fn changed_named_spacing_refuses_source_correspondence() {
         unreachable!();
     };
     runs[1] = ftoo_manifest::corpus::SlotRun::Text(" ".into());
-    let checked = admit_slot(draft, |_, _, _| true).unwrap();
+    let checked = admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| true).unwrap();
     assert_eq!(
-        check_transfer(&checked, &imported(&bytes), &bytes, 44, 98).unwrap_err(),
+        check_transfer(
+            &checked,
+            &imported(&bytes),
+            "documents/paper/explainer/explainer.tex",
+            &bytes,
+            44,
+            98
+        )
+        .unwrap_err(),
         SlotFault::SourceContent { index: 2 }
     );
 }
@@ -173,7 +270,7 @@ fn tex_merging_sequences_refuse_slot_admission() {
         };
         *runs = vec![SlotRun::Text(text.into())];
         assert_eq!(
-            admit_slot(draft, |_, _, _| true).unwrap_err(),
+            admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| true).unwrap_err(),
             SlotFault::UnsupportedRun { index: 2 }
         );
     }
@@ -186,7 +283,7 @@ fn tex_merging_sequences_refuse_slot_admission() {
         SlotRun::Text("-known".into()),
     ];
     assert_eq!(
-        admit_slot(draft, |_, _, _| true).unwrap_err(),
+        admit_slot(draft, "units/fixtures/explainer-plain.toml", |_, _, _| true).unwrap_err(),
         SlotFault::UnsupportedRun { index: 2 }
     );
 }

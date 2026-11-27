@@ -2604,9 +2604,9 @@ pub(super) fn check_excerpt_shape(
     let shape = plan.blocks.len() >= 2
         && plan.blocks[0].depth == Some(1)
         && plan.blocks[1..].iter().all(|block| {
+            let corpus_child = block.site.file.starts_with("units/corpus/");
             if block.depth == Some(2) {
-                return block.unit == "sec:explainer:plain"
-                    && matches!(block.runs.as_slice(), [Inline::Text(_)]);
+                return corpus_child && matches!(block.runs.as_slice(), [Inline::Text(_)]);
             }
             block.depth.is_none()
                 && block.displays.is_empty()
@@ -2623,10 +2623,7 @@ pub(super) fn check_excerpt_shape(
                             Inline::Math { latex, .. } => native_paragraph_command(latex),
                             Inline::Styled { kind, children, .. } => {
                                 (*kind == StyleKind::Emphasis
-                                    || (*kind == StyleKind::Strong
-                                        && block
-                                            .unit
-                                            .starts_with("sec:explainer:plain::paragraph:")))
+                                    || (*kind == StyleKind::Strong && corpus_child))
                                     && children
                                         .iter()
                                         .all(|child| matches!(child, Inline::Text(_)))
@@ -3917,7 +3914,7 @@ fn slot_blocks(
 ) -> Result<Vec<Block>, DocumentError> {
     let mut blocks = Vec::with_capacity(slot.blocks().len());
     for (child_index, child) in slot.blocks().iter().enumerate() {
-        let site = super::input::site("units/corpus/explainer-plain.toml")
+        let site = super::input::site(slot.source())
             .child("unit")
             .child("blocks")
             .child(&child_index.to_string());

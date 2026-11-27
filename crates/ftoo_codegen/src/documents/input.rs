@@ -160,18 +160,14 @@ pub(super) fn composition_with_slots(
             .filter(|row| row.unit == *id && row.role == "corpus-slot")
             .count();
         if physical != 1 {
-            return Err(mismatch(
-                &site("units/corpus/explainer-plain.toml"),
-                id,
-                "physical occurrence",
-            ));
+            return Err(mismatch(&site(slot.source()), id, "physical occurrence"));
         }
         for child in slot.blocks() {
             if let ftoo_manifest::corpus::SlotBlock::Use { unit, .. } = child
                 && inclusions.iter().any(|row| row.unit == *unit)
             {
                 return Err(mismatch(
-                    &site("units/corpus/explainer-plain.toml"),
+                    &site(slot.source()),
                     id,
                     "duplicate child occurrence",
                 ));

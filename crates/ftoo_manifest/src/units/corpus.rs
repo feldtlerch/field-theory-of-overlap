@@ -337,6 +337,7 @@ impl std::fmt::Display for ImportFault {
 impl std::error::Error for ImportFault {}
 
 pub use admission::{
-    CheckedSlot, SlotBlock, SlotDraft, SlotFault, SlotRun, SlotStyle, admit_slot, check_transfer,
+    CheckedSlot, SlotBlock, SlotDraft, SlotFault, SlotInterval, SlotIntervalBlock, SlotRun,
+    SlotStyle, admit_slot, admitted_intervals, check_transfer,
 };
 pub use import::{ensure_unchanged, import_source, validate_accounting};

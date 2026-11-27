@@ -2,7 +2,7 @@
 
 use crate::documents::input;
 use ftoo_manifest::corpus::{
-    BlockStatus, CorpusDraft, SourceDraft, ensure_unchanged, import_source,
+    BlockStatus, CorpusDraft, SourceDraft, admitted_intervals, ensure_unchanged, import_source,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -14,6 +14,7 @@ use std::{
 mod correspondence;
 mod slot;
 pub use correspondence::export_correspondence;
+pub(crate) use correspondence::recovery_selection;
 pub use slot::parse_slot;
 #[cfg(test)]
 mod tests;
@@ -84,7 +85,11 @@ fn all_fault_rows(sources: &[SourceDraft], source_bytes: &BTreeMap<String, Vec<u
     }).collect::<BTreeMap<_, _>>())
 }
 
-fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Value {
+fn residue(
+    corpus: &CorpusDraft,
+    source_bytes: &BTreeMap<String, Vec<u8>>,
+    units: &ftoo_manifest::LanguageCheckedUnits,
+) -> Value {
     let mut files = Vec::new();
     let mut kinds_total: BTreeMap<String, (usize, usize, usize)> = BTreeMap::new();
     let mut refusals_total: BTreeMap<String, (usize, Vec<Value>)> = BTreeMap::new();
@@ -148,6 +153,17 @@ fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Va
             .iter()
             .map(|piece| piece.end_byte - piece.start_byte)
             .sum();
+        let intervals = admitted_intervals(
+            source,
+            &source_bytes[&source.path],
+            |unit, document, language| {
+                units.units().iter().any(|entry| {
+                    entry.label().as_str() == unit
+                        && entry.document() == document
+                        && entry.texts().contains_key(language)
+                })
+            },
+        );
         accounted_total += accounted;
         decoded_total += decoded;
         unresolved_total += unresolved;
@@ -157,6 +173,7 @@ fn residue(corpus: &CorpusDraft, source_bytes: &BTreeMap<String, Vec<u8>>) -> Va
             "path":source.path,"byte_length":source.byte_length,"accounted_bytes":accounted,
             "fully_decoded_outer":decoded,"remaining_outer":unresolved,"existing_native_inclusions":native,
             "nested_occurrences":nested,"unresolved_mathematics":source.math.len(),"kinds":kind_rows,
+            "admitted_slot_intervals":intervals,
             "refusal_kinds":refusal_kinds,"first_fault_kinds":refusal_kinds.keys().collect::<Vec<_>>(),
             "all_faults":all_fault_rows(std::slice::from_ref(source), source_bytes)
         }));
@@ -242,7 +259,8 @@ pub fn dry_run(root: &Path, output: &Path) -> Result<Value, String> {
         sources,
         transfer_ready: false,
     };
-    let report = residue(&corpus, &source_bytes);
+    let units = crate::load_unit_files(&root).map_err(|error| error.to_string())?;
+    let report = residue(&corpus, &source_bytes, &units);
     fs::create_dir(&output).map_err(|error| error.to_string())?;
     serialize(&output.join("draft.json"), &corpus)?;
     serialize(&output.join("residue.json"), &report)?;

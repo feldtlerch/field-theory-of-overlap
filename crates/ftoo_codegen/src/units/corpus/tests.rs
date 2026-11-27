@@ -27,6 +27,13 @@ fn composition_copy() -> std::path::PathBuf {
             entry.file_name().to_string_lossy()
         ));
     }
+    for entry in fs::read_dir(original.join("units/statements")).unwrap() {
+        let entry = entry.unwrap();
+        files.push(format!(
+            "units/statements/{}",
+            entry.file_name().to_string_lossy()
+        ));
+    }
     for file in files {
         let target = copied.join(&file);
         fs::create_dir_all(target.parent().unwrap()).unwrap();

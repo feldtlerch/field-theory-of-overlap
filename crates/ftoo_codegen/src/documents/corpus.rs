@@ -11,7 +11,7 @@ use ftoo_manifest::{
 };
 use std::{collections::BTreeMap, path::Path};
 
-pub(super) fn load(
+pub(crate) fn load(
     root: &Path,
     units: &LanguageCheckedUnits,
 ) -> Result<(BTreeMap<String, CheckedSlot>, Vec<UnitSource>), DocumentError> {
@@ -22,39 +22,43 @@ pub(super) fn load(
         return Ok((BTreeMap::new(), Vec::new()));
     }
     let paths = input::discover(root, directory, false)?;
-    if paths.len() != 1 || paths[0] != "units/corpus/explainer-plain.toml" {
-        return Err(failure(
-            RuleId::M055,
-            AssemblyStage::Source,
-            AssemblySite::Source(input::site(directory)),
-            AssemblyFault::UnknownToken {
-                value: format!("{paths:?}"),
-                expected: vec!["units/corpus/explainer-plain.toml".into()],
-            },
-        ));
-    }
     let sources = input::sources(root, &paths)?;
-    let draft = crate::parse_slot(&sources[0])
-        .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
-    let checked = admit_slot(draft, |unit, document, language| {
-        units.units().iter().any(|entry| {
-            entry.label().as_str() == unit
-                && entry.document() == document
-                && entry.texts().contains_key(language)
+    let mut slots = BTreeMap::new();
+    for source in &sources {
+        let draft = crate::parse_slot(source)
+            .map_err(|errors| DocumentError::Units(crate::UnitLoadError::Admission(errors)))?;
+        let checked = admit_slot(draft, &source.file, |unit, document, language| {
+            units.units().iter().any(|entry| {
+                entry.label().as_str() == unit
+                    && entry.document() == document
+                    && entry.texts().contains_key(language)
+            })
         })
-    })
-    .map_err(|fault| {
-        failure(
-            RuleId::M055,
-            AssemblyStage::Ownership,
-            AssemblySite::Source(input::site(&sources[0].file)),
-            AssemblyFault::UnknownToken {
-                value: format!("{fault:?}"),
-                expected: vec!["checked corpus slot".into()],
-            },
-        )
-    })?;
-    Ok((BTreeMap::from([(checked.id().into(), checked)]), sources))
+        .map_err(|fault| {
+            failure(
+                RuleId::M055,
+                AssemblyStage::Ownership,
+                AssemblySite::Source(input::site(&source.file)),
+                AssemblyFault::UnknownToken {
+                    value: format!("{fault:?}"),
+                    expected: vec!["checked corpus slot".into()],
+                },
+            )
+        })?;
+        let id = checked.id().to_owned();
+        if slots.insert(id.clone(), checked).is_some() {
+            return Err(failure(
+                RuleId::M055,
+                AssemblyStage::Ownership,
+                AssemblySite::Source(input::site(&source.file)),
+                AssemblyFault::UnknownToken {
+                    value: id,
+                    expected: vec!["unique corpus slot identity".into()],
+                },
+            ));
+        }
+    }
+    Ok((slots, sources))
 }
 
 pub(super) fn physical_owner<'a>(
@@ -102,26 +106,49 @@ fn paper_runs(output: &mut String, runs: &[ftoo_manifest::corpus::SlotRun]) {
 
 pub(super) fn fragment(
     slot: &CheckedSlot,
-    intro: &super::plan::Block,
+    blocks: &[super::plan::Block],
 ) -> Result<String, DocumentError> {
     use std::fmt::Write as _;
-    let ftoo_manifest::corpus::SlotBlock::Heading { title, .. } = &slot.blocks()[0] else {
-        unreachable!("admitted heading");
-    };
+    if blocks.len() != slot.blocks().len() {
+        return Err(failure(
+            RuleId::M055,
+            AssemblyStage::Emission,
+            AssemblySite::Source(input::site(slot.source())),
+            AssemblyFault::UnknownToken {
+                value: blocks.len().to_string(),
+                expected: vec![format!("{} ordered slot children", slot.blocks().len())],
+            },
+        ));
+    }
     let mut output = String::new();
-    output.push_str("\\section{");
-    paper_runs(&mut output, title);
-    writeln!(output, "}}\n\\label{{{}}}\n", slot.id()).expect("string write");
-    output.push_str(&super::paragraph_fragment_line(intro)?);
-    output.push('\n');
-    for (index, child) in slot.blocks().iter().enumerate().skip(2) {
-        let ftoo_manifest::corpus::SlotBlock::Paragraph { runs } = child else {
-            unreachable!("admitted paragraph");
-        };
-        paper_runs(&mut output, runs);
-        output.push('\n');
-        if index + 1 < slot.blocks().len() {
+    for (index, (child, block)) in slot.blocks().iter().zip(blocks).enumerate() {
+        if index > 0 {
             output.push('\n');
+        }
+        match child {
+            ftoo_manifest::corpus::SlotBlock::Heading { title, .. } => {
+                output.push_str("\\section{");
+                paper_runs(&mut output, title);
+                writeln!(output, "}}\n\\label{{{}}}", slot.id()).expect("string write");
+            }
+            ftoo_manifest::corpus::SlotBlock::Use { unit, .. } => {
+                if block.unit != *unit {
+                    return Err(failure(
+                        RuleId::M055,
+                        AssemblyStage::Emission,
+                        AssemblySite::Source(input::site(slot.source())),
+                        AssemblyFault::UnknownToken {
+                            value: block.unit.clone(),
+                            expected: vec![unit.clone()],
+                        },
+                    ));
+                }
+                output.push_str(&super::paragraph_fragment_line(block)?);
+            }
+            ftoo_manifest::corpus::SlotBlock::Paragraph { runs } => {
+                paper_runs(&mut output, runs);
+                output.push('\n');
+            }
         }
     }
     output.push_str("\\par\n");

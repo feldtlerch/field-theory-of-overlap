@@ -1,10 +1,9 @@
 //! Located source projection for one bounded corpus-slot comparison.
 
-use super::parse_slot;
-use crate::{units::UnitSource, units::toml};
+use crate::{documents::input, units::toml};
 use ftoo_manifest::corpus::{
     AccountOwner, BlockKind, BlockStatus, LocatedPiece, SlotBlock, SlotRun, SourceDraft,
-    admit_slot, check_transfer, import_source, located_inline,
+    check_transfer, import_source, located_inline,
 };
 use ftoo_manifest::{ShapeKind, SourceAnchor};
 use serde::Deserialize;
@@ -12,17 +11,12 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, path::Path, process::Command};
 
+#[cfg(test)]
 const SOURCE: &str = "documents/paper/explainer/explainer.tex";
+#[cfg(test)]
 const SLOT: &str = "units/corpus/explainer-plain.toml";
+#[cfg(test)]
 const INTRO: &str = "units/statements/plain-intro.toml";
-const KINDS: [&str; 6] = [
-    "heading",
-    "existing-native-inclusion",
-    "paragraph",
-    "paragraph",
-    "paragraph",
-    "paragraph",
-];
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -110,39 +104,52 @@ fn line_start(bytes: &[u8], line: usize) -> Result<usize, String> {
 fn selection(request: &Assignment, bytes: &[u8], before: bool) -> Result<(usize, usize), String> {
     if request.schema != 4
         || request.form != "coarse-slot"
-        || request.source != SOURCE
-        || request.unit != "sec:explainer:plain"
-        || request.first != 44
-        || request.last != 98
-        || request.blocks.len() != 6
+        || request.first == 0
+        || request.first > request.last
+        || request.blocks.len() < 2
+        || request.blocks[0].kind != "heading"
+        || request.blocks[0].first != request.first
         || request
             .blocks
-            .iter()
-            .zip(KINDS)
-            .any(|(block, kind)| block.kind != kind)
+            .last()
+            .is_none_or(|block| block.last != request.last)
+        || !request.blocks.iter().any(|block| block.kind == "paragraph")
+        || request.blocks.iter().enumerate().any(|(index, block)| {
+            block.first == 0
+                || block.first > block.last
+                || (index > 0
+                    && (request.blocks[index - 1].last.checked_add(1) != Some(block.first)
+                        || !matches!(
+                            block.kind.as_str(),
+                            "paragraph" | "existing-native-inclusion"
+                        )))
+        })
     {
         return Err("unsupported corpus-slot assignment".into());
     }
-    let expected = [(44, 46), (47, 48), (49, 55), (56, 68), (69, 84), (85, 98)];
-    if request
-        .blocks
-        .iter()
-        .zip(expected)
-        .any(|(block, (first, last))| block.first != first || block.last != last)
-    {
-        return Err("corpus-slot block lines differ from the bounded source".into());
-    }
     let first = line_start(bytes, request.first)?;
     let end = if before {
-        line_start(bytes, request.last + 1).unwrap_or(bytes.len())
+        line_start(
+            bytes,
+            request.last.checked_add(1).ok_or("source line overflows")?,
+        )
+        .unwrap_or(bytes.len())
     } else {
-        let after = line_start(bytes, request.first + 1).unwrap_or(bytes.len());
-        if &bytes[first..after] != b"% generated: sec:explainer:plain\n" {
+        let after = line_start(
+            bytes,
+            request
+                .first
+                .checked_add(1)
+                .ok_or("source line overflows")?,
+        )
+        .unwrap_or(bytes.len());
+        let marker = format!("% generated: {}\n", request.unit);
+        if bytes.get(first..after) != Some(marker.as_bytes()) {
             return Err("candidate marker differs from the selected slot".into());
         }
         if bytes
             .split(|byte| *byte == b'\n')
-            .filter(|line| *line == b"% generated: sec:explainer:plain")
+            .filter(|line| *line == marker.trim_end().as_bytes())
             .count()
             != 1
         {
@@ -314,46 +321,72 @@ fn plain_pieces(text: &str, base: usize) -> Vec<LocatedPiece> {
         .collect()
 }
 
-fn intro(root: &Path, revision: &str, before: bool) -> Result<Value, String> {
-    let (bytes, blob) = captured(root, revision, INTRO)?;
+fn native_child(
+    root: &Path,
+    revision: &str,
+    unit: &str,
+    document: &str,
+    language: &str,
+    index: usize,
+    before: bool,
+) -> Result<Value, String> {
+    let checked = crate::load_unit_files(root).map_err(|error| error.to_string())?;
+    let owner = checked
+        .units()
+        .iter()
+        .find(|entry| entry.label().as_str() == unit && entry.document() == document)
+        .ok_or_else(|| format!("native child {unit} has no checked owner"))?;
+    let checked_text = owner
+        .texts()
+        .get(language)
+        .ok_or_else(|| format!("native child {unit} has no {language} text"))?;
+    if !owner.math().is_empty() {
+        return Err(format!(
+            "native child {unit} is outside the plain paragraph profile"
+        ));
+    }
+    let path = checked_text.site().file.as_str();
+    let (bytes, blob) = captured(root, revision, path)?;
     let text = std::str::from_utf8(&bytes).map_err(|error| error.to_string())?;
-    let tree = toml::parse(INTRO, text).map_err(|error| error.to_string())?;
+    let tree = toml::parse(path, text).map_err(|error| error.to_string())?;
     toml::numeric(&tree, text).map_err(|error| error.to_string())?;
     let root_fields = toml::fixed(&tree, &["schema", "unit"]).map_err(|error| error.to_string())?;
     if toml::raw(root_fields[0], text) != "1" {
-        return Err("intro unit schema changed".into());
+        return Err("native child schema changed".into());
     }
     let unit_fields = toml::fixed(root_fields[1], &["id", "document", "math", "texts"])
         .map_err(|error| error.to_string())?;
     let id = toml::string(unit_fields[0])
         .map_err(|error| error.to_string())?
         .value;
-    if id != "sec:reading:plain-intro" {
-        return Err("intro unit identity changed".into());
+    if id != unit {
+        return Err("native child identity changed".into());
     }
     let document = toml::string(unit_fields[1])
         .map_err(|error| error.to_string())?
         .value;
-    if document != "explainer-pilot" {
-        return Err("intro unit document changed".into());
+    if document != owner.document() {
+        return Err("native child document changed".into());
     }
     if !toml::typed(unit_fields[2], ShapeKind::Table)
         .map_err(|error| error.to_string())?
         .fields
         .is_empty()
     {
-        return Err("intro unit mathematics changed".into());
+        return Err("native child mathematics changed".into());
     }
-    let texts = toml::fixed(unit_fields[3], &["en"]).map_err(|error| error.to_string())?;
-    let english = texts[0];
-    let (start, end, value) = plain_field(english, text)?;
+    let native_text = field(unit_fields[3], language)?;
+    let (start, end, value) = plain_field(native_text, text)?;
+    if value != checked_text.text() {
+        return Err("native child decoded text changed".into());
+    }
     let base = if before { start } else { 0 };
     let (tokens, controls) = tokenize(
         &plain_pieces(&value, base),
         if before { text } else { &value },
     )?;
-    Ok(json!({"kind":"existing-native-inclusion","index":1,
-        "origin":origin(INTRO,&blob,&bytes,start,end,Some("unit.texts.en")),
+    Ok(json!({"kind":"existing-native-inclusion","index":index,
+        "origin":origin(path,&blob,&bytes,start,end,Some(format!("unit.texts.{language}").as_str())),
         "tokens":tokens,"controls":controls}))
 }
 
@@ -390,6 +423,70 @@ fn source_accounting(source: &SourceDraft, start: usize, end: usize) -> Result<V
     Ok(accounting)
 }
 
+struct BeforeHeading {
+    pieces: Vec<LocatedPiece>,
+    controls: Vec<Value>,
+    label_controls: Vec<Value>,
+}
+
+fn before_heading(
+    source: &SourceDraft,
+    request: &Assignment,
+    text: &str,
+    start: usize,
+    end: usize,
+) -> Result<BeforeHeading, String> {
+    let prefix = "\\section{";
+    if !text[start..end].starts_with(prefix) {
+        return Err("heading syntax changed".into());
+    }
+    let title_start = start + prefix.len();
+    let close = text[title_start..end]
+        .find('}')
+        .ok_or("heading close is missing")?
+        + title_start;
+    let pieces = located_inline(&request.source, text, title_start, close)?;
+    let controls = vec![
+        control("section-open", start, title_start),
+        control("section-close", close, close + 1),
+    ];
+    let targets: Vec<_> = source
+        .metadata_targets
+        .iter()
+        .filter(|target| target.site.start_byte >= start && target.site.end_byte <= end)
+        .collect();
+    let [target] = targets.as_slice() else {
+        return Err("heading has no unique checked label".into());
+    };
+    let label_start = target.site.start_byte;
+    let label = format!("\\label{{{}}}", request.unit);
+    if target.exact_key != request.unit
+        || target.selector != request.unit
+        || target.source_command != "\\label"
+        || text.get(label_start..target.site.end_byte) != Some(label.as_str())
+    {
+        return Err("heading label changed".into());
+    }
+    let label_controls = vec![
+        control("label-open", label_start, label_start + 7),
+        control(
+            "label-value",
+            label_start + 7,
+            label_start + 7 + request.unit.len(),
+        ),
+        control(
+            "label-close",
+            label_start + 7 + request.unit.len(),
+            target.site.end_byte,
+        ),
+    ];
+    Ok(BeforeHeading {
+        pieces,
+        controls,
+        label_controls,
+    })
+}
+
 fn before_blocks(
     root: &Path,
     revision: &str,
@@ -398,13 +495,15 @@ fn before_blocks(
     request: &Assignment,
 ) -> Result<(Vec<Value>, Vec<Value>), String> {
     let text = std::str::from_utf8(bytes).map_err(|error| error.to_string())?;
-    let source = import_source(
-        SOURCE,
-        bytes,
-        digest(bytes),
-        &[("sec:reading:plain-intro".into(), "paragraph".into())],
-    )
-    .map_err(|error| error.to_string())?;
+    captured(root, revision, "generated/documents/inclusions.tsv")?;
+    let inclusions = input::import_inclusions(root).map_err(|error| error.to_string())?;
+    let markers = inclusions
+        .iter()
+        .filter(|row| row.source == request.source)
+        .map(|row| (row.unit.clone(), row.role.clone()))
+        .collect::<Vec<_>>();
+    let source = import_source(&request.source, bytes, digest(bytes), &markers)
+        .map_err(|error| error.to_string())?;
     let (selected_start, selected_end) = selection(request, bytes, true)?;
     let selected: Vec<_> = source
         .blocks
@@ -417,75 +516,71 @@ fn before_blocks(
         return Err("imported block count differs from assignment".into());
     }
     let mut blocks = Vec::new();
-    for (index, selected) in request.blocks.iter().enumerate() {
-        if index == 1 {
-            blocks.push(intro(root, revision, true)?);
-            continue;
-        }
-        let kind = if index == 0 {
-            BlockKind::Heading
-        } else {
-            BlockKind::Paragraph
-        };
-        let draft = source
-            .blocks
-            .iter()
-            .find(|block| block.site.start_line == selected.first && block.kind == kind)
-            .ok_or_else(|| format!("source block {index} was not decoded"))?;
-        if draft.status != BlockStatus::Decoded || draft.site.end_line > selected.last {
+    for (index, (selected, draft)) in request.blocks.iter().zip(selected).enumerate() {
+        if draft.status != BlockStatus::Decoded
+            || draft.site.start_line != selected.first
+            || draft.site.end_line > selected.last
+            || selected.kind
+                != serde_json::to_value(&draft.kind)
+                    .map_err(|error| error.to_string())?
+                    .as_str()
+                    .ok_or("imported block kind is not a string")?
+        {
             return Err(format!(
-                "source block {index} is not closed inside its selected lines"
+                "source block {index} differs from its selected lines or kind"
             ));
+        }
+        if let BlockKind::ExistingNativeInclusion = draft.kind {
+            let ftoo_manifest::corpus::BlockFields::NativeInclusion { unit, role, .. } =
+                &draft.fields
+            else {
+                return Err(format!("source child {index} has no native marker"));
+            };
+            if role != "paragraph" {
+                return Err(format!("source child {index} is not a paragraph use"));
+            }
+            blocks.push(native_child(
+                root,
+                revision,
+                unit,
+                "explainer-pilot",
+                "en",
+                index,
+                true,
+            )?);
+            continue;
         }
         let start = draft.site.start_byte;
         let end = if index == 0 {
-            line_start(bytes, 47)?
+            line_start(
+                bytes,
+                selected
+                    .last
+                    .checked_add(1)
+                    .ok_or("source line overflows")?,
+            )
+            .unwrap_or(bytes.len())
         } else {
             draft.site.end_byte
         };
-        let (pieces, mut controls) = if index == 0 {
-            let prefix = "\\section{";
-            if !text[start..end].starts_with(prefix) {
-                return Err("heading syntax changed".into());
-            }
-            let title_start = start + prefix.len();
-            let close = text[title_start..end]
-                .find('}')
-                .ok_or("heading close is missing")?
-                + title_start;
-            let pieces = located_inline(SOURCE, text, title_start, close)?;
-            let controls = vec![
-                control("section-open", start, title_start),
-                control("section-close", close, close + 1),
-            ];
-            (pieces, controls)
+        let BeforeHeading {
+            pieces,
+            mut controls,
+            label_controls,
+        } = if index == 0 {
+            before_heading(&source, request, text, start, end)?
         } else {
-            (located_inline(SOURCE, text, start, end)?, Vec::new())
+            BeforeHeading {
+                pieces: located_inline(&request.source, text, start, end)?,
+                controls: Vec::new(),
+                label_controls: Vec::new(),
+            }
         };
         let (tokens, inline_controls) = tokenize(&pieces, text)?;
         controls.extend(inline_controls);
-        if index == 0 {
-            let label_start = line_start(bytes, 45)?;
-            let label = "\\label{sec:explainer:plain}";
-            if !text[label_start..].starts_with(label) {
-                return Err("heading label changed".into());
-            }
-            controls.extend([
-                control("label-open", label_start, label_start + 7),
-                control(
-                    "label-value",
-                    label_start + 7,
-                    label_start + 7 + request.unit.len(),
-                ),
-                control(
-                    "label-close",
-                    label_start + 7 + request.unit.len(),
-                    label_start + label.len(),
-                ),
-            ]);
-        }
+        controls.extend(label_controls);
         blocks.push(json!({"kind":selected.kind,"index":index,
-            "origin":origin(SOURCE,blob,bytes,start,end,None),
+            "origin":origin(&request.source,blob,bytes,start,end,None),
             "tokens":tokens,"controls":controls}));
     }
     Ok((
@@ -536,51 +631,78 @@ fn after_blocks(
     request: &Assignment,
     parent_bytes: &[u8],
 ) -> Result<Vec<Value>, String> {
-    let (bytes, blob) = captured(root, revision, SLOT)?;
-    let source = UnitSource {
-        file: SLOT.into(),
-        bytes: bytes.clone(),
-    };
-    let draft = parse_slot(&source).map_err(|error| error.to_string())?;
-    let intro_row = intro(root, revision, false)?;
-    let checked = admit_slot(draft, |unit, document, language| {
-        unit == "sec:reading:plain-intro" && document == "explainer-pilot" && language == "en"
-    })
-    .map_err(|error| error.to_string())?;
+    captured(root, revision, "generated/documents/inclusions.tsv")?;
+    let inclusions = input::import_inclusions(root).map_err(|error| error.to_string())?;
+    let selected: Vec<_> = inclusions
+        .iter()
+        .filter(|row| {
+            row.source == request.source && row.unit == request.unit && row.role == "corpus-slot"
+        })
+        .collect();
+    if selected.len() != 1 || selected[0].line != request.first {
+        return Err("candidate slot has no unique declared physical occurrence".into());
+    }
+    let units = crate::load_unit_files(root).map_err(|error| error.to_string())?;
+    let (slots, _) =
+        crate::documents::corpus::load(root, &units).map_err(|error| error.to_string())?;
+    let checked = slots
+        .get(&request.unit)
+        .ok_or("candidate slot has no checked native owner")?;
+    if checked.document() != "explainer-pilot" || checked.language() != "en" {
+        return Err("candidate slot document or language differs".into());
+    }
+    let slot_path = checked.source();
+    let (bytes, blob) = captured(root, revision, slot_path)?;
+    let child_markers = checked
+        .blocks()
+        .iter()
+        .filter_map(|block| match block {
+            SlotBlock::Use { unit, role } => Some((unit.clone(), role.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     let inherited = import_source(
-        SOURCE,
+        &request.source,
         parent_bytes,
         digest(parent_bytes),
-        &[("sec:reading:plain-intro".into(), "paragraph".into())],
+        &child_markers,
     )
     .map_err(|error| error.to_string())?;
     check_transfer(
-        &checked,
+        checked,
         &inherited,
+        &request.source,
         parent_bytes,
         request.first,
         request.last,
     )
     .map_err(|error| format!("parent interval transfer refuses: {error}"))?;
-    if checked.id() != request.unit || checked.blocks().len() != 6 {
+    if checked.blocks().len() != request.blocks.len() {
         return Err("native slot identity or order changed".into());
     }
     let text = std::str::from_utf8(&bytes).map_err(|error| error.to_string())?;
-    let tree = toml::parse(SLOT, text).map_err(|error| error.to_string())?;
+    let tree = toml::parse(slot_path, text).map_err(|error| error.to_string())?;
     let nodes = &field(field(&tree, "unit")?, "blocks")?.elements;
     let mut blocks = Vec::new();
     for (index, (block, node)) in checked.blocks().iter().zip(nodes).enumerate() {
-        if index == 1 {
-            if !matches!(block, SlotBlock::Use { unit, role } if unit == "sec:reading:plain-intro" && role == "paragraph")
-            {
-                return Err("native intro use changed".into());
+        if let SlotBlock::Use { unit, role } = block {
+            if role != "paragraph" {
+                return Err(format!("native child {index} has a nonparagraph role"));
             }
-            blocks.push(intro_row.clone());
+            blocks.push(native_child(
+                root,
+                revision,
+                unit,
+                checked.document(),
+                checked.language(),
+                index,
+                false,
+            )?);
             continue;
         }
         let (runs, field_name) = match block {
             SlotBlock::Heading { title, .. } if index == 0 => (title, "title"),
-            SlotBlock::Paragraph { runs } if index >= 2 => (runs, "runs"),
+            SlotBlock::Paragraph { runs } if index >= 1 => (runs, "runs"),
             _ => return Err(format!("native block {index} changed kind")),
         };
         let run_node = field(node, field_name)?;
@@ -598,13 +720,44 @@ fn after_blocks(
         let (start, end) = span(&run_node.site.anchor)?;
         let (tokens, controls) = tokenize(&plain_pieces(&value, 0), &value)?;
         blocks.push(json!({"kind":request.blocks[index].kind,"index":index,
-            "origin":origin(SLOT,&blob,&bytes,start,end,Some(format!("unit.blocks[{index}].{field_name}").as_str())),
+            "origin":origin(slot_path,&blob,&bytes,start,end,Some(format!("unit.blocks[{index}].{field_name}").as_str())),
             "tokens":tokens,"controls":controls}));
     }
     Ok(blocks)
 }
 
-/// Export one captured side of the bounded ordered prefix.
+/// Check that a selected native child retains the same authored bytes.
+fn unchanged_native_children(root: &Path, request: &Assignment) -> Result<(), String> {
+    let units = crate::load_unit_files(root).map_err(|error| error.to_string())?;
+    let (slots, _) =
+        crate::documents::corpus::load(root, &units).map_err(|error| error.to_string())?;
+    let slot = slots
+        .get(&request.unit)
+        .ok_or("candidate slot has no checked owner")?;
+    for child in slot.blocks() {
+        if let SlotBlock::Use { unit, .. } = child {
+            let owner = units
+                .units()
+                .iter()
+                .find(|entry| entry.label().as_str() == unit && entry.document() == slot.document())
+                .ok_or("native child has no checked owner")?;
+            let path = &owner.texts()[slot.language()].site().file;
+            let parent = git(root, &["rev-parse", &format!("{}:{path}", request.parent)])?;
+            let candidate = git(
+                root,
+                &["rev-parse", &format!("{}:{path}", request.candidate)],
+            )?;
+            if parent != candidate {
+                return Err(format!(
+                    "native child {unit} source changed across transfer"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Export one captured side of a bounded ordered slot.
 /// # Errors
 /// Refuses changed source blobs, malformed assignments, unsupported syntax and ambiguous output paths.
 pub fn export_correspondence(
@@ -621,6 +774,13 @@ pub fn export_correspondence(
         return Err("assignment exceeds byte bound".into());
     }
     let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
+    let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
+        .map_err(|error| error.to_string())?;
+    if !request.source.starts_with("documents/paper/explainer/")
+        || !source_list.lines().any(|path| path == request.source)
+    {
+        return Err("assignment source is outside the declared explainer sources".into());
+    }
     for revision in [&request.parent, &request.candidate] {
         if revision.len() != 40
             || !revision
@@ -640,24 +800,20 @@ pub fn export_correspondence(
     }
     let parent_blob = git(
         root,
-        &["rev-parse", &format!("{}:{}", request.parent, SOURCE)],
+        &[
+            "rev-parse",
+            &format!("{}:{}", request.parent, request.source),
+        ],
     )?;
     if parent_blob != request.source_blob {
         return Err("parent source blob differs from assignment".into());
     }
-    let (bytes, blob) = captured(root, revision, SOURCE)?;
+    let (bytes, blob) = captured(root, revision, &request.source)?;
     let (first, end) = selection(&request, &bytes, side == "before")?;
     let (blocks, accounting) = if side == "before" {
         before_blocks(root, revision, &bytes, &blob, &request)?
     } else {
-        let parent_intro = git(root, &["rev-parse", &format!("{}:{INTRO}", request.parent)])?;
-        let candidate_intro = git(
-            root,
-            &["rev-parse", &format!("{}:{INTRO}", request.candidate)],
-        )?;
-        if parent_intro != candidate_intro {
-            return Err("intro child source changed across transfer".into());
-        }
+        unchanged_native_children(root, &request)?;
         (
             after_blocks(root, revision, &request, &blob_bytes(root, &parent_blob)?)?,
             vec![json!({"kind":"block","range":[first,end]})],
@@ -667,12 +823,17 @@ pub fn export_correspondence(
     let result = json!({"schema":1,"side":side,"revision":revision,"selection":selection,
         "source-blob":blob,"source-sha256":digest(&bytes),
         "accounting":accounting,"blocks":blocks});
-    if fs::read(root.join(SOURCE)).map_err(|error| error.to_string())? != bytes {
+    if fs::read(root.join(&request.source)).map_err(|error| error.to_string())? != bytes {
         return Err("source changed during correspondence export".into());
     }
-    captured(root, revision, INTRO)?;
     if side == "after" {
-        captured(root, revision, SLOT)?;
+        let units = crate::load_unit_files(root).map_err(|error| error.to_string())?;
+        let (slots, _) =
+            crate::documents::corpus::load(root, &units).map_err(|error| error.to_string())?;
+        let slot = slots
+            .get(&request.unit)
+            .ok_or("candidate slot has no checked owner")?;
+        captured(root, revision, slot.source())?;
     }
     if fs::read(assignment).map_err(|error| error.to_string())? != input {
         return Err("assignment changed during correspondence export".into());
@@ -699,6 +860,33 @@ pub fn export_correspondence(
     fs::write(output.join("correspondence.json"), encoded).map_err(|error| error.to_string())
 }
 
+/// Read one captured candidate selection for checked screen recovery.
+/// # Errors
+/// Refuses an unsupported request, changed candidate revision or missing source marker.
+pub(crate) fn recovery_selection(
+    root: &Path,
+    assignment: &Path,
+) -> Result<(String, usize, usize, String), String> {
+    let input = fs::read(assignment).map_err(|error| error.to_string())?;
+    if input.len() > 1_048_576 {
+        return Err("assignment exceeds byte bound".into());
+    }
+    let request: Assignment = serde_json::from_slice(&input).map_err(|error| error.to_string())?;
+    let source_list = fs::read_to_string(root.join("documents/paper-build/sources.tsv"))
+        .map_err(|error| error.to_string())?;
+    if !request.source.starts_with("documents/paper/explainer/")
+        || !source_list.lines().any(|path| path == request.source)
+    {
+        return Err("assignment source is outside the declared explainer sources".into());
+    }
+    if git(root, &["rev-parse", "HEAD"])? != request.candidate {
+        return Err("captured checkout revision differs from assignment candidate".into());
+    }
+    let bytes = fs::read(root.join(&request.source)).map_err(|error| error.to_string())?;
+    selection(&request, &bytes, false)?;
+    Ok((request.source, request.first, request.last, request.unit))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -717,16 +905,40 @@ mod tests {
             std::process::id()
         ));
         fs::create_dir_all(root.join("documents/paper/explainer")).unwrap();
+        fs::create_dir_all(root.join("documents/paper/parts")).unwrap();
+        fs::create_dir_all(root.join("documents/paper-build")).unwrap();
         fs::create_dir_all(root.join("units/statements")).unwrap();
         fs::create_dir_all(root.join("units/corpus")).unwrap();
+        fs::create_dir_all(root.join("units/scopes")).unwrap();
+        fs::create_dir_all(root.join("generated/documents")).unwrap();
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         for (from, to) in [
             ("units/fixtures/explainer-prefix-source.tex", SOURCE),
             (INTRO, INTRO),
             ("units/fixtures/explainer-plain.toml", SLOT),
+            (
+                "units/fixtures/explainer-prefix-scope.toml",
+                "units/scopes/explainer.toml",
+            ),
+            ("units/documents.toml", "units/documents.toml"),
         ] {
             fs::copy(source.join(from), root.join(to)).unwrap();
         }
+        fs::write(
+            root.join("documents/paper/parts/coda.tex"),
+            "% generated: sec:fixture:paper\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("documents/paper-build/sources.tsv"),
+            format!("{SOURCE}\ndocuments/paper/parts/coda.tex\n"),
+        )
+        .unwrap();
+        fs::write(root.join("units/scopes/coda.toml"),
+            "schema = 1\n\n[scope]\ndocument = \"paper-pilot\"\nsource = \"documents/paper/parts/coda.tex\"\n\n[[scope.occurrences]]\nunit = \"sec:fixture:paper\"\nrole = \"paragraph\"\n").unwrap();
+        fs::write(root.join("generated/documents/inclusions.tsv"),
+            format!("{SOURCE}\tsec:reading:plain-intro\tgenerated/documents/explainer-pilot/sec-reading-plain-intro.tex\tparagraph\t47\n"),
+        ).unwrap();
         for args in [
             vec!["init", "-q"],
             vec!["config", "user.name", "Test"],
@@ -794,6 +1006,19 @@ mod tests {
         result.extend_from_slice(b"% generated: sec:explainer:plain\n");
         result.extend_from_slice(&bytes[end..]);
         fs::write(path, result).unwrap();
+        fs::write(root.join("generated/documents/inclusions.tsv"),
+            format!("{SOURCE}\tsec:explainer:plain\tgenerated/documents/explainer-pilot/sec-explainer-plain.tex\tcorpus-slot\t44\n"),
+        ).unwrap();
+        let scope = root.join("units/scopes/explainer.toml");
+        let original = fs::read_to_string(&scope).unwrap();
+        fs::write(
+            scope,
+            original.replace(
+                "unit = \"sec:reading:plain-intro\"\nrole = \"paragraph\"",
+                "unit = \"sec:explainer:plain\"\nrole = \"corpus-slot\"",
+            ),
+        )
+        .unwrap();
     }
 
     fn assert_before_locations(old: &Value, source: &str) {

@@ -373,7 +373,7 @@ pub fn check_skeletons_with_slots<'a>(
         let sites = slot_references.get(label).cloned().unwrap_or_default();
         if sites.len() != 1 {
             let site = sites.first().cloned().unwrap_or_else(|| UnitSite {
-                file: "units/corpus/explainer-plain.toml".into(),
+                file: checked.source().into(),
                 path: Vec::new(),
                 anchor: crate::SourceAnchor::Unavailable,
                 decoded: None,

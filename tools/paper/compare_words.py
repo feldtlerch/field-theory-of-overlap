@@ -452,11 +452,15 @@ def coarse_slot_assignment(row, source_bytes):
     if row['blocks'][0]['first'] != row['first'] or preceding != row['last']:
         raise Fault('AssignmentInvalid', 'coarse-slot interval is not fully accounted',
                     'request')
+    kinds = [block['kind'] for block in row['blocks']]
+    if (len(kinds) < 2 or kinds[0] != 'heading' or
+            'paragraph' not in kinds[1:] or
+            any(kind not in ('paragraph', 'existing-native-inclusion')
+                for kind in kinds[1:])):
+        raise Fault('AssignmentInvalid', 'coarse-slot child kinds differ', 'request')
     return row
 
 
-SLOT_KINDS = ('heading', 'existing-native-inclusion', 'paragraph', 'paragraph',
-              'paragraph', 'paragraph')
 SLOT_CONTROLS = {
     'section-open': (b'\\section{', b''),
     'section-close': (b'}', b''),
@@ -490,7 +494,7 @@ def _unique_json(data, code):
         raise Fault(code, 'correspondence is not UTF-8 JSON', 'snapshot') from error
 
 
-def located_slot_export(data, captured, assignment, side, revision):
+def located_slot_export(data, captured, assignment, side, revision, nested_units=None):
     """Bind the importer's located blocks to this side's captured source bytes."""
     row = _unique_json(data, 'CorrespondenceInvalid')
     selection = {key: assignment[key] for key in ('source', 'first', 'last', 'unit')}
@@ -500,7 +504,7 @@ def located_slot_export(data, captured, assignment, side, revision):
             row['side'] != side or row['revision'] != revision or
             row['selection'] != selection or
             not isinstance(row['blocks'], list) or
-            len(row['blocks']) != len(SLOT_KINDS)):
+            len(row['blocks']) != len(assignment['blocks'])):
         raise Fault('CorrespondenceInvalid', 'located slot identity or blocks differ',
                     'snapshot')
     inherited = captured.get(assignment['source'])
@@ -534,8 +538,23 @@ def located_slot_export(data, captured, assignment, side, revision):
     if cursor != interval_end:
         raise Fault('CorrespondenceInvalid', 'located slot accounting omits source bytes',
                     'snapshot')
+    def native_unit_id(path):
+        try:
+            unit = tomllib.loads(captured[path].decode('utf-8'))['unit']
+            value = unit['id']
+        except (KeyError, TypeError, ValueError, UnicodeError) as error:
+            raise Fault('CorrespondenceInvalid',
+                        'located slot child owner is unreadable', 'snapshot') from error
+        if not isinstance(value, str):
+            raise Fault('CorrespondenceInvalid',
+                        'located slot child owner is unreadable', 'snapshot')
+        return value
+
     preceding_end = -1
-    for ordinal, (block, kind) in enumerate(zip(row['blocks'], SLOT_KINDS)):
+    native_paths = set()
+    use_index = 0
+    for ordinal, (block, selected) in enumerate(zip(row['blocks'], assignment['blocks'])):
+        kind = selected['kind']
         if (not isinstance(block, dict) or set(block) != {
                 'kind', 'index', 'origin', 'tokens', 'controls'} or
                 block['kind'] != kind or type(block['index']) is not int or
@@ -561,13 +580,23 @@ def located_slot_export(data, captured, assignment, side, revision):
             raise Fault('CorrespondenceInvalid', 'located slot child origin differs',
                         'snapshot')
         raw_field = blob[span[0]:span[1]]
-        expected_path = ('units/statements/plain-intro.toml' if ordinal == 1 else
-                         assignment['source'] if side == 'before' else
-                         'units/corpus/explainer-plain.toml')
-        if path != expected_path:
+        expected_origin = (
+            path.startswith('units/statements/') and path.endswith('.toml')
+            if kind == 'existing-native-inclusion' else
+            path == assignment['source'] if side == 'before' else
+            path.startswith('units/corpus/') and path.endswith('.toml'))
+        if not expected_origin:
             raise Fault('CorrespondenceInvalid', 'located slot child source differs',
                         'snapshot')
-        if ordinal != 1:
+        if kind == 'existing-native-inclusion':
+            if nested_units is not None and (use_index >= len(nested_units) or
+                                              native_unit_id(path) != nested_units[use_index]):
+                raise Fault('CorrespondenceInvalid', 'located slot child owner differs',
+                            'snapshot')
+            use_index += 1
+        elif side == 'after':
+            native_paths.add(path)
+        if kind != 'existing-native-inclusion':
             if (side == 'before' and not interval_start <= span[0] < span[1] <= interval_end or
                     span[0] < preceding_end):
                 raise Fault('CorrespondenceInvalid', 'located slot source order differs',
@@ -670,6 +699,11 @@ def located_slot_export(data, captured, assignment, side, revision):
         decoded.append(dict(tokens=tokens, source_bytes=source_bytes, base_offset=base,
                             source_controls=controls, extracted=extracted, semantic=semantic,
                             origin=origin, kind=kind))
+    if nested_units is not None and use_index != len(nested_units):
+        raise Fault('CorrespondenceInvalid', 'located slot child owner differs', 'snapshot')
+    if side == 'after' and (len(native_paths) != 1 or
+                            native_unit_id(next(iter(native_paths))) != assignment['unit']):
+        raise Fault('CorrespondenceInvalid', 'located slot native owner differs', 'snapshot')
     return decoded
 
 
@@ -1704,49 +1738,84 @@ def slot_source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, sl
                     'snapshot')
     new_rows = scope_fragments(candidate_dir)
     nested = [row for row in old_rows if row[0] == source and first <= row[4] <= last]
-    if len(nested) != 1 or nested[0][3] != 'paragraph':
+    uses = [block for block in slot['blocks']
+            if block['kind'] == 'existing-native-inclusion']
+    if (len(nested) != len(uses) or
+            any(row[3] != 'paragraph' or row[4] != block['first']
+                for row, block in zip(nested, uses))):
         reasons.append('slot existing inclusion differs')
-        old_fragment = None
+        old_fragments = []
         new_fragment = None
     else:
-        old_fragment = nested[0][2]
+        old_fragments = [row[2] for row in nested]
         slot_rows = [row for row in new_rows if row[0] == source and
                      row[1] == slot['unit'] and row[3] == 'corpus-slot' and row[4] == first]
         if len(slot_rows) != 1:
             reasons.append('slot inclusion row is absent or repeated')
             return dict(available=False, reasons=sorted(set(reasons)), rows=rows,
-                        inclusion_shift=shift, nested_use=nested[0][1])
+                        inclusion_shift=shift, nested_use=nested[0][1] if len(nested) == 1 else None,
+                        nested_uses=[row[1] for row in nested])
         new_fragment = slot_rows[0][2]
         if any(not name.startswith('generated/documents/') or
                '..' in pathlib.PurePosixPath(name).parts
-               for name in (old_fragment, new_fragment)):
+               for name in old_fragments + [new_fragment]):
             reasons.append('slot fragment path differs')
             return dict(available=False, reasons=sorted(set(reasons)), rows=rows,
-                        inclusion_shift=shift, nested_use=nested[0][1])
+                        inclusion_shift=shift, nested_use=nested[0][1] if len(nested) == 1 else None,
+                        nested_uses=[row[1] for row in nested])
         expected_rows = []
+        insert_at = None
         for row in old_rows:
-            if row == nested[0]:
-                expected_rows.append((source, slot['unit'], new_fragment,
-                                      'corpus-slot', first))
-            else:
+            if row in nested and insert_at is None:
+                insert_at = len(expected_rows)
+            if (insert_at is None and row[0] == source and row[4] > last):
+                insert_at = len(expected_rows)
+            if row not in nested:
                 path, key, fragment, role, line = row
                 expected_rows.append((path, key, fragment, role,
                                       line + shift if path == source and line > last else line))
-        if list(new_rows) != expected_rows:
+        if insert_at is None:
+            same_source = [index for index, row in enumerate(expected_rows)
+                           if row[0] == source]
+            if same_source:
+                insert_at = same_source[-1] + 1
+            else:
+                source_order = (candidate_dir / 'documents/paper-build/sources.tsv'
+                                ).read_text().splitlines()
+                if source not in source_order:
+                    reasons.append('slot source is outside the declared source order')
+                    insert_at = len(expected_rows)
+                else:
+                    rank = source_order.index(source)
+                    insert_at = next((index for index, row in enumerate(expected_rows)
+                                      if row[0] in source_order and
+                                      source_order.index(row[0]) > rank),
+                                     len(expected_rows))
+        expected_rows.insert(insert_at, slot_rows[0])
+        source_positions = [index for index, row in enumerate(new_rows)
+                            if row[0] == source]
+        source_lines = [new_rows[index][4] for index in source_positions]
+        if (new_rows != tuple(expected_rows) or
+                source_positions != list(range(min(source_positions), max(source_positions) + 1)) or
+                source_lines != sorted(set(source_lines))):
             reasons.append('slot inclusion rows differ')
-        old_artifact = parent_dir / old_fragment
         new_artifact = candidate_dir / new_fragment
-        if (old_artifact.is_symlink() or new_artifact.is_symlink() or
-                not old_artifact.is_file() or not new_artifact.is_file()):
+        if new_artifact.is_symlink() or not new_artifact.is_file():
             reasons.append('slot fragment is not an ordinary file')
-            original = replacement = b''
+            replacement = b''
         else:
-            original = old_artifact.read_bytes()
             replacement = new_artifact.read_bytes()
-        if not original or replacement.count(original) != 1:
-            reasons.append('slot child fragment is not unchanged exactly once')
-        rows.append(dict(path=old_fragment, selected=True,
-                         before_original=digest(original)))
+        for old_fragment in old_fragments:
+            old_artifact = parent_dir / old_fragment
+            if old_artifact.is_symlink() or not old_artifact.is_file():
+                reasons.append('slot child fragment is not an ordinary file')
+                original = b''
+            else:
+                original = old_artifact.read_bytes()
+            if not original or replacement.count(original) != 1:
+                reasons.append('slot child fragment is not unchanged exactly once')
+            rows.append(dict(path=old_fragment, selected=True,
+                             before_original=digest(original)))
         rows.append(dict(path=new_fragment, selected=True,
                          after_original=digest(replacement)))
     old_receipt = parent['receipt']
@@ -1763,8 +1832,8 @@ def slot_source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, sl
     after_names = set(new_receipt['inputs'])
     selected = {source, 'generated/documents/inclusions.tsv',
                 'generated/paper/inputs.json'} | set(native_paths)
-    if old_fragment is not None:
-        selected.update((old_fragment, new_fragment))
+    if new_fragment is not None:
+        selected.update(old_fragments + [new_fragment])
     if before_names - selected != after_names - selected:
         reasons.append('slot receipt input membership differs')
     captured_before = {row['path'] for row in parent['inputs']}
@@ -1791,6 +1860,7 @@ def slot_source_envelope(parent, parent_dir, candidate_dir, candidate_inputs, sl
                          selected=name in selected))
     return dict(available=not reasons, reasons=sorted(set(reasons)), rows=rows,
                 inclusion_shift=shift, nested_use=nested[0][1] if len(nested) == 1 else None,
+                nested_uses=[row[1] for row in nested],
                 source_substitution=dict(path=source, before=[first, last], after=[first, first]))
 
 
@@ -1824,15 +1894,16 @@ def capture_assignment(repo, assignment_path):
     if isinstance(assignment, dict) and assignment.get('schema') == 4:
         source = assignment.get('source')
         parent = assignment.get('parent')
-        if (source != 'documents/paper/explainer/explainer.tex' or
+        declared = (repo / 'documents/paper-build/sources.tsv').read_text().splitlines()
+        if (not isinstance(source, str) or
+                not source.startswith('documents/paper/explainer/') or
+                source not in declared or
                 not isinstance(parent, str) or
                 re.fullmatch(r'[0-9a-f]{40}', parent) is None):
             raise Fault('AssignmentInvalid', 'coarse-slot source identity differs',
                         'request')
         source_bytes = git(repo, 'show', parent + ':' + source)
         coarse_slot_assignment(assignment, source_bytes)
-        if tuple(block['kind'] for block in assignment['blocks']) != SLOT_KINDS:
-            raise Fault('AssignmentInvalid', 'coarse-slot child kinds differ', 'request')
         return assignment, path, data
     fields = {'schema', 'parent', 'candidate', 'source', 'source-blob', 'first',
               'last', 'unit', 'unit-path'}
@@ -2135,7 +2206,7 @@ def assigned_plain_scope(repo, assignment, evidence, parent, before, after, enve
     return result
 
 
-def _slot_export(binary, repo, root, revision, request, side, output):
+def _slot_export(binary, repo, root, revision, request, source, side, output):
     """Ask the native owner from a captured checkout at this side's commit."""
     target = output / (side + '-correspondence')
     checkout = output / (side + '-checkout')
@@ -2150,11 +2221,7 @@ def _slot_export(binary, repo, root, revision, request, side, output):
         if prepared.returncode != 0:
             raise Fault('CorrespondenceInvalid', 'side checkout refuses: ' +
                         prepared.stderr.decode('utf-8', errors='replace'), 'snapshot')
-    paths = ['documents/paper/explainer/explainer.tex',
-             'units/statements/plain-intro.toml']
-    if side == 'after':
-        paths.append('units/corpus/explainer-plain.toml')
-    for name in paths:
+    for name in [source]:
         try:
             equal = (checkout / name).read_bytes() == (root / name).read_bytes()
         except OSError as error:
@@ -2235,25 +2302,6 @@ def _capture_slot_origins(repo, revision, root, export, inputs, side):
     return {name for name in paths if name.startswith('units/corpus/')}
 
 
-def _seed_slot_sources(repo, revision, root, inputs, side):
-    """Supply the first slot's two declared native origins to its exporter."""
-    names = ['units/statements/plain-intro.toml']
-    if side == 'after':
-        names.append('units/corpus/explainer-plain.toml')
-    known = {item['path'] for item in inputs}
-    for name in names:
-        if name in known:
-            continue
-        data = git(repo, 'show', revision + ':' + name)
-        target = root / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
-        if side == 'after' and (repo / name).read_bytes() != data:
-            raise Fault('InputChanged', 'slot unit differs from candidate: ' + name,
-                        'snapshot')
-        inputs.append(dict(path=name, sha256=digest(data)))
-
-
 def compare_slot(args, captured_assignment):
     """Use checked native projections for one ordered slot; retain whole PDF checks."""
     repo = args.repository.resolve()
@@ -2294,8 +2342,6 @@ def compare_slot(args, captured_assignment):
     candidate_inputs = snapshot_inputs(repo, snapshot, held)
     parent_dir = output / 'parent-snapshot'
     old = parent_snapshot(repo, parent, parent_dir)
-    _seed_slot_sources(repo, parent, parent_dir, old['inputs'], 'before')
-    _seed_slot_sources(repo, candidate, snapshot, candidate_inputs, 'after')
     for item in candidate_inputs:
         name = item['path']
         if (snapshot / name).read_bytes() != git(repo, 'show', candidate + ':' + name):
@@ -2305,8 +2351,10 @@ def compare_slot(args, captured_assignment):
             git(repo, 'show', parent + ':' + assignment['source'])):
         raise Fault('InputChanged', 'slot parent source differs from commit', 'snapshot')
     before_data = _slot_export(args.paper_binary, repo, parent_dir, parent, request,
+                               assignment['source'],
                                'before', output)
     after_data = _slot_export(args.paper_binary, repo, snapshot, candidate, request,
+                              assignment['source'],
                               'after', output)
     _capture_slot_origins(repo, parent, parent_dir, before_data, old['inputs'], 'before')
     native_paths = _capture_slot_origins(
@@ -2315,8 +2363,20 @@ def compare_slot(args, captured_assignment):
                  for item in old['inputs']}
     new_paths = {item['path']: (snapshot / item['path']).read_bytes()
                  for item in candidate_inputs}
-    before_blocks = located_slot_export(before_data, old_paths, assignment, 'before', parent)
-    after_blocks = located_slot_export(after_data, new_paths, assignment, 'after', candidate)
+    nested_units = []
+    for block in assignment['blocks']:
+        if block['kind'] == 'existing-native-inclusion':
+            matches = [row[1] for row in old['fragments']
+                       if row[0] == assignment['source'] and row[3] == 'paragraph'
+                       and row[4] == block['first']]
+            if len(matches) != 1:
+                raise Fault('CorrespondenceInvalid',
+                            'located slot nested inclusion differs', 'snapshot')
+            nested_units.append(matches[0])
+    before_blocks = located_slot_export(before_data, old_paths, assignment, 'before',
+                                        parent, nested_units)
+    after_blocks = located_slot_export(after_data, new_paths, assignment, 'after',
+                                       candidate, nested_units)
     envelope = slot_source_envelope(old, parent_dir, snapshot, candidate_inputs,
                                     assignment, native_paths)
     declared_fragments(snapshot, (snapshot / 'documents/paper-build/sources.tsv').read_text().splitlines())
