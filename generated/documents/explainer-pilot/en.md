@@ -21,6 +21,12 @@ Every tie invites two different questions. *Which way does it lean?* — when th
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+## The Edge
+
+The whole theory starts with a simple thought:
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <p align="center"><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>
 <p align="right"><a href="../paper-pilot/en.md#sec-cwhich--way">sec:which&#45;way</a></p>
 

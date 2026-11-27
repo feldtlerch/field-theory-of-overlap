@@ -13,9 +13,10 @@ documents/paper/parts/coda.tex	sec:coda:whole-field	generated/documents/paper-pi
 documents/paper/parts/coda.tex	sec:coda:record-limit	generated/documents/paper-pilot/sec-coda-record-limit.tex	refrain	79
 documents/paper/parts/appendices.tex	sec:log:andreoni-joint	generated/documents/paper-pilot/sec-log-andreoni-joint.tex	paragraph	424
 documents/paper/explainer/explainer.tex	sec:explainer:plain	generated/documents/explainer-pilot/sec-explainer-plain.tex	corpus-slot	44
-documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	262
-documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	353
-documents/paper/explainer/explainer.tex	sec:explainer:accountability	generated/documents/explainer-pilot/sec-explainer-accountability.tex	corpus-slot	532
-documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	611
-documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	879
-documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	887
+documents/paper/explainer/explainer.tex	sec:explainer:edge	generated/documents/explainer-pilot/sec-explainer-edge.tex	corpus-slot	212
+documents/paper/explainer/explainer.tex	sec:say:direction	generated/documents/explainer-pilot/sec-say-direction.tex	quotation	258
+documents/paper/explainer/explainer.tex	eq:explainer:overlap-flow	generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex	equation	349
+documents/paper/explainer/explainer.tex	sec:explainer:accountability	generated/documents/explainer-pilot/sec-explainer-accountability.tex	corpus-slot	528
+documents/paper/explainer/explainer.tex	sec:say:enemy-to-none	generated/documents/explainer-pilot/sec-say-enemy-to-none.tex	quotation	607
+documents/paper/explainer/explainer.tex	sec:explainer:eight-words	generated/documents/explainer-pilot/sec-explainer-eight-words.tex	paragraph	875
+documents/paper/explainer/explainer.tex	sec:coda:record-limit	generated/documents/explainer-pilot/sec-coda-record-limit.tex	quotation	883

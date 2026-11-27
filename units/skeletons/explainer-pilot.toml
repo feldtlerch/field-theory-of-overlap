@@ -7,6 +7,7 @@ document = "explainer-pilot"
 heading = "sec:pilot:explainer-excerpt"
 children = [
   { kind = "corpus-slot", unit = "sec:explainer:plain" },
+  { kind = "corpus-slot", unit = "sec:explainer:edge" },
   { kind = "quotation", unit = "sec:say:direction" },
   { kind = "equation", unit = "eq:explainer:overlap-flow", numbering = "none" },
   { kind = "corpus-slot", unit = "sec:explainer:accountability" },

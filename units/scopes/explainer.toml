@@ -9,6 +9,10 @@ unit = "sec:explainer:plain"
 role = "corpus-slot"
 
 [[scope.occurrences]]
+unit = "sec:explainer:edge"
+role = "corpus-slot"
+
+[[scope.occurrences]]
 unit = "sec:say:direction"
 role = "quotation"
 

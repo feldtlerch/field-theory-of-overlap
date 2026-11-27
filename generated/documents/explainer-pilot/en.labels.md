@@ -29,6 +29,14 @@ Every tie invites two different questions. *Which way does it lean?* — when th
 
 Not yet converted: intervening material is omitted from this excerpt.
 
+<!-- unit sec:explainer:edge document explainer-pilot language en -->
+## The Edge
+
+<!-- unit sec:explainer:edge::paragraph:1 document explainer-pilot language en -->
+The whole theory starts with a simple thought:
+
+Not yet converted: intervening material is omitted from this excerpt.
+
 <!-- unit sec:say:direction document explainer-pilot language en -->
 <p align="center"><em>Direction tells which way two fates lean, never how much fate there is to lean.</em></p>
 <p align="right"><a href="../paper-pilot/en.md#sec-cwhich--way">sec:which&#45;way</a><!-- cite sec:say:direction --></p>

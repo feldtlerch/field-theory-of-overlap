@@ -9,7 +9,7 @@
       "position": 0
     },
     {
-      "after-unit": "sec:say:direction",
+      "after-unit": "sec:explainer:edge",
       "before-unit": "sec:explainer:plain::paragraph:5",
       "document": "explainer-pilot",
       "language": "en",
@@ -17,12 +17,20 @@
       "position": 6
     },
     {
+      "after-unit": "sec:say:direction",
+      "before-unit": "sec:explainer:edge::paragraph:1",
+      "document": "explainer-pilot",
+      "language": "en",
+      "message": "Not yet converted: intervening material is omitted from this excerpt.",
+      "position": 8
+    },
+    {
       "after-unit": "eq:explainer:overlap-flow",
       "before-unit": "sec:say:direction",
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 7
+      "position": 9
     },
     {
       "after-unit": "sec:explainer:accountability",
@@ -30,7 +38,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 8
+      "position": 10
     },
     {
       "after-unit": "sec:say:enemy-to-none",
@@ -38,7 +46,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 11
+      "position": 13
     },
     {
       "after-unit": "sec:explainer:eight-words",
@@ -46,7 +54,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 12
+      "position": 14
     },
     {
       "after-unit": "sec:coda:record-limit",
@@ -54,7 +62,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 13
+      "position": 15
     },
     {
       "after-unit": null,
@@ -62,7 +70,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 14
+      "position": 16
     },
     {
       "after-unit": "sec:reading:shadow",

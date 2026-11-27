@@ -1,0 +1,18 @@
+schema = 1
+
+[unit]
+id = "sec:explainer:edge"
+document = "explainer-pilot"
+composition = "corpus-slot"
+language = "en"
+
+[[unit.blocks]]
+kind = "heading"
+level = "section"
+star = false
+title = [{ kind = "text", decoded = "The Edge" }]
+label = "sec:explainer:edge"
+
+[[unit.blocks]]
+kind = "paragraph"
+runs = [{ kind = "text", decoded = "The whole theory starts with a simple thought:" }]
