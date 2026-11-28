@@ -231,7 +231,7 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
 | `generated/documents/inclusions.tsv` | `5b4014b9f85e756eb18647444436814181d7ec0d` |
 | `tools/paper/native_coverage_capabilities.tsv` | `ef49751a3894cc755ffe851343d432a31fc57e14` |
-| `tools/paper/native_coverage_slot_census.json` | `8c53aff027bf2ffd614ca8b831b9fcaacd3874dc` |
+| `tools/paper/native_coverage_slot_census.json` | `aa6e14ac43e432a4a98a7e52204048854c59088c` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |

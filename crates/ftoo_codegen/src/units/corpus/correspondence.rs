@@ -9,7 +9,7 @@ use ftoo_manifest::{ShapeKind, SourceAnchor};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{fs, path::Path, process::Command};
+use std::{fs, ops::Range, path::Path, process::Command};
 
 #[cfg(test)]
 const SOURCE: &str = "documents/paper/explainer/explainer.tex";
@@ -300,7 +300,9 @@ fn tokenize(pieces: &[LocatedPiece], source: &str) -> Result<(Vec<Value>, Vec<Va
         let kind = if ch.is_ascii_alphabetic() {
             index += 1;
             while index < characters.len()
-                && characters[index - 1].2 == characters[index].1
+                && (characters[index - 1].2 == characters[index].1
+                    || (characters[index - 1].1 == characters[index].1
+                        && characters[index - 1].2 == characters[index].2))
                 && (characters[index].0.is_ascii_alphabetic()
                     || matches!(characters[index].0, '\'' | '’')
                         && characters
@@ -364,6 +366,49 @@ fn plain_pieces(text: &str, base: usize) -> Vec<LocatedPiece> {
         .collect()
 }
 
+fn native_pieces(
+    text: &str,
+    base: usize,
+    virtues: &[(Range<usize>, &str)],
+) -> Result<Vec<LocatedPiece>, String> {
+    let mut pieces = Vec::new();
+    let mut at = 0;
+    let mut remaining = virtues.iter().peekable();
+    while at < text.len() {
+        if let Some((range, word)) = remaining.peek() {
+            if range.start < at || range.end > text.len() {
+                return Err("native virtue site differs from checked text".into());
+            }
+            if range.start == at {
+                if text.get(range.clone()) != Some(format!("@virtue{{{word}}}").as_str()) {
+                    return Err("native virtue site differs from checked text".into());
+                }
+                pieces.push(LocatedPiece {
+                    start: base + range.start,
+                    end: base + range.end,
+                    semantic: (*word).to_owned(),
+                    control: None,
+                });
+                at = range.end;
+                remaining.next();
+                continue;
+            }
+        }
+        let ch = text[at..].chars().next().ok_or("native text ends early")?;
+        pieces.push(LocatedPiece {
+            start: base + at,
+            end: base + at + ch.len_utf8(),
+            semantic: ch.to_string(),
+            control: None,
+        });
+        at += ch.len_utf8();
+    }
+    if remaining.next().is_some() {
+        return Err("native virtue site differs from checked text".into());
+    }
+    Ok(pieces)
+}
+
 fn native_child(
     root: &Path,
     revision: &str,
@@ -424,8 +469,22 @@ fn native_child(
         return Err("native child decoded text changed".into());
     }
     let base = if before { start } else { 0 };
+    let virtues = checked_text
+        .virtue_occurrences()
+        .iter()
+        .map(|occurrence| {
+            Ok((
+                occurrence
+                    .site()
+                    .decoded
+                    .clone()
+                    .ok_or("native virtue has no decoded site")?,
+                occurrence.word(),
+            ))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     let (tokens, controls) = tokenize(
-        &plain_pieces(&value, base),
+        &native_pieces(&value, base, &virtues)?,
         if before { text } else { &value },
     )?;
     Ok(json!({"kind":"existing-native-inclusion","index":index,
@@ -1163,6 +1222,95 @@ mod tests {
                 Err("paragraph slot id differs from its captured source interval".into())
             );
         }
+    }
+
+    #[test]
+    fn native_virtue_words_keep_their_checked_source_spelling() {
+        let source = "Hold @virtue{wonder} and @virtue{beauty}.";
+        let wonder = source.find("@virtue{wonder}").unwrap();
+        let beauty = source.find("@virtue{beauty}").unwrap();
+        let sites = [
+            (wonder..wonder + "@virtue{wonder}".len(), "wonder"),
+            (beauty..beauty + "@virtue{beauty}".len(), "beauty"),
+        ];
+        let (tokens, controls) =
+            tokenize(&native_pieces(source, 0, &sites).unwrap(), source).unwrap();
+        assert_eq!(controls, Vec::<Value>::new());
+        assert_eq!(tokens[1]["semantic"], "wonder");
+        assert_eq!(tokens[1]["source_spelling"], "@virtue{wonder}");
+        assert_eq!(tokens[3]["semantic"], "beauty");
+        assert_eq!(tokens[3]["source_spelling"], "@virtue{beauty}");
+        let changed = source.replace("wonder", "wisdom");
+        let changed_sites = [
+            (wonder..wonder + "@virtue{wisdom}".len(), "wisdom"),
+            sites[1].clone(),
+        ];
+        let (changed_tokens, _) = tokenize(
+            &native_pieces(&changed, 0, &changed_sites).unwrap(),
+            &changed,
+        )
+        .unwrap();
+        assert_ne!(tokens[1]["semantic"], changed_tokens[1]["semantic"]);
+        let missing = source.replace("@virtue{wonder}", "wonder");
+        let beauty = missing.find("@virtue{beauty}").unwrap();
+        let missing_sites = [(beauty..beauty + "@virtue{beauty}".len(), "beauty")];
+        let (missing_tokens, _) = tokenize(
+            &native_pieces(&missing, 0, &missing_sites).unwrap(),
+            &missing,
+        )
+        .unwrap();
+        assert_ne!(
+            tokens[1]["source_spelling"],
+            missing_tokens[1]["source_spelling"]
+        );
+    }
+
+    #[test]
+    fn changed_or_missing_native_virtue_refuses_an_unchanged_child() {
+        let root = repo();
+        let path = root.join(INTRO);
+        let original = fs::read_to_string(&path).unwrap();
+        let with_virtue =
+            original.replacen("This first section", "@virtue{wonder} first section", 1);
+        assert_ne!(with_virtue, original);
+        fs::write(&path, &with_virtue).unwrap();
+        let parent = commit(&root);
+        candidate_source(&root);
+        let candidate = commit(&root);
+        let request = assignment(&root, &parent, &candidate);
+        let output = root.parent().unwrap().join(format!(
+            "{}-virtue",
+            root.file_name().unwrap().to_string_lossy()
+        ));
+        export_correspondence(&root, &request, "after", &output).unwrap();
+        let export: Value =
+            serde_json::from_slice(&fs::read(output.join("correspondence.json")).unwrap()).unwrap();
+        assert!(
+            export["blocks"][1]["tokens"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|token| token["source_spelling"] == "@virtue{wonder}"
+                    && token["semantic"] == "wonder")
+        );
+        for changed in [
+            with_virtue.replace("@virtue{wonder}", "@virtue{wisdom}"),
+            with_virtue.replace("@virtue{wonder}", "wonder"),
+        ] {
+            fs::write(&path, changed).unwrap();
+            let changed_candidate = commit(&root);
+            let changed_request = assignment(&root, &parent, &changed_candidate);
+            let error = export_correspondence(
+                &root,
+                &changed_request,
+                "after",
+                &root.parent().unwrap().join("unused-virtue-output"),
+            )
+            .unwrap_err();
+            assert!(error.contains("source changed across transfer"), "{error}");
+        }
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(output).unwrap();
     }
 
     fn repo() -> PathBuf {
