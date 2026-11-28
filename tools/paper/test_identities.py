@@ -1137,8 +1137,8 @@ class Identities(unittest.TestCase):
         revision = compare_words.git(source, 'rev-parse', 'HEAD').decode().strip()
         shadow = ('documents/paper/parts/front.tex', 'sec:reading:shadow',
                   'units/statements/reading-shadow.toml')
-        intro = ('documents/paper/explainer/explainer.tex', 'sec:explainer:eight-words',
-                 'units/statements/explainer-eight-words.toml')
+        intro = ('documents/paper/parts/coda.tex', 'sec:coda:eight-words',
+                 'units/statements/coda-eight-words.toml')
         rows = {key: line for path, key, _, role, line in scope_fragments(source)
                 if role == 'paragraph' for selected in (shadow, intro)
                 if (path, key) == selected[:2]}
@@ -1157,31 +1157,30 @@ class Identities(unittest.TestCase):
                              ('source', 'source-blob', 'first', 'last', 'unit', 'unit-path')})
         assigned_path = self.root/'two-paragraph-assignment.json'
         assigned_path.write_text(json.dumps(assignment))
-        fragment = read(source/'generated/documents/explainer-pilot/sec-explainer-eight-words.tex')
+        fragment = read(source/'generated/documents/paper-pilot/sec-coda-eight-words.tex')
         body = fragment.split('}{', 1)[1].removesuffix('}\n')
         rendered, _, _ = compare_words.decode_paragraph(
-            body.split('\\papervirtue', 1)[0].rstrip(), bindings(source))
+            body.split('\\virtue', 1)[0].rstrip(), bindings(source))
 
-        def explainer(path, document, side, value):
-            if document != 'explainer':
+        def paper(path, document, side, value):
+            if document != 'paper':
                 return
-            value['stream'] = rendered + ' Companion text'
-            if side == 'after':
-                value['stream'] = value['stream'].replace('discipline', 'practice')
+            second = rendered if side == 'before' else rendered.replace(
+                'document', 'manual', 1)
+            value['stream'] += ' ' + second
             value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
         def unchanged(path, document, side, value):
-            if document != 'explainer':
-                return
-            value['stream'] = rendered + ' Companion text'
-            value['offsets'] = [[1, index] for index in range(len(value['stream']))]
+            if document == 'paper':
+                value['stream'] += ' ' + rendered
+                value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
         original = compare_words.selected_sources
         def plain_selection(*arguments, **options):
             old, new = original(*arguments, **options)
             if arguments[1].unit == intro[1]:
-                old = dict(old, body=old['body'].split(b'\\papervirtue', 1)[0].rstrip())
-                new = dict(new, body=new['body'].split(b'\\papervirtue', 1)[0].rstrip())
+                old = dict(old, body=old['body'].split(b'\\virtue', 1)[0].rstrip())
+                new = dict(new, body=new['body'].split(b'\\virtue', 1)[0].rstrip())
             return old, new
 
         with mock.patch.object(compare_words, 'selected_sources', side_effect=plain_selection), \
@@ -1195,50 +1194,50 @@ class Identities(unittest.TestCase):
         def changed_second(*arguments, **options):
             old, new = plain_selection(*arguments, **options)
             if arguments[1].unit == intro[1]:
-                new = dict(new, body=new['body'].replace(b'discipline', b'practice', 1),
+                new = dict(new, body=new['body'].replace(b'document', b'manual', 1),
                            blob_bytes=new['blob_bytes'].replace(
-                               b'discipline', b'practice', 1))
+                               b'document', b'manual', 1))
             return old, new
 
         with mock.patch.object(compare_words, 'selected_sources', side_effect=changed_second), \
                 mock.patch.object(compare_words, 'assigned_plain_scope',
                                   return_value={'verdict': 'scope-admissible'}):
-            exit_code, result = self.conversion_run(explainer, dict(assignment=assigned_path))
+            exit_code, result = self.conversion_run(paper, dict(assignment=assigned_path))
         self.assertEqual((exit_code, result['verdict']), (1, 'different'))
         self.assertEqual(result['coverage']['decoded_units'], [shadow[1], intro[1]])
         self.assertTrue(any(row.get('unit') == intro[1] and row['part'] == 'source/body'
                             for row in result['differences']))
         stream = next(row for row in result['differences'] if
-                      row.get('document') == 'explainer' and row['part'] == 'stream')
+                      row.get('document') == 'paper' and row['part'] == 'stream')
         self.assertEqual(stream['location']['after']['raw'][0][1],
-                         result['documents']['explainer']['after']['stream'].index('practice'))
+                         result['documents']['paper']['after']['stream'].index('manual'))
         with mock.patch.object(compare_words, 'selected_sources', side_effect=changed_second), \
                 mock.patch.object(compare_words, 'assigned_plain_scope', side_effect=
                                   compare_words.Fault('ComparisonIncomplete',
                                                       'complete comparison is not equal',
                                                       'final')):
-            exit_code, result = self.conversion_run(explainer, dict(assignment=assigned_path))
+            exit_code, result = self.conversion_run(paper, dict(assignment=assigned_path))
         self.assertEqual((exit_code, result['verdict']), (1, 'different'))
         self.assertEqual(result['scope_admissibility']['faults'][0]['rule'], 'M082')
         self.assertEqual(result['scope_admissibility']['faults'][0]['code'],
                          'ComparisonIncomplete')
 
-    def test_single_explainer_paragraph_locates_changed_word(self):
+    def test_single_paper_paragraph_locates_changed_word(self):
         source = pathlib.Path(__file__).resolve().parents[2]
-        fragment = read(source/'generated/documents/explainer-pilot/sec-explainer-eight-words.tex')
+        fragment = read(source/'generated/documents/paper-pilot/sec-coda-eight-words.tex')
         body = fragment.split('}{', 1)[1].removesuffix('}\n')
         rendered, _, _ = compare_words.decode_paragraph(
-            body.split('\\papervirtue', 1)[0].rstrip(), bindings(source))
+            body.split('\\virtue', 1)[0].rstrip(), bindings(source))
 
         def changed(path, document, side, value):
-            if document == 'explainer':
+            if document == 'paper':
                 value['stream'] = rendered + ' Companion text'
                 if side == 'after':
-                    value['stream'] = value['stream'].replace('discipline', 'practice')
+                    value['stream'] = value['stream'].replace('document', 'manual')
                 value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
         def unchanged(path, document, side, value):
-            if document == 'explainer':
+            if document == 'paper':
                 value['stream'] = rendered + ' Companion text'
                 value['offsets'] = [[1, index] for index in range(len(value['stream']))]
 
@@ -1246,27 +1245,50 @@ class Identities(unittest.TestCase):
 
         def changed_source(*arguments, **options):
             old, new = original(*arguments, **options)
-            old = dict(old, body=old['body'].split(b'\\papervirtue', 1)[0].rstrip())
-            new = dict(new, body=new['body'].split(b'\\papervirtue', 1)[0].rstrip())
-            new = dict(new, body=new['body'].replace(b'discipline', b'practice', 1),
+            old = dict(old, body=old['body'].split(b'\\virtue', 1)[0].rstrip())
+            new = dict(new, body=new['body'].split(b'\\virtue', 1)[0].rstrip())
+            new = dict(new, body=new['body'].replace(b'document', b'manual', 1),
                        blob_bytes=new['blob_bytes'].replace(
-                           b'discipline', b'practice', 1))
+                           b'document', b'manual', 1))
             return old, new
 
         with mock.patch.object(compare_words, 'selected_sources',
                                side_effect=changed_source):
             exit_code, record = self.conversion_run(changed, dict(
-                unit='sec:explainer:eight-words', before_revision='HEAD'))
+                unit='sec:coda:eight-words', before_revision='HEAD'))
         self.assertEqual((exit_code, record['verdict']), (1, 'different'))
         self.assertTrue(any(row['part'] == 'stream' and
-                            row['document'] == 'explainer'
+                            row['document'] == 'paper'
                             for row in record['differences']))
         with mock.patch.object(compare_words, 'selected_sources',
                                side_effect=changed_source):
             exit_code, record = self.conversion_run(unchanged, dict(
-                unit='sec:explainer:eight-words', before_revision='HEAD'))
+                unit='sec:coda:eight-words', before_revision='HEAD'))
         self.assertEqual((exit_code, record['verdict']), (2, 'refused'))
         self.assertEqual(record['faults'][0]['code'], 'CorrespondenceInvalid')
+
+    def test_nested_explainer_paragraph_keeps_virtue_words(self):
+        source = pathlib.Path(__file__).resolve().parents[2]
+        fragment = read(source/'generated/documents/explainer-pilot/sec-explainer-two-feet.tex')
+        line, = (line for line in fragment.splitlines() if line.startswith(
+            r'\PaperNativeParagraph{sec:explainer:eight-words}{'))
+        body = line.split('}{', 1)[1].removesuffix('}')
+        words = ('wonder', 'beauty', 'goodness', 'kindness', 'love', 'wisdom',
+                 'truth', 'health')
+        virtues = {word: {'key': 'v:' + word, 'target': '#virtue-' + word}
+                   for word in words}
+        path = 'generated/documents/explainer-pilot/sec-explainer-two-feet.tex'
+        original = compare_words.decode_located(body, bindings(source), path=path,
+                                                virtues=virtues)
+        self.assertEqual([row['word'] for row in original['virtues']], list(words))
+        changed = body.replace(r'\papervirtue{wonder}', r'\papervirtue{wisdom}', 1)
+        changed_record = compare_words.decode_located(changed, bindings(source), path=path,
+                                                      virtues=virtues)
+        self.assertNotEqual(original['extracted'], changed_record['extracted'])
+        missing = body.replace(r'\papervirtue{wonder}', 'wonder', 1)
+        missing_record = compare_words.decode_located(missing, bindings(source), path=path,
+                                                      virtues=virtues)
+        self.assertNotEqual(original['virtues'], missing_record['virtues'])
 
     def test_two_authored_paragraphs_in_one_source(self):
         source = 'documents/paper/parts/plain.tex'

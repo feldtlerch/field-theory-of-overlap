@@ -73,7 +73,7 @@
       "position": 19
     },
     {
-      "after-unit": "sec:explainer:eight-words",
+      "after-unit": "sec:explainer:two-feet",
       "before-unit": "sec:explainer:log::paragraph:1",
       "document": "explainer-pilot",
       "language": "en",
@@ -86,7 +86,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: intervening material is omitted from this excerpt.",
-      "position": 22
+      "position": 25
     },
     {
       "after-unit": null,
@@ -94,7 +94,7 @@
       "document": "explainer-pilot",
       "language": "en",
       "message": "Not yet converted: later material is omitted from this excerpt.",
-      "position": 23
+      "position": 26
     },
     {
       "after-unit": "sec:reading:shadow",

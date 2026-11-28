@@ -42,8 +42,8 @@ unit = "sec:explainer:log"
 role = "corpus-slot"
 
 [[scope.occurrences]]
-unit = "sec:explainer:eight-words"
-role = "paragraph"
+unit = "sec:explainer:two-feet"
+role = "corpus-slot"
 
 [[scope.occurrences]]
 unit = "sec:coda:record-limit"

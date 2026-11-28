@@ -14,8 +14,8 @@ Each member is an occurrence of its class. Inline forms and objects may be neste
 |---|---:|---:|---:|---|---|
 | inline mathematics | 1 / 1031 | 0 / 6 | 1 / 1037 | subset | Compared inherited symbols and observed HTML expressions cover selected contexts; `dec:notation:compared-inherited-native-support`, `rec:adr:042-html-mathematics`. |
 | tag or handle references | 4 / 651 | 0 / 138 | 4 / 789 | subset | Checked paper tag runs and visible handles cover selected targets; `dec:documents:paper-tagged-paragraphs`, `rec:adr:048-reference-forms`. |
-| paragraphs | 7 / 238 | 13 / 76 | 20 / 314 | subset | Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`. |
-| headings | 0 / 149 | 6 / 14 | 6 / 163 | subset | Unnumbered explainer section headings in corpus slots; `dec:documents:bounded-corpus-slot`. |
+| paragraphs | 7 / 238 | 15 / 76 | 22 / 314 | subset | Tagged paragraph units and bounded corpus slots; `dec:documents:paper-tagged-paragraphs`, `dec:documents:bounded-corpus-slot`, `dec:documents:source-bounded-paragraph-slots`. |
+| headings | 0 / 149 | 7 / 14 | 7 / 163 | subset | Unnumbered explainer section headings in corpus slots; `dec:documents:bounded-corpus-slot`. |
 | displayed equations | 0 / 141 | 1 / 1 | 1 / 142 | subset | The explainer's admitted equation unit covers one display form; M055 and `dec:documents:markdown-display-spacing`. |
 | cross-references | 1 / 117 | 0 / 13 | 1 / 130 | subset | Checked see references and visible handles cover selected targets; `rec:adr:048-reference-forms`. |
 | bibliography citations | 2 / 74 | 0 / 0 | 2 / 74 | subset | Verified parenthetical citations in native paragraphs and the economics box; `dec:documents:paper-tagged-paragraphs`, `dec:documents:native-econ`. |
@@ -89,10 +89,10 @@ A capability unlock counts an authored explainer paragraph whose only missing de
 | Document | Paragraph members | Native | Using only admitted forms | Authored using only admitted forms |
 |---|---:|---:|---:|---:|
 | paper | 238 | 7 | 12 | 12 |
-| explainer | 76 | 13 | 51 | 39 |
-| all | 314 | 20 | 63 | 51 |
+| explainer | 76 | 15 | 51 | 37 |
+| all | 314 | 22 | 63 | 49 |
 
-Of the 39 authored explainer paragraphs using only admitted forms, 39 lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). This retained snapshot lists explainer intervals; the importer source report enumerates all 12 body files.
+Of the 37 authored explainer paragraphs using only admitted forms, 37 lie wholly within admissible intervals from the [importer's dry run](../adr/053-whole-corpus-import.md). This retained snapshot lists explainer intervals; the importer source report enumerates all 12 body files.
 
 ## Importer blocks and refusals
 
@@ -105,9 +105,9 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 | economics-box | 0 | 33 |
 | epistemology-box | 0 | 1 |
 | existing-native-inclusion | 26 | 0 |
-| heading | 152 | 2 |
+| heading | 151 | 2 |
 | list | 0 | 2 |
-| paragraph | 106 | 232 |
+| paragraph | 104 | 232 |
 | refusal | 0 | 12 |
 | statement-box | 0 | 20 |
 | table | 0 | 33 |
@@ -185,15 +185,15 @@ The importer owns block splitting and diagnostic refusal counts. Its counts belo
 | 737–737 | `documents/paper/explainer/explainer.tex:739 List Unresolved` |
 | 749–764 | `documents/paper/explainer/explainer.tex:766 Paragraph Unresolved` |
 | 778–809 | `documents/paper/explainer/explainer.tex:810 Paragraph Unresolved` |
-| 818–848 | `documents/paper/explainer/explainer.tex:849 ExistingNativeInclusion Decoded` |
+| 820–824 | `documents/paper/explainer/explainer.tex:826 ExistingNativeInclusion Decoded` |
 
 ## Coverage by reader words
 
 | Document | Native words / all | Word share |
 |---|---:|---:|
 | paper | 710 / 28919 | 2.46% |
-| explainer | 1326 / 8601 | 15.42% |
-| all | 2036 / 37520 | 5.43% |
+| explainer | 1582 / 8601 | 18.39% |
+| all | 2292 / 37520 | 6.11% |
 
 ## Per-file detail
 
@@ -213,9 +213,9 @@ Word tokens count literal headings, captions, table cells and prose; they exclud
 | paper | [`documents/paper/parts/coda.tex`](../../documents/paper/parts/coda.tex) | 463 / 992 | 46.67% | `f32fad8baa9a806cb745c984509a53ebdad356f0` |
 | paper | [`documents/paper/parts/appendices.tex`](../../documents/paper/parts/appendices.tex) | 36 / 4476 | 0.80% | `6f5d0d158aa6316f511be9353162e911739fc3f5` |
 | paper | Total | 710 / 28919 | 2.46% | — |
-| explainer | [`documents/paper/explainer/explainer.tex`](../../documents/paper/explainer/explainer.tex) | 1326 / 8601 | 15.42% | `1828fc0c4534a63ae370734f1f333e29f756dbe0` |
-| explainer | Total | 1326 / 8601 | 15.42% | — |
-| all | Total | 2036 / 37520 | 5.43% | — |
+| explainer | [`documents/paper/explainer/explainer.tex`](../../documents/paper/explainer/explainer.tex) | 1582 / 8601 | 18.39% | `cb7bf6f0e10479c6abe362967021f166a24ab6e1` |
+| explainer | Total | 1582 / 8601 | 18.39% | — |
+| all | Total | 2292 / 37520 | 6.11% | — |
 
 ## Limits and regeneration
 
@@ -229,17 +229,17 @@ Input identities are Git blob IDs of the measured bytes. The importer source-lis
 |---|---|
 | `documents/paper/main.tex` | `06bf235acb58b61df74058a8411e6b64a84d2bed` |
 | `documents/paper-build/sources.tsv` | `03eb4406b96f3f730b7b4113b9306983b2e88ad3` |
-| `generated/documents/inclusions.tsv` | `5b4014b9f85e756eb18647444436814181d7ec0d` |
+| `generated/documents/inclusions.tsv` | `7ebc027a88fec3b283d5c0e0c7ac3b9b0742aa22` |
 | `tools/paper/native_coverage_capabilities.tsv` | `ef49751a3894cc755ffe851343d432a31fc57e14` |
-| `tools/paper/native_coverage_slot_census.json` | `590ec0ea7c32f2de70cc0fa54633e92680dd9c45` |
+| `tools/paper/native_coverage_slot_census.json` | `7410a6afcaad1e0c7b643606e1c5fb1cd1fc93b3` |
 | `generated/documents/explainer-pilot/eq-explainer-overlap-flow.tex` | `b85e6aad8526aac08e02ea0bcf591bedf9fc060e` |
 | `generated/documents/explainer-pilot/sec-coda-record-limit.tex` | `a65badd079a35732942e07e0142456f85c0b96f3` |
 | `generated/documents/explainer-pilot/sec-explainer-accountability.tex` | `288faebf96c340e284e83cb1a248ca936cb0024f` |
 | `generated/documents/explainer-pilot/sec-explainer-edge.tex` | `18d7a7134f02fdd2652e5db12039e29e11a10f8b` |
-| `generated/documents/explainer-pilot/sec-explainer-eight-words.tex` | `209d37c06c43da9a06c305d41b9bca1bf288e830` |
 | `generated/documents/explainer-pilot/sec-explainer-falsifier.tex` | `599a6582f99a47566b551db244fab78d80820ff4` |
 | `generated/documents/explainer-pilot/sec-explainer-log.tex` | `be7307dda2247ed163c7badb33ae783098eb25a3` |
 | `generated/documents/explainer-pilot/sec-explainer-plain.tex` | `dbc811c11427ce161a883be934582a4ed7473b09` |
+| `generated/documents/explainer-pilot/sec-explainer-two-feet.tex` | `73c37637360a11a5ca8720d71c91d856bd6fcf66` |
 | `generated/documents/explainer-pilot/sec-explainer-verdicts-lives.tex` | `c200aa0f4b1936e0ffdda035ef6a4bef1a5233d5` |
 | `generated/documents/explainer-pilot/sec-say-direction.tex` | `3c7f5590a578c5dcced2cebf2f856faff2f677df` |
 | `generated/documents/explainer-pilot/sec-say-enemy-to-none.tex` | `24799d78631c1e1fbb6bd57e83b5fa9b49d78995` |

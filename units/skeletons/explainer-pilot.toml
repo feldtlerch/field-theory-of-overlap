@@ -15,6 +15,6 @@ children = [
   { kind = "corpus-slot", unit = "sec:explainer:falsifier" },
   { kind = "corpus-slot", unit = "sec:explainer:verdicts-lives" },
   { kind = "corpus-slot", unit = "sec:explainer:log" },
-  { kind = "paragraph", unit = "sec:explainer:eight-words" },
+  { kind = "corpus-slot", unit = "sec:explainer:two-feet" },
   { kind = "quotation", unit = "sec:coda:record-limit" }
 ]

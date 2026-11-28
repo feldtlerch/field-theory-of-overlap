@@ -1,11 +1,11 @@
 {
   "schema": 2,
   "source": "documents/paper/explainer/explainer.tex",
-  "source_sha256": "a13cfa1b1cec0c7321b9dca3df0c7757f0f7300e46497d3f13cb8c9f61380659",
+  "source_sha256": "d3116268ac033bbf18f65130bffc1d8200dd1c9fd2f59d85097b993c3efc9607",
   "source_list_digest": "e3fa37f59b91c9d640737b309e7dcbd72e532fd29d998f6841b0ef117ea111fd",
-  "import_context_digest": "9d1ce7b7f074209c34c4f9222a922df770267b21b69a17be3ac89000ab1c5c2e",
+  "import_context_digest": "c47d6236dd9f831023b48fffea9cd21f8d074eb34b4d20ef2eebcf4d25b985cb",
   "source_digests": {
-    "documents/paper/explainer/explainer.tex": "a13cfa1b1cec0c7321b9dca3df0c7757f0f7300e46497d3f13cb8c9f61380659",
+    "documents/paper/explainer/explainer.tex": "d3116268ac033bbf18f65130bffc1d8200dd1c9fd2f59d85097b993c3efc9607",
     "documents/paper/parts/front.tex": "4e82d07b59e628ae9c0bcee3ab9a55bf9c74886b96ec8177cfe0ede02cfc81f1",
     "documents/paper/parts/partA.tex": "f5515e1b394b31f5f950589e27f6df47df218501ec33ebb6bc85532b12cb2a81",
     "documents/paper/parts/partB.tex": "302748c084e00aeb4365675664b954241c9775008313626355d34a7388cc7823",
@@ -30,7 +30,7 @@
           "refused": 0
         },
         "heading": {
-          "decoded": 8,
+          "decoded": 7,
           "refused": 0
         },
         "list": {
@@ -38,7 +38,7 @@
           "refused": 2
         },
         "paragraph": {
-          "decoded": 40,
+          "decoded": 38,
           "refused": 43
         },
         "refusal": {
@@ -619,7 +619,7 @@
       "first": 89,
       "last": 138,
       "stopping_condition": "documents/paper/explainer/explainer.tex:140 StatementBox Unresolved",
-      "unit": "sec:corpus:3b29483cd3a3b15038a7090f9b95ac3e7f9a263d79f7c7a3b297bce97063d62f"
+      "unit": "sec:corpus:e21f917e170042a90b701658d16803317f1b6a0b982c96ef659aa914bfbbed7a"
     },
     {
       "blocks": [
@@ -632,7 +632,7 @@
       "first": 145,
       "last": 147,
       "stopping_condition": "documents/paper/explainer/explainer.tex:149 Refusal Unresolved",
-      "unit": "sec:corpus:f518e18276c6292b6c77a11ca0b41ce5a61cd1c1d89acc9311bed2859ffb982f"
+      "unit": "sec:corpus:6801be34d94014711ff960b8e4e79c155cafbd0d5a0178a6512cb68e696a778d"
     },
     {
       "blocks": [
@@ -645,7 +645,7 @@
       "first": 224,
       "last": 224,
       "stopping_condition": "documents/paper/explainer/explainer.tex:226 Paragraph Unresolved",
-      "unit": "sec:corpus:e4fcaf54536a6bb968cc542c0631eff272afe84fbfe35852e2915c3db0162243"
+      "unit": "sec:corpus:808c89283b28f05402f6e2c5070021c9c2a2069a6a7cb0b519c3fc483d1eeeb3"
     },
     {
       "blocks": [
@@ -673,7 +673,7 @@
       "first": 232,
       "last": 256,
       "stopping_condition": "documents/paper/explainer/explainer.tex:258 ExistingNativeInclusion Decoded",
-      "unit": "sec:corpus:ce4e6500ad2f4e84862ed0e61bb437f6ec4a2f5e3b79dc88c69108e2badac0fd"
+      "unit": "sec:corpus:768df4780ec712e8137e5b0e7c2de036eb9b487ad9e2f428bcba9e2e63da01e9"
     },
     {
       "blocks": [
@@ -686,7 +686,7 @@
       "first": 282,
       "last": 283,
       "stopping_condition": "documents/paper/explainer/explainer.tex:285 StatementBox Unresolved",
-      "unit": "sec:corpus:a4938bb1d16ad6336ecc7591121bc5af7d238f229dd6ac5c557bd8e77355e53f"
+      "unit": "sec:corpus:8496a0f6fb52c29c4c4dcc183768edf0ea1b64cbb44f4af5c2e6e12154065abd"
     },
     {
       "blocks": [
@@ -704,7 +704,7 @@
       "first": 289,
       "last": 297,
       "stopping_condition": "documents/paper/explainer/explainer.tex:299 StatementBox Unresolved",
-      "unit": "sec:corpus:e0f8a5eb72116f5ab4c2e548b8ae08925e880290c124f4f72acd3cb01ac46352"
+      "unit": "sec:corpus:8cef16e0950b870d89825a4a912906b3c13697b163056d1babdab1f5e1f62d69"
     },
     {
       "blocks": [
@@ -717,7 +717,7 @@
       "first": 303,
       "last": 312,
       "stopping_condition": "documents/paper/explainer/explainer.tex:314 Paragraph Unresolved",
-      "unit": "sec:corpus:91a9f28cbd850597640e8caa7e90c68247d9a361c2a12d36e20dd12fdc063c20"
+      "unit": "sec:corpus:369d10cf18e43c260ab975f856b67ce2c70f220c63dd181c927eb9141d9a711a"
     },
     {
       "blocks": [
@@ -735,7 +735,7 @@
       "first": 340,
       "last": 347,
       "stopping_condition": "documents/paper/explainer/explainer.tex:349 ExistingNativeInclusion Decoded",
-      "unit": "sec:corpus:8476aa9fb4f150c00b829dd033b2950d0694c179e248c95a0cb9791bfb46c27e"
+      "unit": "sec:corpus:168fb595535817df484980355983c5afad03291a28f15ec21ca81ee905edbc1a"
     },
     {
       "blocks": [
@@ -753,7 +753,7 @@
       "first": 351,
       "last": 366,
       "stopping_condition": "documents/paper/explainer/explainer.tex:368 Paragraph Unresolved",
-      "unit": "sec:corpus:56422bcf3a38b90a8b271f49cced0414f6b601f60bb4d0e99d65ba3c07916e62"
+      "unit": "sec:corpus:e21fdb306f4b7189b62b57043a32da95ea91c5dd198fa21003f814e953bbbc20"
     },
     {
       "blocks": [
@@ -766,7 +766,7 @@
       "first": 374,
       "last": 374,
       "stopping_condition": "documents/paper/explainer/explainer.tex:376 StatementBox Unresolved",
-      "unit": "sec:corpus:0f159ab1f2cbe0913e682cce29977a7df2bcd07d97a6b526af7880eccdee9daa"
+      "unit": "sec:corpus:935ed2d8bb5634323c6b4d49cdaa5a987e9030903d4bd24fe76bf593822f9b8f"
     },
     {
       "blocks": [
@@ -784,7 +784,7 @@
       "first": 439,
       "last": 454,
       "stopping_condition": "documents/paper/explainer/explainer.tex:456 Paragraph Unresolved",
-      "unit": "sec:corpus:3f483129daf60acece380df82a68c3a38b5d29e777ac45dfdb84c373cb766a52"
+      "unit": "sec:corpus:e8d0f084e732bd97c2bd810595d4344741b8ba23e5e817161ee666cbb89662a9"
     },
     {
       "blocks": [
@@ -797,7 +797,7 @@
       "first": 492,
       "last": 497,
       "stopping_condition": "documents/paper/explainer/explainer.tex:499 Paragraph Unresolved",
-      "unit": "sec:corpus:0ad614f325e99616f2b29f94b8c183728f4c97e233ef72312e19e899adaa0acb"
+      "unit": "sec:corpus:bc42830ca6e38ec193586acac66421295cde68ce781b4ab850125fe250e3b1bc"
     },
     {
       "blocks": [
@@ -810,7 +810,7 @@
       "first": 599,
       "last": 605,
       "stopping_condition": "documents/paper/explainer/explainer.tex:607 ExistingNativeInclusion Decoded",
-      "unit": "sec:corpus:bbdf65e92557878a735ab3afaf9ca03b75932b0a81918a1ec310c1710e5ff8c4"
+      "unit": "sec:corpus:8def5490d6adbe861986d016022c6b4e9aadc2bc4c3c87d67e86ec77566699df"
     },
     {
       "blocks": [
@@ -823,7 +823,7 @@
       "first": 609,
       "last": 615,
       "stopping_condition": "documents/paper/explainer/explainer.tex:617 Paragraph Unresolved",
-      "unit": "sec:corpus:c83c9e583c3e4ffc76d52ddbe00f3979acdc2f148404a5c003c58a72d1d24332"
+      "unit": "sec:corpus:f09778e737bc3be354d2c31a514d9c624bba172b617d9ec24de84c3bd07ac05f"
     },
     {
       "blocks": [
@@ -841,7 +841,7 @@
       "first": 667,
       "last": 692,
       "stopping_condition": "documents/paper/explainer/explainer.tex:694 Paragraph Unresolved",
-      "unit": "sec:corpus:87a63148ee785326ac126c9ce4eb7dede6dcef6c0ea015ecf8a8cf4b71630213"
+      "unit": "sec:corpus:e28d94313707cea8dd057984e557ee071e97cc43edcf71cb0e5882bd4159ce0a"
     },
     {
       "blocks": [
@@ -854,7 +854,7 @@
       "first": 701,
       "last": 709,
       "stopping_condition": "documents/paper/explainer/explainer.tex:711 Paragraph Unresolved",
-      "unit": "sec:corpus:55fd29dccbe5b88965399051a597921bcca587046b4d8fa7a477808bbf44c790"
+      "unit": "sec:corpus:d1064c21a49b6a7d2670015e26d121dd84d7dde30ae908149d300caa26495b60"
     },
     {
       "blocks": [
@@ -867,7 +867,7 @@
       "first": 737,
       "last": 737,
       "stopping_condition": "documents/paper/explainer/explainer.tex:739 List Unresolved",
-      "unit": "sec:corpus:457adf1525e16924805ca5023027db62310e5261011e25029a785ff963107568"
+      "unit": "sec:corpus:1142116b3ee4efb9eaf4f79b22870c603648dd5a82fa61f915906e0ab4a91d29"
     },
     {
       "blocks": [
@@ -890,7 +890,7 @@
       "first": 749,
       "last": 764,
       "stopping_condition": "documents/paper/explainer/explainer.tex:766 Paragraph Unresolved",
-      "unit": "sec:corpus:0b0215ff924a8a4740315f7046b531d06ebc33dcc75c50cd389789a9b4122a75"
+      "unit": "sec:corpus:29dbc0b3eb1bb93ce4818a5edacb3c86a50a56ea58a0bd49eeaa0dd16609f527"
     },
     {
       "blocks": [
@@ -923,40 +923,20 @@
     {
       "blocks": [
         {
-          "first": 818,
-          "kind": "heading",
-          "last": 820
-        },
-        {
-          "first": 821,
+          "first": 820,
           "kind": "paragraph",
-          "last": 834
+          "last": 823
         },
         {
-          "first": 835,
+          "first": 824,
           "kind": "paragraph",
-          "last": 840
-        },
-        {
-          "first": 841,
-          "kind": "existing-native-inclusion",
-          "last": 842
-        },
-        {
-          "first": 843,
-          "kind": "paragraph",
-          "last": 846
-        },
-        {
-          "first": 847,
-          "kind": "paragraph",
-          "last": 848
+          "last": 824
         }
       ],
-      "first": 818,
-      "last": 848,
-      "stopping_condition": "documents/paper/explainer/explainer.tex:849 ExistingNativeInclusion Decoded",
-      "unit": "sec:explainer:two-feet"
+      "first": 820,
+      "last": 824,
+      "stopping_condition": "documents/paper/explainer/explainer.tex:826 ExistingNativeInclusion Decoded",
+      "unit": "sec:corpus:8d2cac823fef5fb072691b05d45fb4308d9c30b7fdc93f50eff33a2ac932c88e"
     }
   ]
 }

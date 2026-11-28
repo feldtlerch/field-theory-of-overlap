@@ -261,54 +261,15 @@ fn support_required_nested_existing_paragraph_recovers_all_renderings()
     }
     let path = root.join("documents/paper/explainer/explainer.tex");
     let original = fs::read_to_string(&path)?;
-    let first = original
-        .find(r"\section{The Two Feet, and the Ground}")
-        .unwrap();
-    let marker = "% generated: sec:explainer:eight-words\n";
-    let last = original[first..].find(marker).unwrap() + first + marker.len();
+    let marker = "% generated: sec:explainer:two-feet\n";
+    assert_eq!(original.matches(marker).count(), 1);
+    let first = original.find(marker).unwrap();
     let first_line = original[..first]
         .bytes()
         .filter(|byte| *byte == b'\n')
         .count()
         + 1;
-    let last_line = original[..last]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count();
-    fs::write(
-        &path,
-        format!(
-            "{}% generated: sec:explainer:two-feet\n{}",
-            &original[..first],
-            &original[last..]
-        ),
-    )?;
-    fs::copy(
-        source.join("units/fixtures/explainer-two-feet.toml"),
-        root.join("units/corpus/explainer-two-feet.toml"),
-    )?;
-    let path = root.join("units/scopes/explainer.toml");
-    let original = fs::read_to_string(&path)?;
-    let old = "unit = \"sec:explainer:eight-words\"\nrole = \"paragraph\"";
-    assert_eq!(original.matches(old).count(), 1);
-    fs::write(
-        &path,
-        original.replace(
-            old,
-            "unit = \"sec:explainer:two-feet\"\nrole = \"corpus-slot\"",
-        ),
-    )?;
-    let path = root.join("units/skeletons/explainer-pilot.toml");
-    let original = fs::read_to_string(&path)?;
-    let old = "{ kind = \"paragraph\", unit = \"sec:explainer:eight-words\" }";
-    assert_eq!(original.matches(old).count(), 1);
-    fs::write(
-        &path,
-        original.replace(
-            old,
-            "{ kind = \"corpus-slot\", unit = \"sec:explainer:two-feet\" }",
-        ),
-    )?;
+    let last_line = first_line;
     let support = NativeSupport::from_environment(root).map_err(|error| format!("{error:?}"))?;
     let prepared = generate_documents(root, &support)?;
     let artifact = |path: &str| {
