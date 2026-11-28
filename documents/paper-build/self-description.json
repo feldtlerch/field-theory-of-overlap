@@ -25,8 +25,8 @@
     {
       "id": 3,
       "file": "documents/paper/parts/partA.tex",
-      "start": 9930,
-      "end": 9963,
+      "start": 9882,
+      "end": 9915,
       "sha256": "3a9c3b780dd766bf80e1f1e6552591513f9bba903c0a4eb742c1493c009d7bc2",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "spend set: the compiler's column)"
@@ -43,8 +43,8 @@
     {
       "id": 5,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 24687,
-      "end": 24709,
+      "start": 24467,
+      "end": 24489,
       "sha256": "145a2e13eca53116c1249de6353385709663d2a30f2c8ab85b30f3410e4a4d52",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "Registers, generated &"
@@ -52,8 +52,8 @@
     {
       "id": 6,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 24795,
-      "end": 24874,
+      "start": 24575,
+      "end": 24654,
       "sha256": "44385627ac903443a9d4973d1ddd43125e5db0f55730bc17c43b7dfaa9638b83",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "projections of the one registry: constants, rulings, branch prices, identities,"
@@ -61,8 +61,8 @@
     {
       "id": 7,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 43254,
-      "end": 43564,
+      "start": 43034,
+      "end": 43344,
       "sha256": "88aa1815fa133ae6db78c2691da53d260caab4106bd561dcc90f76ba19acbd3d",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "The dimensioned constants the framework posts, one per scalarization --- none a fact, each a"
@@ -70,8 +70,8 @@
     {
       "id": 8,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 44022,
-      "end": 44102,
+      "start": 43802,
+      "end": 43882,
       "sha256": "6e66ec5a74bc24705dca1f14cecd27ac3502cbe07719e456e819c34f61e6822e",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "The type-check keeps the price from passing as a measurement. The held weighting"
@@ -79,8 +79,8 @@
     {
       "id": 9,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 44374,
-      "end": 44684,
+      "start": 44154,
+      "end": 44464,
       "sha256": "9730be4ac76fa7cdc887bb06bf55da91da665f69290a0e5a5e7c2412cdcd9c4f",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "A type system that must decide must show its decisions; a checker that smuggles theses is"
@@ -88,8 +88,8 @@
     {
       "id": 10,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 44771,
-      "end": 47440,
+      "start": 44551,
+      "end": 47220,
       "sha256": "5dacd09748b77c3a064991c15f170beac2df2bb9ddd0a5ee1d4de0641053572a",
       "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
       "anchor": "What each mechanism certifies, and what it does not. This is an implementation"
@@ -97,8 +97,8 @@
     {
       "id": 11,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 52899,
-      "end": 53015,
+      "start": 52679,
+      "end": 52795,
       "sha256": "419852313cd855d5b9826068fe12bc90edede847b23c21a950a9cbc697b94b02",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the visible-label index & discharged: the index of the tag namespace, in the back"
@@ -106,8 +106,8 @@
     {
       "id": 12,
       "file": "documents/paper/parts/appendices.tex",
-      "start": 53041,
-      "end": 53129,
+      "start": 52821,
+      "end": 52909,
       "sha256": "0db377c46a43d44545b9320a97b5b8b06233ba7639c2337ba6d63abf55ecea14",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "the companion explainer & open: its claims await re-scoping to the paper's"
@@ -115,8 +115,8 @@
     {
       "id": 13,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 9988,
-      "end": 10314,
+      "start": 6082,
+      "end": 6408,
       "sha256": "284d376bca3767ddf1fc44fb4515b26d883f65f9bcc8e1604888cf0b6f9e5900",
       "reading_acceptance": "Accepted text is the text identified by this SHA256.",
       "anchor": "takes its own medicine here: every exchange rate it uses is declared on a public"
@@ -124,8 +124,8 @@
     {
       "id": 14,
       "file": "documents/paper/explainer/explainer.tex",
-      "start": 53180,
-      "end": 55993,
+      "start": 46232,
+      "end": 49045,
       "sha256": "d7dc4a49e621fd741b74a948a9c9e138d277f8448193849c5fbaf35db8965ce2",
       "reading_acceptance": "The project's owner approved this wording of the paper's description of its checking; this SHA256 identifies the renewed passage bytes; evidence: registry/paper-layout/self-description-wording-renewal.md.",
       "anchor": "\\section{The Paper and Its Checks}"
