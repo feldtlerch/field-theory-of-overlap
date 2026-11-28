@@ -3,8 +3,8 @@
 
 Word tokens include literal headings, captions, table cells and body prose; they exclude comments,
 blank lines, preambles, command names and keys, math notation, reference and citation
-labels, and macro expansions. This source inventory differs from the PDF-extracted,
-source-corresponded stream compared by compare_words.py. `paper import-dry-run`
+labels, and macro expansions. This source inventory differs from PDF-extracted reader text;
+an optional word report can display differences but does not decide acceptance. `paper import-dry-run`
 counts diagnostic draft blocks, including refusals, rather than admitted inclusions.
 Paragraphs are prose runs outside boxes, lists, tables, abstracts and displays; their
 forms are literal math, command, typography and adjacent-structure spellings. Forms

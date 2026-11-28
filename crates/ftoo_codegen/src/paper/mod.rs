@@ -186,7 +186,6 @@ fn command_output(command: &mut Command) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 fn inputs(root: &Path, support_work: Option<(&Path, &Path)>) -> Result<Value> {
-    check_reading_acceptance(root)?;
     let mut command = Command::new("python3");
     command
         .args(["-B", "tools/paper/inputs.py"])
@@ -835,9 +834,6 @@ pub fn run(args: &[OsString]) -> Result<()> {
         release::inputs(&req.root)?;
     }
     if req.release || built {
-        if !req.release {
-            check_reading_acceptance(&req.root)?;
-        }
         if req.release {
             release::part("registry", registry::check(&req.root))?;
         } else {
@@ -861,7 +857,9 @@ pub fn run(args: &[OsString]) -> Result<()> {
         }
         let built = PathBuf::from(built);
         let receipt = check_built(&built)?;
-        return if req.release {
+        return if req.registered_html_gaps {
+            release::check_current(&req.root, &built, &receipt)
+        } else if req.release {
             release::check(&req.root, &built, &receipt)
         } else {
             compare(&req.root, &built, &receipt)

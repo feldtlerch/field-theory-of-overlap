@@ -40,10 +40,7 @@ def assertion(args):
     record = json.loads(pathlib.Path(args.input).read_text())
     names = {row['fixture'] for row in record['fixtures']}
     expected = {'leak-control', 'shipped', 'copies', 'math', 'locator', 'layout-sites',
-                'concordance', 'concordance-differs', 'missing',
-                'conversion-companion', 'conversion-parent', 'conversion-parent-hyphen',
-                'conversion-native', 'conversion-changed',
-                'conversion-reflow', 'conversion-reflow-hyphen', 'line-end-marks'}
+                'concordance', 'concordance-differs', 'missing'}
     passed = record['status'] == 0 and names == expected
     write(pathlib.Path(args.output), {'verdict': 'pass' if passed else 'refusal',
           'reason': '' if passed else 'T40 identity fixtures incomplete or failed'})

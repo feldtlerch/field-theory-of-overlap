@@ -547,8 +547,8 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
         M016, M017, M018, M019, M020, M021, M022, M023, M024, M025, M026, M027, M028, M029, M030,
         M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042, M043, M044, M045,
         M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056, M057, M058, M059, M060,
-        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M077,
-        M078, M079, M082, M083,
+        M061, M062, M063, M064, M065, M066, M067, M068, M069, M070, M071, M072, M073, M074, M078,
+        M079,
     };
     assert_eq!(
         RULES.map(|rule| rule.number),
@@ -558,7 +558,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             M029, M030, M031, M032, M033, M034, M035, M036, M037, M038, M039, M040, M041, M042,
             M043, M044, M045, M046, M047, M048, M049, M050, M051, M052, M053, M054, M055, M056,
             M057, M058, M059, M060, M061, M062, M063, M064, M065, M066, M067, M068, M069, M070,
-            M071, M072, M073, M074, M077, M078, M079, M082, M083
+            M071, M072, M073, M074, M078, M079
         ]
     );
     for rule in RULES {
@@ -569,7 +569,7 @@ fn register_has_exact_m6a_allocation_and_deferral_reasons() -> TestResult {
             | M002 | M003 | M004 | M012 | M037 | M038 | M039 | M040 | M041 | M042 | M043 | M044
             | M045 | M046 | M047 | M048 | M050 | M051 | M052 | M053 | M054 | M055 | M056 | M057
             | M058 | M059 | M060 | M061 | M062 | M063 | M064 | M065 | M067 | M068 | M069 | M070
-            | M071 | M073 | M074 | M077 | M078 | M079 | M082 | M083 => RuleState::Enforced,
+            | M071 | M073 | M074 | M078 | M079 => RuleState::Enforced,
             M016 | M017 | M018 | M019 => RuleState::DeferredM2,
             M029 => RuleState::DeferredExclusiveRoutes,
             M072 => RuleState::DeferredPaperUnits,
@@ -633,7 +633,7 @@ fn m024_adapter_support_is_not_engine_availability() -> TestResult {
 }
 #[test]
 fn register_pins_admission_statements_and_counts() {
-    assert_eq!(RULES.len(), 79);
+    assert_eq!(RULES.len(), 76);
     assert_eq!(
         (
             RULES[..44].len(),
@@ -713,7 +713,7 @@ fn register_pins_admission_statements_and_counts() {
             .iter()
             .filter(|r| r.state == RuleState::Enforced)
             .count(),
-        68
+        65
     );
     assert_eq!(
         RULES
@@ -1151,7 +1151,7 @@ fn corpus_inclusion_rule_literal() {
         .unwrap();
     assert_eq!(
         rule.statement,
-        "Each top-level excerpt occurrence is declared once in the one source scope record that names its paper source, with its document, unit and role; a second record for one source, a source outside the closed source list, an unknown document or role, or a repeated occurrence refuses, and the source holds exactly one marker line for each top-level recorded unit (M055). A corpus-slot occurrence owns ordered checked children; an existing native child use appears exactly once there, has no separate source marker within the replaced interval and must not also be declared as an independent top-level occurrence. A child use counts as an occurrence for the repeated-occurrence refusal. The econ role requires matching checked unit metadata and derives its owning skeleton position and inclusion from that same source scope record; no separate authored use or position is admitted. Excerpt skeleton uses are ordered by the closed source list (documents/paper-build/sources.tsv) and then by marker line, with corpus children in their checked order; document generation writes the two excerpt skeletons, and document checking refuses a committed excerpt skeleton whose uses differ before skeleton admission. Excerpt declarations remain authored and must equal the fixed excerpt template's required languages, targets and paper context, including its explicitly admitted corpus-slot mode. Document generation emits one inclusion list containing physical source slots only, checked byte for byte with the other generated documents; paper preparation consumes only that list and refuses a malformed row. A corpus-slot row has the distinct corpus-slot role and replaces one unique marker with the canonical body of its checked coarse unit; complete interval accounting, child order, existing-inclusion correspondence and prescribed row changes must be checked for its transfer. In the admitted corpus mode a result container and its children occupy one checked ordered slot; its header mint, checking boundaries and child uses are checked without admitting it as a paragraph fragment."
+        "Each top-level excerpt occurrence is declared once in the one source scope record that names its paper source, with its document, unit and role; a second record for one source, a source outside the closed source list, an unknown document or role, or a repeated occurrence refuses, and the source holds exactly one marker line for each top-level recorded unit (M055). A corpus-slot occurrence owns ordered checked children; an existing native child use appears exactly once there, has no separate source marker within the replaced interval and must not also be declared as an independent top-level occurrence. A child use counts as an occurrence for the repeated-occurrence refusal. The econ role requires matching checked unit metadata and derives its owning skeleton position and inclusion from that same source scope record; no separate authored use or position is admitted. Excerpt skeleton uses are ordered by the closed source list (documents/paper-build/sources.tsv) and then by marker line, with corpus children in their checked order; document generation writes the two excerpt skeletons, and document checking refuses a committed excerpt skeleton whose uses differ before skeleton admission. Excerpt declarations remain authored and must equal the fixed excerpt template's required languages, targets and paper context, including its explicitly admitted corpus-slot mode. Document generation emits one inclusion list containing physical source slots only, checked byte for byte with the other generated documents; paper preparation consumes only that list and refuses a malformed row. A corpus-slot row has the distinct corpus-slot role and replaces one unique marker with the canonical body of its checked coarse unit; current source accounting, child order and exactly-once existing inclusions are checked during generation. Parent-to-candidate interval and inclusion-row correspondence is not a retention requirement under ADR 061. In the admitted corpus mode a result container and its children occupy one checked ordered slot; its header mint, checking boundaries and child uses are checked without admitting it as a paragraph fragment."
     );
     assert_eq!(
         rule.scope,
@@ -1159,74 +1159,4 @@ fn corpus_inclusion_rule_literal() {
     );
     assert_eq!(rule.state, RuleState::Enforced);
     assert_eq!(rule.deferred_reason, None);
-}
-
-#[test]
-fn conversion_text_rule_literal() {
-    let rule = RULES
-        .iter()
-        .find(|rule| rule.number == RuleId::M077)
-        .unwrap();
-    assert_eq!(
-        rule.statement,
-        "Requested paper-pair comparisons read captured PDFs in full through the recorded extractor, retain every raw page and classify every character under the stated profile and normalization rules. They compare complete canonical document streams and ordered bookmark titles and corroborate every declared selected occurrence with each side's captured source of that occurrence at its checked inclusion place. The corpus-slot route admits source paragraph bodies and heading-led prose tails under M055, optionally preceded by the admitted unnumbered explainer section heading, and unchanged existing native paragraph uses as one selected occurrence; every child's correspondence is checked independently on each side within the uniquely matched complete sequence. The slot's own paragraph runs are decoded text, strong and emphasis and named en-space intent; any other run refuses the selected occurrence. Admit a checked result container only with children of kinds already admitted for selected occurrences; compare its printed kind, number, title, key and grade as header tokens, and account for and compare each side's events and every child independently. Other requests retain the declared-paragraph grammar. Only verified folios, whitespace, the listed presentation ligatures and source-decided line-end interpretation change extracted text. For a selected result whose extractor order differs from uniquely established visual line order, source-bound glyph rectangles may reorder that selected occurrence for header-and-child correspondence only when every character in its bounded region is accounted for; the complete extracted document stream remains in recorded order. Line-end hyphens, en dashes, em dashes and slashes are retained as events before interpretation. An unchanged event may bypass interpretation only with an identical raw line, the same aligned token position and identical enclosing source bytes; an unidentified legacy interval may use the stricter unchanged-residual proof stated in ADR 043, never an offset-only match. Every other event requires unique source correspondence on each side independently; only a source-confirmed discretionary hyphen is removed, and authored marks and separators are retained. Complete comparison includes all text outside the corroborated selected occurrences. Checked bare paper tags retain the measured extracted small-cap spelling without general case folding, and correspondence refuses a mismatch; decoded paragraph text also compares their semantic spellings and targets. Literal papervirtue commands in the explainer contribute one checked virtue token, whose roster word is compared with extracted text and whose ordered command form, word, key and semantic target are compared between the captured source sides; unsupported arguments or a command in the wrong document refuse. This token does not establish face, link or first-use mode. Outside decoded paragraph text, case inside small capitals is compared as extracted, so a source case change there can compare equal. Invalid or changed inputs, unavailable or ambiguous extraction, unsupported profiles or syntax, invalid furniture, absent or ambiguous selected-occurrence correspondence and exceeded correspondence bounds refuse. Unequal canonical content or bookmark titles reports differences. A difference that holds without the unresolved events (bookmark titles, source/body, source/tags or source/virtues, or a document stream with no unresolved events) reports different. The witness decides only otherwise. If only unresolved line-end coverage prevents complete interpretation, deleting the four event marks and whitespace everywhere from both streams may prove different when the resulting witnesses are unequal; otherwise the verdict is refused. Unresolved events are retained as coverage and never authorize equal. Changed locators, reflow at other break points and moved floats remain stated coverage limits, not permission to erase content, and can report differences without changed words. Equality attests only these comparisons, not paragraph boundaries, mathematical structure, checking effects, appearance or acceptance."
-    );
-    assert_eq!(
-        rule.scope,
-        "Explicit complete-paper-and-explainer comparison requests using the A4 plain-folio profile, one or more declared plain paragraphs with checked bare paper tags, literal papervirtue commands in the explainer and the bounded source-decided line-end grammar, or one bounded corpus slot with the kinds and own-source correspondence admitted by the corpus-slot record; complete raw and canonical streams, ordered bookmark titles, per-side captured source and unchanged-event/residual evidence. No automatic release or conversion acceptance, no derived-locator exclusion and no general legacy TeX decoder."
-    );
-    assert_eq!(rule.state, RuleState::Enforced);
-    assert_eq!(rule.deferred_reason, None);
-    let guide = include_str!("../../../tools/paper/README.md");
-    let section = guide
-        .split_once("`rule:paper:conversion-word-comparison`")
-        .unwrap()
-        .1
-        .trim_start();
-    let (statement, scoped) = section.split_once("\n\nScope: ").unwrap();
-    assert_eq!(statement, rule.statement);
-    assert_eq!(scoped.split_once("\n\n").unwrap().0, rule.scope);
-}
-
-#[test]
-fn assigned_plain_scope_rule_literal() {
-    let rule = RULES
-        .iter()
-        .find(|rule| rule.number == RuleId::M082)
-        .unwrap();
-    assert_eq!(
-        rule.statement,
-        "An assigned set of plain paragraphs is scope-admissible only when its single captured assignment binds the supplied immediate parent and candidate commits, names every selected parent source blob, unit and interval in one source file, and permits only the parent's fixed generated classes, including registry/screen-destination-gaps.json and registry/html-block-gaps.json only after both equal their canonical candidate-plan recomputation; the selected intervals do not overlap one another or a bound self-description passage, every changed path belongs to the assignment, a verified offset-only acceptance record or a prescribed generated class and is an ordinary file, all capability inputs are unchanged between parent and candidate, other captured inputs are unchanged, and the complete pair comparison is equal. Scope admissibility alone does not authorize retention; complementary generation, checking and release gates remain required."
-    );
-    assert_eq!(
-        rule.scope,
-        "One or more selected plain paragraphs from one declared source file in an explicit complete-paper-and-explainer comparison request with a captured assignment and supplied parent/candidate commits; no history-authentication or batch-retention claim."
-    );
-    assert_eq!(rule.state, RuleState::Enforced);
-}
-
-#[test]
-fn complete_plain_conversion_rule_literal() {
-    let rule = RULES
-        .iter()
-        .find(|rule| rule.number == RuleId::M083)
-        .unwrap();
-    assert_eq!(
-        rule.statement,
-        "A complete check of one assigned plain explainer paragraph requires M082 scope admission, exactly one new plain unit and its one structural occurrence, canonical parent and candidate documents including their screens, the parent's committed PDFs and receipt, a fresh candidate paper pair equal to its committed PDFs and receipt, and a complete M077 comparison. Checking captures are produced in this run from independently prepared inputs on each side, validated against those inputs and their outputs, and compared for unchanged outcomes. A missing, stale, unsupported or different proof refuses; this check does not itself retain a conversion or authorize release."
-    );
-    assert_eq!(
-        rule.scope,
-        "One assigned authored explainer paragraph replaced by one native plain paragraph in an immediate parent/candidate commit pair, through tools/paper/complete_gate.py run from the parent's checkout; no several-occurrence, theory-change or automatic-retention claim."
-    );
-    assert_eq!(rule.state, RuleState::Enforced);
-    let guide = include_str!("../../../tools/paper/README.md");
-    let section = guide
-        .split_once("`rule:paper:complete-plain-conversion`")
-        .unwrap()
-        .1
-        .trim_start();
-    let (statement, scoped) = section.split_once("\n\nScope: ").unwrap();
-    assert_eq!(statement, rule.statement);
-    assert_eq!(scoped.split_once("\n\n").unwrap().0, rule.scope);
 }

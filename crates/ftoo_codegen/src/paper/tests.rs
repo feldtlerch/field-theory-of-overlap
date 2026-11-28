@@ -201,6 +201,38 @@ fn reading_acceptance_locates_bytes_and_reports_complete_faults() {
 }
 
 #[test]
+fn pending_passage_acceptance_allows_production_inputs_but_refuses_release() {
+    let scratch = Scratch::new();
+    let root = &scratch.0;
+    fs::create_dir_all(root.join("documents/paper-build")).unwrap();
+    fs::create_dir_all(root.join("tools/paper")).unwrap();
+    fs::write(root.join("tools/paper/inputs.py"), b"print('{}')\n").unwrap();
+    fs::write(root.join("text.tex"), b"abcd").unwrap();
+    let record = json!({"passages": (1..=19).map(|id| json!({
+        "id": id,
+        "file": "text.tex",
+        "start": 0,
+        "end": 4,
+        "anchor": "ab",
+        "sha256": hex(&Sha256::digest(b"abcd")),
+        "reading_acceptance": if id == 7 { "" } else { "accepted" }
+    })).collect::<Vec<_>>()});
+    save(
+        &root.join("documents/paper-build/self-description.json"),
+        &record,
+    )
+    .unwrap();
+    assert_eq!(inputs(root, None).unwrap(), json!({}));
+    assert_eq!(
+        release::inputs(root),
+        Err(PaperFault::Release {
+            part: "self-description acceptance",
+            reason: PaperFault::ReadingAcceptance { passage: 7 }.to_string()
+        })
+    );
+}
+
+#[test]
 fn release_conjunction_refuses_each_failed_condition() {
     let scratch = Scratch::new();
     let root = scratch.0.join("repo");
@@ -262,6 +294,21 @@ fn release_conjunction_refuses_each_failed_condition() {
         save(&work.join("identity-ledger.json"), &ledger).unwrap();
         fs::write(work.join("paper.pdf"), b"abcd").unwrap();
     }
+    let mut pending = record.clone();
+    pending["passages"][6]["reading_acceptance"] = json!("");
+    save(
+        &root.join("documents/paper-build/self-description.json"),
+        &pending,
+    )
+    .unwrap();
+    release::check_current(&root, &work, &receipt).unwrap();
+    assert_eq!(
+        release::check(&root, &work, &receipt),
+        Err(PaperFault::Release {
+            part: "self-description acceptance",
+            reason: PaperFault::ReadingAcceptance { passage: 7 }.to_string()
+        })
+    );
 }
 
 struct Scratch(PathBuf);

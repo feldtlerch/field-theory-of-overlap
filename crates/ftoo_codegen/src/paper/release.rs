@@ -101,6 +101,10 @@ pub(super) fn inputs(root: &Path) -> Result<()> {
 
 pub(super) fn check(root: &Path, work: &Path, receipt: &Value) -> Result<()> {
     inputs(root)?;
+    check_current(root, work, receipt)
+}
+
+pub(super) fn check_current(root: &Path, work: &Path, receipt: &Value) -> Result<()> {
     part(
         "printed identities",
         (|| {
