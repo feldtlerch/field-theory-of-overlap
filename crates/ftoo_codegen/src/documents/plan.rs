@@ -1199,6 +1199,7 @@ fn slot_recovered_text(runs: &[Recovered]) -> Option<String> {
         match run {
             Recovered::Text(value) => text.push_str(value),
             Recovered::Styled { children, .. } => text.push_str(&slot_recovered_text(children)?),
+            Recovered::Virtue { word, .. } => text.push_str(word),
             _ => return None,
         }
     }

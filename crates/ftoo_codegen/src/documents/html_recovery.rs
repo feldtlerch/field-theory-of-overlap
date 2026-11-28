@@ -1674,6 +1674,41 @@ pub(super) fn check(
 fn slot_node_text(node: &Node) -> Option<String> {
     match node {
         Node::Text(value) => Some(value.clone()),
+        Node::Element {
+            name,
+            attributes,
+            children,
+        } if name == "a" && attributes.len() == 1 && attributes[0].0 == "href" => {
+            let [
+                Node::Element {
+                    name: strong,
+                    attributes: strong_attributes,
+                    children: strong_children,
+                },
+            ] = children.as_slice()
+            else {
+                return None;
+            };
+            let [
+                Node::Element {
+                    name: emphasis,
+                    attributes: emphasis_attributes,
+                    children: emphasis_children,
+                },
+            ] = strong_children.as_slice()
+            else {
+                return None;
+            };
+            let [Node::Text(word)] = emphasis_children.as_slice() else {
+                return None;
+            };
+            (strong == "strong"
+                && emphasis == "em"
+                && strong_attributes.is_empty()
+                && emphasis_attributes.is_empty()
+                && attributes[0].1 == format!("../paper-pilot/en.html#virtue-{word}"))
+            .then(|| word.clone())
+        }
         Node::Element { name, children, .. }
             if matches!(name.as_str(), "strong" | "em" | "p" | "h2") =>
         {
@@ -1835,5 +1870,41 @@ fn slot_html_start(
             return Err(mismatch(plan, "HTML corpus paragraph position"));
         }
         Ok(at)
+    }
+}
+
+#[cfg(test)]
+mod slot_text_tests {
+    use super::*;
+
+    fn element(name: &str, children: Vec<Node>) -> Node {
+        Node::Element {
+            name: name.into(),
+            attributes: Vec::new(),
+            children,
+        }
+    }
+
+    #[test]
+    fn only_virtue_shaped_links_contribute_slot_text() {
+        let word = Node::Text("wonder".into());
+        let virtue = Node::Element {
+            name: "a".into(),
+            attributes: vec![("href".into(), "../paper-pilot/en.html#virtue-wonder".into())],
+            children: vec![element("strong", vec![element("em", vec![word.clone()])])],
+        };
+        assert_eq!(slot_node_text(&virtue), Some("wonder".into()));
+        let wrong_target = Node::Element {
+            name: "a".into(),
+            attributes: vec![("href".into(), "../paper-pilot/en.html#virtue-beauty".into())],
+            children: vec![element("strong", vec![element("em", vec![word.clone()])])],
+        };
+        assert_eq!(slot_node_text(&wrong_target), None);
+        let other = Node::Element {
+            name: "a".into(),
+            attributes: vec![("href".into(), "#other".into())],
+            children: vec![word],
+        };
+        assert_eq!(slot_node_text(&other), None);
     }
 }

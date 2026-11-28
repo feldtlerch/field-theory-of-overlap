@@ -217,3 +217,169 @@ fn support_required_corpus_slot_renders_and_recovers_the_real_prefix()
     assert!(format!("{error:?}").contains(path));
     Ok(())
 }
+
+#[test]
+fn support_required_nested_existing_paragraph_recovers_all_renderings()
+-> Result<(), Box<dyn std::error::Error>> {
+    const CHILD: &str = "FTOO_NESTED_PARAGRAPH_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args([
+                "--exact",
+                "documents::tests::corpus::support_required_nested_existing_paragraph_recovers_all_renderings",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("test result: ok. 1 passed;"),
+            "child status: {:?}\n{}{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Ok(());
+    }
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixture = native_fixture();
+    let root = &fixture.directory.0;
+    for directory in [
+        "crates",
+        "docs",
+        "documents",
+        "generated",
+        "licenses",
+        "registry",
+        "tools",
+        "units",
+    ] {
+        copy_tree(&source.join(directory), &root.join(directory))?;
+    }
+    for file in ["Cargo.lock", "Cargo.toml", "README.md"] {
+        fs::copy(source.join(file), root.join(file))?;
+    }
+    let path = root.join("documents/paper/explainer/explainer.tex");
+    let original = fs::read_to_string(&path)?;
+    let first = original
+        .find(r"\section{The Two Feet, and the Ground}")
+        .unwrap();
+    let marker = "% generated: sec:explainer:eight-words\n";
+    let last = original[first..].find(marker).unwrap() + first + marker.len();
+    let first_line = original[..first]
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count()
+        + 1;
+    let last_line = original[..last]
+        .bytes()
+        .filter(|byte| *byte == b'\n')
+        .count();
+    fs::write(
+        &path,
+        format!(
+            "{}% generated: sec:explainer:two-feet\n{}",
+            &original[..first],
+            &original[last..]
+        ),
+    )?;
+    fs::copy(
+        source.join("units/fixtures/explainer-two-feet.toml"),
+        root.join("units/corpus/explainer-two-feet.toml"),
+    )?;
+    let path = root.join("units/scopes/explainer.toml");
+    let original = fs::read_to_string(&path)?;
+    let old = "unit = \"sec:explainer:eight-words\"\nrole = \"paragraph\"";
+    assert_eq!(original.matches(old).count(), 1);
+    fs::write(
+        &path,
+        original.replace(
+            old,
+            "unit = \"sec:explainer:two-feet\"\nrole = \"corpus-slot\"",
+        ),
+    )?;
+    let path = root.join("units/skeletons/explainer-pilot.toml");
+    let original = fs::read_to_string(&path)?;
+    let old = "{ kind = \"paragraph\", unit = \"sec:explainer:eight-words\" }";
+    assert_eq!(original.matches(old).count(), 1);
+    fs::write(
+        &path,
+        original.replace(
+            old,
+            "{ kind = \"corpus-slot\", unit = \"sec:explainer:two-feet\" }",
+        ),
+    )?;
+    let support = NativeSupport::from_environment(root).map_err(|error| format!("{error:?}"))?;
+    let prepared = generate_documents(root, &support)?;
+    let artifact = |path: &str| {
+        prepared
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.path() == path)
+            .unwrap()
+    };
+    let fragment = std::str::from_utf8(
+        artifact("generated/documents/explainer-pilot/sec-explainer-two-feet.tex").bytes(),
+    )?;
+    assert_eq!(
+        fragment
+            .matches(r"\PaperNativeParagraph{sec:explainer:eight-words}")
+            .count(),
+        1
+    );
+    let labelled =
+        std::str::from_utf8(artifact("generated/documents/explainer-pilot/en.labels.md").bytes())?;
+    assert_eq!(
+        labelled
+            .matches("<!-- unit sec:explainer:eight-words document explainer-pilot language en -->")
+            .count(),
+        1
+    );
+    let words = [
+        "wonder", "beauty", "goodness", "kindness", "love", "wisdom", "truth", "health",
+    ];
+    let plain = std::str::from_utf8(artifact("generated/documents/explainer-pilot/en.md").bytes())?;
+    let html =
+        std::str::from_utf8(artifact("generated/documents/explainer-pilot/en.html").bytes())?;
+    for word in words {
+        assert_eq!(
+            labelled
+                .matches(&format!("<!-- virtue v:{word} -->"))
+                .count(),
+            1
+        );
+        assert_eq!(plain.matches(&format!("virtue-{word}")).count(), 1);
+        assert_eq!(html.matches(&format!("virtue-{word}")).count(), 1);
+    }
+    let markdown_recovery = prepared
+        .corpus_slot_recovery_export(
+            "markdown",
+            "documents/paper/explainer/explainer.tex",
+            first_line,
+            last_line,
+            "sec:explainer:two-feet",
+        )
+        .unwrap();
+    let html_recovery = prepared
+        .corpus_slot_recovery_export(
+            "html",
+            "documents/paper/explainer/explainer.tex",
+            first_line,
+            last_line,
+            "sec:explainer:two-feet",
+        )
+        .unwrap();
+    assert_eq!(markdown_recovery["text"], html_recovery["text"]);
+    let recovered = markdown_recovery["text"].as_str().unwrap();
+    let tail = recovered
+        .split_once("eight welded words line up where they were earned:")
+        .unwrap()
+        .1;
+    let mut tokens = tail.split(|character: char| !character.is_alphabetic());
+    for word in words {
+        assert!(tokens.any(|token| token == word));
+    }
+    // The published artifacts also retain the checked inventory.
+    artifacts::verify(root, &prepared)?;
+    Ok(())
+}
